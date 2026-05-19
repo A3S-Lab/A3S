@@ -268,8 +268,8 @@ pub struct RemoteGitConflict {
 
 Tools that want to recover from `BRANCH_EXISTS` / `WORKING_TREE_DIRTY` /
 `NOTHING_TO_STASH` downcast `anyhow::Error::downcast_ref::<RemoteGitConflict>()`,
-the same pattern used by [`WorkspaceVersionConflict`](../sessions) on the
-S3 path.
+the same pattern `edit` / `patch` use for `WorkspaceVersionConflict` on
+S3 compare-and-swap writes.
 
 Error codes documented in the public schema (extensible):
 
@@ -395,7 +395,8 @@ Capability gating then registers the `git` tool automatically.
 ## 11. Per-Call Observability
 
 Every HTTP call emits a `tracing::debug!` event with the same field
-shape used by `S3WorkspaceBackend` (see [Telemetry](../telemetry)):
+shape `S3WorkspaceBackend` uses for its per-call metering (see
+`emit_s3_call_event` in `crates/code/core/src/workspace/s3.rs`):
 
 | Field         | Example                       |
 | ------------- | ----------------------------- |
