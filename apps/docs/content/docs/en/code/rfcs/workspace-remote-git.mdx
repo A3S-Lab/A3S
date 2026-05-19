@@ -5,12 +5,18 @@ description: "HTTP/JSON protocol for serving git operations to non-local workspa
 
 # RFC: Remote Workspace Git Backend
 
-| Field    | Value                                              |
-| -------- | -------------------------------------------------- |
-| Status   | **Draft** — not approved, not implemented          |
-| Owner    | `crates/code` workspace subsystem                  |
-| Tracks   | Phase 4.1 of S3 / non-local workspace hardening    |
-| Related  | `S3WorkspaceBackend`, `WorkspaceGit*` trait family |
+| Field    | Value                                                                  |
+| -------- | ---------------------------------------------------------------------- |
+| Status   | **Implemented** in v2.6.x (`crates/code/core/src/workspace/remote_git.rs`) |
+| Owner    | `crates/code` workspace subsystem                                       |
+| Tracks   | Phase 4.1 of S3 / non-local workspace hardening                         |
+| Related  | `S3WorkspaceBackend`, `WorkspaceGit*` trait family                      |
+
+This document is retained as the protocol specification — clients and
+servers speaking this surface should match the wire shapes defined
+below. Subsequent revisions should land as separate amendment documents
+rather than editing this one in place, so the "what was shipped" history
+stays auditable.
 
 This RFC proposes a protocol and a Rust client that let `a3s-code` run the
 built-in `git` tool against workspaces backed by something other than a local
@@ -497,24 +503,33 @@ These should be resolved before Phase 4.2 (implementation) starts.
 - **Hooks management.** Listing / configuring server-side hooks from the
   client.
 
-## 15. Implementation Plan (Phase 4.2 Sketch)
+## 15. Implementation Notes (shipped in v2.6.x)
 
-Assuming this RFC is accepted, Phase 4.2 lands in this order:
+The original draft sketched an 8-step implementation plan; what
+actually shipped (Phase 4.2 plus Phase 5.x follow-ups) is:
 
-1. Add `remote-git` cargo feature and `reqwest` is already in deps —
-   verify `rustls`/`native-tls` choice matches the rest of the crate.
-2. New module `crates/code/core/src/workspace/remote_git.rs` with
-   `RemoteGitBackend` + `RemoteGitBackendConfig` + `RemoteGitConflict`.
-3. Implement `WorkspaceGit` and `WorkspaceGitStashProvider`.
-4. Add `WorkspaceServices::with_remote_git` and (optional)
-   `s3_with_remote_git`.
-5. Unit tests: per-method request shape (using `wiremock`),
-   per-error-code conflict mapping, timeout / metering events.
-6. Integration test fixture: tiny `wiremock`-backed server that exercises
-   the full surface end-to-end through the `git` tool.
-7. README + `code/sessions.mdx` section: how to wire remote git;
-   trade-offs vs local.
-8. CHANGELOG entry.
-
-No SDK-binding exposure in Phase 4.2 — the Node and Python SDKs can land
-the remote git option in a follow-up once the trait is settled.
+1. `RemoteGitBackend` / `RemoteGitBackendConfig` / `RemoteGitConflict`
+   live in `crates/code/core/src/workspace/remote_git.rs`. No
+   `remote-git` feature was added — `reqwest` was already a hard
+   dependency for the LLM clients, so the module compiles
+   unconditionally.
+2. `WorkspaceGit` and `WorkspaceGitStashProvider` implemented in full.
+   `WorkspaceGitWorktreeProvider` deliberately omitted (see §8).
+3. `WorkspaceServices::with_remote_git` is the public attachment
+   point. The internal helper `with_git_provider` (added in v2.6.x
+   follow-up) handles the actual struct-literal copy so future fields
+   on `WorkspaceServices` cannot be silently dropped by the decorator.
+4. mTLS is supported in addition to bearer token (`client_cert_pem`
+   + `client_key_pem`), shipped in a Phase 5.2 follow-up that also
+   updated §6 above.
+5. `diff` is hardened against unbounded responses: HTTP body is
+   streamed with a hard cap of `max_diff_bytes * 4` (Phase 6.2). The
+   soft `max_diff_bytes` display truncation continues to apply
+   post-decode.
+6. Test surface: 25+ wiremock-backed unit tests in `remote_git.rs`,
+   one end-to-end test driving the `git` built-in tool through the
+   remote backend, plus the workspace-wide conformance suite added
+   in Phase 6.3.
+7. README and CHANGELOG updated; rustls-tls backend selected to match
+   the AWS SDK.
+8. SDK exposure landed in Phase 5.1 (Node + Python).

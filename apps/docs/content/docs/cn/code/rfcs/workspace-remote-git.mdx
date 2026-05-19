@@ -5,12 +5,16 @@ description: "为非本地 workspace 后端提供 git 操作的 HTTP/JSON 协议
 
 # RFC：远端 Workspace Git 后端
 
-| 字段     | 取值                                                |
-| -------- | --------------------------------------------------- |
-| 状态     | **草案** — 未批准、已实现（v2.6.x）                  |
-| 归属     | `crates/code` workspace 子系统                       |
-| 关联     | S3 / 非本地 workspace 加固 Phase 4.1                 |
-| 相关     | `S3WorkspaceBackend`、`WorkspaceGit*` trait 族       |
+| 字段     | 取值                                                                          |
+| -------- | ----------------------------------------------------------------------------- |
+| 状态     | **已实现** v2.6.x（`crates/code/core/src/workspace/remote_git.rs`）              |
+| 归属     | `crates/code` workspace 子系统                                                  |
+| 关联     | S3 / 非本地 workspace 加固 Phase 4.1                                            |
+| 相关     | `S3WorkspaceBackend`、`WorkspaceGit*` trait 族                                  |
+
+本文档作为协议规范保留——讲此协议的客户端与服务端应当严格匹配下方的
+线协议形态。后续修订应作为独立的 amendment 文档发布，而非原地修改这
+份 RFC，以便"实际 ship 出去的是什么"这条历史线索可审计。
 
 本 RFC 提出一套协议和 Rust 客户端，让 `a3s-code` 的内置 `git` 工具能够
 跑在非本地文件系统的 workspace 之上——首先服务 S3，将来覆盖容器 / DFS
@@ -467,24 +471,28 @@ let ws    = local.with_remote_git(remote_cfg);   // 覆盖本地的 git provider
   会让 gRPC 的判断重新被讨论。
 - **Hooks 管理。** 通过客户端列举 / 配置服务端 hook。
 
-## 15. 实现计划（Phase 4.2 提纲）
+## 15. 实现笔记（v2.6.x 已发布）
 
-假设本 RFC 通过，Phase 4.2 按以下顺序落地：
+最初草案给的是 8 步实施提纲；实际发布出去的（Phase 4.2 + 后续 Phase 5.x）如下：
 
-1. 加一个 `remote-git` cargo feature；`reqwest` 已经在依赖里——
-   核对 `rustls` / `native-tls` 选择与 crate 其他部分一致。
-2. 新模块 `crates/code/core/src/workspace/remote_git.rs`：
-   `RemoteGitBackend` + `RemoteGitBackendConfig` + `RemoteGitConflict`。
-3. 实现 `WorkspaceGit` 与 `WorkspaceGitStashProvider`。
-4. 加 `WorkspaceServices::with_remote_git` 与（可选）
-   `s3_with_remote_git`。
-5. 单元测试：每个方法的请求 shape（用 `wiremock`），各 error 码到
-   conflict 的映射，timeout / metering 事件。
-6. 集成测试 fixture：一个 `wiremock` 后端的小服务，端到端跑一遍
-   `git` 工具。
-7. README + `code/sessions.mdx` 新增一段：怎么接远端 git；与本地的
-   取舍。
-8. CHANGELOG 条目。
-
-Phase 4.2 不暴露 SDK 绑定——Node 与 Python SDK 在 trait 稳定之后用
-独立提交补上。
+1. `RemoteGitBackend` / `RemoteGitBackendConfig` / `RemoteGitConflict` 位于
+   `crates/code/core/src/workspace/remote_git.rs`。最终没有加
+   `remote-git` cargo feature——`reqwest` 已经在依赖里，模块无条件编译。
+2. `WorkspaceGit` 与 `WorkspaceGitStashProvider` 完整实现；
+   `WorkspaceGitWorktreeProvider` 故意不实现（见 §8）。
+3. `WorkspaceServices::with_remote_git` 是公开挂载点。内部 helper
+   `with_git_provider`（v2.6.x 一个后续提交里加上）用 struct literal
+   显式拷贝字段——确保 `WorkspaceServices` 未来加字段时装饰器不会静默丢失。
+4. 除 bearer token 外支持 mTLS（`client_cert_pem` + `client_key_pem`），
+   在 Phase 5.2 一次后续提交里 ship；同一个提交把上方 §6 也更新到了
+   已实现状态。
+5. `diff` 客户端侧防 OOM：HTTP body 流式累积，硬上限
+   `max_diff_bytes * 4`（Phase 6.2）。soft `max_diff_bytes` 显示截断
+   在 JSON decode 之后照旧生效。
+6. 测试面：`remote_git.rs` 里 25+ 个 wiremock 单元测试 + 1 个端到端
+   驱动内置 `git` 工具的集成测试；workspace 通用 conformance suite
+   在 Phase 6.3 加入。
+7. README 与 CHANGELOG 已更新；TLS 后端选择与 AWS SDK 一致用
+   rustls-tls。
+8. SDK 暴露在 Phase 5.1 完成（Node + Python）——草案曾说"trait 稳定之
+   后再补"，结果是 Phase 4.2 完成两个提交后就上了。
