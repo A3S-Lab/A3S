@@ -16,6 +16,8 @@ const session = agent.session('/repo', {
   builtinSkills: true,
   planningMode: 'enabled',
   goalTracking: true,
+  autoDelegation: { enabled: true, maxTasks: 4 },
+  autoParallel: false,
 });
 ```
 
@@ -92,7 +94,7 @@ if (latest) {
 
 `currentRun()` is for the operation that is current at the time of the call.
 During an active `send()` or `stream()`, pass its `id` to `cancelRun(id)` to
-request cancellation. When idle, v2.1.0 may return `null` or a retained run
+request cancellation. When idle, `currentRun()` may return `null` or a retained run
 snapshot depending on the preceding control flow, so use `runs()` for completed
 history and inspect `status` before treating a snapshot as cancellable:
 
@@ -105,7 +107,7 @@ if (current?.id && current.status === 'running') {
 
 ## Agent Definitions
 
-`sessionForAgent()` applies a named agent definition from built-in agents or configured `agentDirs`.
+`sessionForAgent()` applies a named agent definition from built-in agents, `.a3s/agents`, or configured `agentDirs`.
 
 ```ts
 const session = agent.sessionForAgent('/repo', 'explore', ['./agents'], {

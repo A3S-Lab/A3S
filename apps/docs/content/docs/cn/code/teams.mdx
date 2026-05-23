@@ -1,43 +1,93 @@
 ---
 title: "团队"
-description: "用 agent 定义和 task 工具构建团队"
+description: "用 agent 定义、task 工具和自动委派构建团队"
 ---
 
 # 团队
 
-团队现在是一种驾驭层模式：命名 agent 定义加上 `task` 与 `parallel_task`。
+团队是一种驾驭层模式：命名 agent 定义加上 `task` 与 `parallel_task` 委派核心。A3S Code 不再暴露单独的 team runner API；父 session 仍负责合成、策略和最终验证。
 
-v2.1.0 不再暴露旧公开 team API。推荐做法是把角色写成 agent 定义文件，用父 session 的 `agentDirs` 加载，然后让父 agent 通过 `task` 或 `parallel_task` 委派。
+## 推荐形态
+
+1. 把长期角色放在 `.a3s/agents`，或配置额外 `agentDirs`。
+2. 每个角色保持聚焦：description、prompt、allowed tools、denied tools。
+3. 需要运行时选择高置信 subagent 时启用 `autoDelegation`。
+4. 宿主已知 lane 时直接调用 `session.task(...)` 或 `session.tasks(...)`。
+5. 父 agent 合并子摘要、证据引用和风险。
 
 ```ts
 const session = agent.session('/repo', {
-  agentDirs: ['./agents'],
+  agentDirs: ['./.a3s/agents'],
   builtinSkills: true,
-  planningMode: 'enabled',
+  planningMode: 'auto',
+  autoDelegation: { enabled: true, maxTasks: 4 },
+  maxParallelTasks: 8,
+  autoParallel: false,
 });
 
 await session.send(`
-组织发布检查团队：
-- explorer: 找出高风险变更区域
-- tester: 找出缺失验证
-- security: 检查副作用路径
-使用 parallel_task，并合并成一份阻塞项优先的报告。
+Build a release-readiness team:
+- explorer: find risky changed areas
+- tester: identify missing verification
+- security: review side-effect paths
+
+Use independent subagents where useful and return a single prioritized report.
 `);
 ```
 
-如果宿主已经知道需要哪些 lane，也可以直接调用 `session.delegateTask(...)`
-或 `session.parallelTask(...)`。
+## 自定义 Agent 文件
+
+Markdown agent 文件使用 Claude 兼容 frontmatter，但 A3S 原生位置是 `.a3s/agents`：
+
+```markdown
+---
+name: release-reviewer
+description: Use proactively after release or CI changes
+tools: Read, Grep, Glob, Bash(cargo test*)
+disallowedTools:
+  - Write
+  - Bash(git push*)
+---
+
+Review release blockers first, then risks, then follow-up work.
+```
+
+A3S 也读取 `.claude/agents` 作为迁移来源。新项目优先使用 `.a3s/agents`。
+
+## 内置团队角色
+
+无需创建文件即可使用：
+
+- `explore`：只读仓库探索
+- `plan`：只读实现计划
+- `general` / `general-purpose`：多步骤实现
+- `verification`：检查、复现和回归验证
+- `review`：findings-first 代码审查
+
+## 手动 Lane
+
+宿主已经知道 lane 时，可直接调用 SDK helper：
+
+```ts
+const result = await session.tasks([
+  { agent: 'explore', description: 'Changed files', prompt: 'Find risky changed files.' },
+  { agent: 'verification', description: 'Test gaps', prompt: 'Find missing verification.' },
+  { agent: 'review', description: 'Regression review', prompt: 'Review correctness risks.' },
+]);
+
+console.log(result.output);
+```
 
 ## Worker Agents
 
-通过 `workerAgents` 或 `registerWorkerAgent()` 注册一次性 worker agents：
+当角色由宿主动态构造而不是存储在磁盘上时，通过 `workerAgents` 或 `registerWorkerAgent()` 注册一次性 worker agents：
 
 ```ts
 const session = agent.session('/repo', {
   workerAgents: [
     {
-      name: 'frontend-cow',
-      description: '小型前端修复',
+      name: 'frontend-worker',
+      description: 'Small verified frontend fixes',
       kind: 'implementer',
       model: 'openai/gpt-4o',
       maxSteps: 24,
@@ -47,31 +97,12 @@ const session = agent.session('/repo', {
 });
 ```
 
-### 确认继承
-
 通过 `confirmationInheritance` 控制子运行如何处理 Ask 决策：
 
 - `'auto_approve'`（默认）：子运行自动批准所有 Ask 决策
 - `'deny_on_ask'`：子运行遇到 Ask 时立即失败
 - `'inherit_parent'`：子运行继承父级的确认策略
 
-```ts
-const session = agent.session('/repo', {
-  workerAgents: [
-    {
-      name: 'restricted-writer',
-      description: '需要父级确认的文件写入',
-      kind: 'implementer',
-      confirmationInheritance: 'inherit_parent',  // 需要父级批准
-    },
-  ],
-});
-```
-
-当子运行需要人工批准敏感操作时使用 `'inherit_parent'`，
-或使用 `'deny_on_ask'` 确保子运行永远不会阻塞在确认提示上。
-
 ## 运行状态
 
-旧生命周期控制面 API 已移除。应用应通过 streaming events 和 run replay
-快照展示状态，Node 侧需要取消时使用 `cancelRun(runId)`。
+应用应通过 streaming events 和 run replay 快照展示状态，Node 侧需要取消时使用 `cancelRun(runId)`。

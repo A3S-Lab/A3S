@@ -1,6 +1,6 @@
 ---
 title: Build a Multi-Agent Review Flow
-description: Use A3S Code v2.1.0 task delegation, registered agent directories, and run inspection from the Node SDK.
+description: Use A3S Code v3.1.0 task delegation, .a3s/agents, automatic subagents, and run inspection from the Node SDK.
 full: true
 ---
 
@@ -8,27 +8,28 @@ import { Callout } from 'fumadocs-ui/components/callout';
 
 # Build a Multi-Agent Review Flow
 
-This tutorial builds a review flow from the current A3S Code v2.1.0 Node SDK:
+This tutorial builds a review flow from the current A3S Code v3.1.0 Node SDK:
 one parent session delegates focused work, gathers compact child results, and
 uses run replay for inspection.
 
 <Callout type="info">
 The snippets below use these Node SDK entry points:
 `Agent.create`, `agent.session`, `session.registerAgentDir`,
-`session.delegateTask`, `session.parallelTask`, `session.runs`, and
+`session.task`, `session.tasks`, `session.runs`, and
 `session.runEvents`.
 </Callout>
 
 ## What Changed
 
-In v2.1.0, routine multi-agent work is driven through task delegation from a
-normal session. Child runs return compact results instead of pushing full
-transcripts back into the parent prompt.
+Routine multi-agent work is driven through task delegation from a normal
+session. v3.1.0 can also launch automatic subagents when `autoDelegation` is
+enabled. Child runs return compact results instead of pushing full transcripts
+back into the parent prompt.
 
 ```text
 review goal
   -> lead session
-  -> delegateTask / parallelTask
+  -> task / tasks / automatic subagents
   -> child summaries
   -> run replay and verification evidence
 ```
@@ -39,6 +40,8 @@ Use ACL, not legacy HCL:
 
 ```text
 default_model = "openai/docs-model"
+max_parallel_tasks = 4
+auto_parallel = false
 
 providers "openai" {
   apiKey = env("A3S_OPENAI_API_KEY")
@@ -49,15 +52,22 @@ providers "openai" {
     tool_call = true
   }
 }
+
+auto_delegation {
+  enabled        = true
+  auto_parallel  = false
+  min_confidence = 0.72
+  max_tasks      = 3
+}
 ```
 
 ## Optional Role Files
 
-`registerAgentDir()` loads role definitions from a directory. Keep role files
-small and operational.
+`registerAgentDir()` loads role definitions from a directory. For durable
+project roles, prefer `.a3s/agents`.
 
 ```text
-agents/
+.a3s/agents/
   release-reviewer.yaml
 ```
 
@@ -77,20 +87,22 @@ import path from 'node:path';
 const agent = await Agent.create('agent.acl');
 const session = agent.session(process.cwd(), {
   builtinSkills: true,
-  planningMode: 'enabled',
+  planningMode: 'auto',
+  autoDelegation: { enabled: true, maxTasks: 3 },
+  autoParallel: false,
 });
 
-const registered = session.registerAgentDir(path.join(process.cwd(), 'agents'));
+const registered = session.registerAgentDir(path.join(process.cwd(), '.a3s/agents'));
 console.log({ registered });
 
-const summary = await session.delegateTask({
+const summary = await session.task({
   agent: 'general',
   description: 'Review auth release blockers',
   prompt: 'Review src/auth for release blockers. Focus on token validation and error handling.',
   maxSteps: 4,
 });
 
-const parallel = await session.parallelTask([
+const parallel = await session.tasks([
   {
     agent: 'general',
     description: 'Auth security review',

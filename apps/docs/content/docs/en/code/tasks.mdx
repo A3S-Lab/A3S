@@ -1,19 +1,43 @@
 ---
 title: "Tasks"
-description: "Routine delegation with task and parallel_task"
+description: "Manual and automatic delegation with task, parallel_task, and subagents"
 ---
 
 # Tasks
 
-In v2.1.0 the routine multi-agent path is the `task` and `parallel_task` tools. They replace older public team runner APIs and keep child context isolated from the parent conversation.
+The routine multi-agent path is the `task` and `parallel_task` tool pair. They keep child context isolated from the parent conversation and return compact results instead of full transcripts.
 
-## Single Task
+In v3.1.0 the same delegation core also powers automatic subagent delegation. Enable it when the runtime should proactively start specialist child agents for high-confidence work, and disable only automatic parallel fan-out with `autoParallel: false` when you want serial automatic delegation.
+
+## Built-in Subagents
+
+| Agent | Use it for |
+| --- | --- |
+| `explore` | Read-only codebase search, file inspection, and structure discovery. |
+| `plan` | Read-only implementation plans and architecture analysis. |
+| `general` / `general-purpose` | Multi-step implementation work with read/write/command access. |
+| `verification` | Focused checks, reproductions, regression validation, and adversarial testing. |
+| `review` | Findings-first code review for correctness, regressions, security, and maintainability. |
+
+You can mention them explicitly, for example `@review`, `@agent-plan`, `use the verification subagent`, or `delegate to general-purpose`.
+
+## Manual Delegation
 
 Ask the parent agent to delegate a bounded job:
 
 ```text
 Use task to ask an explore agent to inspect the auth module.
 Return files inspected, findings, risks, and confidence.
+```
+
+If the host already knows the task boundary, call the same core tool directly:
+
+```ts
+await session.task({
+  agent: 'explore',
+  description: 'Inspect auth module',
+  prompt: 'Return files inspected, findings, risks, and confidence.',
+});
 ```
 
 A child agent should return a compact contract:
@@ -26,19 +50,9 @@ A child agent should return a compact contract:
 
 The parent should not ingest the full child transcript.
 
-If the host already knows the task boundary, call the same core tool directly:
+## Parallel Delegation
 
-```ts
-await session.delegateTask({
-  agent: 'explore',
-  description: 'Inspect auth module',
-  prompt: 'Return files inspected, findings, risks, and confidence.',
-});
-```
-
-## Parallel Task
-
-Use `parallel_task` when independent work can run concurrently:
+Use `parallel_task` or `session.tasks(...)` when independent work can run concurrently:
 
 ```text
 Run parallel_task with three lanes:
@@ -50,11 +64,64 @@ Merge the results into one release-readiness report.
 ```
 
 ```ts
-await session.parallelTask([
+await session.tasks([
   { agent: 'explore', description: 'Inspect config', prompt: 'Check provider parsing.' },
   { agent: 'verification', description: 'Verify SDK', prompt: 'Check SDK declarations.' },
 ]);
 ```
+
+`maxParallelTasks` in session options and `max_parallel_tasks` in ACL bound sibling fan-out.
+
+## Automatic Delegation
+
+Automatic delegation is opt-in. The runtime scores the current request against built-in and custom agent descriptions, then launches up to `maxTasks` child runs when confidence is high enough.
+
+```ts
+const session = agent.session('/repo', {
+  autoDelegation: { enabled: true, minConfidence: 0.72, maxTasks: 4 },
+  maxParallelTasks: 8,
+  autoParallel: false,
+});
+```
+
+```text
+auto_delegation {
+  enabled        = true
+  auto_parallel  = false
+  min_confidence = 0.72
+  max_tasks      = 4
+}
+```
+
+`autoParallel: false` / `auto_parallel = false` is the global kill switch for automatic parallel child-agent fan-out. Manual `parallel_task` and `session.tasks(...)` remain available.
+
+## Agent Directories
+
+Load custom agent definitions through `agentDirs`, `agent_dirs`, or the built-in A3S directories:
+
+```ts
+const session = agent.session('/repo', { agentDirs: ['./.a3s/agents'] });
+const loaded = session.registerAgentDir('./more-agents');
+```
+
+A3S scans configured `agent_dirs`, project/user `.a3s/agents`, and Claude-compatible `.claude/agents` migration paths. Prefer `.a3s/agents` for new projects.
+
+Markdown agent files support frontmatter:
+
+```markdown
+---
+name: docs-auditor
+description: Use proactively after documentation changes
+tools: Read, Grep, Glob
+disallowedTools:
+  - Write
+  - Bash(rm:*)
+---
+
+Audit docs for drift, broken examples, and unclear migration notes.
+```
+
+The `tools` field is an allowlist. `disallowedTools` is a denylist and wins over allowed tools. Model routing fields are intentionally outside this compatibility layer.
 
 ## Worker Agents
 
@@ -64,7 +131,7 @@ Register disposable worker agents with `workerAgents` or `registerWorkerAgent()`
 const session = agent.session('/repo', {
   workerAgents: [
     {
-      name: 'frontend-cow',
+      name: 'frontend-worker',
       description: 'Small verified frontend fixes',
       kind: 'implementer',
       model: 'openai/gpt-4o',
@@ -79,34 +146,8 @@ const session = agent.session('/repo', {
 
 Control how child runs resolve Ask decisions with `confirmationInheritance`:
 
-- `'auto_approve'` (default): Child runs auto-approve all Ask decisions
-- `'deny_on_ask'`: Child runs fail immediately when encountering an Ask
-- `'inherit_parent'`: Child runs inherit the parent's confirmation policy
+- `'auto_approve'` (default): child runs auto-approve all Ask decisions
+- `'deny_on_ask'`: child runs fail immediately when encountering an Ask
+- `'inherit_parent'`: child runs inherit the parent's confirmation policy
 
-```ts
-const session = agent.session('/repo', {
-  workerAgents: [
-    {
-      name: 'restricted-writer',
-      description: 'Write files with parent confirmation',
-      kind: 'implementer',
-      confirmationInheritance: 'inherit_parent',  // requires parent approval
-    },
-  ],
-});
-```
-
-Use `'inherit_parent'` when child runs need human approval for sensitive operations,
-or `'deny_on_ask'` to ensure child runs never block on confirmation prompts.
-
-## Agent Directories
-
-Load custom agent definitions through `agentDirs` or register them on a live session:
-
-```ts
-const session = agent.session('/repo', { agentDirs: ['./agents'] });
-const loaded = session.registerAgentDir('./more-agents');
-```
-
-Legacy lifecycle control-plane APIs are removed. Applications that need UI state
-should consume streaming events, run replay, and Node `cancelRun(runId)`.
+Legacy lifecycle control-plane APIs are removed. Applications that need UI state should consume streaming events, run replay, and Node `cancelRun(runId)`.

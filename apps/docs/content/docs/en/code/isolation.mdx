@@ -5,7 +5,7 @@ description: "Workspace, context, and delegated-task isolation"
 
 # Isolation
 
-Isolation in v2.1.0 starts with the session boundary: each session binds to one
+Isolation starts with the session boundary: each session binds to one
 workspace, and each delegated child run receives bounded context. Direct host
 tool calls are privileged host operations; gate them in the host application
 before exposing them to users.
@@ -22,7 +22,7 @@ policy path you depend on before using them as a production boundary.
 
 ## Delegated Context
 
-`task` and `parallel_task` isolate child reasoning. The parent receives compact results instead of full transcripts. This avoids prompt pollution and makes evidence review easier.
+`task`, `parallel_task`, and automatic subagent delegation isolate child reasoning. The parent receives compact results instead of full transcripts. This avoids prompt pollution and makes evidence review easier.
 
 ## Storage Isolation
 

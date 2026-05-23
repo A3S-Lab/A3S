@@ -5,7 +5,7 @@ description: "可选外部与混合分发基础设施"
 
 # Lane Queue
 
-普通 session 默认不启用队列。Lane queue 是显式的高级基础设施。
+普通 session 默认不启用队列。Lane queue 是显式的高级基础设施，独立于 `task`、`parallel_task` 和自动 subagent 委派。
 
 只有需要外部 worker、混合本地/远程执行、队列指标、死信或多机器分发时才启用 lane queue。
 

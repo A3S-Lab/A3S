@@ -20,7 +20,7 @@ a3s-box              <- Docker-like MicroVM runtime for Linux OCI workloads
 a3s-gateway          <- application-agnostic ingress/reverse proxy layer
 ```
 
-**a3s-code** is a coding-agent runtime library. It exposes ACL config, tools, hooks, security policy, memory, MCP, structured output (`generate_object`), explicit planning mode, run replay, QuickJS PTC, task delegation, and a pluggable workspace subsystem through runtime APIs and SDKs. v3.0 ships a hexagonal workspace stack: local filesystem, S3-compatible object storage (with ETag CAS, opt-in degraded search, cost-bounded operations), and an HTTP/JSON `RemoteGitBackend` that keeps the `git` tool available on workspaces that have no `.git` directory. Failures surface as a typed `ToolErrorKind` discriminator (`version_conflict`, `not_found`, `timeout`, …) end-to-end into Node and Python SDKs, so callers branch on `.type` instead of regex-matching messages.
+**a3s-code** is a coding-agent runtime library. It exposes ACL config, tools, hooks, security policy, memory, MCP, structured output (`generate_object`), explicit planning mode, run replay, QuickJS PTC, task delegation, automatic subagent delegation, and a pluggable workspace subsystem through runtime APIs and SDKs. v3.1 adds Claude Code-style built-in subagents (`explore`, `plan`, `general`, `verification`, `review`), native `.a3s/agents` custom-agent loading, and a global `auto_parallel` / `autoParallel` switch that disables automatic parallel fan-out while keeping manual `parallel_task` available. The v3 workspace stack includes local filesystem, S3-compatible object storage (with ETag CAS, opt-in degraded search, cost-bounded operations), and an HTTP/JSON `RemoteGitBackend` that keeps the `git` tool available on workspaces that have no `.git` directory. Failures surface as a typed `ToolErrorKind` discriminator (`version_conflict`, `not_found`, `timeout`, ...) end-to-end into Node and Python SDKs, so callers branch on `.type` instead of regex-matching messages.
 
 **a3s-box** is a MicroVM runtime. Its local Docker-like CLI is the primary product surface. Kubernetes CRI, hardware TEE, and Windows paths are integration surfaces with explicit platform limits.
 
@@ -41,7 +41,7 @@ a3s-gateway          <- application-agnostic ingress/reverse proxy layer
 
 | Project | Version | Description | Docs |
 | --- | --- | --- | --- |
-| [a3s-code](crates/code/) | 3.0.0 | Harness-driven coding-agent runtime with ACL config, SDKs, structured output, planning, run replay, PTC, delegation, memory, and a hexagonal workspace stack — local FS, S3 (ETag CAS, cost-bounded grep/glob), remote-git over HTTP/JSON, all with typed errors end-to-end | [README](crates/code/README.md) |
+| [a3s-code](crates/code/) | 3.1.0 | Harness-driven coding-agent runtime with ACL config, SDKs, structured output, planning, run replay, PTC, task/parallel_task delegation, automatic subagent delegation, `.a3s/agents`, memory, and a hexagonal workspace stack: local FS, S3 (ETag CAS, cost-bounded grep/glob), remote-git over HTTP/JSON, all with typed errors end-to-end | [README](crates/code/README.md) |
 | [a3s-box](crates/box/) | 2.0.4 | Docker-like MicroVM runtime for Linux OCI workloads | [README](crates/box/README.md) |
 | [a3s-gateway](crates/gateway/) | 0.2.5 | Reverse proxy with middleware, routing, and privacy features | [README](crates/gateway/README.md) |
 | [a3s-lane](crates/lane/) | 0.4.0 | Priority queues with lanes, concurrency, retry, and DLQ | [README](crates/lane/README.md) |

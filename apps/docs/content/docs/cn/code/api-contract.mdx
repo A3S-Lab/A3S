@@ -1,12 +1,12 @@
 ---
 title: "API 契约"
-description: "本地集成检查覆盖的 v2.2.0 SDK 机制"
+description: "本地集成检查覆盖的 SDK 机制"
 ---
 
 # API 契约
 
 本页只记录 `crates/code/scripts/docs_api_contract_smoke.mjs` 覆盖过的
-A3S Code v2.2.0 Node SDK 行为。该脚本会启动一个临时的
+A3S Code Node SDK 行为。该脚本会启动一个临时的
 OpenAI-compatible 本地测试服务，创建真实 SDK session，调用 native binding，
 并断言返回值。不需要 docs build。
 
@@ -320,7 +320,7 @@ if (current?.id && current.status === 'running') {
 console.log(session.traceEvents());
 ```
 
-`currentRun()` 用于读取当前操作。空闲时，v2.1.0 可能返回 `null`，也可能
+`currentRun()` 用于读取当前操作。空闲时，它可能返回 `null`，也可能
 因前序控制流保留一个 snapshot。已完成历史请使用 `runs()`。
 
 ## Persistence
@@ -350,14 +350,14 @@ Node 进程需要及时释放 session 级后台资源时，调用 `session.close
 已验证核心委派工具的直接 helper：
 
 ```ts
-await session.delegateTask({
+await session.task({
   agent: 'general',
   description: 'docs delegated check',
   prompt: 'Return a short response.',
   maxSteps: 1,
 });
 
-await session.parallelTask([
+await session.tasks([
   { agent: 'general', description: 'one', prompt: 'Return one response.', maxSteps: 1 },
   { agent: 'general', description: 'two', prompt: 'Return another response.', maxSteps: 1 },
 ]);

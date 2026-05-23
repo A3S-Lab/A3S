@@ -20,5 +20,6 @@ session.registerHook(
 );
 ```
 
-handler 可返回 `continue`、`skip`、`block`，或者返回空表示继续。把 hook
-当作生产关卡前，应对产品实际依赖的 event path 做集成测试。
+handler 可返回 `continue`、`skip`、`block`，或者返回空表示继续。委派和自动
+subagent fan-out 都会走 `task` / `parallel_task` 路径；把 hook 当作生产关卡前，
+应对产品实际依赖的 event path 做集成测试。

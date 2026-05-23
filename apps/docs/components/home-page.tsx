@@ -126,8 +126,8 @@ function getModules(lang: Lang) {
       tag: lang === 'cn' ? 'Agent 框架' : 'Agent Framework',
       description:
         lang === 'cn'
-          ? 'v2.0 驾驭式编程 Agent 运行时 — ACL 配置、PTC、task / parallel_task、AHP 2.3、验证证据、Hooks、MCP。'
-          : 'v2.0 harness-driven coding agent runtime — ACL config, PTC, task / parallel_task, AHP 2.3, verification evidence, hooks, MCP.',
+          ? 'v3.1 驾驭式编程 Agent 运行时：ACL 配置、PTC、自动 subagent 委派、.a3s/agents、验证证据、Hooks、MCP。'
+          : 'v3.1 harness-driven coding agent runtime: ACL config, PTC, automatic subagent delegation, .a3s/agents, verification evidence, hooks, MCP.',
       href: `${base}/docs/code`,
       icon: Bot,
       lightColor: 'bg-indigo-50 text-indigo-600',

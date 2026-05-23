@@ -1,44 +1,34 @@
 ---
 title: "A3S Code"
-description: "带 v2.3.0 Node SDK 的驾驭式编程智能体运行时"
+description: "带 v3.1.0 SDK 的驾驭式编程智能体运行时"
 ---
 
 # A3S Code
 
-A3S Code v2.3.0 是一个驾驭式编程智能体运行时。本节文档聚焦当前 Node SDK 能力面。
+A3S Code v3.1.0 是一个驾驭式编程智能体运行时。运行时保持 agent loop 小而可观测，驾驭层负责上下文组装、工具执行、权限策略、任务委派、验证证据与 run replay。
 
-## v2.3.0 新特性
+## v3.1.0 重点
 
-| 领域 | v2.3.0 新内容 |
+| 领域 | 当前能力 |
 | --- | --- |
-| SDK API | 紧凑的对象形式方法：`send()`、`run()`、`stream()`、`task()`、`tasks()`、`git()`、`addMcp()`、`removeMcp()`、`mcps()` 用于长期集成。 |
-| 可观测性 | 通过活跃工具快照和更丰富的 run replay API 实现实时 run/tool 可观测性，覆盖 Rust、Node.js 和 Python SDK。 |
-| Python SDK | Worker agents、HITL 确认策略/控制、session-for-worker、实时 worker 注册和 session close 的完整功能对等。 |
-| AHP 集成 | 单一驾驭/咨询/控制平面，具有更丰富的事件上下文、心跳状态、运行时状态快照和决策映射。 |
-| 架构 | 将大型 agent 和 session API 实现文件拆分为聚焦的运行时模块，提升可维护性。 |
-| 文档 | 在 `manual/SDK_API_DESIGN.md` 下添加持久的 SDK API 设计契约。 |
-| 清理 | 移除过时的 sidecar/copilot/BTW/strategize/BTE 机制及相关 prompts、docs、configs 和 examples。 |
+| 自动委派 | 可根据显式 `@agent` 提及、高置信任务描述和自定义 agent 的 proactive 描述自动触发 subagent。 |
+| 内置 subagent | `explore`、`plan`、`general` / `general-purpose`、`verification`、`review` 可通过 `task`、`parallel_task`、`session.task(...)`、`session.tasks(...)` 和自动委派使用。 |
+| Agent 目录 | 自定义 Markdown/YAML agents 会从配置的 `agent_dirs`、项目/用户 `.a3s/agents` 以及 Claude 兼容的 `.claude/agents` 迁移路径加载。`.a3s/agents` 是 A3S 原生位置，并在同一作用域同名时优先。 |
+| 并行控制 | `max_parallel_tasks` 限制 sibling fan-out。`auto_parallel = false` / `autoParallel: false` 只全局关闭自动并行子 agent fan-out；手动 `parallel_task` 仍可用。 |
+| SDK 对齐 | Rust、Node.js 和 Python 暴露同一组核心委派、run replay、typed tool errors、workspace backend 与自动委派控制。 |
+| Workspace 栈 | 本地文件系统、S3 兼容对象存储和 HTTP/JSON remote-git backend 共享端到端 typed `ToolErrorKind`。 |
 
-### 继承自 v2.0-2.2
-
-| 领域 | 特性 |
-| --- | --- |
-| 配置 | 只支持 ACL 配置，使用带标签的 `providers` 和 `models` 块；`env(...)` 是标准凭证注入方式。 |
-| 委派 | `task` 和 `parallel_task` 是默认多运行路径，委派子运行返回紧凑摘要而不是完整 transcript。 |
-| 工具表面 | 核心工具保持小而稳定；web、git、batch、skill 管理和 MCP 工具按意图启用。`generate_object` 提供 schema 校验的结构化输出。 |
-| PTC | Programmatic Tool Calling 在内嵌 QuickJS 中运行有边界的 JavaScript；Node SDK 通过 `session.program(...)` 对齐核心 `program` 工具。 |
-| 持久化 | file/memory store 支持可恢复 session、显式 `save()`、`autoSave`、memory recall 和 session ID。 |
-
-当前执行形态是：
+当前执行形态：
 
 ```text
 Agent / AgentSession
   -> 上下文组装
-  -> 工具选择
-  -> 确定性任务走 PTC
-  -> 已配置的权限与确认策略
+  -> 可选 planning
+  -> 配置启用时自动 subagent 委派
+  -> 工具选择或 programmatic tool calling
+  -> 权限与确认策略
   -> 执行
-  -> 追踪与验证证据
+  -> trace、artifact 与验证证据
   -> 压缩
 ```
 
@@ -46,24 +36,18 @@ Agent / AgentSession
 
 ```bash
 npm install @a3s-lab/code
+pip install a3s-code
+cargo add a3s-code-core
 ```
 
 ## 配置
 
-v2.3.0 只使用 ACL。配置文件使用 `.acl` 后缀和带标签的块；旧的 HCL 配置不再支持。
-
-```text
-default_model = "anthropic/claude-sonnet-4-20250514"
-
-providers "anthropic" {
-  apiKey = env("ANTHROPIC_API_KEY")
-}
-```
-
-MiniMax 等 OpenAI 兼容服务使用 `openai` provider 和 `baseUrl`：
+A3S Code 使用 ACL 配置。推荐 `.acl` 文件和带标签的块；JSON 和旧 HCL 配置不再支持。
 
 ```text
 default_model = "openai/MiniMax-M2.7-highspeed"
+max_parallel_tasks = 8
+auto_parallel = false
 
 providers "openai" {
   apiKey = env("A3S_OPENAI_API_KEY")
@@ -75,10 +59,19 @@ providers "openai" {
   }
 }
 
+agent_dirs = ["./.a3s/agents"]
+
+auto_delegation {
+  enabled        = true
+  auto_parallel  = false
+  min_confidence = 0.72
+  max_tasks      = 4
+}
+
 storage_backend = "file"
 ```
 
-发布集成脚本也接受 `MINIMAX_API_KEY` 和 `MINIMAX_BASE_URL`，并把它们映射成 OpenAI 兼容 provider 使用的环境变量。
+顶层 `auto_parallel` 是自动并行 fan-out 的全局开关。它不会移除 `parallel_task` 或 SDK 的 `session.tasks(...)` helper。
 
 ## 使用
 
@@ -88,36 +81,29 @@ import { Agent } from '@a3s-lab/code';
 const agent = await Agent.create('agent.acl');
 const session = agent.session('/my-project', {
   builtinSkills: true,
-  planningMode: 'enabled',
+  planningMode: 'auto',
+  autoDelegation: { enabled: true, maxTasks: 4 },
+  maxParallelTasks: 8,
+  autoParallel: false,
 });
 
-const result = await session.send('定位认证错误处理逻辑并总结流程');
+const result = await session.send(
+  '使用 @review 检查认证相关变更，并总结发布阻塞项',
+);
+
 console.log(result.text);
 console.log(result.verificationSummaryText);
 ```
 
-## 当前 v2.3.0 能力面
+## 当前能力面
 
-### 核心 API
-
-- **紧凑 SDK 方法**：`send()`、`run()`、`stream()` 用于对话；`task()`、`tasks()` 用于委派；`git()` 用于 git 操作；`addMcp()`、`removeMcp()`、`mcps()` 用于 MCP 管理。
+- **对话**：`send()`、`run()` 和 `stream()` 用于同步与流式回合。
+- **委派**：`task()` 和 `tasks()` 封装核心 `task` / `parallel_task` 工具，并返回紧凑子任务摘要。
+- **自动 subagent**：通过 `autoDelegation` 或 `auto_delegation` 启用，由 `maxParallelTasks` / `max_parallel_tasks` 限流，可用 `autoParallel: false` / `auto_parallel = false` 关闭自动并行。
 - **可观测性**：`runs()`、`runSnapshot()`、`runEvents()`、`activeTools()`、`cancelRun()` 用于实时 run/tool 追踪。
-- **配置**：`.acl` 是唯一支持的格式；`Agent.create()` 接受 `.acl` 文件或内联 ACL 字符串。
-- **Planning**：明确的 `auto` / `enabled` / `disabled` 契约；`auto` 使用结构化预分析而非关键词门控。
-- **PTC**：Programmatic Tool Calling 通过 `session.program(...)` 将确定性工具链移到宿主代码执行。
-- **委派**：`task()` 和 `tasks()`（原 `parallel_task`）返回紧凑子摘要而非完整 transcript。
+- **PTC**：`session.program(...)` 在 QuickJS 中运行有边界的 JavaScript 工具链。
+- **结构化输出**：`generate_object` 生成带修复重试的 schema 校验 JSON。
+- **配置**：`Agent.create()` 接受 `.acl` 文件路径或内联 ACL 字符串。
+- **持久化**：file/memory store 支持可恢复 session、显式 `save()`、`autoSave`、memory recall 和 session ID。
 
-### Python SDK 功能对等
-
-- Worker agents、HITL 确认策略/控制、`session_for_worker()`、实时 worker 注册和 `close()`。
-- 与 Node.js SDK 完全功能对等，适用于生产集成。
-
-### 基础设施
-
-- **AHP 集成**：单一驾驭/咨询/控制平面，具有更丰富的事件上下文、心跳状态和决策映射。
-- **Hooks**：注册、计数和卸载是公开 session API。
-- **权限**：显式规则列表加默认决策。
-- **Sessions**：默认不启用队列；lane queue 是显式的外部或混合分发基础设施。
-- **结果**：通过 `session.traceEvents()`、`session.verificationReports()` 和 run replay API 获取 token 统计、验证状态和验证摘要。
-
-建议从 [API 契约](/cn/docs/code/api-contract)、[会话](/cn/docs/code/sessions)和[Provider 配置](/cn/docs/code/providers)开始。
+建议从 [API 契约](/cn/docs/code/api-contract)、[会话](/cn/docs/code/sessions)、[任务](/cn/docs/code/tasks) 和 [Provider 配置](/cn/docs/code/providers)开始。

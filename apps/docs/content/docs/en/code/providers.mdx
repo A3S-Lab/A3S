@@ -1,16 +1,18 @@
 ---
 title: "Providers"
-description: "ACL provider configuration and environment injection for v2.1.0"
+description: "ACL provider configuration and environment injection"
 ---
 
 # Providers
 
-A3S Code v2.1.0 reads runtime configuration from ACL. A config source can be a path to an `.acl` file or an inline ACL string. JSON and legacy HCL configs are intentionally not supported.
+A3S Code reads runtime configuration from ACL. A config source can be a path to an `.acl` file or an inline ACL string. JSON and legacy HCL configs are intentionally not supported.
 
 ## Basic Shape
 
 ```text
 default_model = "provider/model-id"
+max_parallel_tasks = 8
+auto_parallel = false
 
 providers "provider" {
   apiKey = env("PROVIDER_API_KEY")
@@ -26,6 +28,24 @@ storage_backend = "file"
 ```
 
 `apiKey` and `api_key` are accepted aliases. `baseUrl` and `base_url` are accepted aliases. Prefer environment variables for secrets and commit only templates or non-secret defaults.
+
+## Delegation Controls
+
+```text
+agent_dirs = ["./.a3s/agents"]
+
+auto_delegation {
+  enabled        = true
+  auto_parallel  = false
+  min_confidence = 0.72
+  max_tasks      = 4
+}
+```
+
+`max_parallel_tasks` limits bounded sibling fan-out. `auto_delegation.enabled`
+turns on automatic subagent delegation. The top-level `auto_parallel = false`
+overrides `auto_delegation.auto_parallel` and disables only automatic parallel
+child-agent fan-out; manual `parallel_task` remains available.
 
 ## Anthropic
 

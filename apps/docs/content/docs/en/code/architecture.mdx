@@ -1,15 +1,16 @@
 ---
 title: "Architecture"
-description: "The v2.1.0 harness loop and extension surface"
+description: "The harness loop and extension surface"
 ---
 
 # Architecture
 
-A3S Code v2.1.0 is organized around a small runtime kernel and a harness that controls the execution loop.
+A3S Code is organized around a small runtime kernel and a harness that controls the execution loop.
 
 ```text
 Prompt
   -> context assembly
+  -> optional planning and automatic subagent delegation
   -> tool selection
   -> LLM generation
   -> programmatic tool calling
@@ -59,7 +60,7 @@ Use ordinary model tool calls when the next action requires judgment. Use PTC wh
 
 ## Extension Points
 
-Use session options, skills, agent definitions, hooks, MCP servers, memory/session stores, security providers, queue configuration, and AHP transports to adapt the runtime.
+Use session options, skills, agent definitions, `.a3s/agents`, hooks, MCP servers, memory/session stores, security providers, queue configuration, and AHP transports to adapt the runtime.
 
 ## Design Direction
 

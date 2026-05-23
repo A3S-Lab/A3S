@@ -5,10 +5,14 @@ description: "Permission policy, HITL, AHP, and verification gates"
 
 # Security
 
-A3S Code v2.1.0 exposes security controls at session creation time and through
+A3S Code exposes security controls at session creation time and through
 session lifecycle hooks. Treat direct host calls such as `session.tool()` and
 `session.bash()` as privileged host operations: the application that calls them
 is responsible for deciding whether to expose that power to a user.
+
+Delegated child runs inherit bounded permissions from the selected subagent or
+worker spec. Use `confirmationInheritance` for child-run Ask decisions, and
+keep high-risk release or publish commands behind explicit policy.
 
 ## Permission Policy
 

@@ -1,6 +1,6 @@
 ---
 title: 构建 Research Agent
-description: 使用 A3S Code v2.1.0 Node SDK 组合 PTC、任务委派、流式输出与队列检查能力。
+description: 使用 A3S Code v3.1.0 Node SDK 组合 PTC、任务委派、流式输出与队列检查能力。
 full: true
 ---
 
@@ -36,6 +36,8 @@ const session = agent.session(process.cwd(), {
   planningMode: 'enabled',
   maxToolRounds: 24,
   autoCompact: true,
+  autoDelegation: { enabled: true, maxTasks: 2 },
+  autoParallel: false,
 });
 ```
 
@@ -75,7 +77,7 @@ console.log(metadata.program.tool_calls);
 ## 委派聚焦调查
 
 ```ts
-const investigations = await session.parallelTask([
+const investigations = await session.tasks([
   {
     agent: 'general',
     description: 'Auth release blockers',
@@ -91,7 +93,7 @@ const investigations = await session.parallelTask([
 ]);
 ```
 
-`parallelTask()` 返回核心 `parallel_task` tool 的 `ToolResult`。
+`tasks()` 返回核心 `parallel_task` tool 的 `ToolResult`。
 
 ## 流式合成
 

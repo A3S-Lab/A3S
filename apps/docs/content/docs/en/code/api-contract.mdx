@@ -1,11 +1,11 @@
 ---
 title: "API Contract"
-description: "v2.2.0 SDK mechanisms covered by the local integration check"
+description: "SDK mechanisms covered by the local integration check"
 ---
 
 # API Contract
 
-This page documents only the A3S Code v2.2.0 Node SDK behavior covered by
+This page documents only the A3S Code Node SDK behavior covered by
 `crates/code/scripts/docs_api_contract_smoke.mjs`. The script starts a temporary
 OpenAI-compatible local test server, creates real SDK sessions, calls the native
 binding, and asserts the returned values. It does not require a docs build.
@@ -326,7 +326,7 @@ if (current?.id && current.status === 'running') {
 console.log(session.traceEvents());
 ```
 
-`currentRun()` is for the current operation. When idle, v2.1.0 may return
+`currentRun()` is for the current operation. When idle, it may return
 `null` or a retained snapshot depending on the preceding control flow. Use
 `runs()` for completed history.
 
@@ -358,14 +358,14 @@ background resources promptly.
 The direct helpers for the core delegation tools were verified:
 
 ```ts
-await session.delegateTask({
+await session.task({
   agent: 'general',
   description: 'docs delegated check',
   prompt: 'Return a short response.',
   maxSteps: 1,
 });
 
-await session.parallelTask([
+await session.tasks([
   { agent: 'general', description: 'one', prompt: 'Return one response.', maxSteps: 1 },
   { agent: 'general', description: 'two', prompt: 'Return another response.', maxSteps: 1 },
 ]);

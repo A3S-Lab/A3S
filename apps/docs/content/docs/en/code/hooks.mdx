@@ -44,9 +44,9 @@ specific event path you depend on before using a hook as a production gate.
 
 ## Propagation
 
-Delegation uses the `task` and `parallel_task` tools. When a product depends on
-hook behavior across delegated runs, cover that product path with an integration
-test.
+Delegation and automatic subagent fan-out use the `task` and `parallel_task`
+tools. When a product depends on hook behavior across delegated runs, cover that
+product path with an integration test.
 
 ## Management
 

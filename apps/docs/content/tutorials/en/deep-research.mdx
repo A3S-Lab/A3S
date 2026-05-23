@@ -1,6 +1,6 @@
 ---
 title: Build a Research Agent
-description: Compose A3S Code v2.1.0 programmatic tool calling, task delegation, streaming, and queue inspection with the Node SDK.
+description: Compose A3S Code v3.1.0 programmatic tool calling, task delegation, streaming, and queue inspection with the Node SDK.
 full: true
 ---
 
@@ -38,6 +38,8 @@ const session = agent.session(process.cwd(), {
   planningMode: 'enabled',
   maxToolRounds: 24,
   autoCompact: true,
+  autoDelegation: { enabled: true, maxTasks: 2 },
+  autoParallel: false,
 });
 ```
 
@@ -77,7 +79,7 @@ console.log(metadata.program.tool_calls);
 ## Delegate Focused Follow-Ups
 
 ```ts
-const investigations = await session.parallelTask([
+const investigations = await session.tasks([
   {
     agent: 'general',
     description: 'Auth release blockers',
@@ -93,7 +95,7 @@ const investigations = await session.parallelTask([
 ]);
 ```
 
-`parallelTask()` returns a `ToolResult` from the core `parallel_task` tool.
+`tasks()` returns a `ToolResult` from the core `parallel_task` tool.
 
 ## Stream Synthesis
 

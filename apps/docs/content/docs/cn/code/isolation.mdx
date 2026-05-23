@@ -5,7 +5,7 @@ description: "工作区、上下文与委派任务隔离"
 
 # 隔离
 
-v2.1.0 的隔离从 session 边界开始：每个 session 绑定一个 workspace，委派子运行接收有边界的 context。宿主直接工具调用是特权操作；暴露给用户前，应在宿主应用内先做权限判断。
+隔离从 session 边界开始：每个 session 绑定一个 workspace，委派子运行接收有边界的 context。宿主直接工具调用是特权操作；暴露给用户前，应在宿主应用内先做权限判断。
 
 ```ts
 import { FileMemoryStore, FileSessionStore } from '@a3s-lab/code';
@@ -16,4 +16,4 @@ const session = agent.session('/repo', {
 });
 ```
 
-文件、搜索、shell 和 git 操作从 session 工作区求值。`task` 与 `parallel_task` 会隔离委派子运行的上下文，父 agent 只合并紧凑结果。Security provider、hooks 和 permission policy 是集成点；把它们作为生产边界前，应对实际策略路径做 harness 测试。
+文件、搜索、shell 和 git 操作从 session 工作区求值。`task`、`parallel_task` 与自动 subagent 委派会隔离子运行上下文，父 agent 只合并紧凑结果。Security provider、hooks 和 permission policy 是集成点；把它们作为生产边界前，应对实际策略路径做 harness 测试。

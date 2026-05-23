@@ -5,7 +5,7 @@ description: "Tool selection, direct tool calls, and verification evidence"
 
 # Tools
 
-v2.3.0 keeps a registry of available tools. `toolNames()` returns the current
+A3S Code keeps a registry of available tools. `toolNames()` returns the current
 session tool surface.
 
 ## Default Core Tools
@@ -110,17 +110,21 @@ privileged host operations.
 For delegated child work, use SDK helpers over the same core tools:
 
 ```ts
-await session.delegateTask({
+await session.task({
   agent: 'explore',
   description: 'Find auth files',
   prompt: 'Inspect auth-related files and return a compact evidence list.',
 });
 
-await session.parallelTask([
+await session.tasks([
   { agent: 'explore', description: 'Find tests', prompt: 'Locate auth tests.' },
   { agent: 'verification', description: 'Check risk', prompt: 'Review auth edge cases.' },
 ]);
 ```
+
+Automatic subagent delegation also uses these core tools. `autoParallel: false`
+disables only automatic parallel fan-out; it does not remove `parallel_task` or
+`session.tasks(...)`.
 
 ## Programmatic Tool Calling
 

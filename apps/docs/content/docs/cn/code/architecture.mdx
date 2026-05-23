@@ -1,15 +1,16 @@
 ---
 title: "架构"
-description: "v2.1.0 驾驭循环与扩展面"
+description: "驾驭循环与扩展面"
 ---
 
 # 架构
 
-A3S Code v2.1.0 围绕小运行时内核和控制执行循环的驾驭层组织。
+A3S Code 围绕小运行时内核和控制执行循环的驾驭层组织。
 
 ```text
 Prompt
   -> context assembly
+  -> optional planning and automatic subagent delegation
   -> tool selection
   -> LLM generation
   -> programmatic tool calling
