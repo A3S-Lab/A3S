@@ -343,7 +343,17 @@ const resumed = agent.resumeSession('docs-contract', {
 console.log(resumed.history());
 ```
 
-Node 进程需要及时释放 session 级后台资源时，调用 `session.close()`。
+Node 进程需要及时释放 session 级后台资源时，调用 `session.close()`。`close()` 是完整的优雅停止入口：把 `session.isClosed` 翻成 `true`（之后 `send` / `stream` 会以 `Session closed` 错误立即返回），fire session 级 `CancellationToken` 让所有 in-flight run、委派子代理任务、HITL 待确认全部中止，并对当前活跃 run emit AHP `recordRunCancelled` 钩子。重复调用 `close()` 是 no-op。
+
+控制面只持有 session ID 时，可以从 Agent 侧触发同样的清理：
+
+```ts
+await agent.listSessions();              // ['session-a', 'session-b']
+await agent.closeSession('session-a');   // 若原本是 open，返回 true
+await agent.close();                     // 关闭所有活 session + 断开全局 MCP
+```
+
+`agent.close()` 之后，再调 `agent.session(...)` / `agent.resumeSession(...)` 会立即抛 `Session closed`。幂等。建议在进程退出 handler 中调用,保证没有 session 级 worker 比 agent 活得更久。
 
 ## Delegation
 

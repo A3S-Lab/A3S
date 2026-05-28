@@ -351,7 +351,26 @@ console.log(resumed.history());
 ```
 
 Use `session.close()` when a Node process should release session-scoped
-background resources promptly.
+background resources promptly. `close()` is the full graceful-stop entry
+point: it flips `session.isClosed` to `true` (further `send` / `stream`
+calls reject with a `Session closed` error), fires the session-level
+`CancellationToken` so every in-flight run, delegated subagent task, and
+HITL confirmation aborts, and emits the AHP `recordRunCancelled` hook for
+the currently active run. Subsequent `close()` calls are no-ops.
+
+For control-plane callers that only know the session ID, the same cleanup
+is reachable from the agent:
+
+```ts
+await agent.listSessions();              // ['session-a', 'session-b']
+await agent.closeSession('session-a');   // true if it was open
+await agent.close();                     // close every live session + disconnect global MCP
+```
+
+After `agent.close()`, subsequent `agent.session(...)` and
+`agent.resumeSession(...)` calls reject with a `Session closed` error.
+Idempotent. Use this in process-shutdown handlers to guarantee no
+session-scoped workers outlive the agent.
 
 ## Delegation
 
