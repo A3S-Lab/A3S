@@ -22,7 +22,7 @@ explore → verify → review；崩溃后恢复这一批），就用编排。当
 
 - **框架**拥有*语法*——有哪些 step、如何组合、并发*提示*，以及可序列化契约
   `AgentStepSpec` / `StepOutcome`。
-- **宿主**（书安OS）拥有*放置*——传输、调度，以及 step 实际在哪里运行。
+- **宿主**拥有*放置*——传输、调度，以及 step 实际在哪里运行。
 
 内置的默认 executor（`TaskExecutor`）在本地、进程内、基于 tokio 运行每个 step。
 宿主可以替换为自己的 `AgentExecutor`，把 step 放置到集群各处；组合子从不观察 step

@@ -1,19 +1,81 @@
 ---
-title: "AHP Safety"
-description: "Attach an external harness to a session"
+title: "AHP Transport & Safety"
+description: "Attach a session to an external host over an AHP transport and gate its actions with a security provider and permission policy."
 ---
 
-# AHP Safety
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+# AHP Transport & Safety
+
+A3S Code sessions can attach to an external host over a pluggable transport (AHP — the Agent Host Protocol). Whatever transport carries the messages, the safety layer is independent: a **security provider** vets tool calls and a **permission policy** decides what runs without a human in the loop. Use this page when you need a remote/host-driven session that still enforces a safe default posture.
+
+The transport and the safety layer are orthogonal. You can swap `HttpTransport` for a WebSocket or Unix-socket transport without touching the permission rules, and vice versa.
+
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
 
 ```ts
-import { Agent, HttpTransport } from '@a3s-lab/code';
+import { Agent, HttpTransport, DefaultSecurityProvider } from '@a3s-lab/code';
 
 const agent = await Agent.create('agent.acl');
+
 const session = agent.session('/repo', {
+  // AHP transport: how the session reaches its external host.
   ahpTransport: new HttpTransport('http://localhost:8080/ahp', process.env.AHP_TOKEN),
+  // Safety: the security provider vets each tool call; the permission
+  // policy decides what runs unattended. These apply regardless of transport.
+  securityProvider: new DefaultSecurityProvider(),
+  permissionPolicy: { defaultDecision: 'ask' },
 });
+
+const result = await session.run('Audit the repo for hardcoded secrets.');
+console.log(result);
+
+await session.close();
 ```
 
-This example verifies the session option shape and transport constructor. Test
-your live AHP server before relying on policy, context injection, idle, audit,
-or supervision behavior.
+Other transports follow the same shape — `WebSocketTransport`, `UnixSocketTransport`, and the in-process `StdioTransport` are all interchangeable here. Set `defaultDecision` to `'deny'` for a stricter, fully-gated posture, or `'allow'` only in trusted, sandboxed environments.
+
+</Tab>
+<Tab value="Python">
+
+```python
+import os
+
+from a3s_code import (
+    Agent,
+    SessionOptions,
+    HttpTransport,
+    DefaultSecurityProvider,
+    PermissionPolicy,
+)
+
+agent = Agent.create(open("agent.acl").read())
+
+opts = SessionOptions()
+# AHP transport: how the session reaches its external host.
+opts.transport = HttpTransport("http://localhost:8080/ahp", os.environ["AHP_TOKEN"])
+# Safety: the security provider vets each tool call; the permission
+# policy decides what runs unattended. These apply regardless of transport.
+opts.security_provider = DefaultSecurityProvider()
+opts.permission_policy = PermissionPolicy(default_decision="ask")
+
+session = agent.session("/repo", opts)
+
+result = session.run("Audit the repo for hardcoded secrets.")
+print(result)
+
+session.close()
+```
+
+Set `default_decision` to `"deny"` for a stricter, fully-gated posture, or `"allow"` only in trusted, sandboxed environments. The transport is independent of the safety layer.
+
+</Tab>
+</Tabs>
+
+## Notes
+
+- **AHP is the transport, not the policy.** Choosing HTTP, WebSocket, or a Unix socket changes *how* the session reaches its host; it does not change *what* the agent is allowed to do. Safety lives entirely in the security provider and permission policy.
+- **`DefaultSecurityProvider`** ships a sensible baseline. Supply your own provider when you need to enforce organization-specific rules (path allow-lists, command vetting, redaction).
+- **Permission policy** (`defaultDecision` / `default_decision`) is the single most important safety knob. Prefer `'ask'` for interactive use and `'deny'` for unattended runs unless the workspace is sandboxed.
+- This example verifies the session option shape and transport constructor. Test your live AHP server before relying on policy, context injection, idle, audit, or supervision behavior.

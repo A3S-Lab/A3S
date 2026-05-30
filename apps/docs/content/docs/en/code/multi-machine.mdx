@@ -7,7 +7,7 @@ description: "Placing orchestration steps across machines via the AgentExecutor 
 
 A3S Code runs multi-agent orchestration as a *grammar* expressed in code, then
 places the resulting steps wherever you want them to run. The split is drawn
-along the **framework / host (书安OS) boundary**, introduced in `[3.4.0]`:
+along the **framework / host boundary**, introduced in `[3.4.0]`:
 
 - The **framework** owns the orchestration grammar and the serializable data
   contracts. It never decides where a step runs.
@@ -44,7 +44,7 @@ combinators (parallel / pipeline / resumable)
 
 The in-box `TaskExecutor` runs each step as a child agent locally — in-process,
 on Tokio — inheriting the session's agent registry, LLM client, workspace, MCP
-tools, and subagent tracker. A host such as 书安OS substitutes its own executor
+tools, and subagent tracker. A host such as a cluster runtime substitutes its own executor
 to place steps across a cluster; the combinators are unaffected.
 
 `concurrency_hint()` is **advisory, not a hard local bound**. The local default

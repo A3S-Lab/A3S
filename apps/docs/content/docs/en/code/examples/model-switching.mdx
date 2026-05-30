@@ -1,11 +1,21 @@
 ---
 title: "Model Switching"
-description: "Override the configured model per session"
+description: "Choose the model per session, and override it per worker agent for cost and capability tuning."
 ---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 # Model Switching
 
-Configure multiple models:
+A session runs against whatever model you pass in the `model` option. Declare
+the models your agent can reach once, then pick one per session — a fast model
+for high-volume, low-stakes work and a stronger model for review. Use this when
+you want to balance cost against capability without changing any of your prompts.
+
+## Declaring models
+
+Models are configured in your agent file. Each provider lists the models it
+exposes, and `default_model` is used when a session does not set `model`.
 
 ```text
 default_model = "openai/MiniMax-M2.7-highspeed"
@@ -19,12 +29,138 @@ providers "openai" {
 }
 ```
 
-Override per session:
+## Per-session model
+
+The `model` option is set when you open the session. Everything that session
+runs — `send`, `run`, `task`, `parallel`, `pipeline` — uses that model. One
+agent configuration can drive different model choices for different sessions.
+
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
 
 ```ts
+import { Agent } from '@a3s-lab/code';
+
+const agent = await Agent.create('agent.acl');
+
+// A fast model for high-volume, low-stakes work.
 const fast = agent.session('/repo', { model: 'openai/MiniMax-M2.7-highspeed' });
+const draft = await fast.run('Draft a short README intro for this project.');
+console.log('draft:', draft);
+await fast.close();
+
+// A stronger model for review / higher-stakes reasoning.
 const review = agent.session('/repo', { model: 'openai/gpt-4o' });
+const critique = await review.run(`Critique this README intro:\n${draft}`);
+console.log('critique:', critique);
+await review.close();
 ```
 
-Per-session `model` override lets one agent configuration drive different model
-choices for different sessions.
+</Tab>
+<Tab value="Python">
+
+```python
+from a3s_code import Agent, SessionOptions
+
+agent = Agent.create(open('agent.acl').read())
+
+# A fast model for high-volume, low-stakes work.
+fast_opts = SessionOptions()
+fast_opts.model = 'openai/MiniMax-M2.7-highspeed'
+fast = agent.session('/repo', fast_opts)
+draft = fast.run('Draft a short README intro for this project.')
+print('draft:', draft)
+fast.close()
+
+# A stronger model for review / higher-stakes reasoning.
+review_opts = SessionOptions()
+review_opts.model = 'openai/gpt-4o'
+review = agent.session('/repo', review_opts)
+critique = review.run(f'Critique this README intro:\n{draft}')
+print('critique:', critique)
+review.close()
+```
+
+</Tab>
+</Tabs>
+
+## Per-worker-agent model override
+
+Worker agents are registered with their own spec. Give a worker its own `model`
+so it runs on a different (often smaller, cheaper) model than the session that
+delegates to it. The orchestrating session keeps its own `model`; only the
+delegated work runs on the worker's model.
+
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
+
+```ts
+import { Agent } from '@a3s-lab/code';
+
+const agent = await Agent.create('agent.acl');
+
+const session = agent.session('/repo', {
+  // Orchestrator stays on the stronger model.
+  model: 'openai/gpt-4o',
+  // High-volume exploration runs on the cheaper model.
+  workerAgents: [
+    {
+      name: 'scout',
+      description: 'Reads files and reports findings.',
+      model: 'openai/MiniMax-M2.7-highspeed',
+    },
+  ],
+});
+
+// Delegate exploration to the cheaper worker, then reason on the strong model.
+const findings = await session.task('scout', 'List every public API in src/.');
+const plan = await session.run(`Given these findings, propose a refactor:\n${findings}`);
+console.log(plan);
+
+await session.close();
+```
+
+</Tab>
+<Tab value="Python">
+
+```python
+from a3s_code import Agent, SessionOptions, WorkerAgentSpec
+
+agent = Agent.create(open('agent.acl').read())
+
+opts = SessionOptions()
+# Orchestrator stays on the stronger model.
+opts.model = 'openai/gpt-4o'
+# High-volume exploration runs on the cheaper model.
+opts.worker_agents = [
+    WorkerAgentSpec(
+        name='scout',
+        description='Reads files and reports findings.',
+        model='openai/MiniMax-M2.7-highspeed',
+    ),
+]
+session = agent.session('/repo', opts)
+
+# Delegate exploration to the cheaper worker, then reason on the strong model.
+findings = session.task('scout', 'List every public API in src/.')
+plan = session.run(f'Given these findings, propose a refactor:\n{findings}')
+print(plan)
+
+session.close()
+```
+
+</Tab>
+</Tabs>
+
+Notes:
+
+- The `model` value is an identifier string your runtime resolves to one of the
+  models declared in your agent file — there are no hard-coded model names in the
+  SDK.
+- A worker agent's `model` applies only to that agent's delegated work. The
+  session's own `send`/`run`/`task` calls still use the session `model`.
+- A worker without a `model` inherits the session `model`, so you only override
+  the agents where a different model actually pays off.
+
+A runnable version showing the `model` option on a session ships at
+`crates/code/sdk/node/examples/basic/test_api_alignment.ts`.

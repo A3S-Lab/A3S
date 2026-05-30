@@ -1,17 +1,81 @@
 ---
-title: "AHP 安全"
-description: "为 session 连接外部驾驭层"
+title: "AHP 传输与安全"
+description: "通过 AHP 传输将会话连接到外部宿主，并使用安全提供器与权限策略对其行为进行管控。"
 ---
 
-# AHP 安全
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+# AHP 传输与安全
+
+A3S Code 会话可以通过可插拔的传输层（AHP，即 Agent Host Protocol，智能体宿主协议）连接到外部宿主。无论由哪种传输承载消息，安全层都是独立的：**安全提供器**会审查工具调用，而**权限策略**决定哪些操作可以在无人参与的情况下执行。当你需要一个由远程宿主驱动、但仍强制执行安全默认姿态的会话时，请参考本页。
+
+传输层与安全层互相正交。你可以把 `HttpTransport` 换成 WebSocket 或 Unix 套接字传输，而无需改动权限规则，反之亦然。
+
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
 
 ```ts
-import { Agent, HttpTransport } from '@a3s-lab/code';
+import { Agent, HttpTransport, DefaultSecurityProvider } from '@a3s-lab/code';
 
 const agent = await Agent.create('agent.acl');
+
 const session = agent.session('/repo', {
+  // AHP transport: how the session reaches its external host.
   ahpTransport: new HttpTransport('http://localhost:8080/ahp', process.env.AHP_TOKEN),
+  // Safety: the security provider vets each tool call; the permission
+  // policy decides what runs unattended. These apply regardless of transport.
+  securityProvider: new DefaultSecurityProvider(),
+  permissionPolicy: { defaultDecision: 'ask' },
 });
+
+const result = await session.run('Audit the repo for hardcoded secrets.');
+console.log(result);
+
+await session.close();
 ```
 
-这个示例展示 session option 形状和 transport constructor。依赖策略、上下文注入、idle、审计或监督行为前，应先测试你的 live AHP server。
+其他传输遵循相同的写法——`WebSocketTransport`、`UnixSocketTransport` 以及进程内的 `StdioTransport` 在这里都可以互换。将 `defaultDecision` 设为 `'deny'` 可获得更严格、完全受控的姿态；仅在受信任的沙箱环境中才使用 `'allow'`。
+
+</Tab>
+<Tab value="Python">
+
+```python
+import os
+
+from a3s_code import (
+    Agent,
+    SessionOptions,
+    HttpTransport,
+    DefaultSecurityProvider,
+    PermissionPolicy,
+)
+
+agent = Agent.create(open("agent.acl").read())
+
+opts = SessionOptions()
+# AHP transport: how the session reaches its external host.
+opts.transport = HttpTransport("http://localhost:8080/ahp", os.environ["AHP_TOKEN"])
+# Safety: the security provider vets each tool call; the permission
+# policy decides what runs unattended. These apply regardless of transport.
+opts.security_provider = DefaultSecurityProvider()
+opts.permission_policy = PermissionPolicy(default_decision="ask")
+
+session = agent.session("/repo", opts)
+
+result = session.run("Audit the repo for hardcoded secrets.")
+print(result)
+
+session.close()
+```
+
+将 `default_decision` 设为 `"deny"` 可获得更严格、完全受控的姿态；仅在受信任的沙箱环境中才使用 `"allow"`。传输层与安全层互相独立。
+
+</Tab>
+</Tabs>
+
+## 说明
+
+- **AHP 是传输层，而非策略。** 选择 HTTP、WebSocket 还是 Unix 套接字，改变的是会话*如何*抵达其宿主，而不改变智能体*被允许做什么*。安全完全由安全提供器和权限策略掌控。
+- **`DefaultSecurityProvider`** 提供了合理的基线。当你需要强制执行组织特定的规则（路径白名单、命令审查、脱敏）时，请提供你自己的提供器。
+- **权限策略**（`defaultDecision` / `default_decision`）是最重要的单个安全开关。交互式使用时优先选择 `'ask'`，无人值守运行时除非工作区已沙箱化，否则优先选择 `'deny'`。
+- 这个示例验证会话选项的形状和传输构造函数。在依赖策略、上下文注入、idle、审计或监督行为之前，应先测试你的实时 AHP 服务器。

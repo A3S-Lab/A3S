@@ -1,22 +1,97 @@
 ---
 title: "流式输出"
-description: "在回合运行时读取 AgentEvent"
+description: "在回合运行时读取增量 AgentEvent"
 ---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 # 流式输出
 
+`session.stream(prompt)` 会在回合运行过程中逐步产出事件，因此你可以在文本到达时即时渲染，并实时响应工具活动。当你需要实时 UI，或希望 CLI 逐 token 打印输出（而不是等待 `send` 或 `run` 返回完整结果）时，请使用它。
+
+每个事件都带有一个类型标识。常见类型包括 `text_delta`（一段助手文本）、`tool_start` / `tool_end`（工具调用的开始与结束）、`verification`（验证摘要）以及 `error`。
+
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
+
 ```ts
-const stream = await session.stream('运行测试并解释失败原因');
+import { Agent } from '@a3s-lab/code';
+
+const agent = await Agent.create('agent.acl');
+const session = agent.session(process.cwd(), { planningMode: 'disabled' });
+
+const stream = await session.stream(
+  'Use the bash tool to run the tests, then summarize the result.',
+);
 
 while (true) {
-  const { value: event, done } = await stream.next();
-  if (done) break;
-  if (!event) continue;
+  const next = await stream.next();
+  if (next.done || !next.value) break;
 
-  if (event.text) process.stdout.write(event.text);
-  if (event.toolName) console.log('\n[tool]', event.toolName);
-  if (event.error) console.error(event.error);
+  const event = next.value;
+  if (event.type === 'text_delta' && event.text) {
+    process.stdout.write(event.text);
+  } else if (event.type === 'tool_start') {
+    console.log(`\n[tool:start] ${event.toolName ?? 'unknown'}`);
+  } else if (event.type === 'tool_end') {
+    console.log(`\n[tool:end] ${event.toolName ?? 'unknown'} exit=${event.exitCode ?? 0}`);
+  } else if (event.type === 'verification') {
+    console.log(`\n[verification] ${event.verificationSummaryText ?? ''}`);
+  } else if (event.type === 'error') {
+    throw new Error(event.error ?? 'stream error');
+  }
 }
+
+console.log('\n[stream] complete');
+await session.close();
 ```
 
-流式事件可以包含文本、工具调用、工具输出、错误、token 总数和验证摘要。
+</Tab>
+<Tab value="Python">
+
+```python
+import os
+
+from a3s_code import Agent, SessionOptions
+
+
+def main() -> None:
+    agent = Agent.create(open("agent.acl").read())
+
+    opts = SessionOptions()
+    opts.planning_mode = "disabled"
+    session = agent.session(".", opts)
+
+    prompt = "Use the bash tool to run the tests, then summarize the result."
+
+    try:
+        for event in session.stream(prompt):
+            if event.event_type == "text_delta" and event.text:
+                print(event.text, end="", flush=True)
+            elif event.event_type == "tool_start":
+                print(f"\n[tool:start] {event.tool_name or 'unknown'}")
+            elif event.event_type == "tool_end":
+                print(f"\n[tool:end] {event.tool_name or 'unknown'} exit={event.exit_code or 0}")
+            elif event.event_type == "verification":
+                print(f"\n[verification] {event.verification_summary_text or ''}")
+            elif event.event_type == "error":
+                raise RuntimeError(event.error or "stream error")
+        print("\n[stream] complete")
+    finally:
+        session.close()
+
+
+if __name__ == "__main__":
+    main()
+```
+
+</Tab>
+</Tabs>
+
+说明：
+
+- Node 端使用 `stream.next()` 手动迭代流，检查 `next.done` 与 `next.value`。在当前构建中，Python SDK 将流式输出暴露为同步迭代器，因此你可以用普通的 `for` 循环来消费它（而 `parallel`、`pipeline` 等编排 API 仍为 `async`）。
+- 类型标识字段在两种语言中不同：Node 读取 `event.type`，Python 读取 `event.event_type`。其余字段遵循各语言的大小写约定：Node 中为 `toolName` / `exitCode` / `verificationSummaryText`，Python 中为 `tool_name` / `exit_code` / `verification_summary_text`。
+- 当启用确认策略时，流式事件还可能包含人工介入（human-in-the-loop）确认信号（`confirmation_required`、`confirmation_received`、`confirmation_timeout`）。
+
+可运行的流式示例位于 `crates/code/sdk/node/examples/streaming/` 目录下。一个完整的人工介入确认循环示例位于 `crates/code/sdk/node/examples/streaming/hitl_confirmation_loop.ts`，对应的 Python 版本位于 `crates/code/sdk/python/examples/hitl_confirmation_loop.py`。

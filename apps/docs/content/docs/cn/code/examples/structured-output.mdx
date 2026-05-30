@@ -1,19 +1,29 @@
 ---
 title: "结构化输出"
-description: "使用 generate_object 生成符合 Schema 校验的 JSON 对象"
+description: "使用 generate_object 工具生成符合 Schema 校验的 JSON 对象。"
 ---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 # 结构化输出
 
-`generate_object` 工具生成严格符合 JSON Schema 的对象，支持智能体自主调用和直接调用两种方式。
+内置的 `generate_object` 工具会生成严格符合你所提供 JSON Schema 的 JSON 对象，而不是自由文本。当你需要机器可读的结果时使用它：抽取、分类、配置生成，或者作为另一个程序的输入。
+
+你通过 `session.tool('generate_object', ...)` 调用它。工具结果会把校验后的对象以 JSON 形式放在 `result.output` 上——解析它并读取 `object` 字段。同一个工具也支持 agent 自主调用，即模型在 `send` 过程中自行决定调用它。
 
 ## 直接工具调用
+
+最简单的方式：直接调用 `generate_object`，并从结果中解析出校验后的对象。
+
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
 
 ```ts
 import { Agent } from '@a3s-lab/code';
 
 const agent = await Agent.create('config.acl');
 const session = agent.session('.', {
+  builtinSkills: true,
   permissionPolicy: { defaultDecision: 'allow' },
 });
 
@@ -31,93 +41,151 @@ const result = await session.tool('generate_object', {
       },
     },
   },
-  prompt: '提取: "Alice 28岁，擅长 Rust、TypeScript 和 Python。"',
+  prompt: 'Extract: "Alice is 28, skilled in Rust, TypeScript, and Python."',
   schema_name: 'developer',
+  mode: 'tool',
 });
 
 const { object } = JSON.parse(result.output);
+console.log(object);
 // { name: "Alice", age: 28, skills: ["Rust", "TypeScript", "Python"] }
+
+await session.close();
 ```
 
-## 智能体自主调用
-
-让智能体自行决定何时使用结构化输出：
-
-```ts
-const result = await session.send(`
-  读取 config.yaml 文件，将所有服务定义提取为结构化 JSON，
-  使用 generate_object 工具，schema 如下：
-  { type: "object", required: ["services"], properties: {
-    services: { type: "array", items: { type: "object",
-      required: ["name", "port"], properties: {
-        name: { type: "string" }, port: { type: "integer" }
-  }}}}}
-`);
-```
-
-## 两阶段模式
-
-复杂任务建议将推理与结构化输出分离：
-
-```ts
-// 阶段 1: 智能体自由推理
-const analysis = await session.send('分析 auth.ts 的安全性');
-
-// 阶段 2: 确定性结构化提取
-const structured = await session.tool('generate_object', {
-  schema: {
-    type: 'object',
-    required: ['vulnerabilities', 'risk_score'],
-    properties: {
-      vulnerabilities: {
-        type: 'array',
-        items: {
-          type: 'object',
-          required: ['type', 'severity', 'line'],
-          properties: {
-            type: { type: 'string' },
-            severity: { type: 'string', enum: ['low', 'medium', 'high', 'critical'] },
-            line: { type: 'integer' },
-            description: { type: 'string' },
-          },
-        },
-      },
-      risk_score: { type: 'number', minimum: 0, maximum: 10 },
-    },
-  },
-  prompt: `基于以下分析生成结构化漏洞报告：\n\n${analysis.text}`,
-  schema_name: 'security_report',
-});
-```
-
-## 流式部分对象
-
-```ts
-const stream = await session.stream('从文档中提取所有实体...');
-
-for await (const ev of stream) {
-  if (ev.type === 'tool_output_delta' && ev.toolName === 'generate_object') {
-    const { object_partial } = JSON.parse(ev.text);
-    updateUI(object_partial); // 渐进渲染
-  }
-  if (ev.type === 'tool_end' && ev.toolName === 'generate_object') {
-    const { object } = JSON.parse(ev.toolOutput);
-    finalize(object); // 完整校验后的最终结果
-  }
-}
-```
-
-## Python
+</Tab>
+<Tab value="Python">
 
 ```python
-from a3s_code import Agent, SessionOptions, PermissionPolicy
 import json
+from a3s_code import Agent, SessionOptions, PermissionPolicy
 
 agent = Agent.create(open('config.acl').read())
 opts = SessionOptions()
+opts.builtin_skills = True
 opts.permission_policy = PermissionPolicy(default_decision="allow")
 session = agent.session('.', opts)
 
+result = session.tool("generate_object", {
+    "schema": {
+        "type": "object",
+        "required": ["name", "age", "skills"],
+        "properties": {
+            "name": {"type": "string"},
+            "age": {"type": "integer", "minimum": 0},
+            "skills": {
+                "type": "array",
+                "items": {"type": "string"},
+                "minItems": 1,
+            },
+        },
+    },
+    "prompt": 'Extract: "Alice is 28, skilled in Rust, TypeScript, and Python."',
+    "schema_name": "developer",
+    "mode": "tool",
+})
+
+obj = json.loads(result.output)["object"]
+print(obj)
+# {"name": "Alice", "age": 28, "skills": ["Rust", "TypeScript", "Python"]}
+
+session.close()
+```
+
+</Tab>
+</Tabs>
+
+校验后的值位于解析输出的 `object` 键上。`required` 中声明的每个字段都保证存在且类型正确；如果模型无法满足 schema，工具会在 `result.exitCode`（Node）/ `result.exit_code`（Python）上报告非零退出码。
+
+## 枚举分类
+
+用 `enum` 把字段约束到一个固定集合。这会把模型变成一个可靠的分类器。
+
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
+
+```ts
+const result = await session.tool('generate_object', {
+  schema: {
+    type: 'object',
+    required: ['sentiment', 'confidence'],
+    properties: {
+      sentiment: { type: 'string', enum: ['positive', 'negative', 'neutral'] },
+      confidence: { type: 'number', minimum: 0, maximum: 1 },
+    },
+  },
+  prompt: 'Classify sentiment: "This is the worst product I have ever used."',
+  schema_name: 'sentiment',
+});
+
+const { object } = JSON.parse(result.output);
+console.log(object.sentiment, object.confidence); // "negative" 0.97
+```
+
+</Tab>
+<Tab value="Python">
+
+```python
+result = session.tool("generate_object", {
+    "schema": {
+        "type": "object",
+        "required": ["sentiment", "confidence"],
+        "properties": {
+            "sentiment": {"type": "string", "enum": ["positive", "negative", "neutral"]},
+            "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        },
+    },
+    "prompt": 'Classify sentiment: "This is the worst product I have ever used."',
+    "schema_name": "sentiment",
+})
+
+obj = json.loads(result.output)["object"]
+print(obj["sentiment"], obj["confidence"])  # "negative" 0.97
+```
+
+</Tab>
+</Tabs>
+
+## 嵌套 schema 与数组
+
+Schema 可以任意深度地嵌套对象和数组，运行时会校验整个结构。这能在一次调用中建模真实的配置文件、清单或 API 载荷。
+
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
+
+```ts
+const result = await session.tool('generate_object', {
+  schema: {
+    type: 'object',
+    required: ['items'],
+    properties: {
+      items: {
+        type: 'array',
+        minItems: 3,
+        maxItems: 5,
+        items: {
+          type: 'object',
+          required: ['name', 'category'],
+          properties: {
+            name: { type: 'string' },
+            category: { type: 'string', enum: ['fruit', 'vegetable', 'grain'] },
+          },
+        },
+      },
+    },
+  },
+  prompt: 'List 3 food items with their categories.',
+  schema_name: 'food_list',
+});
+
+const { items } = JSON.parse(result.output).object;
+console.log(items.length, items.map((i) => i.name));
+```
+
+</Tab>
+<Tab value="Python">
+
+```python
 result = session.tool("generate_object", {
     "schema": {
         "type": "object",
@@ -125,17 +193,63 @@ result = session.tool("generate_object", {
         "properties": {
             "items": {
                 "type": "array",
-                "items": {"type": "object", "required": ["name", "price"],
-                          "properties": {"name": {"type": "string"}, "price": {"type": "number"}}}
-            }
-        }
+                "minItems": 3,
+                "maxItems": 5,
+                "items": {
+                    "type": "object",
+                    "required": ["name", "category"],
+                    "properties": {
+                        "name": {"type": "string"},
+                        "category": {"type": "string", "enum": ["fruit", "vegetable", "grain"]},
+                    },
+                },
+            },
+        },
     },
-    "prompt": "提取商品: '苹果 ¥10, 香蕉 ¥5, 橙子 ¥8'",
-    "schema_name": "grocery_list",
+    "prompt": "List 3 food items with their categories.",
+    "schema_name": "food_list",
 })
 
-data = json.loads(result.output)["object"]
+items = json.loads(result.output)["object"]["items"]
+print(len(items), [i["name"] for i in items])
 ```
+
+</Tab>
+</Tabs>
+
+## Agent 自主调用
+
+你也可以让 agent 自行决定何时使用结构化输出。让它在 `send` 过程中调用 `generate_object`；它会先收集上下文，再输出对象。
+
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
+
+```ts
+const result = await session.send(
+  'Use the generate_object tool to extract the following into an object ' +
+    'with fields "title" (string), "year" (integer), "genre" (string): ' +
+    'The movie "Inception" was released in 2010 and is a sci-fi thriller.'
+);
+
+console.log(`tool calls: ${result.toolCallsCount}, tokens: ${result.totalTokens}`);
+```
+
+</Tab>
+<Tab value="Python">
+
+```python
+result = session.send(
+    'Use the generate_object tool to produce a JSON object with schema '
+    '{"type":"object","required":["language","paradigm"],"properties":'
+    '{"language":{"type":"string"},"paradigm":{"type":"string"}}} '
+    'for: "Rust is a systems programming language with a focus on safety."'
+)
+
+print(f"tool calls: {result.tool_calls_count}, tokens: {result.total_tokens}")
+```
+
+</Tab>
+</Tabs>
 
 ## Schema 校验覆盖
 
@@ -149,3 +263,11 @@ data = json.loads(result.output)["object"]
 - `minimum`、`maximum`、`exclusiveMinimum`、`exclusiveMaximum`
 - `minItems`、`maxItems`、`items`
 - 嵌套对象和数组校验
+
+## 说明
+
+- 校验后的值位于解析后 `result.output` 的 `object` 键上。直接结构化调用传 `mode: 'tool'`，仅 prompt 的回退方式传 `mode: 'prompt'`。
+- 把你依赖的每个字段都列入 `required`——运行时会强制执行，因此缺失或类型错误的字段会导致校验失败，而不是悄悄返回部分数据。
+- `generate_object` 是内置工具，因此 session 需要启用 `builtinSkills` / `builtin_skills`（如上所示）。
+
+可运行版本随源码提供，位于 `crates/code/sdk/node/examples/basic/test_generate_object.ts` 和 `crates/code/sdk/python/examples/test_generate_object.py`。

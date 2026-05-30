@@ -1,24 +1,46 @@
 ---
 title: "直接工具"
-description: "不经过 LLM 回合运行确定性工具"
+description: "不消耗 LLM 回合即可运行确定性宿主工具"
 ---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 # 直接工具
 
+`session.tool(name, args)`（以及 `glob`、`grep`、`readFile` 等类型化辅助方法）会直接运行宿主工具，循环中不发起任何模型调用。它们适用于测试、迁移以及宿主驱动的工作流——你需要确定性结果，而不是一次智能体回合。对于无人值守的调用，请将权限策略的 `defaultDecision` 设为 `allow`，这样工具就不会因等待确认提示而阻塞。
+
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
+
 ```ts
-const files = await session.glob('content/docs/**/*.mdx');
-const matches = await session.grep('default_model|providers "openai"|baseUrl');
-const readme = await session.readFile('README.md');
-const tests = await session.bash('npm run build');
-const raw = await session.tool('read', { file_path: 'README.md' });
-const schemas = session.toolDefinitions();
-const program = await session.program({
-  source: 'export default async function run(ctx, inputs) { return ctx.grep(inputs.q); }',
-  inputs: { q: 'planningMode' },
-  allowedTools: ['grep'],
+import { Agent } from '@a3s-lab/code';
+
+const agent = await Agent.create('agent.acl');
+const session = agent.session('.', {
+  permissionPolicy: { defaultDecision: 'allow' },
 });
 
-// 结构化输出：生成符合 schema 校验的 JSON 对象
+// Glob: list files by pattern
+const files = await session.glob('**/*.ts');
+console.log(`glob found ${files.length} TypeScript files`);
+
+// Grep: search file contents
+const matches = await session.grep('Agent.create');
+console.log(`grep found ${matches.length} matches`);
+
+// Read a file
+const readme = await session.readFile('README.md');
+console.log(`README is ${readme.length} bytes`);
+
+// Direct tool call by name
+const raw = await session.tool('read', { file_path: 'package.json' });
+console.log(`package.json via tool(): ${String(raw).length} bytes`);
+
+// Inspect available tool schemas
+const schemas = session.toolDefinitions();
+console.log(`session exposes ${schemas.length} tools`);
+
+// Structured output: generate a schema-validated JSON object
 const structured = await session.tool('generate_object', {
   schema: {
     type: 'object',
@@ -28,9 +50,66 @@ const structured = await session.tool('generate_object', {
       language: { type: 'string' },
     },
   },
-  prompt: '有多少 .mdx 文件？它们是什么语言的？',
+  prompt: 'How many TypeScript files are in this project?',
   schema_name: 'file_stats',
 });
+console.log('structured output:', structured);
+
+await session.close();
 ```
 
-直接工具适合测试、迁移和宿主应用工作流。它们在 session 工作区下执行，应视为宿主侧特权操作。
+</Tab>
+<Tab value="Python">
+
+```python
+from a3s_code import Agent, SessionOptions, PermissionPolicy
+
+agent = Agent.create(open('agent.acl').read())
+opts = SessionOptions()
+opts.permission_policy = PermissionPolicy(default_decision='allow')
+session = agent.session('.', opts)
+
+# Glob: list files by pattern
+files = session.glob('**/*.py')
+print(f'glob found {len(files)} Python files')
+
+# Grep: search file contents
+matches = session.grep('Agent.create')
+print(f'grep found {len(matches)} matches')
+
+# Read a file
+readme = session.read_file('README.md')
+print(f'README is {len(readme)} bytes')
+
+# Direct tool call by name
+raw = session.tool('read', {'file_path': 'pyproject.toml'})
+print(f'pyproject.toml via tool(): {len(str(raw))} bytes')
+
+# Inspect available tool schemas
+schemas = session.tool_definitions()
+print(f'session exposes {len(schemas)} tools')
+
+# Structured output: generate a schema-validated JSON object
+structured = session.tool('generate_object', {
+    'schema': {
+        'type': 'object',
+        'required': ['count', 'language'],
+        'properties': {
+            'count': {'type': 'integer'},
+            'language': {'type': 'string'},
+        },
+    },
+    'prompt': 'How many Python files are in this project?',
+    'schema_name': 'file_stats',
+})
+print('structured output:', structured)
+
+session.close()
+```
+
+</Tab>
+</Tabs>
+
+直接工具在 session 工作区下执行，应视为宿主侧的特权操作。大多数调用（`read`、`glob`、`grep`）是纯确定性的；`generate_object` 是个例外——它仍会调用模型来填充经过 schema 校验的 JSON 对象，但由你显式驱动，而非通过自由形式的智能体回合。
+
+可运行版本位于 `crates/code/sdk/node/examples/basic/test_generate_object.ts`（Python：`crates/code/sdk/python/examples/test_generate_object.py`）。
