@@ -1,25 +1,116 @@
 ---
-title: "Skills"
-description: "Load file-based and built-in skills"
+title: "Skills & Custom Agents"
+description: "Toggle the built-in skills and load your own skills and subagents from project directories."
 ---
 
-# Skills
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+# Skills & Custom Agents
+
+A3S Code ships with a set of built-in skills, and you can extend a session with your
+own skills and subagents loaded from directories on disk. Use the `builtinSkills`
+option to turn the bundled skills on or off, and `agentDirs` (or `registerAgentDir`)
+to point the session at folders that contain your custom `*.skill.md` and agent
+definitions. This is the right approach when you want project-specific behavior
+without changing the runtime.
+
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
 
 ```ts
-const session = agent.session('/repo', {
+import { Agent } from '@a3s-lab/code';
+
+const agent = await Agent.create('agent.acl');
+
+// Built-in skills ON, plus custom skills/agents from project dirs.
+const session = agent.session('/path/to/project', {
   builtinSkills: true,
-  skillDirs: ['./skills'],
+  agentDirs: ['./.a3s/skills', './.a3s/agents'],
+});
+
+// You can also register more directories after the session exists.
+session.registerAgentDir('./team/shared-agents');
+
+// Inspect what the session loaded.
+console.log('Tools:', session.toolNames());
+console.log('Commands:', session.listCommands());
+
+// The agent now has access to both built-in and custom skills.
+const result = await session.run(
+  'Use the project conventions skill to scaffold a new module.',
+);
+console.log(result);
+
+await session.close();
+```
+
+</Tab>
+<Tab value="Python">
+
+```python
+from a3s_code import Agent, SessionOptions
+
+agent = Agent.create(open('agent.acl').read())
+
+# Built-in skills ON, plus custom skills/agents from project dirs.
+opts = SessionOptions()
+opts.builtin_skills = True
+opts.agent_dirs = ['./.a3s/skills', './.a3s/agents']
+
+session = agent.session('/path/to/project', opts)
+
+# You can also register more directories after the session exists.
+session.register_agent_dir('./team/shared-agents')
+
+# Inspect what the session loaded.
+print('Tools:', session.tool_names())
+print('Commands:', session.list_commands())
+
+# The agent now has access to both built-in and custom skills.
+result = session.run(
+    'Use the project conventions skill to scaffold a new module.',
+)
+print(result)
+
+session.close()
+```
+
+</Tab>
+</Tabs>
+
+## Disabling the built-in skills
+
+Set `builtinSkills` / `builtin_skills` to `false` when you want a lean session that
+only uses the skills you explicitly provide. The bundled skills are no longer
+registered, so `toolNames()` / `tool_names()` reflects only your custom set plus the
+core tools.
+
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
+
+```ts
+const session = agent.session('/path/to/project', {
+  builtinSkills: false,
+  agentDirs: ['./.a3s/skills'],
 });
 ```
 
-Example skill:
+</Tab>
+<Tab value="Python">
 
-```md
----
-name: release-review
-description: Review release blockers
-allowed-tools: "read(*), grep(*), bash(npm run build*)"
----
-
-Return blockers first, with evidence.
+```python
+opts = SessionOptions()
+opts.builtin_skills = False
+opts.agent_dirs = ['./.a3s/skills']
+session = agent.session('/path/to/project', opts)
 ```
+
+</Tab>
+</Tabs>
+
+Custom subagents loaded from `agentDirs` can be referenced by name in
+[`session.parallel(...)`](/docs/code/examples/orchestration) and
+[`session.pipeline(...)`](/docs/code/examples/orchestration) alongside the built-in
+registry agents (`explore`, `plan`, `general`, `verification`, `review`).
+
+A runnable version ships at `crates/code/sdk/node/examples/skills/test_custom_skills_agents.ts`.

@@ -95,7 +95,7 @@ if (session.isClosed()) {
 ```
 
 ```python
-await session.close()
+session.close()
 if session.is_closed():
     # send/stream now reject with CodeError::SessionClosed
     pass
@@ -133,9 +133,9 @@ console.log(agent.isClosed());
 ```
 
 ```python
-ids = await agent.list_sessions()
-await agent.close_session(ids[0])
-await agent.close()  # closes all remaining sessions + global MCP
+ids = agent.list_sessions()
+agent.close_session(ids[0])
+agent.close()  # closes all remaining sessions + global MCP
 print(agent.is_closed())
 ```
 

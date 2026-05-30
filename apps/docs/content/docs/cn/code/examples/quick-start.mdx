@@ -1,45 +1,61 @@
 ---
 title: "快速开始"
-description: "创建 ACL 配置并运行第一个 session"
+description: "创建一个 agent、打开会话、运行一轮对话并读取结果。"
 ---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 # 快速开始
 
-创建 `agent.acl`：
+最小可用的程序：从 ACL 文件创建一个 agent，在项目目录上打开会话，使用 `send`
+运行一轮对话，打印回复文本，并查看运行时为该轮生成的验证摘要。
 
-```text
-default_model = "openai/MiniMax-M2.7-highspeed"
-max_parallel_tasks = 4
-
-providers "openai" {
-  apiKey = env("A3S_OPENAI_API_KEY")
-  baseUrl = env("A3S_OPENAI_BASE_URL")
-
-  models "MiniMax-M2.7-highspeed" {
-    name = "MiniMax M2.7 Highspeed"
-    tool_call = true
-  }
-}
-
-auto_delegation {
-  enabled        = true
-  auto_parallel  = false
-  min_confidence = 0.72
-  max_tasks      = 2
-}
-```
-
-运行一个 session：
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
 
 ```ts
 import { Agent } from '@a3s-lab/code';
 
+// Agent.create takes a PATH to the ACL file.
 const agent = await Agent.create('agent.acl');
-const session = agent.session(process.cwd(), {
-  builtinSkills: true,
-  autoDelegation: { enabled: true, maxTasks: 2 },
-  autoParallel: false,
-});
-const result = await session.send('总结这个仓库的结构');
+const session = agent.session('.');
+
+const result = await session.send('List the files in this directory.');
 console.log(result.text);
+
+// What the runtime checked while producing that turn.
+console.log(session.verificationSummaryText());
+
+await session.close();
 ```
+
+</Tab>
+<Tab value="Python">
+
+```python
+from a3s_code import Agent
+
+# Agent.create takes the ACL SOURCE TEXT, not a path.
+agent = Agent.create(open('agent.acl').read())
+session = agent.session('.')
+
+result = session.send('List the files in this directory.')
+print(result.text)
+
+# What the runtime checked while producing that turn.
+print(session.verification_summary_text())
+
+session.close()
+```
+
+</Tab>
+</Tabs>
+
+请注意两个 SDK 之间的差异：在 Node.js 中，`Agent.create` 接收 ACL 文件的**路径**，
+而在 Python 中它接收 ACL 的**源文本**（需要你自己读取文件）。使用完毕后，请务必
+调用 `close()` 关闭会话，以便运行时刷新状态并释放资源。
+
+## 下一步
+
+- [流式输出](/cn/docs/code/examples/streaming) — 在 token 到达时实时读取
+- [会话](/cn/docs/code/examples/sessions) — 持久化并恢复对话

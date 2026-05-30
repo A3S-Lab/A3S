@@ -168,6 +168,8 @@ validated async iteration support.
 
 ## Direct Tools
 
+> Full guide: [Tools](/docs/code/tools).
+
 The integration check covers these host-driven direct calls:
 
 ```ts
@@ -236,6 +238,8 @@ tool set.
 
 ## Verification
 
+> Full guide: [Verification](/docs/code/verification).
+
 Verification is session-scoped:
 
 ```ts
@@ -252,6 +256,8 @@ console.log(formatVerificationSummary(session.verificationSummary()));
 ```
 
 ## Memory
+
+> Full guide: [Memory](/docs/code/memory).
 
 Node memory was verified with `FileMemoryStore`:
 
@@ -272,6 +278,8 @@ The verified recent-memory method is `memoryRecent()`. `recallRecent()` is not
 present on the current Node SDK surface.
 
 ## Skills
+
+> Full guide: [Skills](/docs/code/skills).
 
 File-backed and inline skills are verified through `search_skills`:
 
@@ -296,6 +304,8 @@ The skill-file check uses Markdown with YAML frontmatter and the
 
 ## Side Questions
 
+> Full guide: [Sessions](/docs/code/sessions).
+
 `btw()` asks a read-only side question and returns a separate result:
 
 ```ts
@@ -306,6 +316,8 @@ console.log(side.totalTokens);
 ```
 
 ## Runs And Cancellation
+
+> Full guide: [Sessions](/docs/code/sessions).
 
 Each `send()` or `stream()` records replayable run state:
 
@@ -331,6 +343,8 @@ console.log(session.traceEvents());
 `runs()` for completed history.
 
 ## Persistence
+
+> Full guide: [Persistence](/docs/code/persistence) and [Sessions](/docs/code/sessions).
 
 File-backed session persistence was verified with stable `sessionId`,
 `autoSave`, explicit `save()`, and `resumeSession()`:
@@ -374,6 +388,8 @@ session-scoped workers outlive the agent.
 
 ## Delegation
 
+> Full guide: [Tasks](/docs/code/tasks) and [Orchestration](/docs/code/orchestration).
+
 The direct helpers for the core delegation tools were verified:
 
 ```ts
@@ -393,6 +409,8 @@ await session.tasks([
 They return `ToolResult` values from `task` and `parallel_task`.
 
 ## Hooks
+
+> Full guide: [Hooks](/docs/code/hooks).
 
 The verified hook management surface is:
 
@@ -414,6 +432,8 @@ production enforcement gate.
 
 ## Slash Commands
 
+> Full guide: [Commands](/docs/code/commands).
+
 Custom slash commands are invoked through `session.send()`:
 
 ```ts
@@ -427,6 +447,8 @@ console.log(result.text);
 ```
 
 ## Lane Queue
+
+> Full guide: [Lane Queue](/docs/code/lane-queue).
 
 Queue infrastructure is opt-in:
 
@@ -447,6 +469,8 @@ await queued.deadLetters();
 Ordinary sessions are queue-free unless `queueConfig` is provided.
 
 ## MCP
+
+> Full guide: [MCP](/docs/code/mcp). Idle disconnect: [Cluster Extension Points](/docs/code/cluster-extension-points).
 
 The integration check covers a live stdio MCP server:
 
@@ -483,7 +507,9 @@ The check does not assert a live AHP server exchange.
 
 ## Cluster-grade extension points
 
-These contracts let a cluster control plane (e.g. 书安OS) wire
+> Full guide: [Cluster Extension Points](/docs/code/cluster-extension-points) (identity labels, budget guard, cluster events, deterministic IDs/replay, loop checkpoints, retention caps).
+
+These contracts let a cluster control plane wire
 multi-tenancy, cost governance, and crash-tolerant runs **without
 forking the framework**. The framework defines decision points and
 emits structured events; the host supplies the policy implementations.

@@ -1,10 +1,19 @@
 ---
 title: "Examples"
-description: "v3.1.0 examples for A3S Code"
+description: "v3.4.0 examples for A3S Code"
 ---
 
 # Examples
 
-These examples use A3S Code v3.1.0 concepts: ACL configuration, explicit environment-variable credentials, session APIs, task-based delegation, automatic subagent delegation, `.a3s/agents`, AHP, direct tools, verification, and optional queue infrastructure.
+These examples use A3S Code v3.4.0 concepts: ACL configuration, explicit environment-variable credentials, session APIs, streaming, structured output, task-based and automatic subagent delegation, programmable orchestration (`parallel` / `pipeline` / `parallelResumable`), `.a3s/agents`, AHP safety, skills, memory, direct tools, verification, git workflows, and optional MCP/queue infrastructure.
 
-Start with [Quick Start](/docs/code/examples/quick-start), then move to streaming, model switching, hooks, security, and release-style verification.
+Start with the [Quick Start](/docs/code/examples/quick-start), then explore by area:
+
+- **Sessions & runtime** — [Quick Start](/docs/code/examples/quick-start), [Streaming](/docs/code/examples/streaming), [Model switching](/docs/code/examples/model-switching), [Auto-compact](/docs/code/examples/auto-compact)
+- **Structured & programmable** — [Structured output](/docs/code/examples/structured-output), [Orchestration](/docs/code/examples/orchestration), [Planning](/docs/code/examples/planning), [Batch](/docs/code/examples/batch)
+- **Tools & context** — [Direct tools](/docs/code/examples/direct-tools), [ripgrep context](/docs/code/examples/ripgrep-context), [Prompt slots](/docs/code/examples/prompt-slots), [Git worktree](/docs/code/examples/git-worktree)
+- **Skills & memory** — [Skills](/docs/code/examples/skills), [Skill tool](/docs/code/examples/skill-tool), [Memory](/docs/code/examples/memory), [Hooks](/docs/code/examples/hooks)
+- **Security & verification** — [Security](/docs/code/examples/security), [AHP safety](/docs/code/examples/ahp-safety)
+- **MCP & queues** — [Lane queue](/docs/code/examples/lane-queue), [External tasks](/docs/code/examples/external-tasks)
+
+New in v3.4.0: see the [Orchestration](/docs/code/examples/orchestration) example for fan-out (`parallel`), staged (`pipeline`), and resumable (`parallelResumable`) multi-agent workflows.

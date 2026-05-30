@@ -1,45 +1,63 @@
 ---
 title: "Quick Start"
-description: "Create an ACL config and run a first session"
+description: "Create an agent, open a session, run one turn, and read the result."
 ---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 # Quick Start
 
-Create `agent.acl`:
+The smallest useful program: create an agent from an ACL file, open a session on a
+project directory, run one turn with `send`, print the reply text, and inspect the
+verification summary the runtime produced for that turn.
 
-```text
-default_model = "openai/MiniMax-M2.7-highspeed"
-max_parallel_tasks = 4
-
-providers "openai" {
-  apiKey = env("A3S_OPENAI_API_KEY")
-  baseUrl = env("A3S_OPENAI_BASE_URL")
-
-  models "MiniMax-M2.7-highspeed" {
-    name = "MiniMax M2.7 Highspeed"
-    tool_call = true
-  }
-}
-
-auto_delegation {
-  enabled        = true
-  auto_parallel  = false
-  min_confidence = 0.72
-  max_tasks      = 2
-}
-```
-
-Run a session:
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
 
 ```ts
 import { Agent } from '@a3s-lab/code';
 
+// Agent.create takes a PATH to the ACL file.
 const agent = await Agent.create('agent.acl');
-const session = agent.session(process.cwd(), {
-  builtinSkills: true,
-  autoDelegation: { enabled: true, maxTasks: 2 },
-  autoParallel: false,
-});
-const result = await session.send('Summarize the repository structure');
+const session = agent.session('.');
+
+const result = await session.send('List the files in this directory.');
 console.log(result.text);
+
+// What the runtime checked while producing that turn.
+console.log(session.verificationSummaryText());
+
+await session.close();
 ```
+
+</Tab>
+<Tab value="Python">
+
+```python
+from a3s_code import Agent
+
+# Agent.create takes the ACL SOURCE TEXT, not a path.
+agent = Agent.create(open('agent.acl').read())
+session = agent.session('.')
+
+result = session.send('List the files in this directory.')
+print(result.text)
+
+# What the runtime checked while producing that turn.
+print(session.verification_summary_text())
+
+session.close()
+```
+
+</Tab>
+</Tabs>
+
+Note the asymmetry between the SDKs: in Node.js `Agent.create` takes a **path** to the
+ACL file, while in Python it takes the **ACL source text** (read the file yourself).
+Always `close()` the session when you are done so the runtime can flush state and
+release resources.
+
+## Next steps
+
+- [Streaming](/docs/code/examples/streaming) — read tokens as they arrive
+- [Sessions](/docs/code/examples/sessions) — persist and resume conversations

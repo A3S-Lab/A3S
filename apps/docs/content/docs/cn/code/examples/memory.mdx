@@ -1,17 +1,84 @@
 ---
 title: "记忆"
-description: "记住并召回任务事实"
+description: "记录任务结果，之后按相似度、标签或时间召回。"
 ---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 # 记忆
 
-```ts
-import { FileMemoryStore } from '@a3s-lab/code';
+持久化记忆让会话能够记录哪些做法成功（以及哪些失败），并在之后取回这些事实。
+挂载一个 `FileMemoryStore`，让记录在多次运行间保留；用 `rememberSuccess` /
+`rememberFailure` 写入结果，再用 `recallSimilar`、`recallByTags` 或
+`memoryRecent` 取回它们。
 
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
+
+```ts
+import { Agent, FileMemoryStore } from '@a3s-lab/code';
+
+const agent = await Agent.create('agent.acl');
 const session = agent.session('/repo', {
   memoryStore: new FileMemoryStore('./.a3s/memory'),
 });
 
-await session.rememberSuccess('文档重写', ['grep', 'read'], '已移除过期配置说明');
-const memories = await session.recallSimilar('文档发布重写', 5);
+// Record outcomes as the agent works.
+await session.rememberSuccess(
+  'refactored auth module',
+  ['read', 'edit', 'bash'],
+  'all tests passed after extracting AuthService',
+);
+await session.rememberFailure(
+  'migration attempt',
+  ['bash'],
+  'psql connection refused on port 5432',
+);
+
+// Recall later — by recency, by tool tags, or by semantic similarity.
+const recent = await session.memoryRecent(10);
+const byTags = await session.recallByTags(['read', 'edit'], 5);
+const similar = await session.recallSimilar('auth refactor', 5);
+
+console.log(recent.length, byTags.length, similar.length);
 ```
+
+</Tab>
+<Tab value="Python">
+
+```python
+from a3s_code import Agent, SessionOptions, FileMemoryStore
+
+agent = Agent.create(open("agent.acl").read())
+opts = SessionOptions()
+opts.memory_store = FileMemoryStore("./.a3s/memory")
+session = agent.session("/repo", opts)
+
+# Record outcomes as the agent works. Python helpers are synchronous — no await.
+session.remember_success(
+    "refactored auth module",
+    ["read", "edit", "bash"],
+    "all tests passed after extracting AuthService",
+)
+session.remember_failure(
+    "migration attempt",
+    ["bash"],
+    "psql connection refused on port 5432",
+)
+
+# Recall later — by recency, by tool tags, or by semantic similarity.
+recent = session.memory_recent(10)
+by_tags = session.recall_by_tags(["read", "edit"], 5)
+similar = session.recall_similar("auth refactor", 5)
+
+print(len(recent), len(by_tags), len(similar))
+```
+
+</Tab>
+</Tabs>
+
+`rememberSuccess` 和 `rememberFailure` 都接收一段简短的任务描述、相关工具列表
+（这些工具同时充当可检索的标签），以及结果文本。三个召回方法相互补充：
+`memoryRecent(limit)` 返回最新的记录，`recallByTags(tags, limit)` 按你记录的
+工具标签过滤，`recallSimilar(query, limit)` 则按与查询的语义相关度对记录排序。
+若不设置 `memoryStore`，记忆仅存在于进程内，会话关闭时即被丢弃。

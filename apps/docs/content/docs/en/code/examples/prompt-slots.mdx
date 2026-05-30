@@ -1,16 +1,158 @@
 ---
 title: "Prompt Slots"
-description: "Programmatic role, guidelines, and response style"
+description: "Customize the agent's persona, guidelines, and response style without overriding core behavior."
 ---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 # Prompt Slots
 
+Prompt slots are session options that shape the agent's system prompt declaratively. Use
+them for host-level behavior — persona, coding standards, output style — that should not
+live inside each user prompt. The slots layer on top of the agent's built-in instructions,
+so core tool behavior (reading, writing, running commands) is preserved.
+
+There are four slots:
+
+| Slot | Purpose |
+|------|---------|
+| `role` / `role` | The persona the agent adopts. |
+| `guidelines` / `guidelines` | Standards and rules the agent must follow. |
+| `responseStyle` / `response_style` | How the agent should format its replies. |
+| `extra` / `extra` | Freeform instructions appended verbatim. |
+
+## Basic usage
+
+Set any subset of the slots when you open a session. They apply to every turn of that
+session.
+
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
+
 ```ts
-const session = agent.session('/repo', {
-  role: 'release-readiness reviewer',
-  guidelines: 'Find blockers before improvements. Require command evidence for done claims.',
-  responseStyle: 'concise, findings first',
+import { Agent } from '@a3s-lab/code';
+
+async function main() {
+  // Node: create() takes a PATH to the ACL agent file.
+  const agent = await Agent.create('agent.acl');
+
+  const session = agent.session('/repo', {
+    role: 'release-readiness reviewer',
+    guidelines: 'Find blockers before improvements. Require command evidence for done claims.',
+    responseStyle: 'concise, findings first',
+  });
+
+  const result = await session.send('Is this repo ready to ship?');
+  console.log(result.text);
+
+  await session.close();
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
 });
 ```
 
-Prompt slots are session options. Use them for host-level behavior that should not live in a user prompt.
+</Tab>
+<Tab value="Python">
+
+```python
+from a3s_code import Agent, SessionOptions
+
+def main():
+    # Python: create() takes the ACL SOURCE TEXT.
+    agent = Agent.create(open('agent.acl').read())
+
+    session = agent.session('/repo', SessionOptions(
+        role='release-readiness reviewer',
+        guidelines='Find blockers before improvements. Require command evidence for done claims.',
+        response_style='concise, findings first',
+    ))
+
+    result = session.send('Is this repo ready to ship?')
+    print(result.text)
+
+    session.close()
+
+main()
+```
+
+</Tab>
+</Tabs>
+
+## Each slot in turn
+
+The four slots compose independently. A persona-only session, a reviewer with strict
+guidelines, and a session that appends a freeform instruction all use the same option set.
+
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
+
+```ts
+// 1. Custom role only.
+let session = agent.session(workspace, {
+  role: 'You are a senior Rust developer who specializes in async programming.',
+});
+
+// 2. Role + guidelines + response style.
+session = agent.session(workspace, {
+  role: 'You are a Python code reviewer.',
+  guidelines: 'Always check for type hints. Flag any use of `eval()`.',
+  responseStyle: 'Reply in bullet points. Be concise.',
+});
+
+// 3. Extra freeform instructions only.
+session = agent.session(workspace, {
+  extra: "Always end your response with '-- A3S'",
+});
+
+// Core tool behavior is preserved regardless of the slots.
+session = agent.session(workspace, {
+  role: 'You are a minimalist file manager.',
+  guidelines: 'Only create files when explicitly asked.',
+});
+const result = await session.send(
+  "Create a file called test.txt with the content 'prompt slots work'. Then read it back.",
+);
+```
+
+</Tab>
+<Tab value="Python">
+
+```python
+# 1. Custom role only.
+session = agent.session(workspace, SessionOptions(
+    role='You are a senior Rust developer who specializes in async programming.',
+))
+
+# 2. Role + guidelines + response style.
+session = agent.session(workspace, SessionOptions(
+    role='You are a Python code reviewer.',
+    guidelines='Always check for type hints. Flag any use of `eval()`.',
+    response_style='Reply in bullet points. Be concise.',
+))
+
+# 3. Extra freeform instructions only.
+session = agent.session(workspace, SessionOptions(
+    extra="Always end your response with '-- A3S'",
+))
+
+# Core tool behavior is preserved regardless of the slots.
+session = agent.session(workspace, SessionOptions(
+    role='You are a minimalist file manager.',
+    guidelines='Only create files when explicitly asked.',
+))
+result = session.send(
+    "Create a file called test.txt with the content 'prompt slots work'. Then read it back.",
+)
+```
+
+</Tab>
+</Tabs>
+
+Slots customize personality and house rules; they do not disable tools or change the
+agent's core loop. Keep task-specific requests in the `send` message and reserve the slots
+for behavior that should hold across every turn of the session.
+
+A runnable version ships at `crates/code/sdk/node/examples/skills/test_prompt_slots.ts`.

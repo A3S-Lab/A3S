@@ -26,7 +26,7 @@ Everything in this layer is written against a single seam, `AgentExecutor`:
 - The **framework** owns the *grammar* — which steps exist, how they compose,
   the concurrency *hint*, and the serializable contracts `AgentStepSpec` /
   `StepOutcome`.
-- The **host** (书安OS) owns *placement* — transport, scheduling, and where a
+- The **host** owns *placement* — transport, scheduling, and where a
   step actually runs.
 
 The in-box default executor (`TaskExecutor`) runs every step locally,

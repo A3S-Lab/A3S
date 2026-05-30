@@ -6,7 +6,7 @@ description: "通过 AgentExecutor seam 将编排步骤分布到多台机器"
 # 多机器
 
 A3S Code 把多智能体编排表达为代码中的一套*语法*（grammar），再把由此产生的步骤
-放到你希望它运行的任何地方。这一划分沿着**框架 / 宿主（书安OS）边界**展开，于
+放到你希望它运行的任何地方。这一划分沿着**框架 / 宿主边界**展开，于
 `[3.4.0]` 引入：
 
 - **框架**拥有编排语法和可序列化的数据契约。它从不决定步骤在哪里运行。
@@ -42,7 +42,7 @@ combinators (parallel / pipeline / resumable)
 
 内置的 `TaskExecutor` 把每个步骤作为子 agent 在本地运行——在进程内、基于 Tokio——
 继承会话的 agent 注册表、LLM 客户端、工作区、MCP 工具和 subagent 跟踪器。诸如
-书安OS 的宿主用自己的 executor 替换它，把步骤分布到集群；combinators 不受影响。
+集群运行时这样的宿主用自己的 executor 替换它，把步骤分布到集群；combinators 不受影响。
 
 `concurrency_hint()` 是**建议性的，不是本地硬上限**。本地默认返回会话的
 `max_parallel_tasks`；由调度器支撑的宿主可以返回其集群范围的目标值。因为它是 hint

@@ -91,7 +91,7 @@ if (session.isClosed()) {
 ```
 
 ```python
-await session.close()
+session.close()
 if session.is_closed():
     # send/stream 现在会以 CodeError::SessionClosed 拒绝
     pass
@@ -126,9 +126,9 @@ console.log(agent.isClosed());
 ```
 
 ```python
-ids = await agent.list_sessions()
-await agent.close_session(ids[0])
-await agent.close()  # 关闭所有剩余 session + 全局 MCP
+ids = agent.list_sessions()
+agent.close_session(ids[0])
+agent.close()  # 关闭所有剩余 session + 全局 MCP
 print(agent.is_closed())
 ```
 

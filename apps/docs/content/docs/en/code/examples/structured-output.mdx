@@ -1,20 +1,29 @@
 ---
 title: "Structured Output"
-description: "Generate schema-validated JSON objects with generate_object"
+description: "Generate schema-validated JSON objects with the generate_object tool."
 ---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 # Structured Output
 
-The `generate_object` tool produces JSON objects that strictly conform to a
-provided JSON Schema. It supports both agent-driven and direct invocation.
+The built-in `generate_object` tool produces JSON objects that strictly conform to a JSON Schema you supply, instead of free-form text. Use it whenever you need machine-readable results: extraction, classification, config generation, or feeding another program.
 
-## Direct Tool Call
+You call it through `session.tool('generate_object', ...)`. The tool result carries the validated object as JSON on `result.output` — parse it and read the `object` field. The same tool also supports agent-driven invocation, where the model decides to call it during a `send`.
+
+## Direct tool call
+
+The simplest path: call `generate_object` directly and parse the validated object out of the result.
+
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
 
 ```ts
 import { Agent } from '@a3s-lab/code';
 
 const agent = await Agent.create('config.acl');
 const session = agent.session('.', {
+  builtinSkills: true,
   permissionPolicy: { defaultDecision: 'allow' },
 });
 
@@ -34,91 +43,149 @@ const result = await session.tool('generate_object', {
   },
   prompt: 'Extract: "Alice is 28, skilled in Rust, TypeScript, and Python."',
   schema_name: 'developer',
+  mode: 'tool',
 });
 
 const { object } = JSON.parse(result.output);
+console.log(object);
 // { name: "Alice", age: 28, skills: ["Rust", "TypeScript", "Python"] }
+
+await session.close();
 ```
 
-## Agent-Driven (Autonomous)
-
-Let the agent decide when to use structured output:
-
-```ts
-const result = await session.send(`
-  Read the file config.yaml and extract all service definitions
-  into a structured JSON using generate_object with this schema:
-  { type: "object", required: ["services"], properties: {
-    services: { type: "array", items: { type: "object",
-      required: ["name", "port"], properties: {
-        name: { type: "string" }, port: { type: "integer" }
-  }}}}}
-`);
-```
-
-## Two-Phase Pattern
-
-For complex tasks, separate reasoning from structured output:
-
-```ts
-// Phase 1: Agent reasons freely
-const analysis = await session.send('Analyze the security of auth.ts');
-
-// Phase 2: Deterministic structured extraction
-const structured = await session.tool('generate_object', {
-  schema: {
-    type: 'object',
-    required: ['vulnerabilities', 'risk_score'],
-    properties: {
-      vulnerabilities: {
-        type: 'array',
-        items: {
-          type: 'object',
-          required: ['type', 'severity', 'line'],
-          properties: {
-            type: { type: 'string' },
-            severity: { type: 'string', enum: ['low', 'medium', 'high', 'critical'] },
-            line: { type: 'integer' },
-            description: { type: 'string' },
-          },
-        },
-      },
-      risk_score: { type: 'number', minimum: 0, maximum: 10 },
-    },
-  },
-  prompt: `Based on this analysis, produce a structured vulnerability report:\n\n${analysis.text}`,
-  schema_name: 'security_report',
-});
-```
-
-## Streaming Partial Objects
-
-```ts
-const stream = await session.stream('Extract all entities from the document...');
-
-for await (const ev of stream) {
-  if (ev.type === 'tool_output_delta' && ev.toolName === 'generate_object') {
-    const { object_partial } = JSON.parse(ev.text);
-    updateUI(object_partial); // progressively render
-  }
-  if (ev.type === 'tool_end' && ev.toolName === 'generate_object') {
-    const { object } = JSON.parse(ev.toolOutput);
-    finalize(object); // fully validated
-  }
-}
-```
-
-## Python
+</Tab>
+<Tab value="Python">
 
 ```python
-from a3s_code import Agent, SessionOptions, PermissionPolicy
 import json
+from a3s_code import Agent, SessionOptions, PermissionPolicy
 
 agent = Agent.create(open('config.acl').read())
 opts = SessionOptions()
+opts.builtin_skills = True
 opts.permission_policy = PermissionPolicy(default_decision="allow")
 session = agent.session('.', opts)
 
+result = session.tool("generate_object", {
+    "schema": {
+        "type": "object",
+        "required": ["name", "age", "skills"],
+        "properties": {
+            "name": {"type": "string"},
+            "age": {"type": "integer", "minimum": 0},
+            "skills": {
+                "type": "array",
+                "items": {"type": "string"},
+                "minItems": 1,
+            },
+        },
+    },
+    "prompt": 'Extract: "Alice is 28, skilled in Rust, TypeScript, and Python."',
+    "schema_name": "developer",
+    "mode": "tool",
+})
+
+obj = json.loads(result.output)["object"]
+print(obj)
+# {"name": "Alice", "age": 28, "skills": ["Rust", "TypeScript", "Python"]}
+
+session.close()
+```
+
+</Tab>
+</Tabs>
+
+The validated value lives on the `object` key of the parsed output. Every field declared in `required` is guaranteed present and correctly typed; if the model cannot satisfy the schema the tool reports a non-zero exit code on `result.exitCode` (Node) / `result.exit_code` (Python).
+
+## Enum classification
+
+Constrain a field to a fixed set with `enum`. This turns the model into a reliable classifier.
+
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
+
+```ts
+const result = await session.tool('generate_object', {
+  schema: {
+    type: 'object',
+    required: ['sentiment', 'confidence'],
+    properties: {
+      sentiment: { type: 'string', enum: ['positive', 'negative', 'neutral'] },
+      confidence: { type: 'number', minimum: 0, maximum: 1 },
+    },
+  },
+  prompt: 'Classify sentiment: "This is the worst product I have ever used."',
+  schema_name: 'sentiment',
+});
+
+const { object } = JSON.parse(result.output);
+console.log(object.sentiment, object.confidence); // "negative" 0.97
+```
+
+</Tab>
+<Tab value="Python">
+
+```python
+result = session.tool("generate_object", {
+    "schema": {
+        "type": "object",
+        "required": ["sentiment", "confidence"],
+        "properties": {
+            "sentiment": {"type": "string", "enum": ["positive", "negative", "neutral"]},
+            "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        },
+    },
+    "prompt": 'Classify sentiment: "This is the worst product I have ever used."',
+    "schema_name": "sentiment",
+})
+
+obj = json.loads(result.output)["object"]
+print(obj["sentiment"], obj["confidence"])  # "negative" 0.97
+```
+
+</Tab>
+</Tabs>
+
+## Nested schemas and arrays
+
+Schemas can nest objects and arrays to any depth, and the runtime validates the whole structure. This models real config files, manifests, or API payloads in one call.
+
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
+
+```ts
+const result = await session.tool('generate_object', {
+  schema: {
+    type: 'object',
+    required: ['items'],
+    properties: {
+      items: {
+        type: 'array',
+        minItems: 3,
+        maxItems: 5,
+        items: {
+          type: 'object',
+          required: ['name', 'category'],
+          properties: {
+            name: { type: 'string' },
+            category: { type: 'string', enum: ['fruit', 'vegetable', 'grain'] },
+          },
+        },
+      },
+    },
+  },
+  prompt: 'List 3 food items with their categories.',
+  schema_name: 'food_list',
+});
+
+const { items } = JSON.parse(result.output).object;
+console.log(items.length, items.map((i) => i.name));
+```
+
+</Tab>
+<Tab value="Python">
+
+```python
 result = session.tool("generate_object", {
     "schema": {
         "type": "object",
@@ -126,19 +193,65 @@ result = session.tool("generate_object", {
         "properties": {
             "items": {
                 "type": "array",
-                "items": {"type": "object", "required": ["name", "price"],
-                          "properties": {"name": {"type": "string"}, "price": {"type": "number"}}}
-            }
-        }
+                "minItems": 3,
+                "maxItems": 5,
+                "items": {
+                    "type": "object",
+                    "required": ["name", "category"],
+                    "properties": {
+                        "name": {"type": "string"},
+                        "category": {"type": "string", "enum": ["fruit", "vegetable", "grain"]},
+                    },
+                },
+            },
+        },
     },
-    "prompt": "Extract items from: 'Apple $1.50, Banana $0.75, Orange $2.00'",
-    "schema_name": "grocery_list",
+    "prompt": "List 3 food items with their categories.",
+    "schema_name": "food_list",
 })
 
-data = json.loads(result.output)["object"]
+items = json.loads(result.output)["object"]["items"]
+print(len(items), [i["name"] for i in items])
 ```
 
-## Schema Validation Coverage
+</Tab>
+</Tabs>
+
+## Agent-driven invocation
+
+You can also let the agent decide when to use structured output. Ask it to call `generate_object` during a `send`; it gathers context first, then emits the object.
+
+<Tabs groupId="lang" items={['Node.js', 'Python']}>
+<Tab value="Node.js">
+
+```ts
+const result = await session.send(
+  'Use the generate_object tool to extract the following into an object ' +
+    'with fields "title" (string), "year" (integer), "genre" (string): ' +
+    'The movie "Inception" was released in 2010 and is a sci-fi thriller.'
+);
+
+console.log(`tool calls: ${result.toolCallsCount}, tokens: ${result.totalTokens}`);
+```
+
+</Tab>
+<Tab value="Python">
+
+```python
+result = session.send(
+    'Use the generate_object tool to produce a JSON object with schema '
+    '{"type":"object","required":["language","paradigm"],"properties":'
+    '{"language":{"type":"string"},"paradigm":{"type":"string"}}} '
+    'for: "Rust is a systems programming language with a focus on safety."'
+)
+
+print(f"tool calls: {result.tool_calls_count}, tokens: {result.total_tokens}")
+```
+
+</Tab>
+</Tabs>
+
+## Schema validation coverage
 
 The built-in validator supports:
 
@@ -150,3 +263,11 @@ The built-in validator supports:
 - `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`
 - `minItems`, `maxItems`, `items`
 - Nested object and array validation
+
+## Notes
+
+- The validated value is on the `object` key of the parsed `result.output`. Pass `mode: 'tool'` for direct structured calls, or `mode: 'prompt'` for a prompt-only fallback.
+- List every field you depend on in `required` — the runtime enforces it, so missing or mistyped fields fail validation instead of silently returning partial data.
+- `generate_object` is a built-in tool, so the session needs `builtinSkills` / `builtin_skills` enabled (shown above).
+
+A runnable version ships at `crates/code/sdk/node/examples/basic/test_generate_object.ts` and `crates/code/sdk/python/examples/test_generate_object.py`.
