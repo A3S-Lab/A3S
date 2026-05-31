@@ -19,7 +19,7 @@ The most important rule: **read A3S Box as a runtime with explicit boundaries, n
 | Networking | TSI default networking, TCP published ports, user-defined bridge networks, and peer `/etc/hosts` discovery are implemented with platform-specific NAT limits. |
 | Compose | Useful local subset; not full Docker Compose parity. |
 | TEE | SEV-SNP-oriented attestation, RA-TLS, sealing, secret injection, and simulation mode. Hardware trust depends on capable hosts. TDX is not productized. |
-| Kubernetes CRI | Experimental. Useful for evaluation and test harnesses, not the current core completion target. Windows CRI is unsupported. |
+| Kubernetes CRI | Reachable by `crictl`/kubelet/`critest` over its Unix socket. Core pod + container lifecycle and `exec` over the Kubernetes SPDY/3.1 `remotecommand` protocol work end to end (verified on a `/dev/kvm` host). Not yet working: `attach` and full `critest` conformance. Linux-only; Windows CRI is out of scope. |
 | Windows | Native WHPX path through libkrun. It runs directly on Windows with Windows Hypervisor Platform enabled and does not require WSL. |
 
 ## Mental Model
@@ -44,7 +44,7 @@ The host prepares the rootfs and starts a shim. The shim configures libkrun. Ins
 
 - Running standard Linux OCI images in foreground, detached, and interactive modes.
 - Persisted `create` / `start` flows with command, entrypoint, env, workdir, user, hostname, and hosts configuration.
-- Exec, PTY, attach, logs, wait, stats, inspect, pause/unpause, restart, and cleanup flows.
+- Exec, PTY, CLI `attach`, logs, wait, stats, inspect, pause/unpause, restart, and cleanup flows.
 - Image lifecycle: pull, load, save, tag, inspect, history, prune, remove, and selected push/signing workflows.
 - Volumes, `cp`, `diff`, `export`, `commit`, and configuration/filesystem snapshots.
 - TCP port publishing and bridge peer discovery on supported hosts.
@@ -66,5 +66,5 @@ The host prepares the rootfs and starts a shim. The shim configures libkrun. Ins
 - [Images](/docs/box/images) explains pull, build, cache, save/load, and signing boundaries.
 - [Networking](/docs/box/networking) explains TSI, bridge, ports, and NAT limits.
 - [TEE Security](/docs/box/tee) separates simulation from hardware trust.
-- [Kubernetes CRI](/docs/box/cri) documents the experimental CRI surface.
+- [Kubernetes CRI](/docs/box/cri) documents the CRI surface: working lifecycle and `exec`, and what is not yet conformant.
 - [CLI Reference](/docs/box/cli) lists the command families and unsupported options.

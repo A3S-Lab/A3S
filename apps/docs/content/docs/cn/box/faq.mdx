@@ -1,6 +1,6 @@
 ---
 title: 常见问题
-description: A3S Box 能力和边界的实用问答
+description: A3S Box 能力和边界的实用问答（CRI 核心生命周期与 exec 已可用，尚未完全一致）
 ---
 
 # 常见问题
@@ -49,7 +49,7 @@ macOS 默认拒绝 Dockerfile `RUN`，避免静默在宿主机执行构建命令
 
 ## CRI 生产可用吗？
 
-不应这样理解。CRI server 已有不少实现和测试覆盖，但仍是实验性。使用前需要在受控 Kubernetes 环境和 `crictl` 下显式验证。Windows CRI 不在范围内。
+不应这样理解。CRI server 现在可被 `crictl` 和 kubelet 访问（通过 h2 UDS 补丁）。核心 Pod 生命周期（RunPodSandbox → CreateContainer → StartContainer → Stop/Remove）和 exec（kubectl exec / crictl exec，TTY/非 TTY，stdin/stdout/stderr 和退出码）已端到端可用；attach 和完整的 critest 一致性尚未完成。请在受控环境中使用并显式验证。Windows CRI 不在范围内。
 
 ## TEE 生产可用吗？
 

@@ -1,11 +1,11 @@
 ---
 title: Helm 部署
-description: A3S Box 实验性 CRI server 的 Helm 部署路径
+description: A3S Box CRI server 的 Helm 部署路径——核心 pod 生命周期与 exec 已端到端可用，attach 与完整 conformance 仍在进行中
 ---
 
 # Helm 部署
 
-Helm chart 用于部署实验性的 A3S Box CRI 路径，适合 Kubernetes 评估。它不是本地 CLI 运行时的主路径；没有经过目标宿主机验证前，不应视为生产就绪。
+Helm chart 用于部署 A3S Box CRI 路径，适合 Kubernetes 评估。CRI server 现在可被 `crictl`、kubelet 与 `critest` 通过其 Unix domain socket 访问：核心 pod + 容器生命周期（`RunPodSandbox`/`CreateContainer`/`StartContainer`/`Stop`/`Remove`）以及 `exec`（基于 Kubernetes SPDY/3.1 `remotecommand`，TTY 与非 TTY、exit code）已在 `/dev/kvm` 宿主机上端到端验证可用。`attach` 与完整的 `critest` conformance 仍在进行中。它不是本地 CLI 运行时的主路径；它尚不是可直接落地的生产 Kubernetes 运行时，没有经过目标宿主机验证前，不应视为生产就绪。
 
 ## 前置条件
 
@@ -38,9 +38,22 @@ helm install a3s-box deploy/helm/a3s-box/ \
 crictl --runtime-endpoint unix:///run/a3s-box-cri.sock info
 ```
 
+已验证可用（在 `/dev/kvm` 宿主机上经 `crictl` 验证）：
+
+- CRI v1 RuntimeService + ImageService over UDS。
+- pod sandbox + 容器生命周期端到端：`runp` → `create` → `start` → `ps` → `stop` → `rm` → `stopp` → `rmp`（一个 pod sandbox 对应一个 Box microVM）。
+- `exec`（基于 Kubernetes SPDY/3.1 `remotecommand`）：`kubectl exec` / `crictl exec`，TTY 与非 TTY，stdin/stdout/stderr，exit code 透传。
+- 容器 stdout/stderr 捕获到 CRI `log_path`，可通过 `crictl logs` 读取。
+- 支持 RuntimeClass 镜像覆盖。
+
+尚未可用 / 不符合 conformance（请勿声称已可用）：
+
+- CRI `attach`。
+- 更严格的 `critest` conformance 规格：精确的 CRI 日志格式、Linux SecurityContext（RunAsUser/RunAsGroup/capabilities/Privileged/ReadonlyRootfs/MaskedPaths/SupplementalGroups）、seccomp/AppArmor、namespace 共享（HostNetwork/HostPID/HostIPC/PodPID）、mount propagation 以及 port-forward。当前 `critest` 基线约为 80 个运行规格中通过 23 个；conformance 进度跟踪在 Box 仓库的 `docs/cri-conformance.md`。
+
 ## 边界
 
-- 这是实验性 CRI server 的评估路径。
+- 这是 CRI server 的评估路径：核心生命周期与 exec 已端到端可用，但 `attach` 与完整 conformance 仍在进行中。
 - 聚焦 Linux；不支持 Windows CRI。
-- 不声明完整 Kubernetes conformance。
+- 尚不是可直接落地的生产 Kubernetes 运行时，也未完全符合 `critest` conformance。
 - 节点安全、镜像分发、CNI 集成和运维加固仍需要部署方完成。

@@ -1,12 +1,12 @@
 ---
 title: A 40MB MicroVM Runtime Written in Rust — A Perfect Docker Replacement for AI Agent Sandboxes
-description: A deep dive into A3S Box architecture — 200ms cold start, 52 Docker-compatible commands, hardware-level isolation, and confidential computing
+description: A deep dive into A3S Box architecture — 200ms cold start, 55 Docker-like commands, hardware-level isolation, and confidential computing
 date: "2026-02-19"
 author: A3S Lab
 tags: [box, microvm, rust, tee, docker, ai-agent]
 ---
 
-> When we strip away all the technical jargon and return to the essence of computing, a core question emerges: **Can we run every workload on its own operating system kernel while maintaining container-level startup speed and developer experience?** A3S Box answers with a definitive yes — a single 40MB binary, no daemon, 200ms cold start, 52 Docker-compatible commands, hardware-level isolation, and optional confidential computing.
+> When we strip away all the technical jargon and return to the essence of computing, a core question emerges: **Can we run every workload on its own operating system kernel while maintaining container-level startup speed and developer experience?** A3S Box answers with a definitive yes — a single 40MB binary, no daemon, 200ms cold start, 55 Docker-like commands, hardware-level isolation, and optional confidential computing.
 
 ---
 
@@ -87,7 +87,7 @@ Specifically:
 
 - **One MicroVM per workload**: Using libkrun to start a lightweight virtual machine in ~200ms, each workload has its own independent Linux kernel. This is not container-level "fake isolation" but hardware-enforced true isolation.
 - **Optional confidential computing**: On hardware supporting AMD SEV-SNP, the MicroVM's memory is hardware-encrypted. Even if the host machine is completely compromised, attackers cannot read data inside the MicroVM.
-- **Docker-compatible user experience**: 52 Docker-compatible commands — developers don't need to learn new tools. `a3s-box run nginx` is as simple as `docker run nginx`, but with a completely different security model underneath.
+- **Docker-compatible user experience**: 55 Docker-like commands — developers don't need to learn new tools. `a3s-box run nginx` is as simple as `docker run nginx`, but with a completely different security model underneath.
 
 The combination of these three elements makes A3S Box not an incremental improvement over existing container runtimes, but a paradigm shift — from "process isolation with a shared kernel" to "hardware isolation with independent kernels."
 
@@ -117,7 +117,7 @@ A3S Box is written in Rust, with the entire project consisting of seven crates, 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        a3s-box-cli                              │
-│                  52 Docker-compatible commands                   │
+│                  55 Docker-like commands                         │
 │                       (361 tests)                               │
 ├─────────────────────────────────────────────────────────────────┤
 │                       a3s-box-sdk                               │
@@ -145,7 +145,7 @@ A3S Box is written in Rust, with the entire project consisting of seven crates, 
 
 **a3s-box-runtime (Runtime Layer)**: Implements VM lifecycle management, OCI image pulling and caching, TEE confidential computing, network configuration, warm pool, auto-scaling, and other core functionality. This is the most complex crate in the system, with 678 unit tests.
 
-**a3s-box-cli (CLI Layer)**: Provides 52 Docker-compatible commands and is the primary interface for user interaction with the system. It translates user commands into calls to the runtime layer.
+**a3s-box-cli (CLI Layer)**: Provides 55 Docker-like commands and is the primary interface for user interaction with the system. It translates user commands into calls to the runtime layer.
 
 **a3s-box-shim (VMM Bridge Layer)**: Runs as an independent subprocess, responsible for calling the libkrun FFI interface to create and manage MicroVMs. This process-isolation design ensures that a VMM crash does not affect the main process.
 
@@ -342,9 +342,9 @@ The warm pool also integrates an auto-scaler (`PoolScaler`) that dynamically adj
 
 ## 7. Core Value 4: Full Docker-Compatible Experience
 
-### 7.1 52 Docker-Compatible Commands
+### 7.1 55 Docker-Like Commands
 
-A3S Box provides 52 Docker CLI-compatible commands, covering all aspects of container lifecycle management. Developers can seamlessly migrate existing Docker workflows to A3S Box without modifying scripts or learning new command syntax.
+A3S Box provides 55 Docker CLI-like commands, covering all aspects of container lifecycle management. Developers can seamlessly migrate existing Docker workflows to A3S Box without modifying scripts or learning new command syntax.
 
 Core command examples:
 
@@ -1969,7 +1969,7 @@ Isolation strength ^
 | **Memory overhead** | ~5 MB | ~15 MB | ~30-50 MB | ~5 MB | ~10 MB |
 | **TEE support** | No | No | Limited | No | Yes (SEV-SNP, TDX planned) |
 | **macOS support** | Yes (Docker Desktop) | No | No | No | Yes (native HVF) |
-| **Docker CLI compat** | Native | Partial | Via shimv2 | No | Yes (52 commands) |
+| **Docker CLI compat** | Native | Partial | Via shimv2 | No | Yes (55 commands) |
 | **K8s integration** | CRI | CRI | CRI | containerd-shim | CRI |
 | **Language** | Go | Go | Go + Rust | Rust | Rust |
 | **Embedded SDK** | No | No | No | Yes (Rust) | Yes (Rust/Python/TS) |
@@ -2134,7 +2134,7 @@ For latency-sensitive scenarios, the warm pool mechanism can reduce effective st
 | ---------- | ------------------------------------------------------------- | ------------------------------- |
 | Installation | Need to install Docker Desktop (macOS/Windows) or docker-ce (Linux) | Download single binary, no installation needed |
 | macOS support | Via Docker Desktop (requires HyperKit/VZ virtualization layer) | Native Apple HVF, no intermediate layer |
-| Command compat | Native | 52 compatible commands, consistent syntax |
+| Command compat | Native | 55 Docker-like commands, consistent syntax |
 | Dockerfile | Native support | Compatible with OCI image format |
 | SDK embedding | Via Docker API (HTTP REST) | Native Rust/Python/TypeScript SDK |
 | Resource usage | Docker Desktop resident memory ~1-2 GB | No resident process, start on demand |
@@ -2238,7 +2238,7 @@ Compared to Docker Desktop's installation experience (download 1GB -> install ->
 
 Recommended: A3S Box (TSI mode) or Docker
 
-A3S Box provides native support on macOS via Apple HVF; developers don't need to install Docker Desktop. 52 compatible commands make migration cost nearly zero. TSI network mode requires zero configuration, suitable for rapid iteration.
+A3S Box provides native support on macOS via Apple HVF; developers don't need to install Docker Desktop. 55 Docker-like commands make migration cost nearly zero. TSI network mode requires zero configuration, suitable for rapid iteration.
 
 **Scenario 2: Multi-Tenant SaaS Platforms**
 
@@ -2343,7 +2343,7 @@ The realization of this answer depends on several key technical choices:
 - **Rust as implementation language**: Memory safety, zero-cost abstractions, cross-platform compilation, PyO3/napi-rs ecosystem
 - **Minimal core + external extensions architecture**: 5 core components remain stable, 14 extension points can evolve independently
 - **Seven-layer defense in depth**: From hardware encryption to syscall filtering, each layer independently increases attack cost
-- **Docker-compatible user experience**: 52 commands, zero migration cost
+- **Docker-compatible user experience**: 55 commands, zero migration cost
 
 A3S Box's 1,466 tests (covering 218 source files) ensure the correct implementation of these technical choices. And its modular design — seven crates each with their own responsibilities, loosely coupled through Trait interfaces — ensures the system can continue to evolve without losing control.
 

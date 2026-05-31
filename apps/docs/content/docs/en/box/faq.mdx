@@ -49,7 +49,19 @@ On macOS, Dockerfile `RUN` fails by default to avoid silently executing build co
 
 ## Is CRI production-ready?
 
-No. The CRI server has significant implementation and test coverage, but it is experimental. Use it with `crictl` and a controlled Kubernetes environment before making any production claim. Windows CRI is out of scope.
+Not yet, but the core path now works end to end. As of v2.0.5 the CRI server is reachable by `crictl`, the kubelet, and `critest` over its Unix domain socket (a vendored `h2` patch relaxes the percent-encoded socket-path `:authority` that grpc-go >= 1.57 sends, which upstream `h2` previously rejected before any RPC could run).
+
+What works, verified on a `/dev/kvm` host via `crictl`:
+
+- CRI v1 `RuntimeService` + `ImageService` over the UDS.
+- The full pod sandbox + container lifecycle (`RunPodSandbox`/`runp` → `CreateContainer`/`create` → `StartContainer`/`start` → `ps` → stop → remove → `stopp` → `rmp`). Each pod sandbox maps to one Box microVM.
+- `exec` over the Kubernetes SPDY/3.1 remotecommand protocol: `kubectl exec` / `crictl exec`, TTY and non-TTY, stdin/stdout/stderr, and exit-code propagation.
+- Container stdout/stderr captured to the CRI `log_path` and readable via `crictl logs`.
+- RuntimeClass image overrides.
+
+What does NOT work yet — do not rely on these: CRI `attach`, and the stricter `critest` conformance specs (exact CRI log format, Linux SecurityContext such as RunAsUser/RunAsGroup/capabilities/Privileged/ReadonlyRootfs/MaskedPaths/SupplementalGroups, seccomp/AppArmor, namespace sharing like HostNetwork/HostPID/HostIPC/PodPID, mount propagation, and port-forward). The `critest` baseline today is roughly 23 of 80 run specs passing; conformance is tracked in the box repo's `docs/cri-conformance.md`.
+
+The CRI is Linux-only. Core lifecycle + exec work with `crictl`/kubelet, but it is not a drop-in production Kubernetes runtime and is not fully `critest`-conformant. Windows CRI is out of scope.
 
 ## Is TEE production-ready?
 

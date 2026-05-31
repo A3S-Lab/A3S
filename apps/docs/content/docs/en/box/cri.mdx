@@ -1,11 +1,11 @@
 ---
 title: Kubernetes CRI
-description: Experimental CRI surface for evaluating A3S Box with kubelet and crictl
+description: A3S Box CRI server — core pod and container lifecycle plus exec work end to end with crictl and kubelet, though it is not yet fully critest-conformant
 ---
 
 # Kubernetes CRI
 
-A3S Box includes an experimental Kubernetes CRI server. It is useful for evaluation, development, and targeted smoke tests, but the current product priority is the local Docker-like runtime. Do not read this page as a production certification statement.
+A3S Box includes a Kubernetes CRI server. As of v2.0.5 it is reachable by `crictl`, the kubelet, and `critest` over its Unix domain socket, and the core pod sandbox + container lifecycle and `exec` work end to end. It is Linux-only, not yet fully `critest`-conformant, and not yet a drop-in production Kubernetes runtime — the broader product priority remains the local Docker-like runtime. Do not read this page as a production certification statement.
 
 Windows CRI is intentionally unsupported.
 
@@ -15,9 +15,9 @@ Windows CRI is intentionally unsupported.
 | --- | --- |
 | RuntimeService | Pod sandbox lifecycle, container lifecycle, status, stats, selected update/status paths. |
 | ImageService | Pull, list, status, filesystem info, and remove paths backed by the local image store. |
-| Streaming | Exec, attach, and port-forward paths exist with Unix-socket bridge logic on Unix hosts. |
+| Streaming | `exec` works over the Kubernetes SPDY/3.1 remotecommand protocol (`crictl exec` / `kubectl exec`, TTY and non-TTY, stdin/stdout/stderr, exit-code propagation). `attach` is not yet working. |
 | Networking | Sandbox port mappings and an `a3s.box/network` annotation path exist for A3S bridge networks. |
-| Tests | Unit tests cover fake ready-VM paths; `crictl_smoke.rs` is ignored and requires a real host setup. |
+| Tests | The CRI is now reachable by `crictl`, the kubelet, and `critest` (a vendored `h2` patch in v2.0.5 fixed the socket-path `:authority` rejection). `critest` baseline: about 23 of 80 run specs pass. |
 
 ## Mental Model
 
@@ -33,7 +33,7 @@ a3s-box-cri
 A3S Box runtime and MicroVM
 ```
 
-A pod sandbox maps to a Box VM. Container support is evolving around rootfs handoff and guest exec/session behavior.
+A pod sandbox maps to one Box microVM. The container lifecycle works end to end (`CreateContainer`/`StartContainer`/`Stop`/`Remove`, verified via `crictl`), and both non-TTY and PTY `exec` work. Container stdout/stderr are captured to the CRI `log_path` and readable via `crictl logs`. Note that `attach` and the stricter conformance specs (exact log format, Linux `SecurityContext`, seccomp/AppArmor, namespace sharing, mount propagation, port-forward) are still in progress.
 
 ## Run for Evaluation
 
@@ -70,7 +70,7 @@ spec:
 
 ## Known Boundaries
 
-- No Windows CRI support.
-- Host must provide image availability, virtualization support, and the expected CRI tooling.
-- The ignored `crictl` smoke suite must be run explicitly on a suitable host.
-- Treat CNI/networking, multi-container edge cases, checkpointing, and full kubelet conformance as work in progress.
+- No Windows CRI support (intentionally out of scope).
+- Linux-only; host must provide image availability, virtualization support (e.g. `/dev/kvm`), and the expected CRI tooling.
+- `attach` is not yet working.
+- Not yet `critest`-conformant: the stricter specs (exact CRI log format, Linux `SecurityContext`, seccomp/AppArmor, namespace sharing, mount propagation, port-forward) are still in progress. Conformance is tracked in the Box repository's `docs/cri-conformance.md`.

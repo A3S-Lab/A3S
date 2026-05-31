@@ -1,12 +1,12 @@
 ---
 title: Rust 编写的 40MB 大小 MicroVM 运行时，完美替代 Docker 作为 AI Agent Sandbox
-description: 深入解析 A3S Box 的架构设计——200ms 冷启动、52 个 Docker 兼容命令、硬件级隔离与机密计算的技术实现
+description: 深入解析 A3S Box 的架构设计——200ms 冷启动、55 个 Docker 兼容命令、硬件级隔离与机密计算的技术实现，以及 v2.0.5 中可被 crictl/kubelet 直达的 CRI 运行时（核心 Pod 生命周期与 exec 已端到端打通，但尚未完全 critest 合规）
 date: "2026-02-19"
 author: A3S Lab
 tags: [box, microvm, rust, tee, docker, ai-agent]
 ---
 
-> 当我们剥离所有技术术语的外衣，回到计算的本质，一个核心问题浮现出来：**我们能否让每一个工作负载都运行在自己的操作系统内核之上，同时保持容器级别的启动速度和开发体验？** A3S Box 给出了肯定的答案——一个 40MB 的单一二进制，无守护进程，200ms 冷启动，52 个 Docker 兼容命令，硬件级隔离 + 可选机密计算。
+> 当我们剥离所有技术术语的外衣，回到计算的本质，一个核心问题浮现出来：**我们能否让每一个工作负载都运行在自己的操作系统内核之上，同时保持容器级别的启动速度和开发体验？** A3S Box 给出了肯定的答案——一个 40MB 的单一二进制，无守护进程，200ms 冷启动，55 个 Docker 兼容命令，硬件级隔离 + 可选机密计算。
 
 ---
 
@@ -87,7 +87,7 @@ A3S Box 的核心洞察可以用一句话概括：
 
 - **每个工作负载一个 MicroVM**：利用 libkrun 在 ~200ms 内启动一个轻量级虚拟机，每个工作负载拥有独立的 Linux 内核。这不是容器级别的"假隔离"，而是硬件强制的真隔离。
 - **可选的机密计算**：在支持 AMD SEV-SNP 的硬件上，MicroVM 的内存被硬件加密。即使宿主机被完全攻破，攻击者也无法读取 MicroVM 内部的数据。
-- **Docker 兼容的用户体验**：52 个 Docker 兼容命令，开发者无需学习新工具。`a3s-box run nginx` 就像 `docker run nginx` 一样简单，但背后是完全不同的安全模型。
+- **Docker 兼容的用户体验**：55 个 Docker 兼容命令，开发者无需学习新工具。`a3s-box run nginx` 就像 `docker run nginx` 一样简单，但背后是完全不同的安全模型。
 
 这三个要素的结合，使得 A3S Box 不是对现有容器运行时的渐进式改进，而是一种范式转换——从"共享内核的进程隔离"到"独立内核的硬件隔离"。
 
@@ -117,7 +117,7 @@ A3S Box 采用 Rust 语言编写，整个项目由七个 Crate 组成，共 218 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        a3s-box-cli                              │
-│                    52 个 Docker 兼容命令                          │
+│                    55 个 Docker 兼容命令                          │
 │                       (361 tests)                               │
 ├─────────────────────────────────────────────────────────────────┤
 │                       a3s-box-sdk                               │
@@ -145,7 +145,7 @@ A3S Box 采用 Rust 语言编写，整个项目由七个 Crate 组成，共 218 
 
 **a3s-box-runtime（运行时层）**：实现 VM 生命周期管理、OCI 镜像拉取与缓存、TEE 机密计算、网络配置、暖池、自动扩缩容等核心功能。这是系统中最复杂的 Crate，拥有 678 个单元测试。
 
-**a3s-box-cli（命令行层）**：提供 52 个 Docker 兼容命令，是用户与系统交互的主要界面。它将用户的命令翻译为对 runtime 层的调用。
+**a3s-box-cli（命令行层）**：提供 55 个 Docker 兼容命令，是用户与系统交互的主要界面。它将用户的命令翻译为对 runtime 层的调用。
 
 **a3s-box-shim（VMM 桥接层）**：作为独立子进程运行，负责调用 libkrun FFI 接口来创建和管理 MicroVM。这种进程隔离设计确保了 VMM 的崩溃不会影响主进程。
 
@@ -342,9 +342,9 @@ A3S Box 的启动流程经过精心优化：
 
 ## 7. 核心价值四：完整的 Docker 兼容体验
 
-### 7.1 52 个 Docker 兼容命令
+### 7.1 55 个 Docker 兼容命令
 
-A3S Box 提供了 52 个与 Docker CLI 兼容的命令，覆盖了容器生命周期管理的方方面面。开发者可以将现有的 Docker 工作流无缝迁移到 A3S Box，无需修改脚本或学习新的命令语法。
+A3S Box 提供了 55 个与 Docker CLI 兼容的命令，覆盖了容器生命周期管理的方方面面。开发者可以将现有的 Docker 工作流无缝迁移到 A3S Box，无需修改脚本或学习新的命令语法。
 
 核心命令示例：
 
@@ -1667,138 +1667,17 @@ kubelet
       └── MicroVM（独立内核 + 可选 TEE）
 ```
 
-### 18.2 BoxAutoscaler CRD
+> **现状说明（v2.0.5，必读）**：A3S Box 的 CRI 运行时**仅支持 Linux**。在此之前它从未能被任何标准工具直达——`grpc-go >= 1.57` 发送的 socket 路径 `:authority` 是百分号编码的，上游 h2 会在任何 RPC 执行之前以 `PROTOCOL_ERROR` 重置该流。v2.0.5 通过 `third_party/h2` 中一个经由 `[patch.crates-io]` 接入的内置 h2 补丁放宽了这一校验，**CRI 服务现在可以被 `crictl`、kubelet 和 `critest` 经由其 Unix 域套接字直达**。
+>
+> 当前**已端到端打通**的能力：CRI v1 `RuntimeService` + `ImageService`（经 UDS）；完整的 Pod sandbox + 容器生命周期（`RunPodSandbox`/`runp` → `CreateContainer`/`create` → `StartContainer`/`start` → `ps` → `Stop` → `Remove` → `stopp` → `rmp`，一个 Pod sandbox 对应一个 Box MicroVM）；经 Kubernetes SPDY/3.1 remotecommand 协议的 **`exec`**（`kubectl exec` / `crictl exec`，TTY 与非 TTY、stdin/stdout/stderr 及退出码传播均可用）；容器 stdout/stderr 捕获到 CRI `log_path` 并可经 `crictl logs` 读取；RuntimeClass 镜像覆盖。这些已在带 `/dev/kvm` 的主机上经 `crictl` 验证。
+>
+> **尚不可用 / 尚不合规**（请勿假定其可用）：CRI 的 **`attach`**；以及更严格的 `critest` 合规项（精确的 CRI 日志格式、Linux `SecurityContext`、seccomp/AppArmor、命名空间共享、挂载传播、`port-forward` 等）。当前 `critest` 基线约为 80 个运行项中通过 23 个。换言之，A3S Box 的 CRI **尚不是可直接投产的 Kubernetes 运行时，也尚未完全 `critest` 合规**——核心生命周期与 exec 已端到端工作，而 attach 与完整合规仍在推进中。合规进展追踪见 box 仓库的 `docs/cri-conformance.md`。
 
-A3S Box 定义了自定义资源 `BoxAutoscaler`（API Group: `box.a3s.dev`，版本: `v1alpha1`），用于在 Kubernetes 中实现 MicroVM 的自动扩缩容：
+### 18.2 规划中的架构（尚未实现，非当前能力）
 
-```yaml
-apiVersion: box.a3s.dev/v1alpha1
-kind: BoxAutoscaler
-metadata:
-  name: my-service-autoscaler
-spec:
-  targetRef:
-    apiVersion: box.a3s.dev/v1alpha1
-    kind: BoxDeployment
-    name: my-service
-  minReplicas: 1
-  maxReplicas: 10
-  metrics:
-    - type: Cpu
-      target: 70          # CPU 使用率目标 70%
-    - type: Memory
-      target: 80          # 内存使用率目标 80%
-    - type: Rps
-      target: 1000        # 每秒请求数目标
-    - type: Inflight
-      target: 50          # 并发请求数目标
-  behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 60
-      policies:
-        - type: Pods
-          value: 3
-          periodSeconds: 60    # 每分钟最多扩容 3 个
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-        - type: Pods
-          value: 1
-          periodSeconds: 60    # 每分钟最多缩容 1 个
-  cooldownSecs: 60
-```
+> **重要提示**：本节描述的 `BoxAutoscaler` CRD、`ScaleRequest`/`ScaleResponse` 扩缩容 API、`InstanceRegistration` Gateway 自注册以及细粒度的实例生命周期状态机，均为**前瞻性/探索性设计草案，截至 v2.0.5 尚未实现**，也未出现在权威的 `crates/box/README.md` 中。请勿将其当作可用能力来依赖或集成。A3S Box 当前在 Kubernetes 方向上实际打通且被追踪的工作，仅限于 18.1 节所述的核心 Pod 生命周期与 exec；实际的合规进展与待办项以 box 仓库的 `docs/cri-conformance.md` 为准。下文保留为对未来方向的说明性草图，不代表现有实现。
 
-### 18.3 指标类型
-
-BoxAutoscaler 支持五种指标类型：
-
-| 指标类型     | 说明                          | 典型目标值 |
-| ------------ | ----------------------------- | ---------- |
-| `Cpu`      | CPU 使用率百分比              | 70%        |
-| `Memory`   | 内存使用率百分比              | 80%        |
-| `Inflight` | 当前并发请求数                | 50         |
-| `Rps`      | 每秒请求数                    | 1000       |
-| `Custom`   | 自定义指标（Prometheus 查询） | 视场景而定 |
-
-### 18.4 实例生命周期
-
-在 Kubernetes 集成中，每个 MicroVM 实例经历以下状态转换：
-
-```
-Creating → Booting → Ready → Busy → Draining → Stopping → Stopped
-                       ↑       │
-                       └───────┘
-                                         ↓ (异常)
-                                       Failed
-```
-
-各状态含义：
-
-- **Creating**：实例配置已生成，资源正在分配
-- **Booting**：MicroVM 正在启动（内核引导、Guest Init 初始化）
-- **Ready**：实例就绪，可以接收流量
-- **Busy**：实例正在处理请求
-- **Draining**：实例正在排空现有请求（缩容前的优雅过渡）
-- **Stopping**：实例正在关闭
-- **Stopped**：实例已停止
-- **Failed**：实例异常终止
-
-### 18.5 Scale API
-
-`ScaleRequest` 和 `ScaleResponse` 定义了扩缩容的请求/响应协议：
-
-```rust
-pub struct ScaleRequest {
-    pub service: String,
-    pub replicas: u32,
-    pub config: ScaleConfig,    // image, vcpus, memory_mib, env, port_map
-    pub request_id: String,
-}
-
-pub struct ScaleResponse {
-    pub request_id: String,
-    pub accepted: bool,
-    pub current_replicas: u32,
-    pub target_replicas: u32,
-    pub instances: Vec<InstanceInfo>,
-    pub error: Option<String>,
-}
-```
-
-### 18.6 实例健康检查
-
-每个实例持续报告健康状态：
-
-```rust
-pub struct InstanceHealth {
-    pub cpu_percent: f32,
-    pub memory_bytes: u64,
-    pub inflight_requests: u32,
-    pub healthy: bool,
-}
-```
-
-健康检查数据同时用于：
-
-- BoxAutoscaler 的扩缩容决策
-- 负载均衡器的流量分配
-- 告警系统的异常检测
-
-### 18.7 Gateway 自注册
-
-MicroVM 实例启动后，通过 `InstanceRegistration` 向 A3S Gateway 自注册：
-
-```rust
-pub struct InstanceRegistration {
-    pub instance_id: String,
-    pub service: String,
-    pub endpoint: String,       // 实例的访问地址
-    pub health: InstanceHealth,
-    pub metadata: HashMap<String, String>,
-}
-```
-
-当实例停止时，发送 `InstanceDeregistration` 取消注册。这种自注册机制使得 Gateway 可以自动发现和路由到新的实例，无需手动配置。
+设想中，A3S Box 可定义自定义资源 `BoxAutoscaler` 用于在 Kubernetes 中实现 MicroVM 的自动扩缩容，并配套 `ScaleRequest`/`ScaleResponse` 协议、实例健康上报（CPU、内存、并发请求数）以及实例启动后经 `InstanceRegistration` 向 A3S Gateway 自注册、停止时取消注册的发现机制。每个实例将经历 `Creating → Booting → Ready → Busy → Draining → Stopping → Stopped`（异常时进入 `Failed`）的状态转换。**这些均为规划，尚未落地。**
 
 ---
 
@@ -1968,8 +1847,8 @@ Python wheels 通过 `maturin` 构建并发布到 PyPI，Node.js 模块通过 `n
 | **内存开销**        | ~5 MB                       | ~15 MB              | ~30-50 MB                  | ~5 MB                | ~10 MB                  |
 | **TEE 支持**        | ❌                          | ❌                  | ⚠️ 有限                  | ❌                   | ✅ SEV-SNP (TDX 规划中) |
 | **macOS 支持**      | ✅ (Docker Desktop)         | ❌                  | ❌                         | ❌                   | ✅ 原生 HVF             |
-| **Docker CLI 兼容** | ✅ 原生                     | ⚠️ 部分           | ⚠️ 通过 shimv2           | ❌                   | ✅ 52 命令              |
-| **K8s 集成**        | ✅ CRI                      | ✅ CRI              | ✅ CRI                     | ⚠️ containerd-shim | ✅ CRI                  |
+| **Docker CLI 兼容** | ✅ 原生                     | ⚠️ 部分           | ⚠️ 通过 shimv2           | ❌                   | ✅ 55 命令              |
+| **K8s 集成**        | ✅ CRI                      | ✅ CRI              | ✅ CRI                     | ⚠️ containerd-shim | ⚠️ CRI（Linux，核心生命周期 + exec；尚未完全 critest 合规） |
 | **语言**            | Go                          | Go                  | Go + Rust                  | Rust                 | Rust                    |
 | **嵌入式 SDK**      | ❌                          | ❌                  | ❌                         | ✅ (Rust)            | ✅ (Rust/Python/TS)     |
 | **审计日志**        | ❌                          | ❌                  | ❌                         | ❌                   | ✅ 26 种操作            |
@@ -2132,7 +2011,7 @@ Docker 的启动速度确实更快（~50ms vs ~200ms），但这 150ms 的差距
 | ---------- | ------------------------------------------------------------- | ------------------------------- |
 | 安装       | 需要安装 Docker Desktop（macOS/Windows）或 docker-ce（Linux） | 下载单一二进制，无需安装        |
 | macOS 支持 | 通过 Docker Desktop（需要 HyperKit/VZ 虚拟化层）              | 原生 Apple HVF，无中间层        |
-| 命令兼容   | 原生                                                          | 52 个兼容命令，语法一致         |
+| 命令兼容   | 原生                                                          | 55 个兼容命令，语法一致         |
 | Dockerfile | 原生支持                                                      | 兼容 OCI 镜像格式               |
 | SDK 嵌入   | 需要通过 Docker API（HTTP REST）                              | 原生 Rust/Python/TypeScript SDK |
 | 资源占用   | Docker Desktop 常驻内存 ~1-2 GB                               | 无常驻进程，按需启动            |
@@ -2236,7 +2115,7 @@ curl -L https://github.com/AI45Lab/Box/releases/latest/download/a3s-box-latest-l
 
 推荐：A3S Box（TSI 模式）或 Docker
 
-A3S Box 在 macOS 上通过 Apple HVF 提供原生支持，开发者无需安装 Docker Desktop。52 个兼容命令使得迁移成本几乎为零。TSI 网络模式零配置，适合快速迭代。
+A3S Box 在 macOS 上通过 Apple HVF 提供原生支持，开发者无需安装 Docker Desktop。55 个兼容命令使得迁移成本几乎为零。TSI 网络模式零配置，适合快速迭代。
 
 **场景二：多租户 SaaS 平台**
 
@@ -2302,7 +2181,7 @@ A3S Box 的技术演进围绕三个方向展开：
 
 **OCI 镜像构建**：`a3s-box build` 命令已通过 feature gate 预留，将支持在 MicroVM 内部构建 OCI 镜像——这意味着构建过程本身也受到硬件隔离保护，防止恶意 Dockerfile 攻击宿主机。
 
-**Kubernetes Operator 成熟化**：当前的 `BoxAutoscaler` CRD 处于 `v1alpha1` 阶段，将逐步演进到 `v1beta1` 和 `v1`，增加更多的自动化运维能力：
+**Kubernetes Operator**：如 18.2 节所述，`BoxAutoscaler` CRD 截至 v2.0.5 尚未实现；规划中它将从 `v1alpha1` 起步并逐步演进，增加更多自动化运维能力：
 
 - 滚动更新策略
 - 金丝雀发布
@@ -2341,7 +2220,7 @@ A3S Box 代表了容器运行时的一次范式转换。它不是在现有容器
 - **Rust 作为实现语言**：内存安全、零成本抽象、跨平台编译、PyO3/napi-rs 生态
 - **最小核心 + 外部扩展的架构**：5 个核心组件保持稳定，14 个扩展点可独立演进
 - **七层纵深防御**：从硬件加密到系统调用过滤，每一层独立增加攻击成本
-- **Docker 兼容的用户体验**：52 个命令，零迁移成本
+- **Docker 兼容的用户体验**：55 个命令，零迁移成本
 
 A3S Box 的 1,466 个测试（覆盖 218 个源文件）确保了这些技术选择的正确实现。而它的模块化设计——七个 Crate 各司其职、通过 Trait 接口松耦合——确保了系统可以持续演进而不失控。
 

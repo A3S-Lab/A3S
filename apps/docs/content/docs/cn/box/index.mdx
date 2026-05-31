@@ -1,11 +1,11 @@
 ---
 title: A3S Box
-description: 面向 Linux OCI 工作负载的类 Docker MicroVM 运行时
+description: 面向 Linux OCI 工作负载的类 Docker MicroVM 运行时；Kubernetes CRI 的核心 pod/容器生命周期与 exec 已通过 crictl/kubelet 验证，attach 与完整 conformance 仍在进行中
 ---
 
 # A3S Box
 
-A3S Box 用 libkrun MicroVM 运行 Linux OCI 工作负载。它提供类 Docker CLI、本地镜像仓库、卷、TCP 端口发布、可选 TEE 流程，以及实验性的 Kubernetes CRI 服务。
+A3S Box 用 libkrun MicroVM 运行 Linux OCI 工作负载。它提供类 Docker CLI、本地镜像仓库、卷、TCP 端口发布、可选 TEE 流程，以及 Kubernetes CRI 服务：自 v2.0.5 起，CRI 的核心 pod/容器生命周期与 exec 已通过 crictl/kubelet 端到端验证，attach 与完整 conformance 仍在进行中。
 
 最重要的边界：**A3S Box 不是 Docker 或 Kubernetes 的完全替代品。它是一个能力边界明确的 MicroVM 运行时。**
 
@@ -19,7 +19,7 @@ A3S Box 用 libkrun MicroVM 运行 Linux OCI 工作负载。它提供类 Docker 
 | 网络 | 支持默认 TSI、TCP 端口发布、自定义 bridge 网络和 peer `/etc/hosts` 发现；NAT 能力按平台不同。 |
 | Compose | 支持常用本地开发子集，不等同完整 Docker Compose。 |
 | TEE | 支持 SEV-SNP 方向的证明、RA-TLS、密封、密钥注入和模拟模式。硬件信任取决于目标主机。TDX 未产品化。 |
-| Kubernetes CRI | 实验性。可用于评估与测试，不是当前核心完成目标。Windows CRI 不支持。 |
+| Kubernetes CRI | 核心 pod + 容器生命周期与 exec（SPDY/3.1）已通过 crictl/kubelet 验证；attach 与完整 critest conformance 仍在进行中。仅限 Linux，尚不是可直接用于生产的替换运行时。Windows CRI 不支持。 |
 | Windows | 原生 WHPX 路径，通过 libkrun 直接在 Windows 上运行。需要启用 Windows Hypervisor Platform，不依赖 WSL。 |
 
 ## 心智模型
@@ -44,7 +44,7 @@ MicroVM
 
 - 前台、后台、交互式运行标准 Linux OCI 镜像。
 - `create` / `start` 持久化流程，包含命令、entrypoint、环境变量、工作目录、用户、hostname、hosts 配置。
-- `exec`、PTY、attach、logs、wait、stats、inspect、pause/unpause、restart 与清理流程。
+- `exec`、PTY、本地 CLI `attach`（直连本地 box 的 VM）、logs、wait、stats、inspect、pause/unpause、restart 与清理流程。注意：Kubernetes CRI 的 attach 尚未实现。
 - 镜像 pull、load、save、tag、inspect、history、prune、remove，以及部分 push/signing 工作流。
 - 卷、`cp`、`diff`、`export`、`commit` 和配置/文件系统级 snapshot。
 - 支持平台上的 TCP 端口发布和 bridge peer 发现。
@@ -66,5 +66,5 @@ MicroVM
 - [镜像与构建](/cn/docs/box/images)：镜像、缓存、构建子集和签名边界。
 - [网络](/cn/docs/box/networking)：TSI、bridge、端口和 NAT 边界。
 - [TEE 机密计算](/cn/docs/box/tee)：区分模拟模式与硬件信任。
-- [Kubernetes CRI](/cn/docs/box/cri)：实验性 CRI 面。
+- [Kubernetes CRI](/cn/docs/box/cri)：CRI 面——核心生命周期 + exec 已验证，完整 conformance 进行中。
 - [CLI 参考](/cn/docs/box/cli)：命令分组和不支持能力。

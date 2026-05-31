@@ -1,11 +1,11 @@
 ---
 title: Helm Deployment
-description: Experimental Helm deployment path for the A3S Box CRI server
+description: Helm deployment path for the A3S Box CRI server — core pod lifecycle and exec work end to end via crictl/kubelet; attach and full conformance are still in progress
 ---
 
 # Helm Deployment
 
-The Helm chart installs the experimental A3S Box CRI path for Kubernetes evaluation. It is not the primary local-runtime path and should not be treated as production-ready without host-specific validation.
+The Helm chart installs the A3S Box CRI path for Kubernetes. As of v2.0.5 the CRI server is reachable by `crictl` and the kubelet over its Unix domain socket, and the core pod sandbox + container lifecycle and `exec` (over the Kubernetes SPDY/3.1 remotecommand protocol) work end to end — verified on `/dev/kvm` hosts. CRI `attach` and full critest conformance are not yet complete, so it is not the primary local-runtime path and should not be treated as a drop-in production Kubernetes runtime without host-specific validation.
 
 ## Prerequisites
 
@@ -40,7 +40,7 @@ crictl --runtime-endpoint unix:///run/a3s-box-cri.sock info
 
 ## Boundaries
 
-- This is an evaluation path for the experimental CRI server.
+- The CRI server supports the core pod sandbox + container lifecycle and `exec` end to end (verified on `/dev/kvm` hosts via `crictl`/kubelet); CRI `attach` and full critest conformance are not yet complete.
 - It is Linux-focused; Windows CRI is unsupported.
 - Full Kubernetes conformance is not claimed.
 - Node security, image distribution, CNI integration, and operational hardening remain deployment-specific work.

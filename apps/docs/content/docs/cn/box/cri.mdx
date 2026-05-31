@@ -1,11 +1,11 @@
 ---
 title: Kubernetes CRI
-description: 用于 kubelet 和 crictl 评估的实验性 CRI 面
+description: 用于 Kubernetes 集群评估的 CRI 面（核心 pod/容器生命周期与 exec 已实现，完整一致性仍在进行中）
 ---
 
 # Kubernetes CRI
 
-A3S Box 包含实验性的 Kubernetes CRI server。它适合评估、开发和定向 smoke test；当前产品优先级仍是本地类 Docker 运行时。不要把本页理解为生产级 Kubernetes 兼容声明。
+A3S Box 包含 Kubernetes CRI server。自 v2.0.5 起，CRI server 已可被 crictl、kubelet 和 critest 通过其 Unix domain socket 访问；核心的 pod sandbox + 容器生命周期以及 exec 已在 `/dev/kvm` 宿主机上端到端验证可用。它适合评估、开发和定向 smoke test；当前产品优先级仍是本地类 Docker 运行时。CRI 仅限 Linux，尚未完全通过 critest 一致性测试，也还不是可直接替换的生产级 Kubernetes 运行时——不要把本页理解为生产级 Kubernetes 兼容声明。
 
 Windows CRI 明确不支持。
 
@@ -15,7 +15,7 @@ Windows CRI 明确不支持。
 | --- | --- |
 | RuntimeService | Pod sandbox lifecycle、container lifecycle、status、stats 和部分 update/status 路径。 |
 | ImageService | pull、list、status、filesystem info、remove，背后复用本地 image store。 |
-| Streaming | exec、attach、port-forward 路径已存在；Unix 主机通过 Unix socket bridge。 |
+| Streaming | exec 通过 Kubernetes SPDY/3.1 remotecommand 协议工作（kubectl exec / crictl exec，TTY 与非 TTY，stdin/stdout/stderr 及 exit code 传播）；attach 和 port-forward 尚未实现。 |
 | 网络 | sandbox port mapping 和 `a3s.box/network` annotation 可接入 A3S bridge 网络。 |
 | 测试 | 单元测试覆盖 fake ready-VM；`crictl_smoke.rs` 被 ignore，需要真实宿主机。 |
 
@@ -72,4 +72,7 @@ spec:
 - 不支持 Windows CRI。
 - 宿主机必须具备镜像、虚拟化和 CRI 工具链条件。
 - ignored `crictl` smoke suite 必须在合适主机上显式运行。
-- CNI/networking、多容器边界、checkpointing 和完整 kubelet conformance 仍是进行中工作。
+- 基本网络隔离模式（none/bridge）与 TSI 代理已具备；但 DNS 配置注入和 CRI 端口映射尚未通过 TSI 接通。
+- CRI attach 尚未实现；port-forward 未实现（critest 运行时以 `--ginkgo.skip="PortForward"` 跳过）。
+- 更严格的 critest 一致性规范尚未通过：精确的 CRI 日志格式、Linux SecurityContext（RunAsUser/RunAsGroup/capabilities/Privileged/ReadonlyRootfs/MaskedPaths/SupplementalGroups）、seccomp/AppArmor、namespace 共享（HostNetwork/HostPID/HostIPC/PodPID）、mount propagation 等。当前 critest 基线约为 80 个运行规范中通过 23 个；一致性进展跟踪见 box 仓库的 `docs/cri-conformance.md`。
+- 多容器边界、checkpointing 和完整 kubelet conformance 仍是进行中工作。
