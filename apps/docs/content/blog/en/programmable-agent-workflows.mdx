@@ -1,0 +1,189 @@
+---
+title: "Programmable, Budget-Bounded Multi-Agent Workflows — Built From Seams You Already Have"
+description: How A3S Code grows a Claude-Code-style dynamic workflow runtime — fan-out, phases, loops, and a shared token budget — by composing the AgentExecutor, WorkflowCheckpoint, and BudgetGuard seams instead of bolting on a new subsystem.
+date: "2026-06-07"
+author: A3S Lab
+tags: [a3s-code, orchestration, multi-agent, workflow, budget, rust]
+---
+
+> The most powerful feature is often the one you *don't* build. A3S Code already
+> had a sandboxed script runtime, a placement-agnostic executor seam, resumable
+> checkpoints, and a budget contract. A "dynamic workflow" — the thing that lets
+> you fan agents out, run phases, loop until done, and cap the whole run against
+> one token budget — turned out to be a thin layer that *composes* those four,
+> not a fifth subsystem.
+
+---
+
+## Two ways an agent fans out
+
+There are two honest ways to run more than one agent.
+
+The first is **model-driven**: you give the model a `task` / `parallel_task`
+tool and it decides, at run time, whether and how to delegate. The shape of the
+fan-out is whatever the model chose. This is great when the *decision* to
+delegate is itself part of the problem.
+
+The second is **programmable**: *you* decide the shape in code — run these three
+reviewers in parallel; flow each candidate through explore → verify → review;
+loop until no new findings; stop the whole thing at 500k tokens. The shape is
+reproducible, testable, budget-bounded, and resumable, independent of what the
+model picks. This is the one you reach for when the *structure* of the work is
+known ahead of time.
+
+Claude Code popularized the programmable style: a script that calls
+`agent()` / `parallel()` / `pipeline()` / `phase()`, with a shared budget and
+resumable checkpoints. We wanted the same expressive power in A3S Code — without
+turning the runtime into a workflow engine.
+
+## The trick: everything is one seam
+
+The whole orchestration layer is written against a single trait, `AgentExecutor`:
+
+```rust
+#[async_trait]
+pub trait AgentExecutor: Send + Sync {
+    async fn execute_step(&self, spec: AgentStepSpec, tx: Option<Sender<AgentEvent>>) -> StepOutcome;
+    fn concurrency_hint(&self) -> usize { /* advisory */ }
+}
+```
+
+That seam splits responsibilities cleanly. The **framework** owns the *grammar* —
+which steps exist, how they compose, and the serializable contracts
+`AgentStepSpec` / `StepOutcome`. The **host** owns *placement* — transport,
+scheduling, and where a step actually runs. The in-box executor runs each step
+as a child agent on the local tokio runtime; a cluster host substitutes its own
+executor to place steps across nodes. The combinators never observe where a step
+ran, so the same workflow scales from one process to a fleet without changes.
+
+Because every step is just `execute_step`, the combinators are tiny:
+
+- `execute_steps_parallel` — a barrier fan-out (await all; failures and panics
+  become `success: false`, never a dropped sibling).
+- `execute_pipeline` — per-item staged chains with **no barrier between stages**,
+  so item A can be in stage 3 while item B is still in stage 1.
+- `execute_steps_parallel_resumable` — the same fan-out, but journaled to a
+  `WorkflowCheckpoint` at each step boundary.
+
+## What "dynamic" actually needs
+
+Mapping Claude Code's verbs onto what already existed, only a few things were
+genuinely missing:
+
+| Capability        | Already there                          | Added |
+| ----------------- | -------------------------------------- | ----- |
+| fan-out / pipeline | `execute_steps_parallel` / `execute_pipeline` | — |
+| resume            | `WorkflowCheckpoint` + `SessionStore`  | — |
+| structured output | `AgentStepSpec.output_schema` → `StepOutcome.structured` | — |
+| a budget contract | `BudgetGuard` (per-call decision points) | — |
+| **phases + milestones** | —                                | `Workflow::phase` + `WorkflowEvent` |
+| **loop-until-done** | —                                    | `execute_loop` + `LoopDecision` |
+| **one budget across a fan-out** | `BudgetGuard` was per-session only | `WorkflowBudget` |
+
+So the work was three small, composable pieces — and a facade to wire them up.
+
+## A facade, not an engine
+
+`session.workflow()` returns a cheaply-clonable handle that pre-wires the
+session's executor, store, event stream, and a stable, session-derived id.
+Control flow stays in the host language — you `await` a verb, look at the
+outcomes, and decide what runs next with ordinary `if` / `for` / `while`:
+
+```rust
+let wf = session.workflow();
+
+// One step, then a *variable* fan-out computed from its result. This is the
+// "dynamic" part — the shape is decided at run time, not declared up front.
+let plan = wf.agent(AgentStepSpec::new("plan", "plan", "plan", goal)).await;
+let specs = derive_specs(&plan);                       // your code
+let done  = wf.phase("implement", specs).await;        // resumable barrier
+let review = wf.phase("review", to_review(&done)).await;
+```
+
+Each verb delegates to exactly one combinator — the facade owns no scheduling
+and no LLM logic. `phase(name, specs)` is the one piece with new behavior: it
+derives a deterministic checkpoint id (`{root}/{index}:{name}`), runs the
+resumable barrier when a store is present, and emits
+`WorkflowEvent::PhaseStart` / `PhaseEnd` on a broadcast you can `subscribe()` to.
+Because there is no embedded script interpreter, there is no sandbox to harden —
+the "interpreter" is the host language, and the attack surface is just Rust
+calling typed functions.
+
+## Looping, with a guard you can't forget
+
+Unknown-length work — loop-until-dry, refine-until-good — needs a loop. But an
+LLM-driven loop that can only stop *itself* is a runaway waiting to happen. So
+`execute_loop` makes the guard mandatory:
+
+```rust
+let outcomes = execute_loop(executor, initial, /* max_iterations */ 5, None, |round| {
+    let follow_ups = derive_follow_ups(round);
+    if follow_ups.is_empty() { LoopDecision::Stop }
+    else { LoopDecision::Continue(follow_ups) }
+}).await;
+```
+
+`max_iterations` is a hard cap: once reached, the loop stops even if the
+predicate would continue. The predicate is the *soft* condition; the cap is the
+*hard* one. You can't write the version without the guard.
+
+## One budget across the whole fan-out — honestly
+
+`BudgetGuard` already decided cost per LLM call, but each child counted its own
+spend. To cap a *fan-out*, `WorkflowBudget` wraps that same guard and
+accumulates every child's usage into one shared atomic ledger:
+
+```rust
+let wf = session.workflow_with_token_budget(Some(500_000));
+// ...run phases...
+if let Some(b) = wf.budget_snapshot() {
+    println!("spent {} / {:?}", b.consumed_tokens, b.limit_tokens);
+}
+```
+
+It installs through the *unchanged* seam — it *is* a `BudgetGuard` — so every
+child loop's existing per-turn check feeds the shared ledger automatically. No
+new enforcement point.
+
+The honest part: usage is recorded **after** each call, while the cap is checked
+**before**. Under a wide parallel fan-out, a handful of in-flight turns can race
+past a hard cap before the ledger catches up. So it is a **soft** ceiling, not a
+per-token guarantee — and the framework never force-kills an in-flight fan-out.
+An exhausted budget simply denies the *next* call, which surfaces as a failed
+step the host can react to. We document that tradeoff rather than pretend the
+race away; a sequential caller gets a crisp cap, a wide fan-out gets a soft one.
+
+## From the SDK
+
+The Node and Python SDKs expose the flat verbs (`parallel`, `pipeline`,
+`parallelResumable`). The shared budget rides in as an *optional argument* on
+`parallel`, so it's backward compatible — no budget, same array you always got;
+with a budget, the richer result:
+
+```ts
+// No budget → the plain outcomes array (unchanged).
+const outcomes = await session.parallel(specs);
+
+// With a budget → { outcomes, budget }; all children share one ledger.
+const { outcomes: out, budget } = await session.parallel(specs, 500_000);
+console.log(budget.consumedTokens, budget.limitTokens);
+```
+
+```python
+res = session.parallel(specs, budget_tokens=500_000)
+print(res["budget"]["consumed_tokens"], res["budget"]["limit_tokens"])
+```
+
+## The lesson
+
+A dynamic workflow runtime sounds like a big subsystem. It wasn't — because the
+runtime was already factored around the right seams. `AgentExecutor` gave us
+placement-agnostic execution; `WorkflowCheckpoint` gave us resume;
+`BudgetGuard` gave us a budget contract. The "feature" was a thin facade plus
+two small combinators that compose them. When the seams are right, the powerful
+thing is small.
+
+If you're building agent infrastructure, the takeaway isn't "copy these three
+types." It's: find the one seam your whole layer can be written against, keep it
+serializable and placement-agnostic, and let the powerful features fall out as
+compositions. The best workflow engine is the one you didn't have to build.
