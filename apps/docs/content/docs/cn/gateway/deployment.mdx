@@ -1,140 +1,80 @@
 ---
 title: 部署
-description: 使用 Helm、Docker 或独立二进制文件部署 A3S Gateway
+description: 通过 Homebrew、Cargo、Docker 或 Helm/Kubernetes 部署 A3S Gateway（v1.0.7）—— 生产配置、RBAC 与热重载
 ---
+
+import { TypeTable } from 'fumadocs-ui/components/type-table';
 
 # 部署
 
-## Helm（Kubernetes）
+A3S Gateway v1.0.7 以单个自包含二进制文件的形式发布。同一个二进制文件既可以作为独立的反向代理运行，也可以作为 Docker 容器，或者作为 Kubernetes ingress 控制器运行。本页涵盖所有受支持的安装路径，以及每种方式在生产环境下的相关行为。
 
-A3S Gateway 附带一个生产就绪的 Helm chart，位于 `deploy/helm/a3s-gateway/`。
+> **版本说明。** crate 版本为 `1.0.7`（`Cargo.toml`）。MSRV 为 Rust `1.88`。已发布的 Linux 二进制文件与 OCI 镜像在构建时启用了 `kube` 与 `redis` 这两个 Cargo feature（参见 [Cargo features](#cargo-features)）；而默认 feature 的构建两者都不包含。
 
-### 安装
+## 安装路径一览
 
-```bash
-helm install gateway deploy/helm/a3s-gateway
-```
+| 方式 | 最适用于 | 内置 feature |
+| ------ | -------- | ----------------- |
+| Homebrew | 本地 / 原生 macOS | 默认构建 |
+| Cargo | 从源码构建、自定义 feature 集 | 由你自行选择 |
+| Docker (`ghcr.io/a3s-lab/gateway`) | 容器、Compose、CI | `kube` + `redis` |
+| Helm / Kubernetes | 集群 ingress 控制器 | `kube` + `redis` |
 
-### 自定义配置
+## Homebrew
 
-通过 `--set-file` 传入自定义 `gateway.acl`：
-
-```bash
-helm install gateway deploy/helm/a3s-gateway \
-  --set-file config=my-gateway.acl
-```
-
-或覆盖单个值：
+通过 A3S tap 进行原生 macOS 安装：
 
 ```bash
-helm install gateway deploy/helm/a3s-gateway \
-  --set replicaCount=3 \
-  --set service.type=LoadBalancer \
-  --set image.tag=0.1.0
+brew install a3s-lab/tap/a3s-gateway
+# or, equivalently
+brew tap a3s-lab/tap
+brew install a3s-gateway
+
+a3s-gateway --config gateway.acl
 ```
 
-### 自动扩缩容
+这是一个默认 feature 的构建。`kube` provider 与 `rate-limit-redis` middleware **不会**被编译进来 —— `providers.kubernetes` 块只会记录一条警告，而 `rate-limit-redis` middleware 会导致配置加载失败。如果你在 macOS 上需要这些功能，请使用 Docker，或带显式 feature 的 `cargo install`。
+
+## Cargo
 
 ```bash
-helm install gateway deploy/helm/a3s-gateway \
-  --set autoscaling.enabled=true \
-  --set autoscaling.minReplicas=2 \
-  --set autoscaling.maxReplicas=10 \
-  --set autoscaling.targetCPUUtilizationPercentage=70
+# Default build (no kube / no redis)
+cargo install a3s-gateway
+
+# With the distributed rate limiter and the Kubernetes provider
+cargo install a3s-gateway --features kube,redis
 ```
 
-### Ingress
-
-```bash
-helm install gateway deploy/helm/a3s-gateway \
-  --set ingress.enabled=true \
-  --set ingress.className=nginx \
-  --set ingress.hosts[0].host=api.example.com \
-  --set ingress.hosts[0].paths[0].path=/ \
-  --set ingress.hosts[0].paths[0].pathType=Prefix
-```
-
-### CLI 管理
-
-Chart 只暴露配置中的流量入口。管理动作通过 CLI 在发布前或运维/debug 容器中执行：
+配置文件**必须**使用 `.acl` 扩展名 —— TOML/YAML/JSON/HCL 文件会在加载时被拒绝。发布前请先校验：
 
 ```bash
 a3s-gateway validate --config gateway.acl
-a3s-gateway config --config gateway.acl summary
 ```
 
-### Helm Values
-
-<TypeTable
-  type={{
-    replicaCount: { type: 'number', default: '1', description: 'Number of replicas' },
-    'image.repository': { type: 'string', default: '"ghcr.io/a3s-lab/gateway"', description: 'Container image' },
-    'image.tag': { type: 'string', default: 'Chart appVersion', description: 'Image tag' },
-    'service.type': { type: 'string', default: '"ClusterIP"', description: 'Service type' },
-    'service.port': { type: 'number', default: '8080', description: 'HTTP port' },
-    config: { type: 'string', default: 'minimal ACL', description: 'Gateway ACL configuration' },
-    'resources.requests.cpu': { type: 'string', default: '"100m"', description: 'CPU request' },
-    'resources.requests.memory': { type: 'string', default: '"64Mi"', description: 'Memory request' },
-    'resources.limits.cpu': { type: 'string', default: '"500m"', description: 'CPU limit' },
-    'resources.limits.memory': { type: 'string', default: '"256Mi"', description: 'Memory limit' },
-    'autoscaling.enabled': { type: 'bool', default: 'false', description: 'Enable HPA' },
-    'ingress.enabled': { type: 'bool', default: 'false', description: 'Enable Ingress' },
-  }}
-/>
-
-### Chart 结构
-
-```
-deploy/helm/a3s-gateway/
-├── Chart.yaml
-├── values.yaml
-└── templates/
-    ├── _helpers.tpl
-    ├── configmap.yaml       # gateway.acl from values.config
-    ├── deployment.yaml      # Pod spec with config volume
-    ├── service.yaml         # ClusterIP/NodePort for configured traffic
-    ├── serviceaccount.yaml
-    ├── ingress.yaml         # Optional
-    ├── hpa.yaml             # Optional
-    └── NOTES.txt
-```
-
-ConfigMap 的校验和作为 Pod 注解包含其中，因此配置变更会自动触发滚动重启。
-
-## Docker
+## 二进制文件 + systemd
 
 ```bash
-docker run -d \
-  -v $(pwd)/gateway.acl:/etc/a3s-gateway/gateway.acl \
-  -p 8080:8080 \
-  -p 9090:9090 \
-  ghcr.io/a3s-lab/gateway:latest \
-  --config /etc/a3s-gateway/gateway.acl
-```
+# Run directly
+a3s-gateway --config gateway.acl
 
-## 二进制文件
+# Optional: override the first entrypoint's listen address at startup
+a3s-gateway --config gateway.acl --listen 0.0.0.0:8080
 
-```bash
-# Download
-curl -L https://github.com/A3S-Lab/Gateway/releases/latest/download/a3s-gateway -o a3s-gateway
-chmod +x a3s-gateway
+# Validate a config without starting
+a3s-gateway validate --config gateway.acl
 
-# Run
-./a3s-gateway --config gateway.acl
-
-# Validate config
-./a3s-gateway validate --config gateway.acl
-
-# Systemd service
-cat > /etc/systemd/system/a3s-gateway.service << EOF
+# Systemd unit
+cat > /etc/systemd/system/a3s-gateway.service <<'EOF'
 [Unit]
 Description=A3S Gateway
 After=network.target
 
 [Service]
-ExecStart=/usr/local/bin/a3s-gateway --config /etc/a3s-gateway/gateway.acl
+ExecStart=/usr/local/bin/a3s-gateway --config /etc/gateway/gateway.acl
 Restart=always
 User=a3s-gateway
+# Required only if the management listener uses bearer auth (default token env var):
+# Environment=A3S_GATEWAY_ADMIN_TOKEN=...
 
 [Install]
 WantedBy=multi-user.target
@@ -143,10 +83,313 @@ EOF
 systemctl enable --now a3s-gateway
 ```
 
-## Homebrew
+### CLI 参考
+
+二进制文件提供了一小组子命令。全局标志 `--config`（默认 `gateway.acl`）、`--listen` 和 `--log-level`（默认 `info`）适用于 run 命令（即不带子命令的情况）。
 
 ```bash
-brew tap a3s-lab/tap
-brew install a3s-gateway
-a3s-gateway --config gateway.acl
+# Validate without starting
+a3s-gateway validate --config gateway.acl
+
+# Inspect parsed config (subcommand goes AFTER the --config flag)
+a3s-gateway config --config gateway.acl summary       # compact summary
+a3s-gateway config --config gateway.acl entrypoints   # list entrypoints
+a3s-gateway config --config gateway.acl routes        # list routers
+a3s-gateway config --config gateway.acl services      # list services + backend counts
+a3s-gateway config --config gateway.acl middlewares   # list middleware names
+a3s-gateway config --config gateway.acl providers     # list enabled providers
+a3s-gateway config --config gateway.acl json          # full parsed config as JSON
+
+# Talk to a running management listener (see Management API below)
+a3s-gateway management events  --url http://127.0.0.1:9090/api/gateway
+a3s-gateway management validate --url http://127.0.0.1:9090/api/gateway --file gateway.acl
+a3s-gateway management reload   --url http://127.0.0.1:9090/api/gateway --file gateway.acl
+
+# Self-update
+a3s-gateway update
 ```
+
+`management` 子命令接受 `--token` / `--token-env` 用于 bearer 认证，以及 `--ca-cert` / `--client-cert` / `--client-key` 用于针对受 TLS 保护的管理监听器进行 TLS / mTLS 通信（此外还有 `--insecure`，仅用于本地诊断）。
+
+## Docker
+
+发布的镜像是 `ghcr.io/a3s-lab/gateway`（基于 Alpine，以非 root 的 `gateway` 用户运行，多平台：`linux/amd64`、`linux/arm64`、`darwin/arm64`）。它在构建时启用了 `kube` + `redis`。
+
+```bash
+docker run -d \
+  -v "$(pwd)/gateway.acl:/etc/gateway/gateway.acl" \
+  -p 8080:8080 \
+  -p 9090:9090 \
+  ghcr.io/a3s-lab/gateway:latest \
+  --config /etc/gateway/gateway.acl
+```
+
+该镜像 `EXPOSE` 了 `80 443 8080`。请映射你的 entrypoint 实际绑定的端口。上面的示例还发布了 `9090`，以便可访问可选的[管理监听器](#management-api--dashboard)。
+
+> **健康检查注意事项。** 该镜像自带一个 Docker `HEALTHCHECK`，它运行 `wget http://localhost:8080/health`。**数据平面并没有内置的 `/health` 端点** —— 只有当你为它定义了一个 router（或将其代理到某个上游）时，该路径才会成功。真正的健康端点位于*管理*监听器上的 `{path_prefix}/health`（默认为 `http://127.0.0.1:9090/api/gateway/health`），而不是在某个流量 entrypoint 上。对于编排系统，更推荐针对某个已绑定的 entrypoint 端口使用 **TCP** 就绪/存活探针（Helm chart 就是这么做的），或者将 HTTP 探针指向管理监听器的 `health` 端点。
+
+### docker compose
+
+```yaml
+services:
+  gateway:
+    image: ghcr.io/a3s-lab/gateway:latest
+    command: ["--config", "/etc/gateway/gateway.acl"]
+    ports:
+      - "8080:8080"
+      - "9090:9090"   # management listener (optional)
+    volumes:
+      - ./gateway.acl:/etc/gateway/gateway.acl:ro
+    environment:
+      # Only needed if management.enabled = true with default bearer auth
+      A3S_GATEWAY_ADMIN_TOKEN: "${A3S_GATEWAY_ADMIN_TOKEN}"
+    restart: unless-stopped
+```
+
+## Helm / Kubernetes
+
+该 chart 位于 `deploy/helm/a3s-gateway/`。它有意保持精简：一个 `Deployment`、一个 `Service`，以及一个承载你 `gateway.acl` 的 `ConfigMap`。Chart version / appVersion 为 `1.0.2`，而默认的 `values.yaml` 发布的 `image.tag` 为 `0.2.1` —— 两者都落后于 `1.0.7` 二进制文件，因此在生产环境中请显式 pin 住 `image.tag`。
+
+### 安装
+
+```bash
+helm install gateway deploy/helm/a3s-gateway \
+  --set image.repository=ghcr.io/a3s-lab/gateway \
+  --set image.tag=1.0.7 \
+  --set image.pullPolicy=IfNotPresent
+```
+
+> 默认的 `image.repository` 为 `a3s-gateway`，`pullPolicy: Never`（针对本地 OrbStack/k8s 共享守护进程开发循环做了调优）。对于真实集群，你必须按上面所示覆盖 repository、tag 和 pull policy。
+
+### 自定义配置
+
+gateway 完全通过其 `gateway.acl` 进行配置，该文件以 `config` 值的形式呈现，并从 `ConfigMap` 挂载到 `/etc/gateway/gateway.acl`。Deployment 运行 `--config /etc/gateway/gateway.acl`。
+
+从文件提供一份完整的配置：
+
+```bash
+helm install gateway deploy/helm/a3s-gateway \
+  --set image.tag=1.0.7 \
+  --set-file config=./gateway.acl
+```
+
+将其以 `LoadBalancer` 而非默认的 `NodePort` 对外暴露：
+
+```bash
+helm install gateway deploy/helm/a3s-gateway \
+  --set image.tag=1.0.7 \
+  --set service.type=LoadBalancer
+```
+
+### Helm values
+
+以下是该 chart **唯一**认可的值。（早期文档曾宣传过 `autoscaling.*`、`ingress.*` 和 `resources.*` 块 —— 这些模板在 chart 中并不存在，会被静默忽略。）
+
+<TypeTable
+  type={{
+    replicaCount: { type: 'number', default: '1', description: 'Deployment replica count' },
+    'image.repository': { type: 'string', default: '"a3s-gateway"', description: 'Container image (set to ghcr.io/a3s-lab/gateway for clusters)' },
+    'image.tag': { type: 'string', default: '"0.2.1"', description: 'Image tag — pin to 1.0.7 in production' },
+    'image.pullPolicy': { type: 'string', default: '"Never"', description: 'Pull policy (use IfNotPresent/Always for real clusters)' },
+    'service.type': { type: 'string', default: '"NodePort"', description: 'Service type (ClusterIP / NodePort / LoadBalancer)' },
+    'service.port': { type: 'number', default: '8080', description: 'Service port; targetPort is fixed at 8080' },
+    'service.nodePort': { type: 'number', default: '30080', description: 'NodePort when service.type=NodePort' },
+    config: { type: 'string', default: 'nginx demo ACL', description: 'Full gateway.acl rendered into a ConfigMap' },
+  }}
+/>
+
+Deployment 中硬编码了：
+
+- `containerPort: 8080` 和 `Service.targetPort: 8080` —— 你的主 HTTP entrypoint 必须绑定 `:8080`（自带的 demo 配置使用 `address = "0.0.0.0:8080"`）。
+- 在 `8080` 上的 **TCP** 就绪与存活探针（就绪：2s 延迟 / 5s 周期；存活：5s 延迟 / 10s 周期）。默认没有 HTTP 健康探针 —— 参见上面的[健康检查注意事项](#docker)。
+
+扩缩容通过简单的 `replicaCount` 实现；该 chart 不会生成 HPA 模板。如果你需要水平自动扩缩容，请在带外为生成的 Deployment 附加一个标准的 Kubernetes `HorizontalPodAutoscaler`。
+
+### Chart 结构
+
+```
+deploy/helm/a3s-gateway/
+├── Chart.yaml              # version/appVersion 1.0.2
+├── values.yaml
+└── templates/
+    ├── configmap.yaml      # gateway.acl from .Values.config
+    ├── deployment.yaml     # pod spec + config volume + TCP probes
+    └── service.yaml        # NodePort (default) / ClusterIP / LoadBalancer
+```
+
+## 作为 Ingress 控制器运行
+
+通过启用 **`kubernetes` provider**，gateway 可以充当 Kubernetes ingress 控制器。它会监视 `networking.k8s.io/v1` 的 `Ingress` 资源，并合成 router/service，将其合并到运行中的配置里（在名称冲突时，静态配置始终胜出）。这需要使用启用了 `kube` feature 构建的镜像（已发布的 `ghcr.io` 镜像满足此要求）。
+
+### Provider 配置
+
+```acl
+providers {
+  kubernetes {
+    namespace           = ""               # "" = all namespaces; else a single namespace
+    label_selector      = "app=my-service" # optional; applied to the Ingress list
+    watch_interval_secs = 30               # poll interval (default 30)
+    ingress_route_crd   = false            # also watch IngressRoute ConfigMaps (default false)
+  }
+}
+```
+
+| Key | 默认值 | 说明 |
+| --- | ------- | ----- |
+| `namespace` | `""`（所有命名空间） | 空 = 集群范围监视；否则按命名空间限定。 |
+| `label_selector` | `""`（不过滤） | 仅应用于 `Ingress` 列表，不应用于 IngressRoute 监视器。 |
+| `watch_interval_secs` | `30` | Ingress 与 IngressRoute 监视器都以此间隔轮询。出错时它们会重建 kube 客户端并指数退避（从 1s 起，最高至 `max(interval, 30s)`）。 |
+| `ingress_route_crd` | `false` | 当为 `true` 时，还会启动 Traefik 风格的 IngressRoute 监视器（见下文）。 |
+
+> 在没有 `kube` feature 的情况下，`providers.kubernetes` 块除了记录一条警告外什么都不做。请使用 `ghcr.io` 镜像或带 `--features kube` 的构建。
+
+### Annotations
+
+生成的 router/service 通过 `Ingress` 对象上的以下 annotation 进行调优。它们全部使用 `a3s-gateway.io/` 前缀，且在适用处为逗号分隔的列表：
+
+| Annotation | 作用 | 默认值 |
+| ---------- | ------ | ------- |
+| `a3s-gateway.io/entrypoints` | router 绑定到的 entrypoint 名称 | 空（所有 entrypoint） |
+| `a3s-gateway.io/middlewares` | 有序的 middleware 链 | 空 |
+| `a3s-gateway.io/strategy` | 负载均衡策略：`round-robin` / `weighted` / `least-connections` / `random` | `round-robin`（无效值 → round-robin） |
+| `a3s-gateway.io/priority` | router 优先级（`i32`）；**值越大越优先**（Traefik 风格） | `0` |
+| `a3s-gateway.io/protocol` | `tcp` 或 `udp` 会生成一个 stream entrypoint 并跳过 HTTP router；其他任何值 → HTTP | `http` |
+| `a3s-gateway.io/listen` | `tcp`/`udp` 协议 entrypoint 的监听地址 | 无（若缺失则不创建 entrypoint） |
+| `a3s-gateway.io/request-timeout` | 生成的 service 上每条路由的上游超时（humantime，例如 `600s`） | `30s` |
+
+路由规则从 Ingress spec 推导而来：非空的 host 会变成 ``Host(`h`)``；`pathType: Exact` 会变成 ``Path(`p`)``，而其他任何 `pathType` 都会变成 ``PathPrefix(`p`)``；`/` 或空路径会被丢弃（仅 host 规则，或在没有其他内容时变成一个 catch-all 的 ``PathPrefix(`/`)``）。
+
+Backend 解析为集群内 DNS 名称 `http://{svc}.{namespace}.svc.cluster.local:{port}`（端口取自 `backend.service.port.number`，否则为 `80`）。生成的名称为 `{namespace}-{ingressName}-{backendServiceName}`。自 v1.0.5 起，provider 会对 router+service 的**内容**进行哈希，因此原地编辑 Ingress 也能被捕获（而不仅是增删）。
+
+> **`a3s-gateway.io/type` 不是 Ingress annotation。** 它是 IngressRoute 监视器所使用的固定 ConfigMap label selector（`a3s-gateway.io/type=ingressroute`）。请勿将其放在 `Ingress` 上。
+
+### IngressRoute（Traefik 风格）
+
+设置 `ingress_route_crd = true` 会启用第二个监视器。请注意，在 v1.0.7 中它**不会**读取已安装的 CRD —— 它会列出带有标签 `a3s-gateway.io/type=ingressroute` 的 **ConfigMap**，并将每个 ConfigMap 的 `.data.spec`（JSON）解析为一个 `IngressRoute`（entrypoint，带 `match`/`priority`/`middlewares`/`services` 的 route，以及可选的 TLS secret）。该监视器遵循 `namespace`，但忽略 `label_selector`（它始终使用固定的 `a3s-gateway.io/type=ingressroute` selector），且没有变更检测哈希，因此它每个间隔都会重新发布。
+
+### RBAC
+
+要在集群范围内监视 `Ingress` 资源（以及在 `ingress_route_crd = true` 时监视 ConfigMap），gateway 的 ServiceAccount 需要读取/监视权限。自带的 chart 不会生成 RBAC 模板，因此请随 release 一同应用：
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: a3s-gateway
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: a3s-gateway
+rules:
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
+  # Only required when ingress_route_crd = true
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: a3s-gateway
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: a3s-gateway
+subjects:
+  - kind: ServiceAccount
+    name: a3s-gateway
+    namespace: default
+```
+
+> 如果你将 `providers.kubernetes.namespace` 设置为某个特定命名空间，请将 `ClusterRole` 收窄为单个命名空间内的 `Role`/`RoleBinding`。
+
+## Management API / Dashboard
+
+可选的管理监听器是一个**专用、独立**的 TCP socket（`management {}` 块；不存在单独的 `dashboard` 块）。它绝不会拦截用户流量。它**默认是禁用的**。
+
+```acl
+management {
+  enabled        = true
+  address        = "127.0.0.1:9090"      # default
+  path_prefix    = "/api/gateway"        # default; must start with "/"
+  auth_token_env = "A3S_GATEWAY_ADMIN_TOKEN"  # env var NAME holding the bearer token
+  allowed_ips    = ["127.0.0.1", "::1"]  # default when key omitted
+
+  # Optional TLS / mTLS for the management listener:
+  tls {
+    cert_file          = "/etc/gateway/tls/mgmt.crt"
+    key_file           = "/etc/gateway/tls/mgmt.key"
+    client_ca_file     = "/etc/gateway/tls/client-ca.crt"  # required if require_client_cert
+    require_client_cert = true            # enforce mTLS
+    min_version        = "1.3"            # exactly "1.2" or "1.3"
+  }
+}
+```
+
+行为说明：
+
+- `auth_token_env` 保存的是**某个环境变量的名称**，而不是 token 本身。如果该环境变量在启动时未设置，管理监听器将**启动失败**。设置 `auth_token_env = ""` 会完全禁用 bearer 认证。
+- `allowed_ips` 仅在**省略该键时**才默认为回环地址。提供该键会替换默认值；显式的 `allowed_ips = []` 会禁用 IP 过滤（允许全部）。
+- 请求按顺序检查：path-prefix → IP allowlist → bearer token。
+- `management.tls.min_version` 会被校验为恰好是 `"1.2"` 或 `"1.3"`（与 entrypoint TLS 不同，后者在配置时不做校验）。
+
+端点（全部位于 `{path_prefix}` 之下）：`GET health`、`GET metrics`（Prometheus 文本）、`GET config`、`GET routes` / `routes/{name}`、`GET services` / `services/{name}`、`GET backends`、`GET events`（`?limit=N`，默认 100，最大 500）、`GET version`，外加两个会产生变更的端点 `POST config/validate` 和 `POST config/reload`（请求体上限为 1 MiB）。
+
+```bash
+# Set the token the env var refers to, then hit the API
+export A3S_GATEWAY_ADMIN_TOKEN="$(openssl rand -hex 32)"
+curl -H "Authorization: Bearer $A3S_GATEWAY_ADMIN_TOKEN" \
+  http://127.0.0.1:9090/api/gateway/health
+```
+
+## 热重载
+
+gateway 在**不中断连接**的情况下重载配置，由一个基于 `notify` 的文件监视器驱动。仅当存在 `providers.file` 块且 `watch = true`（这是该块的默认值）时，该监视器才会运行。
+
+```acl
+providers {
+  file {
+    watch     = true                 # default
+    directory = "/etc/gateway/conf.d" # optional extra dir, watched recursively
+  }
+}
+```
+
+- 该监视器会监视主配置文件的父目录（非递归）以及可选的 `directory`（递归），去抖时间为 500 ms。
+- 只有 `.acl` 文件会被视为配置；被监视目录中的 `.toml`/`.yaml`/`.json` 片段会被忽略。重载时，主文件加上所有按字典序排序的 `.acl` 片段会被拼接、重新解析并校验。
+- 在**解析/校验失败**时，会保留上一份可用的配置并记录一条错误 —— 一次错误的编辑不会让运行中的 gateway 宕机。
+
+重载策略会自动选择：
+
+1. **热交换（不重新绑定）。** 如果 `old.entrypoints == new.entrypoints` 且双方都没有任何 UDP entrypoint，运行时状态会就地交换，而不触碰 socket（“Runtime state hot-swapped without rebinding ports”）。
+2. **增量重启。** 如果只有部分 HTTP/TCP entrypoint 发生变化（且没有 UDP），则只重新绑定新增/变化的监听器；未变化的监听器继续运行。
+3. **完全重启。** 任何 UDP entrypoint，或更大范围的变更，都会强制对所有监听器执行一次 abort-and-rebind。
+
+你也可以通过管理 API 远程触发重载：
+
+```bash
+a3s-gateway management reload \
+  --url http://127.0.0.1:9090/api/gateway \
+  --file gateway.acl
+```
+
+在 Helm 下运行时，编辑 `config` 值并执行 `helm upgrade`。由于配置是从 ConfigMap 挂载的，你必须触发 Pod 去拾取新文件（例如滚动重启，或依赖 Kubernetes 最终的 ConfigMap 投影加上 Pod 内的文件监视器）。
+
+## 部署的 TLS 说明
+
+- Entrypoint TLS 使用 rustls（ring provider）进行终结，ALPN 为 `["h2","http/1.1"]`。`min_version` 接受 `"1.2"`（TLS 1.2 **和** 1.3）或 `"1.3"`（仅 1.3）；它是一个最小值，而非精确版本。
+- `tls { acme = true }` 标志会启用 ACME manager 的 12h 检测/续期循环，但在 v1.0.7 中，签发的证书**不会**被热交换进活跃的 acceptor，且 HTTP-01 挑战端点不会在数据平面上提供服务。请将配置驱动的 ACME 视为**并非**端到端的自动 HTTPS；对于生产 TLS，请预置静态的 `cert_file`/`key_file` PEM（例如来自 cert-manager 或你的 CA），并让文件监视器拾取轮换。DNS-01 / Cloudflare / Route53 ACME 在 ACL schema 中**无法**触及。
+
+## Cargo features
+
+```toml
+# default = []  (no features)
+# redis  -> distributed rate limiting (rate-limit-redis middleware)
+# kube   -> Kubernetes Ingress / IngressRoute controller
+```
+
+已发布的 Linux 二进制文件与 `ghcr.io/a3s-lab/gateway` 镜像在构建时启用了 `kube` + `redis`（v1.0.1 版本修复了早期未包含它们的 Linux 制品）。Homebrew 和普通的 `cargo install` 会产生默认 feature 的构建，除非你传入 `--features kube,redis`。

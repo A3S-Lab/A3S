@@ -1,195 +1,178 @@
 ---
 title: Quick Start
-description: Get A3S Gateway running with a basic reverse proxy configuration
+description: Install A3S Gateway (v1.0.7) and run a minimal reverse proxy to an LLM/HTTP backend
 ---
 
 # Quick Start
 
+This guide gets A3S Gateway **v1.0.7** running as a reverse proxy in front of an
+LLM/HTTP backend. Everything here is copy-pasteable and runs as written.
+
+The gateway is a single statically-linked binary (`a3s-gateway`). Configuration
+is a Traefik-style **entrypoint → router → middleware → service** model written
+in ACL. Config files **must** use the `.acl` extension — HCL/TOML/YAML/JSON
+files are rejected at load.
+
+## Install
+
+Pick one. Homebrew and Cargo install the native `a3s-gateway` binary; Docker
+runs the published image from GitHub Container Registry.
+
+### Homebrew (macOS)
+
+```bash
+brew install a3s-lab/tap/a3s-gateway
+```
+
+### Cargo
+
+```bash
+cargo install a3s-gateway
+```
+
+Building from source requires Rust **1.88** or newer (the current MSRV).
+
+### Docker (ghcr.io)
+
+The published Linux images build with the `kube` and `redis` cargo features
+enabled (Kubernetes provider + distributed Redis rate limiting). The default
+`cargo install` / `brew` builds enable no extra features.
+
+```bash
+docker run -d \
+  -v $(pwd)/gateway.acl:/etc/a3s-gateway/gateway.acl \
+  -p 8080:8080 \
+  ghcr.io/a3s-lab/gateway:latest \
+  --config /etc/a3s-gateway/gateway.acl
+```
+
 ## Minimal Configuration
 
-Create a `gateway.acl` file with an entrypoint, a router, and a service:
+Create a `gateway.acl` with one entrypoint, one router, and one service that
+proxies to an LLM/HTTP backend.
 
 ```text
+# gateway.acl — proxy /v1 traffic to a local LLM backend
 entrypoints "web" {
-  address = "0.0.0.0:80"
+  address = "0.0.0.0:8080"
 }
 
-routers "my-api" {
-  rule        = "PathPrefix(`/api`)"
-  service     = "api-backend"
+routers "llm" {
+  rule        = "PathPrefix(`/v1`)"
+  service     = "llm-backend"
   entrypoints = ["web"]
 }
 
-services "api-backend" {
+services "llm-backend" {
   load_balancer {
-    strategy = "round-robin"
-    servers  = [{ url = "http://127.0.0.1:8001" }]
+    strategy        = "round-robin"
+    request_timeout = "60s"
+    servers = [
+      { url = "http://127.0.0.1:8001" },
+    ]
   }
 }
 ```
 
+How this maps to the schema:
+
+- **`entrypoints`** — a named network listener. `address` (`host:port`) is
+  required; `protocol` defaults to `http` (also `tcp` / `udp`). Listening on
+  `0.0.0.0:8080` matches the published Docker image, which exposes `8080`.
+- **`routers`** — `rule` and `service` are required. The rule uses backtick
+  arguments and the `&&` combinator (`Host`, `Path`, `PathPrefix`, `Method`,
+  `Headers`). `PathPrefix` is a raw `starts_with`, so `PathPrefix(`/v1`)` matches
+  `/v1`, `/v1/chat/completions`, and `/v1xyz`. An empty `entrypoints` list (or
+  omitting it) binds the router to **all** entrypoints.
+- **`services`** — wraps a `load_balancer`. `request_timeout` defaults to
+  `"30s"`; LLM responses can be slow, so this example raises it to `"60s"`.
+  Durations accept `ms` / `s` / `m` suffixes (a bare number means seconds);
+  empty, `0s`, or non-numeric values are rejected at load. A service must have
+  at least one `server` (or a revision) or validation fails.
+
+> The router `service` and `entrypoints`, and each middleware name, are
+> cross-validated at load — a reference to a name that does not exist is a hard
+> config error.
+
 ## Start the Gateway
 
 ```bash
-# Start with ACL config
+# Start with the ACL config (defaults to ./gateway.acl if --config is omitted)
 a3s-gateway --config gateway.acl
 
 # Start with debug logging
 a3s-gateway --config gateway.acl --log-level debug
 
-# Validate configuration without starting
+# Validate the configuration without starting
 a3s-gateway validate --config gateway.acl
 ```
 
-## Add HTTPS
-
-```text
-entrypoints "web" {
-  address = "0.0.0.0:80"
-}
-
-entrypoints "websecure" {
-  address = "0.0.0.0:443"
-
-  tls {
-    cert_file = "/etc/certs/cert.pem"
-    key_file  = "/etc/certs/key.pem"
-  }
-}
-
-routers "my-api" {
-  rule        = "Host(`api.example.com`) && PathPrefix(`/v1`)"
-  service     = "api-backend"
-  entrypoints = ["websecure"]
-}
-
-services "api-backend" {
-  load_balancer {
-    strategy = "round-robin"
-    servers  = [{ url = "http://127.0.0.1:8001" }]
-  }
-}
-```
-
-## Add Middleware
-
-```text
-entrypoints "websecure" {
-  address = "0.0.0.0:443"
-
-  tls {
-    cert_file = "/etc/certs/cert.pem"
-    key_file  = "/etc/certs/key.pem"
-  }
-}
-
-routers "my-api" {
-  rule        = "Host(`api.example.com`)"
-  service     = "api-backend"
-  entrypoints = ["websecure"]
-  middlewares  = ["auth", "rate-limit"]
-}
-
-middlewares "auth" {
-  type  = "jwt"
-  value = "my-jwt-secret"
-}
-
-middlewares "rate-limit" {
-  type  = "rate-limit"
-  rate  = 100
-  burst = 50
-}
-
-services "api-backend" {
-  load_balancer {
-    strategy = "round-robin"
-    servers = [
-      { url = "http://127.0.0.1:8001" },
-      { url = "http://127.0.0.1:8002" },
-    ]
-  }
-}
-```
-
-## Health Check
-
-```text
-services "api-backend" {
-  load_balancer {
-    strategy = "least-connections"
-
-    servers = [
-      { url = "http://127.0.0.1:8001" },
-      { url = "http://127.0.0.1:8002" },
-    ]
-
-    health_check {
-      path                = "/health"
-      interval            = "10s"
-      timeout             = "5s"
-      unhealthy_threshold = 3
-      healthy_threshold   = 1
-    }
-  }
-}
-```
-
-## Management
-
-Gateway management is CLI-first by default. If you need remote inspection for a
-console or operator, enable the Dashboard API on a dedicated listener. It does
-not reserve `/api/gateway/*` on traffic entrypoints.
+Inspect what was parsed without binding any sockets:
 
 ```bash
-a3s-gateway validate --config gateway.acl
 a3s-gateway config --config gateway.acl summary
 a3s-gateway config --config gateway.acl entrypoints
 a3s-gateway config --config gateway.acl routes
 a3s-gateway config --config gateway.acl services
 a3s-gateway config --config gateway.acl middlewares
-a3s-gateway config --config gateway.acl providers
 a3s-gateway config --config gateway.acl json
-a3s-gateway management events --url http://127.0.0.1:9090/api/gateway
-a3s-gateway management validate --url http://127.0.0.1:9090/api/gateway --file gateway.acl
-a3s-gateway management reload --url http://127.0.0.1:9090/api/gateway --file gateway.acl
 ```
 
-```text
-management {
-  enabled        = true
-  address        = "127.0.0.1:9090"
-  path_prefix    = "/api/gateway"
-  auth_token_env = "A3S_GATEWAY_ADMIN_TOKEN"
-  allowed_ips    = ["127.0.0.1", "::1"]
+## Verify
 
-  tls {
-    cert_file           = "/etc/a3s/admin/server.crt"
-    key_file            = "/etc/a3s/admin/server.key"
-    client_ca_file      = "/etc/a3s/admin/client-ca.crt"
-    require_client_cert = true
+Send a request through the gateway. The router matches `PathPrefix(`/v1`)` and
+forwards to `llm-backend`, which proxies to `http://127.0.0.1:8001`:
+
+```bash
+curl -i http://localhost:8080/v1/models
+```
+
+If the backend is reachable you get its response. The gateway always adds
+`X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`, and
+`X-Forwarded-Port` to the upstream request (this is unconditional — there are no
+config keys for forwarded headers).
+
+A POST works the same way — paths and bodies stream straight through:
+
+```bash
+curl -i http://localhost:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"my-model","messages":[{"role":"user","content":"ping"}]}'
+```
+
+If no backend is healthy you get `502`; an upstream that exceeds
+`request_timeout` returns `504`.
+
+## Secrets via `env()`
+
+Any string-valued ACL attribute can read from the environment with `env("VAR")`.
+A missing variable is a config error. This is the only function call supported in
+ACL values.
+
+```text
+services "llm-backend" {
+  load_balancer {
+    servers = [
+      { url = env("LLM_UPSTREAM_URL") },
+    ]
   }
 }
 ```
 
-## Programmatic Usage
-
-```rust
-use a3s_gateway::{Gateway, config::GatewayConfig};
-
-#[tokio::main]
-async fn main() -> a3s_gateway::Result<()> {
-    let config = GatewayConfig::from_file("gateway.acl").await?;
-    let gateway = Gateway::new(config)?;
-
-    gateway.start().await?;
-
-    // Check health
-    let health = gateway.health();
-    println!("State: {:?}, Uptime: {}s", health.state, health.uptime_secs);
-
-    // Wait for shutdown signal
-    gateway.wait_for_shutdown().await;
-    Ok(())
-}
+```bash
+export LLM_UPSTREAM_URL="http://127.0.0.1:8001"
+a3s-gateway --config gateway.acl
 ```
+
+## Next Steps
+
+- **Routing** — `Host`/`Path`/`PathPrefix`/`Method`/`Headers` matchers,
+  priority, and most-specific-wins ordering: see [Routing](./routing).
+- **Middleware** — `rate-limit`, `jwt`, `api-key`, `cors`, `circuit-breaker`,
+  and more, attached via `middlewares = [...]`: see [Middleware](./middleware).
+- **Services** — load-balancing strategies, active/passive health checks,
+  sticky sessions, failover, autoscaling, and revision traffic splitting:
+  see [Services](./services).
+- **Deployment** — Helm, Docker, and systemd: see [Deployment](./deployment).
+- **Observability & management API** — Prometheus metrics and the dedicated
+  management listener: see [Observability](./observability).

@@ -1,39 +1,70 @@
 ---
 title: Services
-description: Load balancing, health checks, sticky sessions, traffic mirroring, failover, and autoscaling
+description: Backends, load balancing, active and passive health checks, sticky sessions, failover, autoscaling, and service discovery providers
 ---
 
 import { TypeTable } from 'fumadocs-ui/components/type-table';
+import { Callout } from 'fumadocs-ui/components/callout';
 
 # Services
 
-Services define backend pools with load balancing, health checks, sticky sessions, traffic mirroring, failover, and optional Knative-style autoscaling.
+A `services` block defines a backend pool plus its resiliency policy: load
+balancing, active and passive health checks, sticky sessions, traffic mirroring,
+failover, and optional Knative-style autoscaling. Each block becomes a
+`LoadBalancer` that filters to healthy backends and selects one per the
+configured `strategy`.
 
-## Load Balancing Strategies
-
-<TypeTable
-  type={{
-    "round-robin": {
-      description: "Cycles through healthy backends sequentially",
-    },
-    "weighted": {
-      description: "Distributes traffic proportionally by weight",
-    },
-    "least-connections": {
-      description: "Routes to the backend with fewest active connections",
-    },
-    "random": {
-      description: "Selects a random healthy backend",
-    },
-  }}
-/>
+A service is valid only if it has **at least one server or at least one
+revision**. Omitting the `load_balancer` block yields an empty round-robin pool
+that fails validation with `no servers configured`.
 
 ```text
 services "api" {
   load_balancer {
-    strategy        = "weighted"
+    strategy        = "round-robin"
     request_timeout = "30s"
-    servers         = [
+    servers = [
+      { url = "http://127.0.0.1:8001" },
+      { url = "http://127.0.0.1:8002" }
+    ]
+  }
+}
+```
+
+Routers reference a service by name through `service = "api"`.
+
+## Load Balancer
+
+<TypeTable
+  type={{
+    strategy: { type: 'string', default: '"round-robin"', description: 'round-robin | weighted | least-connections | random' },
+    request_timeout: { type: 'string', default: '"30s"', description: 'Max wait for an upstream response before 504' },
+    servers: { type: 'array', description: 'Backend servers (required unless revisions provide backends)' },
+    health_check: { type: 'block', description: 'Active HTTP health check (optional)' },
+    sticky: { type: 'block', description: 'Cookie-based session affinity (optional)' },
+  }}
+/>
+
+### Strategies
+
+<TypeTable
+  type={{
+    "round-robin": { description: 'Cycles through healthy backends with an atomic counter (default)' },
+    "weighted": { description: 'Distributes traffic proportionally by server weight' },
+    "least-connections": { description: 'Routes to the healthy backend with the fewest active connections' },
+    "random": { description: 'Picks a healthy backend pseudo-randomly (time-based, not a cryptographic RNG)' },
+  }}
+/>
+
+The strategy name is kebab-case; any other value is rejected at load with
+`unknown strategy`. `weight` is only consulted by the `weighted` strategy — if
+every weight is `0` the weighted path falls back to the first healthy backend.
+
+```text
+services "api" {
+  load_balancer {
+    strategy = "weighted"
+    servers = [
       { url = "http://127.0.0.1:8001", weight = 3 },
       { url = "http://127.0.0.1:8002", weight = 1 }
     ]
@@ -41,27 +72,39 @@ services "api" {
 }
 ```
 
-`request_timeout` controls the maximum time the gateway waits for a buffered
-plain HTTP upstream response before returning `504 Gateway Timeout`. It accepts millisecond,
-second, or minute values such as `"500ms"`, `"30s"`, or `"2m"`.
-
 <TypeTable
   type={{
-    strategy: { type: 'string', default: '"round-robin"', description: 'Load balancing strategy' },
-    request_timeout: { type: 'string', default: '"30s"', description: 'Maximum buffered plain HTTP upstream request time before a 504 response' },
-    servers: { type: 'array', required: true, description: 'Backend URLs and optional weights' },
+    url: { type: 'string', required: true, description: 'Backend URL, e.g. http://host:port or h2c://host:port (gRPC cleartext)' },
+    weight: { type: 'u32', default: '1', description: 'Relative weight (weighted strategy only)' },
   }}
 />
 
-## Health Checks
+### request_timeout
 
-Active HTTP probes with configurable thresholds. Unhealthy backends are automatically excluded from load balancing.
+`request_timeout` wraps each upstream request in a timeout; on elapse the
+gateway returns `504 Gateway Timeout`. It accepts millisecond, second, or minute
+suffixes (`"750ms"`, `"30s"`, `"2m"`); a bare number is interpreted as seconds.
+The value is validated at load — an empty, `0`, or non-numeric value is
+**rejected** with a config error. The default is `"30s"`.
+
+<Callout type="info">
+  Servers, revisions, health-check seeds, and header maps each accept several ACL
+  spellings: an inline list (`servers = [ {..} ]`), a single object, or repeated
+  child blocks (`server`/`servers`). Pick whichever reads best.
+</Callout>
+
+## Active Health Checks
+
+Adding a `health_check` block starts a per-service active checker that GETs the
+configured `path` on every backend and flips health by consecutive
+success/failure counts. Any non-2xx response (and any request error) counts as a
+failure. Unhealthy backends are excluded from selection.
 
 ```text
 services "api" {
   load_balancer {
     strategy = "round-robin"
-    servers  = [
+    servers = [
       { url = "http://127.0.0.1:8001" },
       { url = "http://127.0.0.1:8002" }
     ]
@@ -78,19 +121,52 @@ services "api" {
 
 <TypeTable
   type={{
-    path: { type: 'string', description: 'HTTP GET path to probe' },
-    interval: { type: 'string', default: '"10s"', description: 'Time between checks' },
-    timeout: { type: 'string', default: '"5s"', description: 'Max wait for response' },
+    path: { type: 'string', required: true, description: 'HTTP GET path to probe' },
+    interval: { type: 'string', default: '"10s"', description: 'Time between probe rounds' },
+    timeout: { type: 'string', default: '"5s"', description: 'Per-probe timeout' },
     unhealthy_threshold: { type: 'u32', default: '3', description: 'Consecutive failures before marking unhealthy' },
     healthy_threshold: { type: 'u32', default: '1', description: 'Consecutive successes before marking healthy' },
   }}
 />
 
-Passive health checks also track error counts and automatically remove backends that exceed the failure threshold.
+<Callout type="warn">
+  `healthy_threshold` defaults to **1** (one good probe restores a backend), not
+  the more common 2. The active health-check duration parser silently falls back
+  to `10s` on an invalid `interval`/`timeout` string — unlike `request_timeout`,
+  which rejects bad durations outright.
+</Callout>
+
+## Passive Health Checks
+
+Passive health checking is **always on for every service** and is **not
+configurable**. There is no ACL block for it — every service is built with the
+fixed defaults below, and backends are observed from real proxied responses
+(no extra probes).
+
+| Setting | Value | Meaning |
+|---|---|---|
+| `error_threshold` | `5` | 5xx responses within the window before eviction |
+| `window` | `30s` | Sliding window for counting errors |
+| `error_status_codes` | `500, 502, 503, 504` | Statuses that count as errors |
+| `recovery_time` | `30s` | How long a backend stays evicted before re-enabling |
+
+When a backend accumulates `error_threshold` matching responses inside the
+sliding `window`, it is marked unhealthy and removed from rotation.
+
+### Recovery ticker (v1.0.6)
+
+Earlier versions recovered an evicted backend only on a subsequent successful
+request — but an evicted backend receives no traffic, so it could never recover,
+producing a permanent `503` until restart. v1.0.6 added a background recovery
+ticker that drives a half-open probe: once `recovery_time` has elapsed, the
+backend is re-enabled and its error window cleared **even with zero live
+traffic**. The ticker interval is `recovery_time` clamped to `[1s, 5s]`, so
+probing happens at most every 5s and at least every 1s.
 
 ## Sticky Sessions
 
-Route the same client to the same backend using cookies:
+Bind a client to a backend with a cookie. The cookie **name** is the only
+configurable field; the TTL and capacity use fixed runtime defaults.
 
 ```text
 services "api" {
@@ -104,11 +180,30 @@ services "api" {
 }
 ```
 
-On the first request, the gateway selects a backend and sets a `Set-Cookie` header. Subsequent requests with that cookie are routed to the same backend. Sessions are evicted on TTL expiry or when max sessions is reached.
+<TypeTable
+  type={{
+    cookie: { type: 'string', required: true, description: 'Cookie name used to pin a client to a backend' },
+  }}
+/>
+
+On the first request the gateway selects a backend (least-connections among
+healthy backends) and emits a `Set-Cookie` of the form:
+
+```text
+<cookie>=<uuid>; Path=/; Max-Age=3600; HttpOnly; SameSite=Lax
+```
+
+Subsequent requests carrying that cookie reuse the same backend while it is
+healthy; a stale or unhealthy binding is dropped and re-selected. The TTL is
+fixed at **1 hour** and the session table holds up to **100,000** entries
+(LRU/oldest eviction at capacity). There is no ACL surface to change the TTL,
+capacity, or cookie attributes (no `Secure` flag is set).
 
 ## Traffic Mirroring
 
-Copy a percentage of live traffic to a shadow service for testing without affecting the primary response:
+Copy a percentage of live traffic to a shadow service for testing. Mirroring is
+fire-and-forget: the shadow response is discarded and never affects the client
+response or latency.
 
 ```text
 services "api" {
@@ -125,14 +220,20 @@ services "api" {
 
 <TypeTable
   type={{
-    service: { type: 'string', required: true, description: 'Target shadow service name' },
-    percentage: { type: 'u32', default: '100', description: 'Percentage of traffic to mirror (0–100)' },
+    service: { type: 'string', required: true, description: 'Shadow service name (must exist in services)' },
+    percentage: { type: 'u8', default: '100', description: 'Percent of traffic mirrored (0–100)' },
   }}
 />
 
+Sampling is deterministic (`counter % 100 < percentage`), not random. If the
+target service is missing at build time, the mirror is skipped with a warning.
+
 ## Failover
 
-Automatic fallback to a secondary backend pool when the primary has zero healthy backends:
+Route to a secondary service when the primary has **zero healthy backends**.
+Failover is not a per-request retry — it engages only when the primary pool is
+entirely unhealthy, and recovers automatically once the primary has any healthy
+backend again.
 
 ```text
 services "api" {
@@ -156,9 +257,19 @@ services "backup-pool" {
 }
 ```
 
+<TypeTable
+  type={{
+    service: { type: 'string', required: true, description: 'Fallback service name (must exist in services)' },
+  }}
+/>
+
+If the named failover service does not exist, the selector is silently skipped
+with a warning at build time.
+
 ## Knative-Style Autoscaling
 
-Optional autoscaling with scale-to-zero, request buffering, and concurrency-based decisions:
+Optional autoscaling with scale-to-zero, request buffering, and
+concurrency-based decisions.
 
 ```text
 services "api" {
@@ -185,18 +296,54 @@ services "api" {
     min_replicas: { type: 'u32', default: '0', description: 'Minimum replicas (0 enables scale-to-zero)' },
     max_replicas: { type: 'u32', default: '10', description: 'Maximum replicas' },
     container_concurrency: { type: 'u32', default: '0', description: 'Max concurrent requests per container (0 = unlimited)' },
-    target_utilization: { type: 'f32', default: '0.7', description: 'Target utilization ratio for scaling decisions' },
-    scale_down_delay_secs: { type: 'u64', default: '300', description: 'Seconds after last request before scaling down' },
+    target_utilization: { type: 'f64', default: '0.7', description: 'Target utilization ratio, must be in (0.0, 1.0]' },
+    scale_down_delay_secs: { type: 'u64', default: '300', description: 'Cooldown after last request before scale-down' },
     buffer_enabled: { type: 'bool', default: 'false', description: 'Enable request buffering during scale-from-zero' },
     buffer_timeout_secs: { type: 'u64', default: '30', description: 'Max wait for a backend during cold start' },
-    buffer_size: { type: 'u32', default: '100', description: 'Max buffered requests' },
-    executor: { type: 'string', default: '"box"', description: 'Scale executor: `box` (HTTP) or `k8s` (kube-rs)' },
+    buffer_size: { type: 'usize', default: '100', description: 'Max requests buffered during scale-from-zero' },
+    executor: { type: 'string', default: '"box"', description: 'Scale executor: "box" or "k8s"' },
   }}
 />
 
+The desired replica count uses the Knative formula:
+
+```text
+desired = ceil((in_flight + queue_depth) / (container_concurrency * target_utilization))
+```
+
+clamped to `[min_replicas, max_replicas]`. Validation enforces
+`min_replicas <= max_replicas` and `target_utilization` in `(0.0, 1.0]`.
+
+<Callout type="warn">
+  Several runtime caveats apply in v1.0.7:
+
+  - The autoscaler loop runs **only** for services with `container_concurrency > 0`. With the default `0`, no autoscaler (and no concurrency limiter) is built for that service.
+  - The tick interval is hardcoded to **2 seconds**.
+  - In the live loop, `in_flight` is hardcoded to `0`, so only `queue_depth` (buffered scale-from-zero requests) actually drives scaling decisions today.
+  - The `box` executor targets `http://localhost:9090` and is not configurable. `executor = "k8s"` falls back to the box executor at startup (an async-init limitation); any unknown value also falls back to box.
+</Callout>
+
+### Scale-from-zero buffering
+
+When `buffer_enabled = true` and a request arrives with no healthy backend, it
+is **held** (not replayed from a log) until a backend becomes ready, then
+re-dispatched. Outcomes:
+
+| Outcome | Response |
+|---|---|
+| Backend ready | request forwarded |
+| `buffer_timeout_secs` elapsed | `504` "Backend scale-up timed out" |
+| Buffer full (`buffer_size`) | `503` "Request buffer full" |
+| Gateway shutting down | `503` |
+
+With `buffer_enabled = false` (the default) a no-backend request falls through to
+failover or returns `503` immediately.
+
 ## Revision Traffic Splitting
 
-Split traffic across named revisions for canary deployments:
+Split traffic across named revisions for canary deployments. Each revision owns
+its own load balancer; selection is **deterministic weighted round-robin**
+(`counter % total_weight`), not random.
 
 ```text
 services "api" {
@@ -205,19 +352,35 @@ services "api" {
     servers  = [{ url = "http://127.0.0.1:8001" }]
   }
   revisions = [
-    { name = "v1", traffic_percent = 90, strategy = "round-robin",
-      servers = [{ url = "http://127.0.0.1:8001" }] },
-    { name = "v2", traffic_percent = 10, strategy = "round-robin",
-      servers = [{ url = "http://127.0.0.1:8003" }] }
+    {
+      name = "v1", traffic_percent = 90, strategy = "round-robin",
+      servers = [{ url = "http://127.0.0.1:8001" }]
+    },
+    {
+      name = "v2", traffic_percent = 10, strategy = "round-robin",
+      servers = [{ url = "http://127.0.0.1:8003" }]
+    }
   ]
 }
 ```
 
-Traffic percentages must sum to 100.
+<TypeTable
+  type={{
+    name: { type: 'string', required: true, description: 'Revision name, e.g. v1' },
+    traffic_percent: { type: 'u32', default: '100', description: 'Percent of traffic (all revisions must sum to 100)' },
+    servers: { type: 'array', description: 'Backends for this revision' },
+    strategy: { type: 'string', default: '"round-robin"', description: 'Per-revision load-balancing strategy' },
+  }}
+/>
+
+`traffic_percent` values must sum to exactly **100** across all revisions or
+config loading fails. If the weight-selected revision has no healthy backend,
+the router falls through to the next revision with a healthy backend. The ACL
+block is named `revision` (with `revisions` accepted as an alias).
 
 ## Gradual Rollout
 
-Automatically shift traffic from one revision to another with safety guardrails:
+Shift traffic from one revision to another with auto-rollback guardrails.
 
 ```text
 services "api" {
@@ -236,4 +399,221 @@ services "api" {
 }
 ```
 
-The rollout shifts `step_percent` of traffic every `step_interval_secs`. If the error rate exceeds `error_rate_threshold` or p99 latency exceeds `latency_threshold_ms`, the rollout automatically rolls back.
+<TypeTable
+  type={{
+    from: { type: 'string', required: true, description: 'Source revision (must exist)' },
+    to: { type: 'string', required: true, description: 'Target revision (must exist)' },
+    step_percent: { type: 'u32', default: '10', description: 'Traffic % shifted per step' },
+    step_interval_secs: { type: 'u64', default: '60', description: 'Seconds between steps' },
+    error_rate_threshold: { type: 'f64', default: '0.05', description: 'Error rate (0.0–1.0) that triggers rollback' },
+    latency_threshold_ms: { type: 'u64', default: '5000', description: 'P99 latency (ms) that triggers rollback' },
+  }}
+/>
+
+Rollout requires at least one revision, and `from`/`to` must name existing
+revisions.
+
+<Callout type="warn">
+  The rollout controller is fully implemented and validated, but in v1.0.7 it is
+  **not driven by any runtime loop** — no scheduler calls its advance step. So
+  `step_percent`, `step_interval_secs`, `error_rate_threshold`, and
+  `latency_threshold_ms` are parsed and validated but currently inert at runtime.
+</Callout>
+
+---
+
+## Service Discovery
+
+Service discovery providers poll or watch an external source, generate routers
+and services, and merge them with the static configuration. They are declared in
+the top-level `providers` block. Exactly four provider blocks are recognized —
+`file`, `discovery`, `kubernetes`, and `docker` — any other name is a config
+error (`Unknown providers ACL block`).
+
+<Callout type="warn">
+  **Merge precedence is not uniform.** The `discovery` and `kubernetes`
+  providers ADD discovered entries but the **static config wins** on name
+  collisions. The `docker` provider instead **overwrites** a static entry that
+  shares a name. There is **no `providers.dns` block** in v1.0.7 (see below).
+</Callout>
+
+### File Provider
+
+Watches the main `.acl` file's directory and an optional extra `directory` and
+hot-reloads on change. Only files with the `.acl` extension are treated as
+config; other extensions are silently ignored, and the main config file must be
+`.acl` or loading fails.
+
+```text
+providers {
+  file {
+    watch     = true
+    directory = "/etc/gateway/conf.d/"
+  }
+}
+```
+
+<TypeTable
+  type={{
+    watch: { type: 'bool', default: 'true', description: 'Hot-reload on file change (notify: inotify/kqueue)' },
+    directory: { type: 'string', description: 'Extra directory whose *.acl fragments are merged' },
+  }}
+/>
+
+On change the gateway concatenates the main file plus all sorted `.acl`
+fragments, re-parses, validates, and on success applies the new config; on a
+parse/validate error it keeps the last known-good config. Events are debounced at
+500ms.
+
+### Health-Based Discovery
+
+Polls each seed URL for `<seed>/.well-known/a3s-service.json` (RFC 8615) and
+groups healthy seeds into round-robin services. A seed is healthy when a GET to
+its advertised `health_path` returns 2xx.
+
+```text
+providers {
+  discovery {
+    poll_interval_secs = 30
+    timeout_secs       = 5
+    seeds = [
+      { url = "http://10.0.0.5:8080" },
+      { url = "http://10.0.0.6:8080" }
+    ]
+  }
+}
+```
+
+<TypeTable
+  type={{
+    seeds: { type: 'array', required: true, description: 'Backend seed base URLs (each has url)' },
+    poll_interval_secs: { type: 'u64', default: '30', description: 'Seconds between discovery polls' },
+    timeout_secs: { type: 'u64', default: '5', description: 'Per-probe HTTP timeout' },
+  }}
+/>
+
+The published `a3s-service.json` carries `name`, `version`, `routes[]`,
+`health_path` (default `/health`), and `weight` (default `1`). Each route has
+`rule` (required), `middlewares` (default `[]`), and `priority` (default `0`).
+The generated service uses a hardcoded `request_timeout` of `"30s"`, and routers
+(`discovered-<name>`) are created only for the **first** healthy instance of each
+service name; later healthy instances add servers but do not create extra
+routers.
+
+### Docker Provider
+
+Polls the Docker API (`GET /containers/json`, v1.41) over a Unix socket or
+`tcp://` endpoint and builds services from container labels namespaced under
+`label_prefix`.
+
+```text
+providers {
+  docker {
+    host               = "/var/run/docker.sock"
+    label_prefix       = "a3s"
+    poll_interval_secs = 10
+  }
+}
+```
+
+<TypeTable
+  type={{
+    host: { type: 'string', default: '"/var/run/docker.sock"', description: 'Unix socket path or tcp:// URL' },
+    label_prefix: { type: 'string', default: '"a3s"', description: 'Prefix for routing labels' },
+    poll_interval_secs: { type: 'u64', default: '10', description: 'Poll interval (effective minimum 1s)' },
+  }}
+/>
+
+Container labels (with `<prefix>` defaulting to `a3s`):
+
+| Label | Required | Meaning |
+|---|---|---|
+| `<prefix>.enable` | yes | Must be exactly `"true"`; any other value (incl. `"false"`, `"True"`, `"1"`) is skipped |
+| `<prefix>.service.port` | yes | Backend port (u16); container is skipped if missing/unparseable |
+| `<prefix>.service.strategy` | no | Load-balancing strategy (default `round-robin`) |
+| `<prefix>.service.weight` | no | Backend weight (default `1`) |
+| `<prefix>.router.rule` | no | Traefik rule; presence triggers HTTP router generation |
+| `<prefix>.router.entrypoints` | no | Comma-separated entrypoint names |
+| `<prefix>.router.middlewares` | no | Comma-separated middleware names |
+| `<prefix>.router.priority` | no | Router priority (default `0`) |
+| `<prefix>.protocol` | no | `tcp`/`udp` generate a stream entrypoint and skip the HTTP router; default `http` |
+| `<prefix>.entrypoint.address` | for tcp/udp | Listen address for the generated stream entrypoint |
+
+```text
+# docker run labels
+a3s.enable=true
+a3s.service.port=8080
+a3s.router.rule=PathPrefix(`/api`)
+a3s.router.middlewares=auth,rate-limit
+```
+
+### Kubernetes Ingress
+
+Watches `networking.k8s.io/v1` Ingress resources (requires the `kube` cargo
+feature; published Linux images include it). For each rule/path it creates a
+service and HTTP router. Behavior is tuned with `a3s-gateway.io/*` annotations.
+
+```text
+providers {
+  kubernetes {
+    namespace           = "default"
+    label_selector      = "app=my-service"
+    watch_interval_secs = 30
+    ingress_route_crd   = false
+  }
+}
+```
+
+<TypeTable
+  type={{
+    namespace: { type: 'string', default: '"" (all namespaces)', description: 'Restrict to a single namespace' },
+    label_selector: { type: 'string', default: '"" (no filter)', description: 'Ingress label selector (applied only when non-empty)' },
+    watch_interval_secs: { type: 'u64', default: '30', description: 'Poll interval for both Ingress and CRD watchers' },
+    ingress_route_crd: { type: 'bool', default: 'false', description: 'Also watch IngressRoute (ConfigMap-backed) specs' },
+  }}
+/>
+
+Generated service backends use the in-cluster DNS name
+`http://<svc>.<namespace>.svc.cluster.local:<port>` (port defaults to `80`). The
+rule is built from host and path: `Host(\`h\`)` plus `Path(\`p\`)` for pathType
+`Exact`, otherwise `PathPrefix(\`p\`)`; a `/` or empty path is dropped. Ingress
+change detection hashes router and service content (since v1.0.5).
+
+Supported Ingress annotations:
+
+| Annotation | Effect |
+|---|---|
+| `a3s-gateway.io/entrypoints` | Comma-separated entrypoint names for generated routers |
+| `a3s-gateway.io/middlewares` | Comma-separated middleware names |
+| `a3s-gateway.io/strategy` | Load-balancing strategy (invalid → `round-robin`) |
+| `a3s-gateway.io/priority` | Router priority, i32 (higher wins; invalid → `0`) |
+| `a3s-gateway.io/protocol` | `tcp`/`udp` generate a stream entrypoint and skip the HTTP router |
+| `a3s-gateway.io/listen` | Listen address for tcp/udp protocol entrypoints |
+| `a3s-gateway.io/request-timeout` | Per-route upstream timeout (e.g. `"600s"`; default `"30s"`) |
+
+<Callout type="info">
+  Without the `kube` feature, a `providers.kubernetes` block only logs a warning
+  and does nothing.
+</Callout>
+
+### IngressRoute CRD
+
+When `ingress_route_crd = true`, the gateway also watches a Traefik-style
+IngressRoute spec. In v1.0.7 this is **not a real installed CRD** — the watcher
+lists ConfigMaps labeled `a3s-gateway.io/type=ingressroute` and parses the JSON
+in each ConfigMap's `.data.spec`. The spec carries `entrypoints[]`, `routes[]`
+(each with `match`, `priority`, `middlewares[]`, `services[]`), and optional
+`tls`.
+
+<Callout type="warn">
+  The CRD watcher honors `namespace` (all vs. namespaced) but **ignores
+  `label_selector`** — it always uses the fixed `a3s-gateway.io/type=ingressroute`
+  selector. It also has no change-detection hash, so it re-sends the merged
+  config every `watch_interval_secs`.
+</Callout>
+
+### DNS Provider (not available)
+
+A DNS provider is present in the source as library-only code but is **not wired
+in v1.0.7**: there is no `providers.dns` block, and the gateway never spawns it.
+Do not configure DNS-based discovery — it has no ACL surface.

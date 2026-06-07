@@ -1,86 +1,101 @@
 ---
 title: 可观测性
-description: Prometheus 指标、结构化日志、分布式追踪、CLI 检查与可选 Dashboard API
+description: Prometheus 指标、结构化 JSON 访问日志、分布式追踪（W3C + B3/Zipkin）、可观测性开关，以及 Dashboard/管理 API
 ---
+
+import { TypeTable } from 'fumadocs-ui/components/type-table';
+import { Callout } from 'fumadocs-ui/components/callout';
 
 # 可观测性
 
-A3S Gateway 内置 Prometheus 指标、结构化访问日志、分布式追踪、CLI 配置检查，
-并可在独立 management listener 上启用 Dashboard API。
+A3S Gateway 内置一套无外部依赖的可观测性栈：进程内的 Prometheus 指标采集器、
+结构化 JSON 访问日志条目、入站分布式追踪上下文提取（W3C + B3/Zipkin）以及出站
+W3C 传播，还有一个运行在独立 listener 上的可选 Dashboard/管理 API。
 
-## 管理检查
+数据平面的所有内容都由一个顶层块 `observability {}` 统一控制，Dashboard 则由
+单独的 `management {}` 块控制。
 
-本地和 CI/CD 工作流建议使用 CLI：
+## `observability` 块
 
-```bash
-a3s-gateway validate --config gateway.acl
-a3s-gateway config --config gateway.acl summary
-a3s-gateway config --config gateway.acl entrypoints
-a3s-gateway config --config gateway.acl routes
-a3s-gateway config --config gateway.acl services
-a3s-gateway config --config gateway.acl middlewares
-a3s-gateway config --config gateway.acl providers
-a3s-gateway config --config gateway.acl json
-a3s-gateway management events --url http://127.0.0.1:9090/api/gateway
-a3s-gateway management validate --url http://127.0.0.1:9090/api/gateway --file gateway.acl
-a3s-gateway management reload --url http://127.0.0.1:9090/api/gateway --file gateway.acl
-```
+`observability {}` 块**恰好包含三个布尔开关**，且**三者都默认为 `true`**。除此
+之外没有其他键（没有 OTLP endpoint、采样率、传播或服务名等键 —— 那些键属于一个
+内部结构体，在 v1.0.7 中尚未接入 ACL）。
 
-需要远程检查时，可以显式启用 Dashboard API：
-
-```text
-management {
-  enabled        = true
-  address        = "127.0.0.1:9090"
-  path_prefix    = "/api/gateway"
-  auth_token_env = "A3S_GATEWAY_ADMIN_TOKEN"
-  allowed_ips    = ["127.0.0.1", "::1"]
-
-  tls {
-    cert_file           = "/etc/a3s/admin/server.crt"
-    key_file            = "/etc/a3s/admin/server.key"
-    client_ca_file      = "/etc/a3s/admin/client-ca.crt"
-    require_client_cert = true
-  }
+```acl
+observability {
+  metrics_enabled    = true   # Prometheus per-router/-service/-backend counters
+  access_log_enabled = true   # structured access log per request
+  tracing_enabled    = true   # W3C Trace Context extraction + outbound traceparent
 }
 ```
 
-设置 `auth_token_env` 后，Dashboard 请求必须携带
-`Authorization: Bearer <token>`；请求来源也必须匹配 `allowed_ips`。当
-`management.tls.require_client_cert = true` 时，客户端还必须提供由
-`client_ca_file` 签发的证书。
+| 键 | 类型 | 默认值 | 作用 |
+| --- | --- | --- | --- |
+| `metrics_enabled` | bool | `true` | 在热路径上记录 Prometheus counters/gauges。设为 `false` 时跳过 request/router/service/backend 的记录。 |
+| `access_log_enabled` | bool | `true` | 为每个请求创建耗时追踪器。 |
+| `tracing_enabled` | bool | `true` | 提取入站追踪上下文，并注入出站的 W3C `traceparent` 请求头。 |
 
-如果 management listener 启用了 mTLS，可以为 `management events` CLI 命令添加
-`--ca-cert`、`--client-cert` 和 `--client-key`。
-
-| Endpoint | Response |
-| --- | --- |
-| `GET /api/gateway/health` | Gateway health JSON |
-| `GET /api/gateway/metrics` | Prometheus text format |
-| `GET /api/gateway/config` | Active configuration JSON |
-| `GET /api/gateway/routes` | Configured routes |
-| `GET /api/gateway/services` | Services with backend health |
-| `GET /api/gateway/backends` | Backends with connection counts |
-| `GET /api/gateway/events` | Recent management security audit events |
-| `GET /api/gateway/version` | Binary version |
-| `POST /api/gateway/config/validate` | Validate an ACL payload without applying it |
-| `POST /api/gateway/config/reload` | Transactionally reload from an ACL payload |
+<Callout type="info">
+  完全省略 `observability {}` 块等同于启用全部三个开关。仅在需要削减每请求开销时
+  才关闭某个开关。
+</Callout>
 
 ## Prometheus 指标
 
+指标由一个进程内采集器（`GatewayMetrics`）维护，使用原子的 counters/gauges。
+Dashboard 以 Prometheus 0.0.4 文本暴露格式渲染它们。当 `metrics_enabled = true`
+时，以下序列会在实时请求路径上被填充：
+
 ```text
+# HELP gateway_requests_total Total number of requests received
+# TYPE gateway_requests_total counter
 gateway_requests_total 12345
+
+# HELP gateway_responses_total Total responses by status class
+# TYPE gateway_responses_total counter
 gateway_responses_total{status_class="2xx"} 11000
 gateway_responses_total{status_class="3xx"} 500
 gateway_responses_total{status_class="4xx"} 700
 gateway_responses_total{status_class="5xx"} 145
+
+# HELP gateway_response_bytes_total Total response bytes sent to clients
+# TYPE gateway_response_bytes_total counter
 gateway_response_bytes_total 987654321
+
+# HELP gateway_active_connections Current active connections
+# TYPE gateway_active_connections gauge
 gateway_active_connections 42
-gateway_router_requests{router="api"} 8000
-gateway_router_requests{router="web"} 4345
-gateway_backend_requests{backend="http://127.0.0.1:8001"} 6000
-gateway_backend_requests{backend="http://127.0.0.1:8002"} 6345
+
+# Per-router / per-service / per-backend request counters (emitted only when non-empty)
+gateway_router_requests_total{router="api"} 8000
+gateway_router_requests_total{router="web"} 4345
+gateway_service_requests_total{service="api-backend"} 12345
+gateway_backend_requests_total{backend="http://127.0.0.1:8001"} 6000
+gateway_backend_requests_total{backend="http://127.0.0.1:8002"} 6345
 ```
+
+### 序列参考
+
+| 序列 | 类型 | 标签 | 说明 |
+| --- | --- | --- | --- |
+| `gateway_requests_total` | counter | — | 收到的请求总数。始终输出 HELP/TYPE。 |
+| `gateway_responses_total` | counter | `status_class` | 固定取值 `2xx`/`3xx`/`4xx`/`5xx`（`status / 100`）。1xx 和 ≥600 会计入 `gateway_requests_total`，但没有对应的类别桶。 |
+| `gateway_response_bytes_total` | counter | — | 发送给客户端的总字节数。 |
+| `gateway_active_connections` | gauge | — | 唯一的 gauge。当前活跃连接数。 |
+| `gateway_router_requests_total` | counter | `router` | 仅当映射非空时才输出该区块。 |
+| `gateway_service_requests_total` | counter | `service` | 仅当非空时才输出。 |
+| `gateway_backend_requests_total` | counter | `backend` | 标签为 backend URL；仅当非空时才输出。 |
+
+<Callout type="warn">
+  **在 v1.0.7 中已定义但未填充。** 采集器还定义了
+  `gateway_middleware_invocations_total{middleware=...}`、
+  `gateway_router_latency_microseconds_total{router=...}`、
+  `gateway_router_errors_total{router=...}` 和
+  `gateway_service_errors_total{service=...}`，但它们的 `record_*` 方法从未在生产
+  请求路径上被调用，因此这些序列在运行时保持为空/缺失。注意
+  `gateway_router_latency_microseconds_total` 是一个**累计 counter**（微秒），而非
+  histogram。系统**没有**任何 autoscaler / scaling / replica 类型的指标。
+</Callout>
 
 ### Grafana 查询
 
@@ -99,7 +114,10 @@ rate(gateway_responses_total{status_class="2xx"}[5m])
 gateway_active_connections
 
 # Traffic by router
-rate(gateway_router_requests[5m])
+rate(gateway_router_requests_total[5m])
+
+# Traffic by backend
+rate(gateway_backend_requests_total[5m])
 
 # Throughput (bytes/sec)
 rate(gateway_response_bytes_total[5m])
@@ -107,27 +125,53 @@ rate(gateway_response_bytes_total[5m])
 
 ## 访问日志
 
-通过 `tracing` crate 输出结构化 JSON 访问日志：
+每个请求都会产生一条结构化的 `AccessLogEntry`。下面的 serde 字段名就是实际输出的
+JSON 键（通过 `tracing` crate，target 为 `access_log`）：
 
 ```json
 {
-  "timestamp": "2025-01-15T10:30:00Z",
+  "timestamp": "2026-06-07T10:30:00Z",
   "client_ip": "203.0.113.42",
   "method": "POST",
   "path": "/api/v1/chat",
+  "host": "api.example.com",
   "status": 200,
-  "request_duration_ms": 145,
-  "bytes_sent": 2048,
+  "response_bytes": 2048,
+  "duration_ms": 145,
+  "backend": "http://127.0.0.1:8001",
   "router": "api",
-  "service": "api-backend",
-  "backend": "http://127.0.0.1:8001"
+  "entrypoint": "web",
+  "user_agent": "curl/8.4.0"
 }
 ```
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `timestamp` | string | RFC 3339。 |
+| `client_ip` | string | 对端/转发后的客户端 IP。 |
+| `method` | string | HTTP 方法。 |
+| `path` | string | 请求路径。 |
+| `host` | string \| null | Host 请求头（可选）。 |
+| `status` | number (u16) | 响应状态码。 |
+| `response_bytes` | number (u64) | 发送给客户端的字节数。 |
+| `duration_ms` | number (u64) | 请求耗时（毫秒）。 |
+| `backend` | string \| null | 选中的 backend URL（可选）。 |
+| `router` | string \| null | 匹配到的 router（可选）。 |
+| `entrypoint` | string \| null | 请求到达的 listener（可选）。 |
+| `user_agent` | string \| null | 客户端 User-Agent（可选）。 |
+
+<Callout type="warn">
+  **v1.0.7 限制。** 尽管 `access_log_enabled` 默认为 `true`，但目前并不会输出每请求
+  的 JSON 访问日志行：请求路径只创建耗时追踪器，从不把条目交给后台日志任务。drain
+  任务与上面的条目 schema 都已存在，但热路径尚未向它们投喂数据。请把该 schema 视为
+  日后真正落地输出时的契约；现阶段请依赖 `RUST_LOG` / `info` 级别日志来获得实时请求
+  可见性。
+</Callout>
 
 ### 日志级别
 
 ```bash
-# Via CLI
+# Via CLI flag
 a3s-gateway --config gateway.acl --log-level debug
 
 # Via environment
@@ -143,7 +187,7 @@ RUST_LOG=a3s_gateway=debug a3s-gateway --config gateway.acl
       description: "Rate limit hits, unhealthy backends, config issues",
     },
     "info": {
-      description: "Startup, shutdown, reload, access logs",
+      description: "Startup, shutdown, reload, audit events",
     },
     "debug": {
       description: "Routing decisions, middleware execution",
@@ -156,9 +200,145 @@ RUST_LOG=a3s_gateway=debug a3s-gateway --config gateway.acl
 
 ## 分布式追踪
 
-A3S Gateway 在服务间传播追踪上下文：
+当 `tracing_enabled = true` 时，gateway 会提取入站追踪上下文，并在出站请求上注入
+一个新的子级 `traceparent`。
 
-- **W3C Trace Context**：`traceparent` / `tracestate` 请求头
-- **B3/Zipkin**：`X-B3-TraceId` / `X-B3-SpanId` 请求头
+**入站提取**（首个匹配优先）支持三种格式：
 
-Span 会在请求生命周期、后端连接和健康检查探测时创建。
+- **W3C Trace Context** —— `traceparent` / `tracestate`。解析很严格：
+  `version` 必须为 `00`，trace ID 恰好 32 个十六进制字符，parent/span ID 为 16 个
+  十六进制字符，flags 为 2 个十六进制字符。会生成一个新的 span ID，解析出的 span
+  成为其 parent。
+- **B3 单请求头** —— `b3: {traceid}-{spanid}-{sampled}[-{parentid}]`。
+  `sampled` 取值为 `1` / `true` 时视为已采样。
+- **B3 多请求头** —— `X-B3-TraceId` / `X-B3-SpanId` / `X-B3-Sampled`。若
+  `X-B3-Sampled` 缺失，则默认视为已采样。
+
+<Callout type="warn">
+  **出站传播仅支持 W3C。** 无论任何传播设置，生产路径始终向上游注入 W3C
+  `traceparent` 请求头。B3/Zipkin 仅在**入站**提取时被识别；具备 B3 能力的出站
+  注入器在 v1.0.7 中并未接入请求路径。不要期望 `b3` / `X-B3-*` 请求头会被重新
+  发往 backend。
+</Callout>
+
+## Dashboard / 管理 API
+
+Dashboard 是一个**独立的、可选的 listener**（`management {}` 块）。它**默认禁用**，
+绑定到 `127.0.0.1:9090`，且永不拦截用户流量 —— 数据平面 entrypoint 上的
+`{path_prefix}/*` 仍然是正常的用户流量。
+
+```acl
+management {
+  enabled        = true
+  address        = "127.0.0.1:9090"
+  path_prefix    = "/api/gateway"
+  auth_token_env = "A3S_GATEWAY_ADMIN_TOKEN"
+  allowed_ips    = ["127.0.0.1", "::1"]
+
+  tls {
+    cert_file           = "/etc/a3s/admin/server.crt"
+    key_file            = "/etc/a3s/admin/server.key"
+    client_ca_file      = "/etc/a3s/admin/client-ca.crt"
+    require_client_cert = true
+    min_version         = "1.2"
+  }
+}
+```
+
+### 配置键
+
+| 键 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `enabled` | bool | `false` | 管理 listener 的总开关。 |
+| `address` | string | `127.0.0.1:9090` | 监听地址；按 socket address 解析。 |
+| `path_prefix` | string | `/api/gateway` | 必须以 `/` 开头。所有 endpoint 都在它之下提供。 |
+| `auth_token_env` | string | `A3S_GATEWAY_ADMIN_TOKEN` | 持有 bearer token 的**环境变量**名称（而非 token 本身）。 |
+| `allowed_ips` | list&lt;string&gt; | `["127.0.0.1", "::1"]` | IP/CIDR 客户端白名单。 |
+| `tls` | block | 无 | 该 listener 的可选 TLS / mTLS。 |
+
+| TLS 键 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `cert_file` | string | 必填 | 服务器证书 PEM。 |
+| `key_file` | string | 必填 | 服务器私钥 PEM。 |
+| `client_ca_file` | string | 无 | 用于验证客户端证书（mTLS）的 CA bundle。当 `require_client_cert = true` 时必填。 |
+| `require_client_cert` | bool | `false` | 强制 mTLS。 |
+| `min_version` | string | `1.2` | 必须恰好为 `1.2` 或 `1.3`。 |
+
+<Callout type="warn">
+  **认证与 IP 白名单的注意事项。**
+  <ul>
+    <li>`auth_token_env` 指定的是一个**环境变量**。如果该环境变量在启动时未设置，
+    管理 listener 将启动失败。在 ACL 中设置 `auth_token_env = ""` 会完全禁用
+    bearer 认证。</li>
+    <li>`allowed_ips` 的默认值（`127.0.0.1`、`::1`）仅在该键被**省略**时生效。提供
+    一个显式的空列表（`allowed_ips = []`）会**禁用** IP 过滤（允许全部）—— 而不会
+    保留默认值。</li>
+    <li>若设置了 `client_ca_file` 但 `require_client_cert = false`，则客户端证书是
+    可选的。`require_client_cert = true` 而不设置 `client_ca_file` 会校验失败。</li>
+  </ul>
+</Callout>
+
+### 请求授权顺序
+
+每个 Dashboard 请求按以下顺序检查：**path-prefix 匹配 → IP 白名单 → bearer
+token**，并在连接层提供可选的 TLS/mTLS。
+
+- 不在 `path_prefix` 范围内的请求返回 `404 {"error":"Not found"}`。
+- IP 拒绝返回 `403`，并记录一条 `ip-rejected` 审计事件。
+- Token 校验失败返回 `401`，并记录一条 `auth-rejected` 审计事件。
+- 当配置的 token 环境变量解析不到 token（未设置/为空）时，`authorize()` 会放行
+  所有请求。
+- 所有 Dashboard 响应都设置 `Cache-Control: no-store`。
+
+### Endpoints
+
+所有路径都相对于 `path_prefix`（默认 `/api/gateway`）。
+
+| Endpoint | Method | 响应 |
+| --- | --- | --- |
+| `/` and `/health` | GET | Health JSON：`state`、`uptime_secs`、`active_connections`、`total_requests`。 |
+| `/metrics` | GET | Prometheus 文本（`Content-Type: text/plain; version=0.0.4`）。 |
+| `/config` | GET | 当前生效的 `GatewayConfig`（JSON）。 |
+| `/routes` (+ `/routes/{name}`) | GET | Route 信息：`name`、`rule`、`service`、`entrypoints`、`middlewares`、`priority`。 |
+| `/services` (+ `/services/{name}`) | GET | Services 及实时 backend 健康状态（`backends_total` / `healthy`）。 |
+| `/backends` | GET | Backend 详情，含 `active_connections`。 |
+| `/events` | GET | 最近的管理安全审计事件。支持 `?limit=N`（默认 100，最大 500）。 |
+| `/version` | GET | `name`（`a3s-gateway`）、`version`（crate 版本）、`api_version`（`v1`）。 |
+| `/config/validate` | POST | 校验一份 ACL payload 而不应用它。 |
+| `/config/reload` | POST | 先校验再从 ACL payload 重新加载（若无 reload 回调则返回 503）。 |
+
+这两个 POST 变更类 endpoint 将请求体上限设为 1 MiB，并以
+`{ valid, reloaded, message }` 作为响应。
+
+### 安全审计日志
+
+管理 listener 维护一个进程内的环形缓冲区（容量 512），保存通过 `/events` 暴露的
+安全事件。每条事件记录 `sequence`、`timestamp`（RFC 3339）、`kind`、
+`remote_addr`、`path`、`status` 和 `reason`。事件种类包括：`not-found`、
+`ip-rejected`、`auth-rejected`、`tls-rejected`、`config-validated`、
+`config-reloaded`、`config-rejected`。
+
+## CLI 检查
+
+本地和 CI/CD 工作流建议使用 CLI —— `validate` / `config` 子命令无需运行中的
+gateway：
+
+```bash
+a3s-gateway validate --config gateway.acl
+a3s-gateway config --config gateway.acl summary
+a3s-gateway config --config gateway.acl entrypoints
+a3s-gateway config --config gateway.acl routes
+a3s-gateway config --config gateway.acl services
+a3s-gateway config --config gateway.acl middlewares
+a3s-gateway config --config gateway.acl providers
+a3s-gateway config --config gateway.acl json
+
+# Against a running management listener
+a3s-gateway management events   --url http://127.0.0.1:9090/api/gateway
+a3s-gateway management validate --url http://127.0.0.1:9090/api/gateway --file gateway.acl
+a3s-gateway management reload   --url http://127.0.0.1:9090/api/gateway --file gateway.acl
+```
+
+对于受 mTLS 保护的管理 listener，请在 `management` 子命令中添加 `--ca-cert`、
+`--client-cert` 和 `--client-key`，并在设置了 `auth_token_env` 时发送
+`Authorization: Bearer <token>`。

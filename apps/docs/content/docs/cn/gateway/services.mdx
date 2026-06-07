@@ -1,39 +1,62 @@
 ---
 title: 服务
-description: 负载均衡、健康检查、会话保持、流量镜像、故障转移与自动扩缩容
+description: 后端、负载均衡、主动与被动健康检查、会话保持、故障转移、自动扩缩容以及服务发现 provider
 ---
 
 import { TypeTable } from 'fumadocs-ui/components/type-table';
+import { Callout } from 'fumadocs-ui/components/callout';
 
 # 服务
 
-服务定义带负载均衡、健康检查、会话保持、流量镜像、故障转移以及可选 Knative 风格自动扩缩容的后端池。
+`services` 块定义一个后端池及其弹性策略：负载均衡、主动与被动健康检查、会话保持、流量镜像、故障转移以及可选的 Knative 风格自动扩缩容。每个块都会成为一个 `LoadBalancer`，它会筛选出健康的后端，并按配置的 `strategy` 选择其中之一。
 
-## 负载均衡策略
-
-<TypeTable
-  type={{
-    "round-robin": {
-      description: "Cycles through healthy backends sequentially",
-    },
-    "weighted": {
-      description: "Distributes traffic proportionally by weight",
-    },
-    "least-connections": {
-      description: "Routes to the backend with fewest active connections",
-    },
-    "random": {
-      description: "Selects a random healthy backend",
-    },
-  }}
-/>
+一个服务只有在**至少包含一个 server 或至少一个 revision** 时才有效。省略 `load_balancer` 块会产生一个空的 round-robin 池，并以 `no servers configured` 校验失败。
 
 ```text
 services "api" {
   load_balancer {
-    strategy        = "weighted"
+    strategy        = "round-robin"
     request_timeout = "30s"
-    servers         = [
+    servers = [
+      { url = "http://127.0.0.1:8001" },
+      { url = "http://127.0.0.1:8002" }
+    ]
+  }
+}
+```
+
+Router 通过 `service = "api"` 按名称引用服务。
+
+## 负载均衡器
+
+<TypeTable
+  type={{
+    strategy: { type: 'string', default: '"round-robin"', description: 'round-robin | weighted | least-connections | random' },
+    request_timeout: { type: 'string', default: '"30s"', description: '等待上游响应的最长时间，超时后返回 504' },
+    servers: { type: 'array', description: '后端服务器（除非由 revisions 提供后端，否则必填）' },
+    health_check: { type: 'block', description: '主动 HTTP 健康检查（可选）' },
+    sticky: { type: 'block', description: '基于 Cookie 的会话亲和性（可选）' },
+  }}
+/>
+
+### 策略
+
+<TypeTable
+  type={{
+    "round-robin": { description: '使用原子计数器在健康后端间轮询（默认）' },
+    "weighted": { description: '按服务器权重成比例分配流量' },
+    "least-connections": { description: '路由到活跃连接数最少的健康后端' },
+    "random": { description: '伪随机选择一个健康后端（基于时间，非加密级 RNG）' },
+  }}
+/>
+
+策略名为 kebab-case；任何其他取值都会在加载时以 `unknown strategy` 被拒绝。`weight` 仅被 `weighted` 策略采用——如果所有权重都为 `0`，weighted 路径会回退到第一个健康后端。
+
+```text
+services "api" {
+  load_balancer {
+    strategy = "weighted"
+    servers = [
       { url = "http://127.0.0.1:8001", weight = 3 },
       { url = "http://127.0.0.1:8002", weight = 1 }
     ]
@@ -41,26 +64,30 @@ services "api" {
 }
 ```
 
-`request_timeout` 控制 Gateway 等待普通缓冲 HTTP 上游响应的最长时间，超时后返回
-`504 Gateway Timeout`。支持毫秒、秒或分钟，例如 `"500ms"`、`"30s"` 或 `"2m"`。
-
 <TypeTable
   type={{
-    strategy: { type: 'string', default: '"round-robin"', description: '负载均衡策略' },
-    request_timeout: { type: 'string', default: '"30s"', description: '普通缓冲 HTTP 上游请求超时，超时后返回 504' },
-    servers: { type: 'array', required: true, description: '后端 URL 和可选权重' },
+    url: { type: 'string', required: true, description: '后端 URL，例如 http://host:port 或 h2c://host:port（gRPC 明文）' },
+    weight: { type: 'u32', default: '1', description: '相对权重（仅 weighted 策略使用）' },
   }}
 />
 
-## 健康检查
+### request_timeout
 
-主动 HTTP 探测，支持可配置的阈值。不健康的后端会自动从负载均衡中排除。
+`request_timeout` 为每个上游请求包裹一个超时；超时后 Gateway 返回 `504 Gateway Timeout`。它接受毫秒、秒或分钟后缀（`"750ms"`、`"30s"`、`"2m"`）；裸数字按秒解释。该值在加载时校验——空值、`0` 或非数字值都会以配置错误**被拒绝**。默认值为 `"30s"`。
+
+<Callout type="info">
+  servers、revisions、健康检查 seed 以及 header map 都接受多种 ACL 写法：内联列表（`servers = [ {..} ]`）、单个对象，或重复的子块（`server`/`servers`）。选择最易读的写法即可。
+</Callout>
+
+## 主动健康检查
+
+添加 `health_check` 块会为每个服务启动一个主动检查器，它对每个后端的配置 `path` 发起 GET 请求，并按连续成功/失败次数翻转健康状态。任何非 2xx 响应（以及任何请求错误）都计为一次失败。不健康的后端会被排除在选择之外。
 
 ```text
 services "api" {
   load_balancer {
     strategy = "round-robin"
-    servers  = [
+    servers = [
       { url = "http://127.0.0.1:8001" },
       { url = "http://127.0.0.1:8002" }
     ]
@@ -77,19 +104,38 @@ services "api" {
 
 <TypeTable
   type={{
-    path: { type: 'string', description: 'HTTP GET path to probe' },
-    interval: { type: 'string', default: '"10s"', description: 'Time between checks' },
-    timeout: { type: 'string', default: '"5s"', description: 'Max wait for response' },
-    unhealthy_threshold: { type: 'u32', default: '3', description: 'Consecutive failures before marking unhealthy' },
-    healthy_threshold: { type: 'u32', default: '1', description: 'Consecutive successes before marking healthy' },
+    path: { type: 'string', required: true, description: '用于探测的 HTTP GET 路径' },
+    interval: { type: 'string', default: '"10s"', description: '两轮探测之间的间隔' },
+    timeout: { type: 'string', default: '"5s"', description: '单次探测的超时' },
+    unhealthy_threshold: { type: 'u32', default: '3', description: '标记为不健康前的连续失败次数' },
+    healthy_threshold: { type: 'u32', default: '1', description: '标记为健康前的连续成功次数' },
   }}
 />
 
-被动健康检查同样会追踪错误计数，并自动移除超过失败阈值的后端。
+<Callout type="warn">
+  `healthy_threshold` 默认为 **1**（一次成功探测即可恢复后端），而非更常见的 2。主动健康检查的 duration 解析器在 `interval`/`timeout` 字符串无效时会静默回退到 `10s`——这与 `request_timeout` 不同，后者会直接拒绝非法 duration。
+</Callout>
+
+## 被动健康检查
+
+被动健康检查**对每个服务始终开启**，且**不可配置**。它没有对应的 ACL 块——每个服务都按下列固定默认值构建，并从真实代理响应中观测后端状态（不发起额外探测）。
+
+| 配置项 | 取值 | 含义 |
+|---|---|---|
+| `error_threshold` | `5` | 触发剔除前窗口内的 5xx 响应数 |
+| `window` | `30s` | 统计错误的滑动窗口 |
+| `error_status_codes` | `500, 502, 503, 504` | 计为错误的状态码 |
+| `recovery_time` | `30s` | 后端被剔除后重新启用前的等待时长 |
+
+当某个后端在滑动 `window` 内累积达到 `error_threshold` 个匹配响应时，它会被标记为不健康并从轮换中移除。
+
+### 恢复定时器（v1.0.6）
+
+早期版本只在后续请求成功时才恢复被剔除的后端——但被剔除的后端不会再收到流量，因此它永远无法恢复，从而产生持续的 `503`，直到重启。v1.0.6 新增了一个后台恢复定时器，用于驱动半开（half-open）探测：一旦 `recovery_time` 过去，后端就会被重新启用并清空其错误窗口，**即使没有任何实时流量**。定时器间隔为 `recovery_time` 钳制到 `[1s, 5s]`，因此探测最快每 5s 一次、最慢每 1s 一次。
 
 ## 会话保持
 
-通过 Cookie 将同一客户端路由到同一后端：
+通过 Cookie 将客户端绑定到某个后端。Cookie **名称**是唯一可配置的字段；TTL 和容量使用固定的运行时默认值。
 
 ```text
 services "api" {
@@ -103,11 +149,23 @@ services "api" {
 }
 ```
 
-首次请求时，Gateway 选择一个后端并设置 `Set-Cookie` 响应头。后续携带该 Cookie 的请求会被路由到同一后端。会话在 TTL 过期或达到最大会话数时被清除。
+<TypeTable
+  type={{
+    cookie: { type: 'string', required: true, description: '用于将客户端固定到某个后端的 Cookie 名称' },
+  }}
+/>
+
+首次请求时，Gateway 选择一个后端（在健康后端中采用 least-connections），并发出如下形式的 `Set-Cookie`：
+
+```text
+<cookie>=<uuid>; Path=/; Max-Age=3600; HttpOnly; SameSite=Lax
+```
+
+后续携带该 Cookie 的请求会在该后端保持健康时复用同一后端；过期或不健康的绑定会被丢弃并重新选择。TTL 固定为 **1 小时**，会话表最多容纳 **100,000** 条记录（达到容量时按 LRU/最旧淘汰）。没有可用于更改 TTL、容量或 Cookie 属性的 ACL 入口（不会设置 `Secure` 标志）。
 
 ## 流量镜像
 
-将一定比例的线上流量复制到影子服务，用于测试，不影响主响应：
+将一定比例的线上流量复制到影子服务用于测试。镜像是 fire-and-forget 的：影子响应会被丢弃，绝不影响客户端响应或延迟。
 
 ```text
 services "api" {
@@ -124,14 +182,16 @@ services "api" {
 
 <TypeTable
   type={{
-    service: { type: 'string', required: true, description: 'Target shadow service name' },
-    percentage: { type: 'u32', default: '100', description: 'Percentage of traffic to mirror (0–100)' },
+    service: { type: 'string', required: true, description: '影子服务名称（必须存在于 services 中）' },
+    percentage: { type: 'u8', default: '100', description: '镜像流量百分比（0–100）' },
   }}
 />
 
+采样是确定性的（`counter % 100 < percentage`），而非随机。如果目标服务在构建时缺失，镜像会被跳过并打印一条警告。
+
 ## 故障转移
 
-当主后端池没有健康实例时，自动切换到备用后端池：
+当主服务**没有任何健康后端**时，路由到备用服务。故障转移不是逐请求的重试——它仅在主池完全不健康时启用，并在主池重新出现任意健康后端时自动恢复。
 
 ```text
 services "api" {
@@ -155,9 +215,17 @@ services "backup-pool" {
 }
 ```
 
+<TypeTable
+  type={{
+    service: { type: 'string', required: true, description: '回退服务名称（必须存在于 services 中）' },
+  }}
+/>
+
+如果指定的故障转移服务不存在，该选择器会在构建时静默跳过并打印警告。
+
 ## Knative 风格自动扩缩容
 
-可选的自动扩缩容，支持缩容至零、请求缓冲和基于并发的决策：
+可选的自动扩缩容，支持缩容至零、请求缓冲以及基于并发的决策。
 
 ```text
 services "api" {
@@ -181,21 +249,51 @@ services "api" {
 
 <TypeTable
   type={{
-    min_replicas: { type: 'u32', default: '0', description: 'Minimum replicas (0 enables scale-to-zero)' },
-    max_replicas: { type: 'u32', default: '10', description: 'Maximum replicas' },
-    container_concurrency: { type: 'u32', default: '0', description: 'Max concurrent requests per container (0 = unlimited)' },
-    target_utilization: { type: 'f32', default: '0.7', description: 'Target utilization ratio for scaling decisions' },
-    scale_down_delay_secs: { type: 'u64', default: '300', description: 'Seconds after last request before scaling down' },
-    buffer_enabled: { type: 'bool', default: 'false', description: 'Enable request buffering during scale-from-zero' },
-    buffer_timeout_secs: { type: 'u64', default: '30', description: 'Max wait for a backend during cold start' },
-    buffer_size: { type: 'u32', default: '100', description: 'Max buffered requests' },
-    executor: { type: 'string', default: '"box"', description: 'Scale executor: `box` (HTTP) or `k8s` (kube-rs)' },
+    min_replicas: { type: 'u32', default: '0', description: '最小副本数（0 启用缩容至零）' },
+    max_replicas: { type: 'u32', default: '10', description: '最大副本数' },
+    container_concurrency: { type: 'u32', default: '0', description: '每容器最大并发请求数（0 = 不限）' },
+    target_utilization: { type: 'f64', default: '0.7', description: '目标利用率，必须在 (0.0, 1.0] 内' },
+    scale_down_delay_secs: { type: 'u64', default: '300', description: '最后一次请求后开始缩容前的冷却时间' },
+    buffer_enabled: { type: 'bool', default: 'false', description: '在从零扩容期间启用请求缓冲' },
+    buffer_timeout_secs: { type: 'u64', default: '30', description: '冷启动期间等待后端的最长时间' },
+    buffer_size: { type: 'usize', default: '100', description: '从零扩容期间最多缓冲的请求数' },
+    executor: { type: 'string', default: '"box"', description: '扩缩执行器："box" 或 "k8s"' },
   }}
 />
 
+期望副本数采用 Knative 公式：
+
+```text
+desired = ceil((in_flight + queue_depth) / (container_concurrency * target_utilization))
+```
+
+并钳制到 `[min_replicas, max_replicas]`。校验会强制 `min_replicas <= max_replicas` 且 `target_utilization` 在 `(0.0, 1.0]` 内。
+
+<Callout type="warn">
+  v1.0.7 中存在若干运行时注意事项：
+
+  - 自动扩缩循环**仅**对 `container_concurrency > 0` 的服务运行。使用默认值 `0` 时，该服务不会构建自动扩缩器（也不会构建并发限制器）。
+  - tick 间隔硬编码为 **2 秒**。
+  - 在实时循环中，`in_flight` 硬编码为 `0`，因此当前实际只有 `queue_depth`（已缓冲的从零扩容请求）驱动扩缩决策。
+  - `box` 执行器以 `http://localhost:9090` 为目标且不可配置。`executor = "k8s"` 会在启动时回退到 box 执行器（异步初始化限制）；任何未知取值同样回退到 box。
+</Callout>
+
+### 从零扩容缓冲
+
+当 `buffer_enabled = true` 且请求到达时没有任何健康后端时，该请求会被**保留**（而非从日志重放），直到某个后端就绪，然后再重新派发。结果如下：
+
+| 结果 | 响应 |
+|---|---|
+| 后端就绪 | 请求被转发 |
+| `buffer_timeout_secs` 已耗尽 | `504` "Backend scale-up timed out" |
+| 缓冲已满（`buffer_size`） | `503` "Request buffer full" |
+| Gateway 正在关闭 | `503` |
+
+当 `buffer_enabled = false`（默认）时，无后端的请求会落入故障转移，或立即返回 `503`。
+
 ## 版本流量分割
 
-将流量按比例分配到不同版本，用于金丝雀发布：
+将流量按命名的 revision 分割，用于金丝雀发布。每个 revision 拥有自己的负载均衡器；选择采用**确定性加权轮询**（`counter % total_weight`），而非随机。
 
 ```text
 services "api" {
@@ -204,19 +302,32 @@ services "api" {
     servers  = [{ url = "http://127.0.0.1:8001" }]
   }
   revisions = [
-    { name = "v1", traffic_percent = 90, strategy = "round-robin",
-      servers = [{ url = "http://127.0.0.1:8001" }] },
-    { name = "v2", traffic_percent = 10, strategy = "round-robin",
-      servers = [{ url = "http://127.0.0.1:8003" }] }
+    {
+      name = "v1", traffic_percent = 90, strategy = "round-robin",
+      servers = [{ url = "http://127.0.0.1:8001" }]
+    },
+    {
+      name = "v2", traffic_percent = 10, strategy = "round-robin",
+      servers = [{ url = "http://127.0.0.1:8003" }]
+    }
   ]
 }
 ```
 
-各版本流量百分比之和必须为 100。
+<TypeTable
+  type={{
+    name: { type: 'string', required: true, description: 'Revision 名称，例如 v1' },
+    traffic_percent: { type: 'u32', default: '100', description: '流量百分比（所有 revision 之和必须为 100）' },
+    servers: { type: 'array', description: '该 revision 的后端' },
+    strategy: { type: 'string', default: '"round-robin"', description: '每个 revision 的负载均衡策略' },
+  }}
+/>
+
+所有 revision 的 `traffic_percent` 值之和必须恰好为 **100**，否则配置加载失败。如果按权重选中的 revision 没有健康后端，router 会落入下一个拥有健康后端的 revision。该 ACL 块名为 `revision`（`revisions` 作为别名被接受）。
 
 ## 渐进式发布
 
-自动将流量从一个版本迁移到另一个版本，并带有安全保障：
+在两个 revision 之间迁移流量，并带有自动回滚护栏。
 
 ```text
 services "api" {
@@ -235,4 +346,177 @@ services "api" {
 }
 ```
 
-发布过程每隔 `step_interval_secs` 将 `step_percent` 的流量切换到新版本。若错误率超过 `error_rate_threshold` 或 p99 延迟超过 `latency_threshold_ms`，发布将自动回滚。
+<TypeTable
+  type={{
+    from: { type: 'string', required: true, description: '源 revision（必须存在）' },
+    to: { type: 'string', required: true, description: '目标 revision（必须存在）' },
+    step_percent: { type: 'u32', default: '10', description: '每步迁移的流量百分比' },
+    step_interval_secs: { type: 'u64', default: '60', description: '每步之间的间隔秒数' },
+    error_rate_threshold: { type: 'f64', default: '0.05', description: '触发回滚的错误率（0.0–1.0）' },
+    latency_threshold_ms: { type: 'u64', default: '5000', description: '触发回滚的 P99 延迟（毫秒）' },
+  }}
+/>
+
+渐进式发布要求至少有一个 revision，且 `from`/`to` 必须命名已存在的 revision。
+
+<Callout type="warn">
+  渐进式发布控制器已完整实现并通过校验，但在 v1.0.7 中它**未被任何运行时循环驱动**——没有调度器调用其推进步骤。因此 `step_percent`、`step_interval_secs`、`error_rate_threshold` 和 `latency_threshold_ms` 会被解析和校验，但目前在运行时处于惰性状态。
+</Callout>
+
+---
+
+## 服务发现
+
+服务发现 provider 会轮询或监视外部数据源，生成 router 和 service，并将它们与静态配置合并。它们在顶层 `providers` 块中声明。仅识别四种 provider 块——`file`、`discovery`、`kubernetes` 和 `docker`——任何其他名称都是配置错误（`Unknown providers ACL block`）。
+
+<Callout type="warn">
+  **合并优先级并不统一。** `discovery` 和 `kubernetes` provider 会**添加**发现到的条目，但在名称冲突时**静态配置优先**。而 `docker` provider 在名称相同时会**覆盖**静态条目。v1.0.7 中**不存在 `providers.dns` 块**（见下文）。
+</Callout>
+
+### File Provider
+
+监视主 `.acl` 文件所在目录以及一个可选的额外 `directory`，并在变更时热重载。只有带 `.acl` 扩展名的文件才被视为配置；其他扩展名会被静默忽略，且主配置文件必须为 `.acl`，否则加载失败。
+
+```text
+providers {
+  file {
+    watch     = true
+    directory = "/etc/gateway/conf.d/"
+  }
+}
+```
+
+<TypeTable
+  type={{
+    watch: { type: 'bool', default: 'true', description: '文件变更时热重载（notify：inotify/kqueue）' },
+    directory: { type: 'string', description: '其 *.acl 片段会被合并的额外目录' },
+  }}
+/>
+
+发生变更时，Gateway 会拼接主文件与所有排序后的 `.acl` 片段，重新解析、校验，成功后应用新配置；若解析/校验出错，则保留上一份已知良好的配置。事件以 500ms 去抖。
+
+### 基于健康的发现
+
+对每个 seed URL 轮询 `<seed>/.well-known/a3s-service.json`（RFC 8615），并将健康的 seed 分组为 round-robin 服务。当对某个 seed 公布的 `health_path` 发起 GET 返回 2xx 时，该 seed 视为健康。
+
+```text
+providers {
+  discovery {
+    poll_interval_secs = 30
+    timeout_secs       = 5
+    seeds = [
+      { url = "http://10.0.0.5:8080" },
+      { url = "http://10.0.0.6:8080" }
+    ]
+  }
+}
+```
+
+<TypeTable
+  type={{
+    seeds: { type: 'array', required: true, description: '后端 seed 基础 URL（各自带 url）' },
+    poll_interval_secs: { type: 'u64', default: '30', description: '两次发现轮询之间的秒数' },
+    timeout_secs: { type: 'u64', default: '5', description: '单次探测的 HTTP 超时' },
+  }}
+/>
+
+公布的 `a3s-service.json` 携带 `name`、`version`、`routes[]`、`health_path`（默认 `/health`）和 `weight`（默认 `1`）。每条 route 含 `rule`（必填）、`middlewares`（默认 `[]`）和 `priority`（默认 `0`）。生成的服务使用硬编码的 `request_timeout` 值 `"30s"`，且仅为每个服务名的**第一个**健康实例创建 router（`discovered-<name>`）；后续的健康实例会追加 server，但不会创建额外的 router。
+
+### Docker Provider
+
+通过 Unix socket 或 `tcp://` 端点轮询 Docker API（`GET /containers/json`，v1.41），并根据以 `label_prefix` 为命名空间的容器标签构建服务。
+
+```text
+providers {
+  docker {
+    host               = "/var/run/docker.sock"
+    label_prefix       = "a3s"
+    poll_interval_secs = 10
+  }
+}
+```
+
+<TypeTable
+  type={{
+    host: { type: 'string', default: '"/var/run/docker.sock"', description: 'Unix socket 路径或 tcp:// URL' },
+    label_prefix: { type: 'string', default: '"a3s"', description: '路由标签的前缀' },
+    poll_interval_secs: { type: 'u64', default: '10', description: '轮询间隔（有效最小值 1s）' },
+  }}
+/>
+
+容器标签（`<prefix>` 默认为 `a3s`）：
+
+| 标签 | 必填 | 含义 |
+|---|---|---|
+| `<prefix>.enable` | 是 | 必须恰好为 `"true"`；任何其他值（包括 `"false"`、`"True"`、`"1"`）都会被跳过 |
+| `<prefix>.service.port` | 是 | 后端端口（u16）；缺失或无法解析时容器会被跳过 |
+| `<prefix>.service.strategy` | 否 | 负载均衡策略（默认 `round-robin`） |
+| `<prefix>.service.weight` | 否 | 后端权重（默认 `1`） |
+| `<prefix>.router.rule` | 否 | Traefik 规则；存在时触发 HTTP router 生成 |
+| `<prefix>.router.entrypoints` | 否 | 逗号分隔的 entrypoint 名称 |
+| `<prefix>.router.middlewares` | 否 | 逗号分隔的 middleware 名称 |
+| `<prefix>.router.priority` | 否 | Router 优先级（默认 `0`） |
+| `<prefix>.protocol` | 否 | `tcp`/`udp` 会生成 stream entrypoint 并跳过 HTTP router；默认 `http` |
+| `<prefix>.entrypoint.address` | tcp/udp 时必填 | 生成的 stream entrypoint 的监听地址 |
+
+```text
+# docker run labels
+a3s.enable=true
+a3s.service.port=8080
+a3s.router.rule=PathPrefix(`/api`)
+a3s.router.middlewares=auth,rate-limit
+```
+
+### Kubernetes Ingress
+
+监视 `networking.k8s.io/v1` Ingress 资源（需要 `kube` cargo feature；发布的 Linux 镜像已包含）。对每条 rule/path，它会创建一个 service 和一个 HTTP router。行为通过 `a3s-gateway.io/*` 注解调优。
+
+```text
+providers {
+  kubernetes {
+    namespace           = "default"
+    label_selector      = "app=my-service"
+    watch_interval_secs = 30
+    ingress_route_crd   = false
+  }
+}
+```
+
+<TypeTable
+  type={{
+    namespace: { type: 'string', default: '"" (所有命名空间)', description: '限制到单个命名空间' },
+    label_selector: { type: 'string', default: '"" (不过滤)', description: 'Ingress 标签选择器（仅在非空时应用）' },
+    watch_interval_secs: { type: 'u64', default: '30', description: 'Ingress 与 CRD 监视器的轮询间隔' },
+    ingress_route_crd: { type: 'bool', default: 'false', description: '同时监视 IngressRoute（ConfigMap 承载）规约' },
+  }}
+/>
+
+生成的服务后端使用集群内 DNS 名称 `http://<svc>.<namespace>.svc.cluster.local:<port>`（端口默认为 `80`）。规则由 host 和 path 构建：pathType 为 `Exact` 时为 `Host(\`h\`)` 加 `Path(\`p\`)`，否则为 `PathPrefix(\`p\`)`；`/` 或空路径会被丢弃。Ingress 变更检测会对 router 和 service 内容做哈希（自 v1.0.5 起）。
+
+支持的 Ingress 注解：
+
+| 注解 | 效果 |
+|---|---|
+| `a3s-gateway.io/entrypoints` | 生成 router 的逗号分隔 entrypoint 名称 |
+| `a3s-gateway.io/middlewares` | 逗号分隔的 middleware 名称 |
+| `a3s-gateway.io/strategy` | 负载均衡策略（无效 → `round-robin`） |
+| `a3s-gateway.io/priority` | Router 优先级，i32（越高越优先；无效 → `0`） |
+| `a3s-gateway.io/protocol` | `tcp`/`udp` 会生成 stream entrypoint 并跳过 HTTP router |
+| `a3s-gateway.io/listen` | tcp/udp 协议 entrypoint 的监听地址 |
+| `a3s-gateway.io/request-timeout` | 每路由的上游超时（例如 `"600s"`；默认 `"30s"`） |
+
+<Callout type="info">
+  没有 `kube` feature 时，`providers.kubernetes` 块只会记录一条警告而不做任何事情。
+</Callout>
+
+### IngressRoute CRD
+
+当 `ingress_route_crd = true` 时，Gateway 还会监视一种 Traefik 风格的 IngressRoute 规约。在 v1.0.7 中这**不是一个真正安装的 CRD**——监视器会列出标签为 `a3s-gateway.io/type=ingressroute` 的 ConfigMap，并解析每个 ConfigMap 的 `.data.spec` 中的 JSON。该规约携带 `entrypoints[]`、`routes[]`（每条带 `match`、`priority`、`middlewares[]`、`services[]`）以及可选的 `tls`。
+
+<Callout type="warn">
+  CRD 监视器遵循 `namespace`（全部 vs. 单命名空间），但**忽略 `label_selector`**——它始终使用固定的 `a3s-gateway.io/type=ingressroute` 选择器。它也没有变更检测哈希，因此每隔 `watch_interval_secs` 都会重新发送合并后的配置。
+</Callout>
+
+### DNS Provider（不可用）
+
+源码中存在一个 DNS provider，但仅为库代码，在 v1.0.7 中**未接入**：没有 `providers.dns` 块，且 Gateway 从不启动它。请勿配置基于 DNS 的发现——它没有任何 ACL 入口。

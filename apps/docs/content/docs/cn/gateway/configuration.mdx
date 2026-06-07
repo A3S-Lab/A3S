@@ -1,13 +1,19 @@
 ---
 title: 配置
-description: 入口点、路由、服务、中间件和提供者的 ACL 配置
+description: 入口点、路由、服务、中间件、可观测性、管理和提供者的完整 ACL 参考
 ---
+
+import { Callout } from 'fumadocs-ui/components/callout';
 
 # 配置
 
-A3S Gateway 使用 ACL（Agent Configuration Language）作为唯一配置格式，通过 `.acl` 文件扩展名自动识别。配置支持通过文件监听实现热重载。
+A3S Gateway 仅使用 ACL（Agent Configuration Language）进行配置。本页是 **v1.0.7** 配置 schema 的完整参考：每一个块、每一个键、其类型及其默认值。
 
-## GatewayConfig
+配置文件**必须**使用 `.acl` 扩展名。加载器会拒绝 `.toml`、`.yaml`、`.yml` 和 `.json` 文件。配置支持通过文件监听实现热重载（参见 [文件提供者](#file-provider)）。
+
+## 顶层结构
+
+配置文件由若干具名块加上一个标量组成。解析器对四个核心块同时接受单数和复数拼写（`entrypoint`/`entrypoints`、`router`/`routers`、`service`/`services`、`middleware`/`middlewares`）。任何其他顶层块都是硬性错误（`Unknown top-level ACL block`）。
 
 ```rust
 pub struct GatewayConfig {
@@ -17,83 +23,93 @@ pub struct GatewayConfig {
     pub middlewares: HashMap<String, MiddlewareConfig>,
     pub providers: ProviderConfig,
     pub management: ManagementConfig,
+    pub observability: ObservabilityConfig,
     pub shutdown_timeout_secs: u64, // default: 30
+}
+```
+
+每个块实例既可以用字符串标签命名（`routers "api" { ... }`），也可以用 `name` 属性命名（`routers { name = "api" ... }`）。
+
+| 顶层块 | 用途 |
+|-----------------|---------|
+| `entrypoints` | 网络监听器（HTTP / TCP / UDP） |
+| `routers` | 将请求匹配到某个服务 + 中间件链 |
+| `services` | 后端池、负载均衡、扩缩容、流量切分 |
+| `middlewares` | 可复用的请求/响应处理器 |
+| `observability` | 指标、访问日志、追踪开关 |
+| `management` | 独立的 dashboard / 管理 API 监听器 |
+| `providers` | 动态配置源（file / discovery / kubernetes / docker） |
+| `shutdown_timeout_secs` | 优雅关停超时（秒），默认 `30` |
+
+在 ACL 中，`shutdown_timeout_secs` 是一个顶层块（而非裸标量）：
+
+```text
+shutdown_timeout_secs {
+  shutdown_timeout_secs = 30
 }
 ```
 
 ### 加载配置
 
 ```rust
-// Load from file
+// Load from a .acl file
 let config = GatewayConfig::from_file("gateway.acl").await?;
 
-// Parse from ACL string
+// Parse from an ACL string
 let config = GatewayConfig::from_acl(acl_content)?;
 
-// Validate (checks router→service, router→middleware, router→entrypoint references)
+// Validate cross-references and value constraints
 config.validate()?;
 ```
 
-## 管理
+`validate()` 会交叉校验每一个 `routers.service` / `routers.middlewares` / `routers.entrypoints` 引用，要求每个服务至少声明一个 server **或**至少一个 revision，解析并校验 `request_timeout`，校验扩缩容/revision/rollout 约束，并且——当 `management.enabled` 为真时——校验管理地址、路径前缀、允许列表和 TLS。
 
-Dashboard API 是可选能力，并运行在独立 listener 上，不会拦截业务流量入口。
-请求来源必须匹配 `allowed_ips`；设置 `auth_token_env` 后还必须携带
-`Authorization: Bearer <token>`。远程管理需要 HTTPS 或客户端证书校验时，
-启用嵌套的 `tls` 配置块。被拒绝的管理请求和 TLS 握手失败会保存在内存审计
-环形缓冲区中，并通过 `/events` 暴露。
+### 环境变量替换
 
-```rust
-pub struct ManagementConfig {
-    pub enabled: bool,                  // default: false
-    pub address: String,                // default: "127.0.0.1:9090"
-    pub path_prefix: String,            // default: "/api/gateway"
-    pub auth_token_env: Option<String>, // default: "A3S_GATEWAY_ADMIN_TOKEN"
-    pub allowed_ips: Vec<String>,       // default: ["127.0.0.1", "::1"]
-    pub tls: Option<ManagementTlsConfig>,
-}
-
-pub struct ManagementTlsConfig {
-    pub cert_file: String,
-    pub key_file: String,
-    pub client_ca_file: Option<String>,
-    pub require_client_cert: bool, // default: false
-    pub min_version: String,       // "1.2" (default) or "1.3"
-}
-```
+任何字符串值属性都可以通过 `env("VAR")` 从环境中读取。变量缺失会导致配置错误。`env(...)` 是值中**唯一**支持的函数调用；任何其他 `Call()` 形式都是错误。
 
 ```text
-management {
-  enabled        = true
-  address        = "127.0.0.1:9090"
-  path_prefix    = "/api/gateway"
-  auth_token_env = "A3S_GATEWAY_ADMIN_TOKEN"
-  allowed_ips    = ["127.0.0.1", "::1"]
+middlewares "auth-jwt" {
+  type  = "jwt"
+  value = env("JWT_SECRET")
+}
 
+entrypoints "websecure" {
+  address = "0.0.0.0:443"
   tls {
-    cert_file           = "/etc/a3s/admin/server.crt"
-    key_file            = "/etc/a3s/admin/server.key"
-    client_ca_file      = "/etc/a3s/admin/client-ca.crt"
-    require_client_cert = true
-    min_version         = "1.3"
+    cert_file = env("TLS_CERT_PATH")
+    key_file  = env("TLS_KEY_PATH")
   }
 }
 ```
 
 ## 入口点
 
-入口点定义网络监听器。
+入口点定义网络监听器。`protocol` 选择监听器类型；`address` 是必填项。
 
 ```rust
 pub struct EntrypointConfig {
-    pub address: String,
-    pub protocol: Protocol,          // http (default), tcp, udp
-    pub tls: Option<TlsConfig>,
-    pub max_connections: Option<u32>, // TCP only
-    pub tcp_allowed_ips: Vec<String>, // TCP only, CIDR or single IP
-    pub udp_session_timeout_secs: Option<u64>,  // UDP only
-    pub udp_max_sessions: Option<usize>,        // UDP only
+    pub address: String,                       // required, "host:port"
+    pub protocol: Protocol,                    // http (default) | tcp | udp
+    pub tls: Option<TlsConfig>,                // optional
+    pub max_connections: Option<u32>,          // TCP only, default: unlimited
+    pub tcp_allowed_ips: Vec<String>,          // TCP only, default: []
+    pub udp_session_timeout_secs: Option<u64>, // UDP only, default: 30 at the listener
+    pub udp_max_sessions: Option<usize>,       // UDP only, default: 10000 at the listener
 }
 ```
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `address` | `String` | **必填** | `host:port`；解析为套接字地址。 |
+| `protocol` | `http` \| `tcp` \| `udp` | `http` | 任何其他值都会被拒绝（`Invalid entrypoint protocol`）。 |
+| `tls` | block | 无 | TLS 终止（HTTP 入口点）。 |
+| `max_connections` | `u32` | 无限制 | 仅 TCP；通过连接信号量强制执行。 |
+| `tcp_allowed_ips` | `[String]` | `[]`（全部允许） | 仅 TCP；CIDR 或单个 IP。 |
+| `udp_session_timeout_secs` | `u64` | `30` | 仅 UDP。未设置时，监听器应用 `30`。 |
+| `udp_max_sessions` | `usize` | `10000` | 仅 UDP。未设置时，监听器应用 `10000`。 |
+
+UDP 默认值（`30` / `10000`）**不是** schema 默认值——这些字段是可选的，省略时由 UDP 监听器应用这些值。
 
 ```text
 # HTTP listener
@@ -101,7 +117,7 @@ entrypoints "web" {
   address = "0.0.0.0:80"
 }
 
-# HTTPS listener with TLS
+# HTTPS listener with static TLS
 entrypoints "websecure" {
   address = "0.0.0.0:443"
   tls {
@@ -111,12 +127,12 @@ entrypoints "websecure" {
   }
 }
 
-# TCP listener with connection limits
-entrypoints "tcp" {
+# TCP listener with connection limit + IP allowlist
+entrypoints "postgres" {
   address         = "0.0.0.0:5432"
   protocol        = "tcp"
-  max_connections  = 1000
-  tcp_allowed_ips  = ["10.0.0.0/8", "192.168.1.0/24"]
+  max_connections = 1000
+  tcp_allowed_ips = ["10.0.0.0/8", "192.168.1.0/24"]
 }
 
 # UDP listener
@@ -128,95 +144,140 @@ entrypoints "dns" {
 }
 ```
 
-### TLS 配置
+### 入口点 TLS
 
 ```rust
 pub struct TlsConfig {
-    pub cert_file: String,
-    pub key_file: String,
-    pub min_version: String,              // "1.2" (default) or "1.3"
-    pub acme: bool,                       // Let's Encrypt auto-cert
-    pub acme_email: Option<String>,       // required when acme = true
-    pub acme_domains: Vec<String>,        // defaults to Host rules if empty
-    pub acme_staging: bool,               // use staging environment
-    pub acme_storage_path: Option<String>,// default: /etc/gateway/acme
+    pub cert_file: String,                 // PEM cert chain
+    pub key_file: String,                  // PEM private key
+    pub min_version: String,               // "1.2" (default) or "1.3"
+    pub acme: bool,                        // default: false
+    pub acme_email: Option<String>,        // required when acme = true
+    pub acme_domains: Vec<String>,         // default: [] (derives from Host rules)
+    pub acme_staging: bool,                // default: false
+    pub acme_storage_path: Option<String>, // default: /etc/gateway/acme
 }
 ```
 
-TLS 由 rustls（纯 Rust，无 OpenSSL 依赖）处理。ACME 支持可从 Let's Encrypt 自动申请证书。
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `cert_file` | `String` | `""` | PEM 证书链。静态证书时实际上必填。 |
+| `key_file` | `String` | `""` | PEM 私钥。实际上必填。 |
+| `min_version` | `String` | `"1.2"` | `"1.2"` 同时启用 TLS 1.2 **和** 1.3；`"1.3"` 仅启用 1.3。入口点 TLS 在加载时**不**校验该字符串。 |
+| `acme` | `bool` | `false` | 启用 ACME（Let's Encrypt）管理器。 |
+| `acme_email` | `String` | 无 | 当 `acme = true` 时**必填**；若为空，则跳过 ACME 管理器并发出警告。 |
+| `acme_domains` | `[String]` | `[]` | 为空时，Gateway 从 `` Host(`...`) `` 路由规则派生域名。 |
+| `acme_staging` | `bool` | `false` | 使用 Let's Encrypt staging 目录。 |
+| `acme_storage_path` | `String` | `/etc/gateway/acme` | 证书/账户存储目录。 |
+
+TLS 终止基于 rustls（纯 Rust，无 OpenSSL）。`min_version` 是**最低**版本：`"1.2"` 仍允许 TLS 1.3。
 
 ```text
 entrypoints "websecure" {
   address = "0.0.0.0:443"
   tls {
-    cert_file          = "/etc/certs/cert.pem"
-    key_file           = "/etc/certs/key.pem"
-    acme               = true
-    acme_email         = "admin@example.com"
-    acme_domains       = ["example.com", "api.example.com"]
-    acme_staging       = false
-    acme_storage_path  = "/etc/gateway/acme"
+    cert_file         = "/etc/certs/cert.pem"
+    key_file          = "/etc/certs/key.pem"
+    acme              = true
+    acme_email        = "admin@example.com"
+    acme_domains      = ["example.com", "api.example.com"]
+    acme_staging      = false
+    acme_storage_path = "/etc/gateway/acme"
   }
 }
 ```
 
+<Callout type="warn">
+在 v1.0.7 中，来自配置的 ACME **仅支持 HTTP-01**。`tls` 块只暴露上述键。从 ACL 中**无法**访问 DNS-01 / Cloudflare / Route53 键——这些 solver 存在于运行时，但未接入配置 schema。挑战类型始终是 HTTP-01，DNS 提供者始终为 `None`。
+</Callout>
+
 ## 路由
 
-路由将传入请求匹配到对应服务。
+路由将传入请求匹配到某个服务以及一个有序的中间件链。
 
 ```rust
 pub struct RouterConfig {
-    pub rule: String,
-    pub service: String,
-    pub entrypoints: Vec<String>,
-    pub middlewares: Vec<String>,
-    pub priority: i32, // lower = higher priority, default: 0
+    pub rule: String,             // required, Traefik-style matcher
+    pub service: String,          // required, must exist
+    pub entrypoints: Vec<String>, // default: [] (= all entrypoints)
+    pub middlewares: Vec<String>, // default: []
+    pub priority: i32,            // default: 0
 }
 ```
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `rule` | `String` | **必填** | 匹配表达式，例如 `` Host(`d`) ``、`` PathPrefix(`/p`) ``、`` Path(`/x`) ``、`` Headers(`k`,`v`) ``、`` Method(`GET`) ``，用 `&&` 连接。 |
+| `service` | `String` | **必填** | 目标服务；必须存在于 `services` 中。 |
+| `entrypoints` | `[String]` | `[]` | 该路由绑定的监听器。为空 = **所有**入口点。每个名称都必须存在。 |
+| `middlewares` | `[String]` | `[]` | 有序链；每个名称都必须存在。 |
+| `priority` | `i32` | `0` | **正值越高越优先**（最具体）。见下方说明。 |
 
 ```text
 routers "api" {
   rule        = "Host(`api.example.com`) && PathPrefix(`/v1`)"
   service     = "api-service"
   entrypoints = ["websecure"]
-  middlewares  = ["auth-jwt", "rate-limit"]
-  priority    = 0
+  middlewares = ["auth-jwt", "rate-limit"]
+  priority    = 100
 }
 
 routers "web" {
   rule        = "Host(`www.example.com`)"
   service     = "web-service"
   entrypoints = ["web", "websecure"]
-  priority    = 10
 }
 ```
 
-`priority` 值越小，匹配优先级越高。规则语法详见 [路由](./routing)。
+<Callout type="warn">
+**路由优先级是"越高越优先"。** 当 `priority > 0` 时直接使用该值，**最高**值最具体（Traefik 风格）。当 `priority <= 0`（默认值）时，Gateway 回退到**规则字符串长度**（更长的规则胜出）。设置负优先级**不会**提升优先级——它会被忽略。（仅由提供者生成的 TCP 路由采用相反约定——越低越优先。）完整的匹配语法和排序规则参见 [路由](./routing)。
+</Callout>
 
 ## 服务
 
-服务定义带负载均衡的后端池。
+一个服务封装了一个负载均衡器，外加可选的扩缩容、revision 切分、rollout、镜像和故障转移。
 
 ```rust
 pub struct ServiceConfig {
     pub load_balancer: LoadBalancerConfig,
+    pub scaling: Option<ScalingConfig>,
+    pub revisions: Vec<RevisionConfig>,
+    pub rollout: Option<RolloutConfig>,
     pub mirror: Option<MirrorConfig>,
     pub failover: Option<FailoverConfig>,
 }
+```
 
+一个服务必须至少声明一个 server **或**至少一个 revision，否则 `validate()` 会以 `no servers configured` 失败。省略 `load_balancer` 块会得到一个空的 round-robin / 30s 池，除非 revision 提供后端，否则会触发此错误。
+
+### 负载均衡器
+
+```rust
 pub struct LoadBalancerConfig {
-    pub strategy: Strategy,  // round-robin, weighted, least-connections, random
-    pub servers: Vec<ServerConfig>,
+    pub strategy: Strategy,                  // round-robin (default) | weighted | least-connections | random
+    pub request_timeout: String,             // default: "30s"
+    pub servers: Vec<ServerConfig>,          // default: []
     pub health_check: Option<HealthCheckConfig>,
     pub sticky: Option<StickyConfig>,
 }
 ```
 
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `strategy` | `round-robin` \| `weighted` \| `least-connections` \| `random` | `round-robin` | 未知值会被拒绝（`unknown strategy`）。 |
+| `request_timeout` | duration `String` | `"30s"` | 等待上游响应的最长时间；超时则请求返回 HTTP 504。 |
+| `servers` | list | `[]` | 后端服务器。 |
+| `health_check` | block | 无 | 主动 HTTP 健康检查。 |
+| `sticky` | block | 无 | 基于 cookie 的会话亲和性。 |
+
+`request_timeout`（以及健康检查的时长）使用自定义解析器：后缀 `ms`、`s`、`m`；裸数字表示秒。空值、`0s` 或非数字值会被拒绝。
+
 ```text
 services "api-service" {
   load_balancer {
-    strategy = "weighted"
-    servers  = [
+    strategy        = "weighted"
+    request_timeout = "30s"
+    servers = [
       { url = "http://127.0.0.1:8001", weight = 3 },
       { url = "http://127.0.0.1:8002", weight = 1 }
     ]
@@ -236,9 +297,47 @@ services "api-service" {
 }
 ```
 
+#### 服务器
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `url` | `String` | **必填** | 例如 `http://127.0.0.1:8001`，或用于明文 gRPC 的 `h2c://host:port`。 |
+| `weight` | `u32` | `1` | 仅 `weighted` 策略使用。 |
+
+服务器接受三种写法：内联列表 `servers = [ { ... } ]`、单个对象，或重复的 `server` / `servers` 子块。
+
+#### 健康检查
+
+存在 `health_check` 块即会为该服务启动主动检查器。
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `path` | `String` | **必填** | 探测的 HTTP 路径，例如 `/health`。 |
+| `interval` | duration `String` | `"10s"` | 探测轮次之间的间隔。 |
+| `timeout` | duration `String` | `"5s"` | 每次探测的超时时间。 |
+| `unhealthy_threshold` | `u32` | `3` | 标记为不健康前的连续失败次数。 |
+| `healthy_threshold` | `u32` | `1` | 标记为健康前的连续成功次数。 |
+
+任何非 2xx 响应（或请求错误）都计为一次失败。每个服务始终开启独立的**被动**健康检查（30s 窗口内出现 5 次 `500/502/503/504` 错误即逐出该后端，并以 30s 恢复探测重新接入）——它没有 ACL 键。参见 [服务](./services)。
+
+#### 粘性会话
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `cookie` | `String` | **必填** | 用于亲和性的 cookie 名称。 |
+
+只有 cookie 名称可配置。会话 TTL（1h）和最大会话上限（100,000）是固定的运行时默认值；cookie 以 `Path=/; HttpOnly; SameSite=Lax` 发出。
+
 ### 流量镜像
 
-将一定比例的线上流量复制到影子后端，用于测试。
+将一定比例的线上流量复制到影子服务（fire-and-forget；影子响应被丢弃，永远不会影响客户端）。
+
+```rust
+pub struct MirrorConfig {
+    pub service: String, // required, must exist in services
+    pub percentage: u8,  // 0-100, default: 100
+}
+```
 
 ```text
 services "api-service" {
@@ -255,7 +354,13 @@ services "api-service" {
 
 ### 故障转移
 
-当主服务没有健康后端时，自动切换到备用服务。
+当主服务**没有**任何健康后端时（不是逐请求重试），路由到备用服务。目标必须存在，否则选择器会被跳过并发出警告。
+
+```rust
+pub struct FailoverConfig {
+    pub service: String, // required, must exist in services
+}
+```
 
 ```text
 services "api-service" {
@@ -269,16 +374,178 @@ services "api-service" {
 }
 ```
 
-负载均衡策略和健康检查详情请参阅 [服务](./services)。
+### 自动扩缩容（缩容至零）
+
+Knative 风格的 serverless 服务。自动扩缩容循环**仅**对 `container_concurrency > 0` 的服务运行。
+
+```rust
+pub struct ScalingConfig {
+    pub min_replicas: u32,            // default: 0 (scale-to-zero)
+    pub max_replicas: u32,            // default: 10
+    pub container_concurrency: u32,   // default: 0 (unlimited)
+    pub target_utilization: f64,      // default: 0.7, in (0.0, 1.0]
+    pub scale_down_delay_secs: u64,   // default: 300
+    pub buffer_timeout_secs: u64,     // default: 30
+    pub buffer_size: usize,           // default: 100
+    pub buffer_enabled: bool,         // default: false
+    pub executor: String,             // "box" (default) | "k8s"
+}
+```
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `min_replicas` | `u32` | `0` | `0` 启用缩容至零。必须 `<= max_replicas`。 |
+| `max_replicas` | `u32` | `10` | 上限钳制。 |
+| `container_concurrency` | `u32` | `0` | 每个容器的最大并发请求数；`0` = 无限制（同时为该服务禁用自动扩缩容 + 并发限制器）。 |
+| `target_utilization` | `f64` | `0.7` | 必须在 `(0.0, 1.0]` 范围内。 |
+| `scale_down_delay_secs` | `u64` | `300` | 允许缩容前的空闲秒数。 |
+| `buffer_timeout_secs` | `u64` | `30` | 从零扩容期间被缓冲的请求等待时长（之后返回 HTTP 504）。 |
+| `buffer_size` | `usize` | `100` | 从零扩容期间最多缓冲的请求数（已满时返回 HTTP 503）。 |
+| `buffer_enabled` | `bool` | `false` | 从零扩容请求缓冲的总开关。 |
+| `executor` | `String` | `"box"` | `"box"` 或 `"k8s"`。无枚举校验；`"k8s"` 和未知值在启动时回退到 box executor。 |
+
+```text
+services "ai-model" {
+  load_balancer {
+    servers = [{ url = "http://127.0.0.1:9000" }]
+  }
+  scaling {
+    min_replicas          = 0
+    max_replicas          = 20
+    container_concurrency = 4
+    target_utilization    = 0.7
+    scale_down_delay_secs = 120
+    buffer_enabled        = true
+    buffer_size           = 200
+    buffer_timeout_secs   = 30
+    executor              = "box"
+  }
+}
+```
+
+<Callout type="warn">
+在运行时，自动扩缩容 tick 被硬编码为 2 秒，`in_flight` 上报为 `0`，box executor URL 固定为 `http://localhost:9090`——因此实际上只有排队（从零扩容）的请求会驱动扩缩容。`executor = "k8s"` 在启动时回退到 box executor。
+</Callout>
+
+### Revision 与 rollout
+
+基于 revision 的流量切分。一个服务所有 revision 的 `traffic_percent` 值**必须恰好加和为 100**，否则配置加载失败。Revision 接受内联 `revisions = [ { ... } ]` 列表、单个对象，或重复的 `revision` / `revisions` 子块。
+
+```rust
+pub struct RevisionConfig {
+    pub name: String,               // required
+    pub traffic_percent: u32,       // 0-100, default: 100
+    pub servers: Vec<ServerConfig>, // default: []
+    pub strategy: Strategy,         // default: round-robin
+}
+
+pub struct RolloutConfig {
+    pub from: String,              // required, must name an existing revision
+    pub to: String,               // required, must name an existing revision
+    pub step_percent: u32,        // default: 10
+    pub step_interval_secs: u64,  // default: 60
+    pub error_rate_threshold: f64,// default: 0.05
+    pub latency_threshold_ms: u64,// default: 5000
+}
+```
+
+```text
+services "api-service" {
+  revisions = [
+    {
+      name            = "v1"
+      traffic_percent = 80
+      servers         = [{ url = "http://127.0.0.1:8001" }]
+    },
+    {
+      name            = "v2"
+      traffic_percent = 20
+      servers         = [{ url = "http://127.0.0.1:8002" }]
+    }
+  ]
+
+  rollout {
+    from                 = "v1"
+    to                   = "v2"
+    step_percent         = 10
+    step_interval_secs   = 60
+    error_rate_threshold = 0.05
+    latency_threshold_ms = 5000
+  }
+}
+```
+
+<Callout type="warn">
+在 v1.0.7 中，`rollout` 会被解析和校验，但在运行时**处于惰性状态**——没有循环驱动 rollout 控制器，因此 `step_interval_secs`、`step_percent`、`error_rate_threshold` 和 `latency_threshold_ms` 目前尚无实际效果。Revision 选择采用确定性加权 round-robin（而非随机）。
+</Callout>
+
+负载均衡、健康检查和扩缩容行为的深入说明，参见 [服务](./services)。
 
 ## 中间件
 
-中间件在全局定义，通过名称在路由中引用。
+中间件在全局定义，并在路由的 `middlewares` 列表中通过名称引用。`type` 键选择实现；所有 HTTP 中间件共享一个扁平的配置结构，因此与给定类型无关的字段会被直接忽略。
+
+通过 `middlewares` 块可选择 **14 种 HTTP 流水线中间件类型**。（第 15 种连接级过滤器 `tcp-filter` **不是**中间件类型——它通过 `max_connections` / `tcp_allowed_ips` 在 TCP 入口点上配置。）
+
+| `type` | 关键字段 | 说明 |
+|--------|-----------|-------|
+| `api-key` | `header`（默认 `X-API-Key`）、`keys`（需 >= 1） | 精确匹配 key；缺失/无效 → 401。 |
+| `basic-auth` | `username`、`password`（均必填） | HTTP Basic；不匹配 → 401。 |
+| `rate-limit` | `rate`（必填）、`burst`（默认 = `rate`） | 进程内令牌桶；超限 → 429 + `Retry-After: 1`。 |
+| `rate-limit-redis` | `redis_url`（必填）、`rate`（必填）、`burst`（默认 = `rate`） | 分布式令牌桶；Redis 出错时**失败放行**。需要 `redis` 构建特性。 |
+| `cors` | `allowed_origins`、`allowed_methods`、`allowed_headers`、`max_age` | 均有默认值；预检返回 204，不允许的来源 → 403。 |
+| `headers` | `request_headers`、`response_headers` | 在入站/出站方向插入/覆盖 header。 |
+| `strip-prefix` | `prefixes` | 首个匹配胜出；`/apps/*` 剥离基础前缀 + 一个路径段。 |
+| `ip-allow` | `allowed_ips`（需 >= 1） | CIDR 或单个 IP；拒绝 → 403。 |
+| `retry` | `max_retries`（默认 3，需 > 0）、`retry_interval_ms`（默认 100） | 注入 `x-gateway-retry-*` 供代理执行。 |
+| `jwt` | `value`（HMAC 密钥，必填）、`header`（默认 `Authorization`） | 仅 HS256；要求 `exp`；注入 `x-jwt-subject`。 |
+| `circuit-breaker` | `failure_threshold`（5）、`cooldown_secs`（30）、`success_threshold`（1） | 连续 5xx 后跳闸；打开 → 503。 |
+| `compress` | *（无——ACL 配置被忽略）* | 硬编码 `min_size=1024`、`level=6`；设置 `x-gateway-compress: eligible`。 |
+| `body-limit` | `max_body_bytes`（必填，需 > 0） | `Content-Length` 超限 → 413。 |
+| `forward-auth` | `forward_auth_url`（必填）、`forward_auth_response_headers` | 通过 GET 委托鉴权；非 2xx 短路。 |
+
+所有键类型都位于同一个结构体上：
+
+```rust
+pub struct MiddlewareConfig {
+    pub middleware_type: String,             // ACL key: "type", required
+    pub header: Option<String>,              // api-key / jwt
+    pub keys: Vec<String>,                   // api-key
+    pub value: Option<String>,               // jwt secret
+    pub username: Option<String>,            // basic-auth
+    pub password: Option<String>,            // basic-auth
+    pub rate: Option<u64>,                   // rate-limit / rate-limit-redis
+    pub burst: Option<u64>,                  // rate-limit / rate-limit-redis
+    pub allowed_origins: Vec<String>,        // cors
+    pub allowed_methods: Vec<String>,        // cors
+    pub allowed_headers: Vec<String>,        // cors
+    pub max_age: Option<u64>,                // cors
+    pub request_headers: HashMap<String, String>,  // headers
+    pub response_headers: HashMap<String, String>, // headers
+    pub prefixes: Vec<String>,               // strip-prefix
+    pub max_retries: Option<u32>,            // retry
+    pub retry_interval_ms: Option<u64>,      // retry
+    pub allowed_ips: Vec<String>,            // ip-allow
+    pub forward_auth_url: Option<String>,    // forward-auth
+    pub forward_auth_response_headers: Vec<String>, // forward-auth
+    pub redis_url: Option<String>,           // rate-limit-redis
+    pub max_body_bytes: Option<u64>,         // body-limit
+    pub failure_threshold: Option<u32>,      // circuit-breaker
+    pub cooldown_secs: Option<u64>,          // circuit-breaker
+    pub success_threshold: Option<u32>,      // circuit-breaker
+}
+```
 
 ```text
 middlewares "auth-jwt" {
   type  = "jwt"
   value = env("JWT_SECRET")
+}
+
+middlewares "api-key" {
+  type   = "api-key"
+  header = "X-API-Key"
+  keys   = ["key-abc", "key-def"]
 }
 
 middlewares "rate-limit" {
@@ -295,8 +562,9 @@ middlewares "cors" {
   max_age         = 3600
 }
 
-middlewares "compress" {
-  type = "compress"
+middlewares "strip-apps" {
+  type     = "strip-prefix"
+  prefixes = ["/apps/*"]
 }
 
 middlewares "circuit-breaker" {
@@ -305,34 +573,122 @@ middlewares "circuit-breaker" {
   cooldown_secs     = 60
   success_threshold = 2
 }
+
+middlewares "edge-auth" {
+  type                          = "forward-auth"
+  forward_auth_url              = "http://auth-svc:8080/verify"
+  forward_auth_response_headers = ["X-User-Id", "X-User-Roles"]
+}
 ```
 
-全部 15 种内置中间件类型请参阅 [中间件](./middleware)。
+<Callout type="info">
+在 ACL 中，`request_headers` / `response_headers` 写作 `{ name = ..., value = ... }` 对象的列表（解析器也接受用 `key`/`header` 表示 name），而非原生 map 字面量。
+</Callout>
 
-### 环境变量替换
+每种类型的完整行为参见 [中间件](./middleware)。
 
-配置值支持引用环境变量：
+## 可观测性
+
+一个顶层块，包含三个布尔开关，**全部默认为 `true`**。它们在热路径上逐请求检查。
+
+```rust
+pub struct ObservabilityConfig {
+    pub metrics_enabled: bool,    // default: true
+    pub access_log_enabled: bool, // default: true
+    pub tracing_enabled: bool,    // default: true
+}
+```
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `metrics_enabled` | `bool` | `true` | Prometheus 的逐 router / service / backend 计数器。 |
+| `access_log_enabled` | `bool` | `true` | 逐请求访问日志。 |
+| `tracing_enabled` | `bool` | `true` | W3C Trace Context 提取 + 出站 `traceparent` 注入。 |
 
 ```text
-middlewares "auth-jwt" {
-  type  = "jwt"
-  value = env("JWT_SECRET")
+observability {
+  metrics_enabled    = true
+  access_log_enabled = true
+  tracing_enabled    = true
+}
+```
+
+此块中没有 `otlp` / `sample_rate` / `propagation` / `service_name` 键。关于 v1.0.7 实际发出哪些指标和追踪格式，参见 [可观测性](./observability)。
+
+## 管理
+
+Dashboard / 管理 API 是一个可选的、独立的监听器（默认禁用，绑定到 `127.0.0.1:9090`），它从不拦截业务流量入口。**没有单独的 `dashboard` 块**——这就是它。请求按顺序受保护：路径前缀匹配 → IP 允许列表 → bearer token，并可选 TLS/mTLS。被拒绝的请求和 TLS 握手失败会保留在内存审计环形缓冲区中，并在 `{path_prefix}/events` 处暴露。
+
+```rust
+pub struct ManagementConfig {
+    pub enabled: bool,                  // default: false
+    pub address: String,                // default: "127.0.0.1:9090"
+    pub path_prefix: String,            // default: "/api/gateway"
+    pub auth_token_env: Option<String>, // default: "A3S_GATEWAY_ADMIN_TOKEN"
+    pub allowed_ips: Vec<String>,       // default: ["127.0.0.1", "::1"]
+    pub tls: Option<ManagementTlsConfig>,
 }
 
-entrypoints "websecure" {
-  address = "0.0.0.0:443"
+pub struct ManagementTlsConfig {
+    pub cert_file: String,              // required
+    pub key_file: String,              // required
+    pub client_ca_file: Option<String>, // default: none
+    pub require_client_cert: bool,      // default: false
+    pub min_version: String,            // "1.2" (default) or "1.3"
+}
+```
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `enabled` | `bool` | `false` | 监听器总开关。 |
+| `address` | `String` | `127.0.0.1:9090` | 启用时校验为套接字地址。 |
+| `path_prefix` | `String` | `/api/gateway` | 启用时必须以 `/` 开头。 |
+| `auth_token_env` | `String` | `A3S_GATEWAY_ADMIN_TOKEN` | 持有 bearer token 的**环境变量**名称。设为 `""` 可禁用 token 鉴权。 |
+| `allowed_ips` | `[String]` | `["127.0.0.1", "::1"]` | CIDR 或单个 IP。省略保留回环默认值；显式 `[]` 禁用 IP 过滤。 |
+| `tls` | block | 无 | 可选 TLS / mTLS。 |
+
+管理 TLS 键：
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `cert_file` | `String` | **必填** | 服务器证书 PEM；为空则拒绝。 |
+| `key_file` | `String` | **必填** | 服务器私钥 PEM；为空则拒绝。 |
+| `client_ca_file` | `String` | 无 | 用于验证客户端证书的 CA；当 `require_client_cert = true` 时**必填**。 |
+| `require_client_cert` | `bool` | `false` | 强制 mTLS。 |
+| `min_version` | `String` | `"1.2"` | 校验必须恰好为 `"1.2"` 或 `"1.3"`。 |
+
+```text
+management {
+  enabled        = true
+  address        = "127.0.0.1:9090"
+  path_prefix    = "/api/gateway"
+  auth_token_env = "A3S_GATEWAY_ADMIN_TOKEN"
+  allowed_ips    = ["127.0.0.1", "::1"]
+
   tls {
-    cert_file = "${TLS_CERT_PATH}"
-    key_file  = "${TLS_KEY_PATH}"
+    cert_file           = "/etc/a3s/admin/server.crt"
+    key_file            = "/etc/a3s/admin/server.key"
+    client_ca_file      = "/etc/a3s/admin/client-ca.crt"
+    require_client_cert = true
+    min_version         = "1.3"
   }
 }
 ```
 
+<Callout type="warn">
+如果 `auth_token_env` 指定的变量在启动时未设置，管理监听器将启动失败。设置 `auth_token_env = ""` 以禁用 bearer 鉴权，或 `allowed_ips = []` 以禁用 IP 过滤——这些与省略相应键是不同的。
+</Callout>
+
 ## 提供者
 
-配置提供者用于提供动态配置。
+动态配置源。`providers` 下只识别四个块（`file`、`discovery`、`kubernetes`、`docker`）；其他任何块都会被拒绝（`Unknown providers ACL block`）。发现的条目会被**添加**到静态配置中，并且**名称冲突时静态配置胜出**（Docker 提供者除外，它会覆盖）。v1.0.7 中没有 `dns` 提供者。
 
 ### 文件提供者
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `watch` | `bool` | `true` | 变更时热重载（仅识别 `.acl` 片段）。 |
+| `directory` | `String` | 无 | 额外目录，其 `.acl` 片段会被合并。 |
 
 ```text
 providers {
@@ -343,11 +699,17 @@ providers {
 }
 ```
 
-当 `watch = true` 时，Gateway 使用 inotify（Linux）或 kqueue（macOS）监听配置文件和目录的变更，并在不停机的情况下热重载。
+当 `watch = true` 时，Gateway 通过 `notify`（inotify / kqueue / ReadDirectoryChanges）监听配置文件的父目录（以及可选的 `directory`，递归监听），对变更去抖（500ms），重新解析、校验，并在不停机的情况下热重载。
 
 ### 服务发现提供者
 
-基于健康状态的服务发现，通过轮询后端种子 URL 的 `/.well-known/a3s-service.json` 元数据实现。
+基于健康状态的服务发现，轮询后端种子 URL 的 `/.well-known/a3s-service.json` 元数据，然后探测每个种子的健康路径。
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `seeds` | `{ url }` 列表 | **必填** | 后端种子 URL。 |
+| `poll_interval_secs` | `u64` | `30` | 轮询节奏。 |
+| `timeout_secs` | `u64` | `5` | 每次探测的 HTTP 超时。 |
 
 ```text
 providers {
@@ -364,7 +726,13 @@ providers {
 
 ### Docker 提供者
 
-通过容器标签自动发现服务。
+从容器标签（位于 `label_prefix` 之下，例如 `a3s.enable`、`a3s.router.rule`、`a3s.service.port`）自动发现服务。
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `host` | `String` | `/var/run/docker.sock` | Unix 套接字路径或 `tcp://` URL。 |
+| `label_prefix` | `String` | `a3s` | 路由标签的前缀。 |
+| `poll_interval_secs` | `u64` | `10` | 轮询节奏（钳制为 >= 1）。 |
 
 ```text
 providers {
@@ -376,9 +744,18 @@ providers {
 }
 ```
 
+容器需要 `<prefix>.enable = "true"`（精确字符串）和 `<prefix>.service.port` 才会被识别。完整的 Docker 标签和 Kubernetes 注解参考，参见 [路由](./routing)。
+
 ### Kubernetes 提供者
 
-监听 Ingress 和 IngressRoute CRD 资源。
+监听 `Ingress` 资源（以及可选的、由 ConfigMap 支持的 IngressRoute spec）。要求 Gateway 构建时启用 `kube` 特性（发布的 Linux 镜像已启用）；否则该块仅记录一条警告。
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `namespace` | `String` | `""` | 为空 = 所有命名空间。 |
+| `label_selector` | `String` | `""` | 仅在非空时应用于 Ingress 列举。 |
+| `watch_interval_secs` | `u64` | `30` | 两个 watcher 的轮询节奏。 |
+| `ingress_route_crd` | `bool` | `false` | 同时监听 IngressRoute spec（存储在带 `a3s-gateway.io/type=ingressroute` 标签的 ConfigMap 中）。 |
 
 ```text
 providers {
@@ -394,23 +771,34 @@ providers {
 ## 热重载
 
 ```rust
-// Programmatic reload
 let new_config = GatewayConfig::from_file("gateway.acl").await?;
 gateway.reload(new_config).await?;
 ```
 
-重载过程：
-1. Gateway 切换到 `Reloading` 状态
-2. 验证新配置
-3. 重建路由、服务和中间件
-4. 如果 HTTP/TCP entrypoint 未变化，直接替换运行时快照，不重新绑定流量端口
-5. 如果新增或迁移 HTTP/TCP listener，则按名称增量协调；新端口绑定失败时，未变化的 listener 继续工作
-6. 如果包含 UDP entrypoint，则显式重启受影响的 entrypoint
-7. Gateway 切换回 `Running` 状态
+重载期间：
+
+1. 校验新配置；失败时保留先前的配置。
+2. 重建路由、服务和中间件。
+3. 如果 `old.entrypoints == new.entrypoints` **并且**两份配置都没有 UDP 入口点，则**不重新绑定**流量端口即可热替换运行时快照。
+4. 如果新增或更改了 HTTP/TCP 入口点（且没有 UDP），则只重启变化的监听器；未变化的监听器保持绑定。
+5. 如果涉及任何 UDP 入口点，则执行完整的中止并重启。
+
+只有当存在 `providers.file` 块且 `watch = true` 时，才会运行文件监听热重载。
 
 ## 完整示例
 
 ```text
+shutdown_timeout_secs {
+  shutdown_timeout_secs = 30
+}
+
+# Observability
+observability {
+  metrics_enabled    = true
+  access_log_enabled = true
+  tracing_enabled    = true
+}
+
 # Entrypoints
 entrypoints "web" {
   address = "0.0.0.0:80"
@@ -429,7 +817,8 @@ routers "api" {
   rule        = "Host(`api.example.com`) && PathPrefix(`/v1`)"
   service     = "api-service"
   entrypoints = ["websecure"]
-  middlewares  = ["auth-jwt", "rate-limit", "cors"]
+  middlewares = ["auth-jwt", "rate-limit", "cors"]
+  priority    = 100
 }
 
 routers "web" {
@@ -441,8 +830,9 @@ routers "web" {
 # Services
 services "api-service" {
   load_balancer {
-    strategy = "least-connections"
-    servers  = [
+    strategy        = "least-connections"
+    request_timeout = "30s"
+    servers = [
       { url = "http://127.0.0.1:8001" },
       { url = "http://127.0.0.1:8002" }
     ]
@@ -476,6 +866,12 @@ middlewares "cors" {
   type            = "cors"
   allowed_origins = ["https://example.com"]
   allowed_methods = ["GET", "POST"]
+}
+
+# Management API
+management {
+  enabled        = true
+  auth_token_env = "A3S_GATEWAY_ADMIN_TOKEN"
 }
 
 # Providers

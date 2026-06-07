@@ -1,37 +1,99 @@
 ---
 title: 快速开始
-description: 使用基本反向代理配置启动 A3S Gateway
+description: 安装 A3S Gateway (v1.0.7) 并运行一个最小的反向代理，将流量转发到 LLM/HTTP 后端
 ---
 
 # 快速开始
 
+本指南帮助你将 A3S Gateway **v1.0.7** 作为反向代理运行在 LLM/HTTP 后端之前。
+这里的所有内容都可直接复制粘贴，并能按原样运行。
+
+网关是一个静态链接的单一二进制文件（`a3s-gateway`）。配置采用 Traefik 风格的
+**entrypoint → router → middleware → service** 模型，使用 ACL 编写。配置文件**必须**
+使用 `.acl` 扩展名——HCL/TOML/YAML/JSON 文件在加载时会被拒绝。
+
+## 安装
+
+任选其一。Homebrew 和 Cargo 安装的是原生 `a3s-gateway` 二进制文件；Docker 则运行
+发布在 GitHub Container Registry 上的镜像。
+
+### Homebrew (macOS)
+
+```bash
+brew install a3s-lab/tap/a3s-gateway
+```
+
+### Cargo
+
+```bash
+cargo install a3s-gateway
+```
+
+从源码构建需要 Rust **1.88** 或更新版本（当前的 MSRV）。
+
+### Docker (ghcr.io)
+
+发布的 Linux 镜像在构建时启用了 `kube` 和 `redis` 这两个 cargo feature（Kubernetes
+provider + 分布式 Redis 限流）。默认的 `cargo install` / `brew` 构建不启用任何额外
+feature。
+
+```bash
+docker run -d \
+  -v $(pwd)/gateway.acl:/etc/a3s-gateway/gateway.acl \
+  -p 8080:8080 \
+  ghcr.io/a3s-lab/gateway:latest \
+  --config /etc/a3s-gateway/gateway.acl
+```
+
 ## 最小配置
 
-创建 `gateway.acl` 文件，包含入口点、路由器和服务：
+创建一个 `gateway.acl`，包含一个 entrypoint、一个 router 和一个 service，将流量代理到
+LLM/HTTP 后端。
 
 ```text
+# gateway.acl — 将 /v1 流量代理到本地 LLM 后端
 entrypoints "web" {
-  address = "0.0.0.0:80"
+  address = "0.0.0.0:8080"
 }
 
-routers "my-api" {
-  rule        = "PathPrefix(`/api`)"
-  service     = "api-backend"
+routers "llm" {
+  rule        = "PathPrefix(`/v1`)"
+  service     = "llm-backend"
   entrypoints = ["web"]
 }
 
-services "api-backend" {
+services "llm-backend" {
   load_balancer {
-    strategy = "round-robin"
-    servers  = [{ url = "http://127.0.0.1:8001" }]
+    strategy        = "round-robin"
+    request_timeout = "60s"
+    servers = [
+      { url = "http://127.0.0.1:8001" },
+    ]
   }
 }
 ```
 
+它如何映射到 schema：
+
+- **`entrypoints`** —— 一个命名的网络监听器。`address`（`host:port`）是必填项；
+  `protocol` 默认为 `http`（也可为 `tcp` / `udp`）。监听 `0.0.0.0:8080` 与发布的 Docker
+  镜像一致，该镜像暴露 `8080` 端口。
+- **`routers`** —— `rule` 和 `service` 是必填项。规则使用反引号参数和 `&&` 组合符
+  （`Host`、`Path`、`PathPrefix`、`Method`、`Headers`）。`PathPrefix` 是原始的
+  `starts_with`，因此 `PathPrefix(`/v1`)` 会匹配 `/v1`、`/v1/chat/completions` 和
+  `/v1xyz`。空的 `entrypoints` 列表（或省略它）会将 router 绑定到**所有** entrypoint。
+- **`services`** —— 包裹一个 `load_balancer`。`request_timeout` 默认为 `"30s"`；LLM 响应
+  可能较慢，因此本示例将其提高到 `"60s"`。时长支持 `ms` / `s` / `m` 后缀（裸数字表示秒）；
+  空值、`0s` 或非数字值在加载时会被拒绝。一个 service 必须至少有一个 `server`（或一个
+  revision），否则校验失败。
+
+> router 的 `service` 和 `entrypoints`，以及每个 middleware 名称，都会在加载时进行交叉
+> 校验——引用一个不存在的名称会导致硬性配置错误。
+
 ## 启动网关
 
 ```bash
-# 使用 ACL 配置启动
+# 使用 ACL 配置启动（若省略 --config，则默认使用 ./gateway.acl）
 a3s-gateway --config gateway.acl
 
 # 开启调试日志
@@ -41,152 +103,68 @@ a3s-gateway --config gateway.acl --log-level debug
 a3s-gateway validate --config gateway.acl
 ```
 
-## 添加 HTTPS
-
-```text
-entrypoints "web" {
-  address = "0.0.0.0:80"
-}
-
-entrypoints "websecure" {
-  address = "0.0.0.0:443"
-
-  tls {
-    cert_file = "/etc/certs/cert.pem"
-    key_file  = "/etc/certs/key.pem"
-  }
-}
-
-routers "my-api" {
-  rule        = "Host(`api.example.com`) && PathPrefix(`/v1`)"
-  service     = "api-backend"
-  entrypoints = ["websecure"]
-}
-
-services "api-backend" {
-  load_balancer {
-    strategy = "round-robin"
-    servers  = [{ url = "http://127.0.0.1:8001" }]
-  }
-}
-```
-
-## 添加中间件
-
-```text
-entrypoints "websecure" {
-  address = "0.0.0.0:443"
-
-  tls {
-    cert_file = "/etc/certs/cert.pem"
-    key_file  = "/etc/certs/key.pem"
-  }
-}
-
-routers "my-api" {
-  rule        = "Host(`api.example.com`)"
-  service     = "api-backend"
-  entrypoints = ["websecure"]
-  middlewares  = ["auth", "rate-limit"]
-}
-
-middlewares "auth" {
-  type  = "jwt"
-  value = "my-jwt-secret"
-}
-
-middlewares "rate-limit" {
-  type  = "rate-limit"
-  rate  = 100
-  burst = 50
-}
-
-services "api-backend" {
-  load_balancer {
-    strategy = "round-robin"
-    servers = [
-      { url = "http://127.0.0.1:8001" },
-      { url = "http://127.0.0.1:8002" },
-    ]
-  }
-}
-```
-
-## 健康检查
-
-```text
-services "api-backend" {
-  load_balancer {
-    strategy = "least-connections"
-
-    servers = [
-      { url = "http://127.0.0.1:8001" },
-      { url = "http://127.0.0.1:8002" },
-    ]
-
-    health_check {
-      path                = "/health"
-      interval            = "10s"
-      timeout             = "5s"
-      unhealthy_threshold = 3
-      healthy_threshold   = 1
-    }
-  }
-}
-```
-
-## 管理
-
-网关默认采用 CLI-first 管理方式。如果控制台或 Operator 需要远程检查，可以在独立
-listener 上启用 Dashboard API。它不会占用流量入口上的 `/api/gateway/*` 路径。
+在不绑定任何 socket 的情况下查看解析结果：
 
 ```bash
-a3s-gateway validate --config gateway.acl
 a3s-gateway config --config gateway.acl summary
 a3s-gateway config --config gateway.acl entrypoints
 a3s-gateway config --config gateway.acl routes
 a3s-gateway config --config gateway.acl services
 a3s-gateway config --config gateway.acl middlewares
-a3s-gateway config --config gateway.acl providers
 a3s-gateway config --config gateway.acl json
-a3s-gateway management events --url http://127.0.0.1:9090/api/gateway
-a3s-gateway management validate --url http://127.0.0.1:9090/api/gateway --file gateway.acl
-a3s-gateway management reload --url http://127.0.0.1:9090/api/gateway --file gateway.acl
 ```
 
-```text
-management {
-  enabled        = true
-  address        = "127.0.0.1:9090"
-  path_prefix    = "/api/gateway"
-  auth_token_env = "A3S_GATEWAY_ADMIN_TOKEN"
-  allowed_ips    = ["127.0.0.1", "::1"]
+## 验证
 
-  tls {
-    cert_file           = "/etc/a3s/admin/server.crt"
-    key_file            = "/etc/a3s/admin/server.key"
-    client_ca_file      = "/etc/a3s/admin/client-ca.crt"
-    require_client_cert = true
+通过网关发送一个请求。router 匹配 `PathPrefix(`/v1`)` 并转发到 `llm-backend`，后者代理到
+`http://127.0.0.1:8001`：
+
+```bash
+curl -i http://localhost:8080/v1/models
+```
+
+如果后端可达，你会收到它的响应。网关始终会向上游请求添加 `X-Forwarded-For`、
+`X-Forwarded-Host`、`X-Forwarded-Proto` 和 `X-Forwarded-Port`（这是无条件的——没有针对
+转发头的配置键）。
+
+POST 的工作方式相同——路径和请求体会直接流式透传：
+
+```bash
+curl -i http://localhost:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"my-model","messages":[{"role":"user","content":"ping"}]}'
+```
+
+如果没有健康的后端，你会得到 `502`；超过 `request_timeout` 的上游会返回 `504`。
+
+## 通过 `env()` 使用密钥
+
+任何字符串值的 ACL 属性都可以用 `env("VAR")` 从环境变量读取。缺失的变量会导致配置错误。
+这是 ACL 值中唯一支持的函数调用。
+
+```text
+services "llm-backend" {
+  load_balancer {
+    servers = [
+      { url = env("LLM_UPSTREAM_URL") },
+    ]
   }
 }
 ```
 
-## 编程式使用
-
-```rust
-use a3s_gateway::{Gateway, config::GatewayConfig};
-
-#[tokio::main]
-async fn main() -> a3s_gateway::Result<()> {
-    let config = GatewayConfig::from_file("gateway.acl").await?;
-    let gateway = Gateway::new(config)?;
-
-    gateway.start().await?;
-
-    let health = gateway.health();
-    println!("状态: {:?}, 运行时间: {}s", health.state, health.uptime_secs);
-
-    gateway.wait_for_shutdown().await;
-    Ok(())
-}
+```bash
+export LLM_UPSTREAM_URL="http://127.0.0.1:8001"
+a3s-gateway --config gateway.acl
 ```
+
+## 后续步骤
+
+- **路由** —— `Host`/`Path`/`PathPrefix`/`Method`/`Headers` 匹配器、优先级以及
+  最具体优先（most-specific-wins）的排序：参见 [Routing](./routing)。
+- **中间件** —— `rate-limit`、`jwt`、`api-key`、`cors`、`circuit-breaker` 等，通过
+  `middlewares = [...]` 挂载：参见 [Middleware](./middleware)。
+- **服务** —— 负载均衡策略、主动/被动健康检查、粘性会话、故障转移、自动扩缩容以及
+  revision 流量切分：参见 [Services](./services)。
+- **部署** —— Helm、Docker 和 systemd：参见 [Deployment](./deployment)。
+- **可观测性与管理 API** —— Prometheus 指标和专用的管理监听器：参见
+  [Observability](./observability)。

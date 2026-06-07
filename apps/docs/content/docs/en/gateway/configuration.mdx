@@ -1,13 +1,19 @@
 ---
 title: Configuration
-description: ACL configuration for entrypoints, routers, services, middlewares, and providers
+description: Complete ACL reference for entrypoints, routers, services, middlewares, observability, management, and providers
 ---
+
+import { Callout } from 'fumadocs-ui/components/callout';
 
 # Configuration
 
-A3S Gateway uses ACL (Agent Configuration Language) exclusively for configuration. The format is auto-detected by `.acl` file extension. Configuration supports hot reload via file watching.
+A3S Gateway is configured exclusively in ACL (Agent Configuration Language). This page is the complete reference for the configuration schema in **v1.0.7**: every block, every key, its type, and its default.
 
-## GatewayConfig
+Configuration files **must** use the `.acl` extension. The loader rejects `.toml`, `.yaml`, `.yml`, and `.json` files. Configuration supports hot reload via file watching (see [File Provider](#file-provider)).
+
+## Top-level structure
+
+A configuration file is composed of named blocks plus one scalar. The parser accepts singular or plural spellings for the four core blocks (`entrypoint`/`entrypoints`, `router`/`routers`, `service`/`services`, `middleware`/`middlewares`). Any other top-level block is a hard error (`Unknown top-level ACL block`).
 
 ```rust
 pub struct GatewayConfig {
@@ -17,84 +23,93 @@ pub struct GatewayConfig {
     pub middlewares: HashMap<String, MiddlewareConfig>,
     pub providers: ProviderConfig,
     pub management: ManagementConfig,
+    pub observability: ObservabilityConfig,
     pub shutdown_timeout_secs: u64, // default: 30
 }
 ```
 
-### Loading Configuration
+Each block instance is named either with a string label (`routers "api" { ... }`) or a `name` attribute (`routers { name = "api" ... }`).
+
+| Top-level block | Purpose |
+|-----------------|---------|
+| `entrypoints` | Network listeners (HTTP / TCP / UDP) |
+| `routers` | Match requests to a service + middleware chain |
+| `services` | Backend pools, load balancing, scaling, traffic splitting |
+| `middlewares` | Reusable request/response processors |
+| `observability` | Metrics, access log, tracing toggles |
+| `management` | Dedicated dashboard / admin API listener |
+| `providers` | Dynamic config sources (file / discovery / kubernetes / docker) |
+| `shutdown_timeout_secs` | Graceful shutdown timeout in seconds (default `30`) |
+
+`shutdown_timeout_secs` is a top-level block (not a bare scalar) in ACL:
+
+```text
+shutdown_timeout_secs {
+  shutdown_timeout_secs = 30
+}
+```
+
+### Loading configuration
 
 ```rust
-// Load from file
+// Load from a .acl file
 let config = GatewayConfig::from_file("gateway.acl").await?;
 
-// Parse from ACL string
+// Parse from an ACL string
 let config = GatewayConfig::from_acl(acl_content)?;
 
-// Validate (checks router→service, router→middleware, router→entrypoint references)
+// Validate cross-references and value constraints
 config.validate()?;
 ```
 
-## Management
+`validate()` cross-checks every `routers.service` / `routers.middlewares` / `routers.entrypoints` reference, requires each service to declare at least one server **or** at least one revision, parses and validates `request_timeout`, validates scaling/revision/rollout constraints, and — when `management.enabled` — validates the management address, path prefix, allowlist, and TLS.
 
-The Dashboard API is optional and runs on a dedicated listener. It never
-intercepts traffic entrypoints. Requests must match `allowed_ips` and, when
-`auth_token_env` is set, include `Authorization: Bearer <token>`. Enable the
-nested `tls` block when remote management needs HTTPS or client certificate
-validation. Rejected management requests and TLS handshake failures are retained
-in an in-memory audit ring buffer and exposed at `/events`.
+### Environment variable substitution
 
-```rust
-pub struct ManagementConfig {
-    pub enabled: bool,                  // default: false
-    pub address: String,                // default: "127.0.0.1:9090"
-    pub path_prefix: String,            // default: "/api/gateway"
-    pub auth_token_env: Option<String>, // default: "A3S_GATEWAY_ADMIN_TOKEN"
-    pub allowed_ips: Vec<String>,       // default: ["127.0.0.1", "::1"]
-    pub tls: Option<ManagementTlsConfig>,
-}
-
-pub struct ManagementTlsConfig {
-    pub cert_file: String,
-    pub key_file: String,
-    pub client_ca_file: Option<String>,
-    pub require_client_cert: bool, // default: false
-    pub min_version: String,       // "1.2" (default) or "1.3"
-}
-```
+Any string-valued attribute may read from the environment with `env("VAR")`. A missing variable is a configuration error. `env(...)` is the **only** function call supported in values; any other `Call()` form is an error.
 
 ```text
-management {
-  enabled        = true
-  address        = "127.0.0.1:9090"
-  path_prefix    = "/api/gateway"
-  auth_token_env = "A3S_GATEWAY_ADMIN_TOKEN"
-  allowed_ips    = ["127.0.0.1", "::1"]
+middlewares "auth-jwt" {
+  type  = "jwt"
+  value = env("JWT_SECRET")
+}
 
+entrypoints "websecure" {
+  address = "0.0.0.0:443"
   tls {
-    cert_file           = "/etc/a3s/admin/server.crt"
-    key_file            = "/etc/a3s/admin/server.key"
-    client_ca_file      = "/etc/a3s/admin/client-ca.crt"
-    require_client_cert = true
-    min_version         = "1.3"
+    cert_file = env("TLS_CERT_PATH")
+    key_file  = env("TLS_KEY_PATH")
   }
 }
 ```
 
 ## Entrypoints
 
-Entrypoints define network listeners.
+Entrypoints define network listeners. The `protocol` selects the listener type; `address` is required.
 
 ```rust
 pub struct EntrypointConfig {
-    pub address: String,
-    pub protocol: Protocol,          // http (default), tcp, udp
-    pub tls: Option<TlsConfig>,
-    pub max_connections: Option<u32>, // TCP only
-    pub tcp_allowed_ips: Vec<String>, // TCP only, CIDR or single IP
-    pub udp_session_timeout_secs: Option<u64>,  // UDP only
-    pub udp_max_sessions: Option<usize>,        // UDP only
+    pub address: String,                       // required, "host:port"
+    pub protocol: Protocol,                    // http (default) | tcp | udp
+    pub tls: Option<TlsConfig>,                // optional
+    pub max_connections: Option<u32>,          // TCP only, default: unlimited
+    pub tcp_allowed_ips: Vec<String>,          // TCP only, default: []
+    pub udp_session_timeout_secs: Option<u64>, // UDP only, default: 30 at the listener
+    pub udp_max_sessions: Option<usize>,       // UDP only, default: 10000 at the listener
 }
 ```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `address` | `String` | **required** | `host:port`; parsed as a socket address. |
+| `protocol` | `http` \| `tcp` \| `udp` | `http` | Any other value is rejected (`Invalid entrypoint protocol`). |
+| `tls` | block | none | TLS termination (HTTP entrypoints). |
+| `max_connections` | `u32` | unlimited | TCP only; enforced via a connection semaphore. |
+| `tcp_allowed_ips` | `[String]` | `[]` (allow all) | TCP only; CIDR or single IP. |
+| `udp_session_timeout_secs` | `u64` | `30` | UDP only. When unset, `30` is applied at the listener. |
+| `udp_max_sessions` | `usize` | `10000` | UDP only. When unset, `10000` is applied at the listener. |
+
+The UDP defaults (`30` / `10000`) are **not** schema defaults — the fields are optional and the values are applied by the UDP listener when omitted.
 
 ```text
 # HTTP listener
@@ -102,7 +117,7 @@ entrypoints "web" {
   address = "0.0.0.0:80"
 }
 
-# HTTPS listener with TLS
+# HTTPS listener with static TLS
 entrypoints "websecure" {
   address = "0.0.0.0:443"
   tls {
@@ -112,12 +127,12 @@ entrypoints "websecure" {
   }
 }
 
-# TCP listener with connection limits
-entrypoints "tcp" {
+# TCP listener with connection limit + IP allowlist
+entrypoints "postgres" {
   address         = "0.0.0.0:5432"
   protocol        = "tcp"
-  max_connections  = 1000
-  tcp_allowed_ips  = ["10.0.0.0/8", "192.168.1.0/24"]
+  max_connections = 1000
+  tcp_allowed_ips = ["10.0.0.0/8", "192.168.1.0/24"]
 }
 
 # UDP listener
@@ -129,95 +144,140 @@ entrypoints "dns" {
 }
 ```
 
-### TLS Configuration
+### Entrypoint TLS
 
 ```rust
 pub struct TlsConfig {
-    pub cert_file: String,
-    pub key_file: String,
-    pub min_version: String,              // "1.2" (default) or "1.3"
-    pub acme: bool,                       // Let's Encrypt auto-cert
-    pub acme_email: Option<String>,       // required when acme = true
-    pub acme_domains: Vec<String>,        // defaults to Host rules if empty
-    pub acme_staging: bool,               // use staging environment
-    pub acme_storage_path: Option<String>,// default: /etc/gateway/acme
+    pub cert_file: String,                 // PEM cert chain
+    pub key_file: String,                  // PEM private key
+    pub min_version: String,               // "1.2" (default) or "1.3"
+    pub acme: bool,                        // default: false
+    pub acme_email: Option<String>,        // required when acme = true
+    pub acme_domains: Vec<String>,         // default: [] (derives from Host rules)
+    pub acme_staging: bool,                // default: false
+    pub acme_storage_path: Option<String>, // default: /etc/gateway/acme
 }
 ```
 
-TLS is handled by rustls (pure Rust, no OpenSSL dependency). ACME support enables automatic certificate provisioning from Let's Encrypt.
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `cert_file` | `String` | `""` | PEM cert chain. Required in practice for static certs. |
+| `key_file` | `String` | `""` | PEM private key. Required in practice. |
+| `min_version` | `String` | `"1.2"` | `"1.2"` enables TLS 1.2 **and** 1.3; `"1.3"` is 1.3-only. Entrypoint TLS does **not** validate this string at load time. |
+| `acme` | `bool` | `false` | Enable the ACME (Let's Encrypt) manager. |
+| `acme_email` | `String` | none | **Required** when `acme = true`; if empty the ACME manager is skipped with a warning. |
+| `acme_domains` | `[String]` | `[]` | When empty, the gateway derives domains from `` Host(`...`) `` router rules. |
+| `acme_staging` | `bool` | `false` | Use the Let's Encrypt staging directory. |
+| `acme_storage_path` | `String` | `/etc/gateway/acme` | Certificate/account storage directory. |
+
+TLS termination is rustls-based (pure Rust, no OpenSSL). `min_version` is a **minimum**: `"1.2"` still allows TLS 1.3.
 
 ```text
 entrypoints "websecure" {
   address = "0.0.0.0:443"
   tls {
-    cert_file          = "/etc/certs/cert.pem"
-    key_file           = "/etc/certs/key.pem"
-    acme               = true
-    acme_email         = "admin@example.com"
-    acme_domains       = ["example.com", "api.example.com"]
-    acme_staging       = false
-    acme_storage_path  = "/etc/gateway/acme"
+    cert_file         = "/etc/certs/cert.pem"
+    key_file          = "/etc/certs/key.pem"
+    acme              = true
+    acme_email        = "admin@example.com"
+    acme_domains      = ["example.com", "api.example.com"]
+    acme_staging      = false
+    acme_storage_path = "/etc/gateway/acme"
   }
 }
 ```
 
+<Callout type="warn">
+ACME from configuration is **HTTP-01 only** in v1.0.7. The `tls` block exposes only the keys above. There are **no** DNS-01 / Cloudflare / Route53 keys reachable from ACL — those solvers exist in the runtime but are not wired to the configuration schema. The challenge type is always HTTP-01 and the DNS provider is always `None`.
+</Callout>
+
 ## Routers
 
-Routers match incoming requests to services.
+Routers match incoming requests to a service and an ordered middleware chain.
 
 ```rust
 pub struct RouterConfig {
-    pub rule: String,
-    pub service: String,
-    pub entrypoints: Vec<String>,
-    pub middlewares: Vec<String>,
-    pub priority: i32, // lower = higher priority, default: 0
+    pub rule: String,             // required, Traefik-style matcher
+    pub service: String,          // required, must exist
+    pub entrypoints: Vec<String>, // default: [] (= all entrypoints)
+    pub middlewares: Vec<String>, // default: []
+    pub priority: i32,            // default: 0
 }
 ```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `rule` | `String` | **required** | Matcher expression, e.g. `` Host(`d`) ``, `` PathPrefix(`/p`) ``, `` Path(`/x`) ``, `` Headers(`k`,`v`) ``, `` Method(`GET`) ``, joined with `&&`. |
+| `service` | `String` | **required** | Target service; must exist in `services`. |
+| `entrypoints` | `[String]` | `[]` | Listeners this router binds to. Empty = **all** entrypoints. Each name must exist. |
+| `middlewares` | `[String]` | `[]` | Ordered chain; each name must exist. |
+| `priority` | `i32` | `0` | **Higher positive value wins** (most-specific). See note below. |
 
 ```text
 routers "api" {
   rule        = "Host(`api.example.com`) && PathPrefix(`/v1`)"
   service     = "api-service"
   entrypoints = ["websecure"]
-  middlewares  = ["auth-jwt", "rate-limit"]
-  priority    = 0
+  middlewares = ["auth-jwt", "rate-limit"]
+  priority    = 100
 }
 
 routers "web" {
   rule        = "Host(`www.example.com`)"
   service     = "web-service"
   entrypoints = ["web", "websecure"]
-  priority    = 10
 }
 ```
 
-Lower `priority` values are matched first. See [Routing](./routing) for rule syntax details.
+<Callout type="warn">
+**Router priority is "higher wins".** When `priority > 0` the value is used directly and the **highest** value is the most specific (Traefik-style). When `priority <= 0` (the default) the gateway falls back to the **rule-string length** (longer rule wins). Setting a negative priority does **not** raise precedence — it is ignored. (TCP routes, which are generated only by providers, use the opposite convention — lower wins.) See [Routing](./routing) for the full matcher grammar and ordering rules.
+</Callout>
 
 ## Services
 
-Services define backend pools with load balancing.
+A service wraps a load balancer plus optional scaling, revision splitting, rollout, mirroring, and failover.
 
 ```rust
 pub struct ServiceConfig {
     pub load_balancer: LoadBalancerConfig,
+    pub scaling: Option<ScalingConfig>,
+    pub revisions: Vec<RevisionConfig>,
+    pub rollout: Option<RolloutConfig>,
     pub mirror: Option<MirrorConfig>,
     pub failover: Option<FailoverConfig>,
 }
+```
 
+A service must declare at least one server **or** at least one revision, otherwise `validate()` fails with `no servers configured`. Omitting the `load_balancer` block yields an empty round-robin / 30s pool that triggers this error unless revisions provide backends.
+
+### Load balancer
+
+```rust
 pub struct LoadBalancerConfig {
-    pub strategy: Strategy,  // round-robin, weighted, least-connections, random
-    pub servers: Vec<ServerConfig>,
+    pub strategy: Strategy,                  // round-robin (default) | weighted | least-connections | random
+    pub request_timeout: String,             // default: "30s"
+    pub servers: Vec<ServerConfig>,          // default: []
     pub health_check: Option<HealthCheckConfig>,
     pub sticky: Option<StickyConfig>,
 }
 ```
 
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `strategy` | `round-robin` \| `weighted` \| `least-connections` \| `random` | `round-robin` | Unknown values are rejected (`unknown strategy`). |
+| `request_timeout` | duration `String` | `"30s"` | Max wait for an upstream response; on elapse the request returns HTTP 504. |
+| `servers` | list | `[]` | Backend servers. |
+| `health_check` | block | none | Active HTTP health check. |
+| `sticky` | block | none | Cookie-based session affinity. |
+
+`request_timeout` (and the health-check durations) use a custom parser: suffixes `ms`, `s`, `m`; a bare number means seconds. Empty, `0s`, or non-numeric values are rejected.
+
 ```text
 services "api-service" {
   load_balancer {
-    strategy = "weighted"
-    servers  = [
+    strategy        = "weighted"
+    request_timeout = "30s"
+    servers = [
       { url = "http://127.0.0.1:8001", weight = 3 },
       { url = "http://127.0.0.1:8002", weight = 1 }
     ]
@@ -237,9 +297,47 @@ services "api-service" {
 }
 ```
 
-### Traffic Mirroring
+#### Servers
 
-Copy a percentage of live traffic to a shadow backend for testing.
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `url` | `String` | **required** | e.g. `http://127.0.0.1:8001`, or `h2c://host:port` for cleartext gRPC. |
+| `weight` | `u32` | `1` | Used by the `weighted` strategy only. |
+
+Servers accept three spellings: an inline list `servers = [ { ... } ]`, a single object, or repeated `server` / `servers` child blocks.
+
+#### Health check
+
+Presence of the `health_check` block starts the active checker for that service.
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `path` | `String` | **required** | HTTP path to probe, e.g. `/health`. |
+| `interval` | duration `String` | `"10s"` | Time between probe rounds. |
+| `timeout` | duration `String` | `"5s"` | Per-probe timeout. |
+| `unhealthy_threshold` | `u32` | `3` | Consecutive failures before marking unhealthy. |
+| `healthy_threshold` | `u32` | `1` | Consecutive successes before marking healthy. |
+
+Any non-2xx response (or request error) counts as a failure. A separate **passive** health check is always on for every service (5 errors of `500/502/503/504` within a 30s window evicts a backend, with a 30s recovery probe) — it has no ACL keys. See [Services](./services).
+
+#### Sticky sessions
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `cookie` | `String` | **required** | Cookie name for affinity. |
+
+Only the cookie name is configurable. The session TTL (1h) and max-session cap (100,000) are fixed runtime defaults; the cookie is emitted with `Path=/; HttpOnly; SameSite=Lax`.
+
+### Traffic mirroring
+
+Copy a percentage of live traffic to a shadow service (fire-and-forget; the shadow response is discarded and never affects the client).
+
+```rust
+pub struct MirrorConfig {
+    pub service: String, // required, must exist in services
+    pub percentage: u8,  // 0-100, default: 100
+}
+```
 
 ```text
 services "api-service" {
@@ -256,7 +354,13 @@ services "api-service" {
 
 ### Failover
 
-Automatic fallback when the primary service has zero healthy backends.
+Route to a fallback service when the primary has **zero** healthy backends (not per-request retry). The target must exist or the selector is skipped with a warning.
+
+```rust
+pub struct FailoverConfig {
+    pub service: String, // required, must exist in services
+}
+```
 
 ```text
 services "api-service" {
@@ -270,16 +374,178 @@ services "api-service" {
 }
 ```
 
-See [Services](./services) for load balancing strategies and health check details.
+### Autoscaling (scale-to-zero)
+
+Knative-style serverless serving. The autoscaler loop runs **only** for services with `container_concurrency > 0`.
+
+```rust
+pub struct ScalingConfig {
+    pub min_replicas: u32,            // default: 0 (scale-to-zero)
+    pub max_replicas: u32,            // default: 10
+    pub container_concurrency: u32,   // default: 0 (unlimited)
+    pub target_utilization: f64,      // default: 0.7, in (0.0, 1.0]
+    pub scale_down_delay_secs: u64,   // default: 300
+    pub buffer_timeout_secs: u64,     // default: 30
+    pub buffer_size: usize,           // default: 100
+    pub buffer_enabled: bool,         // default: false
+    pub executor: String,             // "box" (default) | "k8s"
+}
+```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `min_replicas` | `u32` | `0` | `0` enables scale-to-zero. Must be `<= max_replicas`. |
+| `max_replicas` | `u32` | `10` | Upper clamp. |
+| `container_concurrency` | `u32` | `0` | Max concurrent requests per container; `0` = unlimited (also disables the autoscaler + concurrency limiter for the service). |
+| `target_utilization` | `f64` | `0.7` | Must be in `(0.0, 1.0]`. |
+| `scale_down_delay_secs` | `u64` | `300` | Idle seconds before scale-down is allowed. |
+| `buffer_timeout_secs` | `u64` | `30` | How long a buffered request waits during scale-from-zero (then HTTP 504). |
+| `buffer_size` | `usize` | `100` | Max requests buffered during scale-from-zero (when full, HTTP 503). |
+| `buffer_enabled` | `bool` | `false` | Master switch for scale-from-zero request buffering. |
+| `executor` | `String` | `"box"` | `"box"` or `"k8s"`. No enum validation; `"k8s"` and unknown values fall back to the box executor at startup. |
+
+```text
+services "ai-model" {
+  load_balancer {
+    servers = [{ url = "http://127.0.0.1:9000" }]
+  }
+  scaling {
+    min_replicas          = 0
+    max_replicas          = 20
+    container_concurrency = 4
+    target_utilization    = 0.7
+    scale_down_delay_secs = 120
+    buffer_enabled        = true
+    buffer_size           = 200
+    buffer_timeout_secs   = 30
+    executor              = "box"
+  }
+}
+```
+
+<Callout type="warn">
+At runtime the autoscaler tick is hardcoded to 2 seconds, `in_flight` is reported as `0`, and the box executor URL is fixed to `http://localhost:9090` — so in practice only queued (scale-from-zero) requests drive scaling. `executor = "k8s"` falls back to the box executor at startup.
+</Callout>
+
+### Revisions and rollout
+
+Revision-based traffic splitting. The `traffic_percent` values across all revisions of a service **must sum to exactly 100** or config loading fails. Revisions accept an inline `revisions = [ { ... } ]` list, an object, or repeated `revision` / `revisions` child blocks.
+
+```rust
+pub struct RevisionConfig {
+    pub name: String,               // required
+    pub traffic_percent: u32,       // 0-100, default: 100
+    pub servers: Vec<ServerConfig>, // default: []
+    pub strategy: Strategy,         // default: round-robin
+}
+
+pub struct RolloutConfig {
+    pub from: String,              // required, must name an existing revision
+    pub to: String,               // required, must name an existing revision
+    pub step_percent: u32,        // default: 10
+    pub step_interval_secs: u64,  // default: 60
+    pub error_rate_threshold: f64,// default: 0.05
+    pub latency_threshold_ms: u64,// default: 5000
+}
+```
+
+```text
+services "api-service" {
+  revisions = [
+    {
+      name            = "v1"
+      traffic_percent = 80
+      servers         = [{ url = "http://127.0.0.1:8001" }]
+    },
+    {
+      name            = "v2"
+      traffic_percent = 20
+      servers         = [{ url = "http://127.0.0.1:8002" }]
+    }
+  ]
+
+  rollout {
+    from                 = "v1"
+    to                   = "v2"
+    step_percent         = 10
+    step_interval_secs   = 60
+    error_rate_threshold = 0.05
+    latency_threshold_ms = 5000
+  }
+}
+```
+
+<Callout type="warn">
+`rollout` is parsed and validated but **inert at runtime** in v1.0.7 — no loop drives the rollout controller, so `step_interval_secs`, `step_percent`, `error_rate_threshold`, and `latency_threshold_ms` have no live effect yet. Revision selection is deterministic weighted round-robin (not random).
+</Callout>
+
+See [Services](./services) for load balancing, health, and scaling behavior in depth.
 
 ## Middlewares
 
-Middlewares are defined globally and referenced by name in routers.
+Middlewares are defined globally and referenced by name in a router's `middlewares` list. The `type` key selects the implementation; all HTTP middlewares share one flat config struct, so fields irrelevant to a given type are simply ignored.
+
+There are **14 HTTP-pipeline middleware types** selectable via a `middlewares` block. (A 15th connection-level filter, `tcp-filter`, is **not** a middleware type — it is configured on a TCP entrypoint via `max_connections` / `tcp_allowed_ips`.)
+
+| `type` | Key fields | Notes |
+|--------|-----------|-------|
+| `api-key` | `header` (default `X-API-Key`), `keys` (>= 1 required) | Exact key match; missing/invalid → 401. |
+| `basic-auth` | `username`, `password` (both required) | HTTP Basic; mismatch → 401. |
+| `rate-limit` | `rate` (required), `burst` (default = `rate`) | In-process token bucket; over-limit → 429 + `Retry-After: 1`. |
+| `rate-limit-redis` | `redis_url` (required), `rate` (required), `burst` (default = `rate`) | Distributed bucket; **fails open** on Redis errors. Needs the `redis` build feature. |
+| `cors` | `allowed_origins`, `allowed_methods`, `allowed_headers`, `max_age` | All have defaults; preflight returns 204, disallowed origin → 403. |
+| `headers` | `request_headers`, `response_headers` | Insert/overwrite headers in/out. |
+| `strip-prefix` | `prefixes` | First match wins; `/apps/*` strips base + one path segment. |
+| `ip-allow` | `allowed_ips` (>= 1 required) | CIDR or single IP; denied → 403. |
+| `retry` | `max_retries` (default 3, > 0), `retry_interval_ms` (default 100) | Injects `x-gateway-retry-*` for the proxy to act on. |
+| `jwt` | `value` (HMAC secret, required), `header` (default `Authorization`) | HS256 only; `exp` required; injects `x-jwt-subject`. |
+| `circuit-breaker` | `failure_threshold` (5), `cooldown_secs` (30), `success_threshold` (1) | Trips after consecutive 5xx; open → 503. |
+| `compress` | *(none — ACL config ignored)* | Hardcoded `min_size=1024`, `level=6`; sets `x-gateway-compress: eligible`. |
+| `body-limit` | `max_body_bytes` (required, > 0) | `Content-Length` over limit → 413. |
+| `forward-auth` | `forward_auth_url` (required), `forward_auth_response_headers` | Delegates auth via GET; non-2xx short-circuits. |
+
+All key types live on one struct:
+
+```rust
+pub struct MiddlewareConfig {
+    pub middleware_type: String,             // ACL key: "type", required
+    pub header: Option<String>,              // api-key / jwt
+    pub keys: Vec<String>,                   // api-key
+    pub value: Option<String>,               // jwt secret
+    pub username: Option<String>,            // basic-auth
+    pub password: Option<String>,            // basic-auth
+    pub rate: Option<u64>,                   // rate-limit / rate-limit-redis
+    pub burst: Option<u64>,                  // rate-limit / rate-limit-redis
+    pub allowed_origins: Vec<String>,        // cors
+    pub allowed_methods: Vec<String>,        // cors
+    pub allowed_headers: Vec<String>,        // cors
+    pub max_age: Option<u64>,                // cors
+    pub request_headers: HashMap<String, String>,  // headers
+    pub response_headers: HashMap<String, String>, // headers
+    pub prefixes: Vec<String>,               // strip-prefix
+    pub max_retries: Option<u32>,            // retry
+    pub retry_interval_ms: Option<u64>,      // retry
+    pub allowed_ips: Vec<String>,            // ip-allow
+    pub forward_auth_url: Option<String>,    // forward-auth
+    pub forward_auth_response_headers: Vec<String>, // forward-auth
+    pub redis_url: Option<String>,           // rate-limit-redis
+    pub max_body_bytes: Option<u64>,         // body-limit
+    pub failure_threshold: Option<u32>,      // circuit-breaker
+    pub cooldown_secs: Option<u64>,          // circuit-breaker
+    pub success_threshold: Option<u32>,      // circuit-breaker
+}
+```
 
 ```text
 middlewares "auth-jwt" {
   type  = "jwt"
   value = env("JWT_SECRET")
+}
+
+middlewares "api-key" {
+  type   = "api-key"
+  header = "X-API-Key"
+  keys   = ["key-abc", "key-def"]
 }
 
 middlewares "rate-limit" {
@@ -296,8 +562,9 @@ middlewares "cors" {
   max_age         = 3600
 }
 
-middlewares "compress" {
-  type = "compress"
+middlewares "strip-apps" {
+  type     = "strip-prefix"
+  prefixes = ["/apps/*"]
 }
 
 middlewares "circuit-breaker" {
@@ -306,34 +573,122 @@ middlewares "circuit-breaker" {
   cooldown_secs     = 60
   success_threshold = 2
 }
+
+middlewares "edge-auth" {
+  type                          = "forward-auth"
+  forward_auth_url              = "http://auth-svc:8080/verify"
+  forward_auth_response_headers = ["X-User-Id", "X-User-Roles"]
+}
 ```
 
-See [Middleware](./middleware) for all 15 built-in middleware types.
+<Callout type="info">
+`request_headers` / `response_headers` are written in ACL as a list of `{ name = ..., value = ... }` objects (the parser also accepts `key`/`header` for the name), not as a native map literal.
+</Callout>
 
-### Environment Variable Substitution
+See [Middleware](./middleware) for full behavior of every type.
 
-Configuration values support environment variable references:
+## Observability
+
+A single top-level block with three boolean flags, **all defaulting to `true`**. These are checked per request on the hot path.
+
+```rust
+pub struct ObservabilityConfig {
+    pub metrics_enabled: bool,    // default: true
+    pub access_log_enabled: bool, // default: true
+    pub tracing_enabled: bool,    // default: true
+}
+```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `metrics_enabled` | `bool` | `true` | Prometheus per-router / -service / -backend counters. |
+| `access_log_enabled` | `bool` | `true` | Per-request access logging. |
+| `tracing_enabled` | `bool` | `true` | W3C Trace Context extraction + outbound `traceparent` injection. |
 
 ```text
-middlewares "auth-jwt" {
-  type  = "jwt"
-  value = env("JWT_SECRET")
+observability {
+  metrics_enabled    = true
+  access_log_enabled = true
+  tracing_enabled    = true
+}
+```
+
+There are no `otlp` / `sample_rate` / `propagation` / `service_name` keys in this block. See [Observability](./observability) for which metrics and trace formats are actually emitted in v1.0.7.
+
+## Management
+
+The Dashboard / management API is an optional, dedicated listener (disabled by default, bound to `127.0.0.1:9090`) that never intercepts traffic entrypoints. There is **no separate `dashboard` block** — this is it. Requests are guarded in order: path-prefix match → IP allowlist → bearer token, with optional TLS/mTLS. Rejected requests and TLS handshake failures are retained in an in-memory audit ring buffer exposed at `{path_prefix}/events`.
+
+```rust
+pub struct ManagementConfig {
+    pub enabled: bool,                  // default: false
+    pub address: String,                // default: "127.0.0.1:9090"
+    pub path_prefix: String,            // default: "/api/gateway"
+    pub auth_token_env: Option<String>, // default: "A3S_GATEWAY_ADMIN_TOKEN"
+    pub allowed_ips: Vec<String>,       // default: ["127.0.0.1", "::1"]
+    pub tls: Option<ManagementTlsConfig>,
 }
 
-entrypoints "websecure" {
-  address = "0.0.0.0:443"
+pub struct ManagementTlsConfig {
+    pub cert_file: String,              // required
+    pub key_file: String,              // required
+    pub client_ca_file: Option<String>, // default: none
+    pub require_client_cert: bool,      // default: false
+    pub min_version: String,            // "1.2" (default) or "1.3"
+}
+```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `enabled` | `bool` | `false` | Master switch for the listener. |
+| `address` | `String` | `127.0.0.1:9090` | Validated as a socket address when enabled. |
+| `path_prefix` | `String` | `/api/gateway` | Must start with `/` when enabled. |
+| `auth_token_env` | `String` | `A3S_GATEWAY_ADMIN_TOKEN` | Name of the **env var** holding the bearer token. Setting it to `""` disables token auth. |
+| `allowed_ips` | `[String]` | `["127.0.0.1", "::1"]` | CIDR or single IP. Omitting keeps loopback default; an explicit `[]` disables IP filtering. |
+| `tls` | block | none | Optional TLS / mTLS. |
+
+Management TLS keys:
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `cert_file` | `String` | **required** | Server cert PEM; rejected if empty. |
+| `key_file` | `String` | **required** | Server key PEM; rejected if empty. |
+| `client_ca_file` | `String` | none | CA to verify client certs; **required** if `require_client_cert = true`. |
+| `require_client_cert` | `bool` | `false` | Enforce mTLS. |
+| `min_version` | `String` | `"1.2"` | Validated to be exactly `"1.2"` or `"1.3"`. |
+
+```text
+management {
+  enabled        = true
+  address        = "127.0.0.1:9090"
+  path_prefix    = "/api/gateway"
+  auth_token_env = "A3S_GATEWAY_ADMIN_TOKEN"
+  allowed_ips    = ["127.0.0.1", "::1"]
+
   tls {
-    cert_file = "${TLS_CERT_PATH}"
-    key_file  = "${TLS_KEY_PATH}"
+    cert_file           = "/etc/a3s/admin/server.crt"
+    key_file            = "/etc/a3s/admin/server.key"
+    client_ca_file      = "/etc/a3s/admin/client-ca.crt"
+    require_client_cert = true
+    min_version         = "1.3"
   }
 }
 ```
 
+<Callout type="warn">
+If `auth_token_env` names a variable that is unset at startup, the management listener fails to start. Set `auth_token_env = ""` to disable bearer auth, or `allowed_ips = []` to disable IP filtering — these are distinct from omitting the keys.
+</Callout>
+
 ## Providers
 
-Configuration providers supply dynamic configuration.
+Dynamic configuration sources. Only four blocks are recognized under `providers` (`file`, `discovery`, `kubernetes`, `docker`); any other is rejected (`Unknown providers ACL block`). Discovered entries are **added** to static config, and **static config wins on name collisions** (except the Docker provider, which overwrites). There is no `dns` provider in v1.0.7.
 
-### File Provider
+### File provider
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `watch` | `bool` | `true` | Hot-reload on change (only `.acl` fragments are recognized). |
+| `directory` | `String` | none | Extra directory whose `.acl` fragments are merged. |
 
 ```text
 providers {
@@ -344,11 +699,17 @@ providers {
 }
 ```
 
-When `watch = true`, the gateway monitors the config file and directory for changes using inotify (Linux) or kqueue (macOS), and hot-reloads without downtime.
+When `watch = true`, the gateway watches the config file's parent directory (and the optional `directory` recursively) via `notify` (inotify / kqueue / ReadDirectoryChanges), debounces changes (500ms), re-parses, validates, and hot-reloads without downtime.
 
-### Discovery Provider
+### Discovery provider
 
-Health-based service discovery that polls backend seed URLs for `/.well-known/a3s-service.json` metadata.
+Health-based service discovery that polls backend seed URLs for `/.well-known/a3s-service.json` metadata, then probes each seed's health path.
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `seeds` | list of `{ url }` | **required** | Backend seed URLs. |
+| `poll_interval_secs` | `u64` | `30` | Poll cadence. |
+| `timeout_secs` | `u64` | `5` | Per-probe HTTP timeout. |
 
 ```text
 providers {
@@ -363,9 +724,15 @@ providers {
 }
 ```
 
-### Docker Provider
+### Docker provider
 
-Auto-discover services from container labels.
+Auto-discover services from container labels (under `label_prefix`, e.g. `a3s.enable`, `a3s.router.rule`, `a3s.service.port`).
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `host` | `String` | `/var/run/docker.sock` | Unix socket path or `tcp://` URL. |
+| `label_prefix` | `String` | `a3s` | Prefix for routing labels. |
+| `poll_interval_secs` | `u64` | `10` | Poll cadence (clamped to >= 1). |
 
 ```text
 providers {
@@ -377,9 +744,18 @@ providers {
 }
 ```
 
-### Kubernetes Provider
+A container needs `<prefix>.enable = "true"` (exact string) and `<prefix>.service.port` to be picked up. See [Routing](./routing) for the full Docker label and Kubernetes annotation reference.
 
-Watch Ingress and IngressRoute CRD resources.
+### Kubernetes provider
+
+Watch `Ingress` resources (and, optionally, ConfigMap-backed IngressRoute specs). Requires the gateway to be built with the `kube` feature (published Linux images enable it); without it, the block only logs a warning.
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `namespace` | `String` | `""` | Empty = all namespaces. |
+| `label_selector` | `String` | `""` | Applied to Ingress listing only when non-empty. |
+| `watch_interval_secs` | `u64` | `30` | Poll cadence for both watchers. |
+| `ingress_route_crd` | `bool` | `false` | Also watch IngressRoute specs (stored in ConfigMaps labeled `a3s-gateway.io/type=ingressroute`). |
 
 ```text
 providers {
@@ -392,26 +768,37 @@ providers {
 }
 ```
 
-## Hot Reload
+## Hot reload
 
 ```rust
-// Programmatic reload
 let new_config = GatewayConfig::from_file("gateway.acl").await?;
 gateway.reload(new_config).await?;
 ```
 
 During reload:
-1. Gateway transitions to `Reloading` state
-2. New configuration is validated
-3. Routers, services, and middlewares are rebuilt
-4. If HTTP/TCP entrypoints are unchanged, the runtime snapshot is swapped without rebinding traffic ports
-5. If HTTP/TCP listeners are added or moved, changed entrypoints are reconciled while unchanged listeners stay active on bind failure
-6. If a UDP entrypoint is involved, affected entrypoints restart explicitly
-7. Gateway transitions back to `Running`
 
-## Full Example
+1. The new configuration is validated; on failure the previous config is kept.
+2. Routers, services, and middlewares are rebuilt.
+3. If `old.entrypoints == new.entrypoints` **and** neither config has a UDP entrypoint, the runtime snapshot is hot-swapped **without rebinding** traffic ports.
+4. If HTTP/TCP entrypoints were added or changed (and no UDP), only the changed listeners are restarted; unchanged listeners stay bound.
+5. If any UDP entrypoint is involved, a full abort-and-restart is performed.
+
+File-watch hot reload only runs when a `providers.file` block is present and `watch = true`.
+
+## Full example
 
 ```text
+shutdown_timeout_secs {
+  shutdown_timeout_secs = 30
+}
+
+# Observability
+observability {
+  metrics_enabled    = true
+  access_log_enabled = true
+  tracing_enabled    = true
+}
+
 # Entrypoints
 entrypoints "web" {
   address = "0.0.0.0:80"
@@ -430,7 +817,8 @@ routers "api" {
   rule        = "Host(`api.example.com`) && PathPrefix(`/v1`)"
   service     = "api-service"
   entrypoints = ["websecure"]
-  middlewares  = ["auth-jwt", "rate-limit", "cors"]
+  middlewares = ["auth-jwt", "rate-limit", "cors"]
+  priority    = 100
 }
 
 routers "web" {
@@ -442,8 +830,9 @@ routers "web" {
 # Services
 services "api-service" {
   load_balancer {
-    strategy = "least-connections"
-    servers  = [
+    strategy        = "least-connections"
+    request_timeout = "30s"
+    servers = [
       { url = "http://127.0.0.1:8001" },
       { url = "http://127.0.0.1:8002" }
     ]
@@ -477,6 +866,12 @@ middlewares "cors" {
   type            = "cors"
   allowed_origins = ["https://example.com"]
   allowed_methods = ["GET", "POST"]
+}
+
+# Management API
+management {
+  enabled        = true
+  auth_token_env = "A3S_GATEWAY_ADMIN_TOKEN"
 }
 
 # Providers
