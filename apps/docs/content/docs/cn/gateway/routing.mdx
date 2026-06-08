@@ -1,48 +1,75 @@
 ---
 title: 路由
-description: 基于规则的请求匹配，支持 Host、Path、Headers、Method 和 SNI 匹配器
+description: 基于规则的请求匹配，支持 Host、PathPrefix、Path、Headers 和 Method 匹配器，以及路由优先级、入口点绑定和 Kubernetes Ingress 路由
 ---
 
 import { TypeTable } from 'fumadocs-ui/components/type-table';
+import { Callout } from 'fumadocs-ui/components/callout';
 
 # 路由
 
-A3S Gateway 使用兼容 Traefik 的规则语法将传入请求匹配到对应服务。
+A3S Gateway 使用 Traefik 风格的规则引擎将传入请求匹配到对应的服务以及一条有序的
+中间件链。系统中有两张相互独立的路由表：
+
+- **HTTP 路由表** 将每个 `routers` 块编译为一条路由，并根据 host、path、method、
+  headers 以及请求到达的入口点（entrypoint）来匹配传入请求。
+- **TCP 路由表** 根据 ClientHello 中的 SNI 主机名来匹配原始 TLS 连接。
+
+配置文件使用 `.acl` 扩展名；HCL/TOML/YAML 文件在加载时会被拒绝。
 
 ## 规则语法
 
-```
+一条规则由一个或多个匹配器通过 `&&` AND 组合符连接而成。参数以反引号
+（backtick）包裹。
+
+```text
 rule = "Matcher(`value`) && Matcher(`value`)"
 ```
 
-### 支持的匹配器
+<Callout type="info">
+唯一的组合符是 `&&`（逻辑 AND——每个匹配器都必须匹配）。**没有** `||`（OR）、
+没有取反、没有正则，也没有 `ClientIP`/`Query` 匹配器。空规则（没有任何匹配器）
+会导致解析错误，未知的匹配器名称会导致配置加载失败。
+</Callout>
+
+### HTTP 匹配器
 
 <TypeTable
   type={{
     "Host": {
-      description: "Description: Match by hostname · Example: Host(api.example.com)",
+      description: "Case-insensitive hostname match. A trailing :port is stripped from the request authority before comparing. Example: Host(`api.example.com`)",
     },
     "PathPrefix": {
-      description: "Description: Match by path prefix · Example: PathPrefix(/api)",
+      description: "Prefix match via starts_with — no path-segment boundary check. Example: PathPrefix(`/api`)",
     },
     "Path": {
-      description: "Description: Match exact path · Example: Path(/health)",
+      description: "Exact path equality. No trailing-slash normalization. Example: Path(`/health`)",
     },
     "Headers": {
-      description: "Description: Match by header key/value · Example: Headers(X-Api-Version, v2)",
+      description: "Header key (case-insensitive) plus EXACT, case-sensitive value comparison. Example: Headers(`X-Api-Version`, `v2`)",
     },
     "Method": {
-      description: "Description: Match by HTTP method · Example: Method(POST)",
-    },
-    "HostSNI": {
-      description: "Description: Match TCP by TLS SNI · Example: HostSNI(db.example.com)",
+      description: "Case-insensitive HTTP method match. Example: Method(`POST`)",
     },
   }}
 />
 
+<Callout type="warn">
+`PathPrefix()` 是一个原始字符串的 `starts_with` 匹配——它**不会**强制路径分段
+边界。`PathPrefix(`/api`)` 会匹配 `/api`、`/api/x`，**以及** `/apixyz`。需要精确
+匹配时请使用 `Path()`。
+</Callout>
+
+以下是一些值得了解的匹配器边界情况：
+
+- 当没有 Host 头时，`Host()` 返回 false（对于缺少 authority 的请求它永远不会
+  匹配）。
+- 如果请求头缺失或其值不是合法的 UTF-8，`Headers()` 返回 false。**值比较是精确
+  且区分大小写的**；只有键查找不区分大小写。
+
 ### 组合匹配器
 
-使用 `&&` 组合多个匹配器（AND 逻辑）：
+使用 `&&` 组合多个匹配器（AND 逻辑——全部都必须匹配）：
 
 ```text
 routers "api-v1" {
@@ -61,15 +88,48 @@ routers "internal" {
 }
 ```
 
-## 优先级
+### Host 端口剥离
 
-当多个路由匹配时，`priority` 值最小的优先（默认值：`0`）：
+网关在将请求 authority 与 `Host()` 规则比较之前，会剥离其末尾的 `:port`，因此从
+非默认外部端口到达的请求仍然可以匹配一条不带端口的规则：
 
 ```text
+# Matches a request with "Host: app.example.com" AND "Host: app.example.com:49164"
+routers "app" {
+  rule    = "Host(`app.example.com`)"
+  service = "app-service"
+}
+```
+
+IPv6 字面量会保留其 `[...]` 方括号——只有位于闭合 `]` **之后**的冒号才会被视为
+端口分隔符。该行为的存在正是为了避免非默认端口上的流量回退到一个不带 host 的
+通配（catch-all）路由。
+
+## 优先级
+
+当多个路由都能匹配一个请求时，网关会使用为每条路由计算出的**有效优先级**
+（effective priority）来选出最具体的那一条：
+
+- 如果配置的 `priority` **严格大于 0**，则直接用作权重，且**值越大越优先**
+  （Traefik 风格）。
+- 否则（`priority` 为 `0` 或任何非正值），权重回退为**规则字符串长度**——更长、
+  更具体的规则胜出。
+
+路由按有效优先级**降序**排序，相同优先级时按路由名称升序打破平局，以保证确定性
+的排序。匹配按该顺序选取第一条命中的路由；匹配是线性扫描，返回首个命中项。
+
+<Callout type="warn">
+为 HTTP 路由设置**负**优先级**不会**提升其优先级——`0` 或更低的值会被忽略，转而
+使用规则字符串长度。只有正的 `priority` 才会覆盖基于长度的默认行为。`priority`
+的默认值是 `0`。
+</Callout>
+
+```text
+# Explicit priority: higher wins
 routers "specific" {
   rule     = "Host(`api.example.com`) && Path(`/health`)"
   service  = "health-service"
-  priority = 0
+  priority = 100
 }
 
 routers "general" {
@@ -79,9 +139,34 @@ routers "general" {
 }
 ```
 
+在没有显式优先级的情况下，更长的规则字符串会自动胜出。正是这一点防止了像
+`PathPrefix(`/`)` 这样不带 host 的通配路由吞掉更具体的路由：
+
+```text
+# No priority set → both fall back to rule-string length.
+# "Host(`api.example.com`) && PathPrefix(`/v1`)" is longer, so it outranks
+# the bare "PathPrefix(`/`)" catch-all below.
+routers "api-v1" {
+  rule    = "Host(`api.example.com`) && PathPrefix(`/v1`)"
+  service = "api-v1"
+}
+
+routers "catch-all" {
+  rule    = "PathPrefix(`/`)"
+  service = "default-service"
+}
+```
+
+<Callout type="info">
+基于长度的排序比较的是字面**规则字符串长度**，而非匹配器数量或路径分段的具体
+程度。即使一条更长的规则字符串在语义上并不更具体，它也会排在更短的规则之前。
+当你需要精确控制时，请设置一个显式的正 `priority`。
+</Callout>
+
 ## 入口点绑定
 
-路由只接收来自其绑定入口点的流量：
+路由只接收来自其绑定的入口点的流量。**空的** `entrypoints` 列表意味着该路由在
+**所有**入口点上匹配；非空列表则将其限制为恰好这些监听器（listener）名称。
 
 ```text
 entrypoints "web" {
@@ -109,24 +194,61 @@ routers "web" {
   service     = "web-service"
   entrypoints = ["web", "websecure"]
 }
+
+# Omitting entrypoints binds to ALL entrypoints
+routers "global-health" {
+  rule    = "Path(`/health`)"
+  service = "health-service"
+}
 ```
+
+`entrypoints` 中列出的每个名称都必须引用一个已存在的入口点，否则配置校验会失败。
 
 ## 中间件链
 
-中间件按列表顺序依次执行。任意中间件拒绝请求时，管道立即短路。
+中间件在请求上按列出的顺序依次应用，在响应上则按相反顺序应用。如果任意中间件
+拒绝了请求，管道会立即短路，剩余的中间件将被跳过。
 
 ```text
 routers "api" {
   rule        = "Host(`api.example.com`)"
   service     = "api-service"
-  middlewares = ["ip-allow", "auth-jwt", "rate-limit", "cors"]
-  # Order: IP check → JWT auth → rate limit → CORS headers
+  middlewares = ["ip-allow", "rate-limit", "cors"]
+  # Order: IP check → rate limit → CORS headers
 }
 ```
 
-## TCP/UDP 路由
+`middlewares` 中列出的每个名称都必须引用一个已存在的 `middlewares` 块。可用的
+类型请参阅 Middlewares 页面。
 
-TCP 入口点使用 TLS ClientHello 中的 SNI：
+## TCP / SNI 路由
+
+TCP 路由表使用 `HostSNI()` 来匹配原始 TLS 连接，其值从 TLS ClientHello 中的
+SNI 主机名解析得到：
+
+<TypeTable
+  type={{
+    "HostSNI(`*`)": {
+      description: "Catch-all. Matches any connection, including one with no SNI present.",
+    },
+    "HostSNI(`*.domain`)": {
+      description: "Wildcard. Matches strict subdomains only (lowercased) — the apex domain itself does NOT match.",
+    },
+    "HostSNI(`host`)": {
+      description: "Exact, case-insensitive (lowercased) hostname match. Requires SNI to be present.",
+    },
+  }}
+/>
+
+TCP 路由表使用与 HTTP 路由表**相反**的优先级约定：TCP 路由按 `priority`
+**升序**排序（值越小 = 优先级越高）。
+
+<Callout type="warn">
+基于 `HostSNI()` 的 TCP 路由是规则引擎的一部分，但在 v1.0.7 中，SNI 匹配器
+**尚未接入实时的 TCP 数据平面**。TCP 入口点会通过 HTTP 路由表进行路由，使用合成
+请求 `match_request(host=None, path="/", method="TCP", headers={}, entrypoint)`。
+实际上这意味着一条实时的 TCP 路由必须以 method `TCP` 匹配 path `/`——例如使用
+`PathPrefix(`/`)` 而非 `HostSNI()`：
 
 ```text
 entrypoints "tcp-secure" {
@@ -134,14 +256,115 @@ entrypoints "tcp-secure" {
   protocol = "tcp"
 }
 
+# Live TCP routing: matched via the HTTP table on path "/", method TCP.
 routers "postgres" {
-  rule        = "HostSNI(`db.example.com`)"
+  rule        = "PathPrefix(`/`)"
   service     = "postgres-service"
   entrypoints = ["tcp-secure"]
 }
 ```
+</Callout>
 
-UDP 路由基于端口——每个 UDP 入口点映射到单个服务。
+UDP 路由基于端口：每个 UDP 入口点在启动时解析出单个上游服务，因此 UDP 没有
+逐请求的规则匹配。
+
+## Kubernetes Ingress 路由
+
+当启用 Kubernetes provider 时（需要 `kube` cargo feature，已包含在发布的 Linux
+镜像中），网关会监视 `networking.k8s.io/v1` 的 `Ingress` 资源，并将其转换为路由
+和服务。
+
+对于每条 Ingress rule/path，它会生成：
+
+- 一个名为 `{namespace}-{ingressName}-{backendServiceName}` 的**服务**，后端 URL
+  为 `http://{svc}.{namespace}.svc.cluster.local:{port}`（未设置时 port 默认为
+  `80`）。
+- 一个同名的**路由**。规则由 host 和 path 构建：当 host 非空时为 `Host(`h`)`，
+  外加针对 `pathType: Exact` 的 `Path(`p`)` 或针对其他任意 `pathType` 的
+  `PathPrefix(`p`)`。值为 `/` 或为空的 path 会从规则中剔除；如果什么都不剩，则
+  使用通配规则 `PathPrefix(`/`)`。
+
+### `a3s-gateway.io/*` 注解
+
+路由行为通过 Ingress 资源上的注解（annotation）来配置。以下所有注解都按
+逐 Ingress 读取：
+
+<TypeTable
+  type={{
+    "a3s-gateway.io/entrypoints": {
+      type: "string (comma-separated)",
+      description: "Entrypoint names applied to the generated routers. Each is trimmed; empty entries are filtered. Missing → bind to all entrypoints.",
+    },
+    "a3s-gateway.io/middlewares": {
+      type: "string (comma-separated)",
+      description: "Middleware names applied to the generated routers, in order. Each is trimmed; empty entries are filtered.",
+    },
+    "a3s-gateway.io/strategy": {
+      type: "string",
+      description: "Load-balancing strategy: round-robin | weighted | least-connections | random. Invalid/missing → round-robin.",
+    },
+    "a3s-gateway.io/priority": {
+      type: "string (i32)",
+      description: "Router priority. Invalid/missing → 0. Higher wins (Traefik-style), consistent with static priority.",
+    },
+    "a3s-gateway.io/protocol": {
+      type: "string",
+      description: "tcp or udp generates a stream EntrypointConfig and SKIPS HTTP router generation; any other value (default http) generates an HTTP router.",
+    },
+    "a3s-gateway.io/listen": {
+      type: "string (host:port)",
+      description: "Listen address for tcp/udp protocol entrypoints. Used only when protocol is tcp/udp; if absent, no entrypoint is created.",
+    },
+    "a3s-gateway.io/request-timeout": {
+      type: "string (duration)",
+      description: "Per-route upstream request timeout (e.g. 600s), set on the generated service. Blank/missing → 30s. Useful for slow uploads that exceed the 30s default.",
+    },
+  }}
+/>
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api
+  namespace: prod
+  annotations:
+    a3s-gateway.io/entrypoints: "websecure"
+    a3s-gateway.io/middlewares: "rate-limit, cors"
+    a3s-gateway.io/strategy: "least-connections"
+    a3s-gateway.io/priority: "100"
+    a3s-gateway.io/request-timeout: "600s"
+spec:
+  rules:
+    - host: api.example.com
+      http:
+        paths:
+          - path: /v1
+            pathType: Prefix      # → PathPrefix(`/v1`)
+            backend:
+              service:
+                name: api-backend
+                port:
+                  number: 8080
+```
+
+<Callout type="warn">
+`a3s-gateway.io/type=ingressroute` **不是**一个逐 Ingress 的注解。它是可选的
+IngressRoute watcher（通过 provider 的 `ingress_route_crd = true` 启用）所使用的
+固定 ConfigMap **标签选择器**，用于发现携带 IngressRoute 规格的 ConfigMap。不要
+将它与上述七个注解一起设置在 Ingress 上。
+</Callout>
+
+使用 tcp/udp 协议注解时，请提供 `a3s-gateway.io/listen`，以便创建一个流式
+入口点（命名为 `{svc}-tcp` / `{svc}-udp`）；UDP 入口点会获得一个 30s 的会话
+超时：
+
+```yaml
+metadata:
+  annotations:
+    a3s-gateway.io/protocol: "tcp"
+    a3s-gateway.io/listen: "0.0.0.0:5432"
+```
 
 ## 示例
 
@@ -151,19 +374,20 @@ UDP 路由基于端口——每个 UDP 入口点映射到单个服务。
 routers "api-v2" {
   rule     = "Host(`api.example.com`) && PathPrefix(`/v2`)"
   service  = "api-v2"
-  priority = 0
+  priority = 110
 }
 
 routers "api-v1" {
   rule     = "Host(`api.example.com`) && PathPrefix(`/v1`)"
   service  = "api-v1"
-  priority = 1
+  priority = 100
 }
 
+# Bare host fallback — keep it lower so the versioned prefixes win.
 routers "api-fallback" {
   rule     = "Host(`api.example.com`)"
   service  = "api-v2"
-  priority = 100
+  priority = 10
 }
 ```
 
@@ -184,15 +408,16 @@ routers "tenant-b" {
 ### 基于请求头的金丝雀发布
 
 ```text
+# More specific rule (host + header + prefix) — give it a positive priority so
+# it always beats the bare prefix below.
 routers "canary" {
   rule     = "Headers(`X-Canary`, `true`) && PathPrefix(`/api`)"
   service  = "canary-backend"
-  priority = 0
+  priority = 100
 }
 
 routers "stable" {
-  rule     = "PathPrefix(`/api`)"
-  service  = "stable-backend"
-  priority = 10
+  rule    = "PathPrefix(`/api`)"
+  service = "stable-backend"
 }
 ```

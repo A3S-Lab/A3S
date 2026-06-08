@@ -1,141 +1,90 @@
 ---
 title: Deployment
-description: Deploy A3S Gateway with Helm, Docker, or as a standalone binary
+description: Deploy A3S Gateway (v1.0.7) with Homebrew, Cargo, Docker, or Helm/Kubernetes — production configuration, RBAC, and hot reload
 ---
+
+import { TypeTable } from 'fumadocs-ui/components/type-table';
 
 # Deployment
 
-## Helm (Kubernetes)
+A3S Gateway v1.0.7 ships as a single self-contained binary. The same binary runs
+as a standalone reverse proxy, a Docker container, or a Kubernetes ingress
+controller. This page covers every supported install path and the
+production-relevant behavior of each.
 
-A3S Gateway ships with a production-ready Helm chart at `deploy/helm/a3s-gateway/`.
+> **Version note.** The crate version is `1.0.7` (`Cargo.toml`). The MSRV is
+> Rust `1.88`. Published Linux binaries and OCI images are built with the
+> `kube` and `redis` Cargo features enabled (see [Cargo features](#cargo-features));
+> a default-feature build has neither.
 
-### Install
+## Install paths at a glance
 
-```bash
-helm install gateway deploy/helm/a3s-gateway
-```
+| Method | Best for | Features built in |
+| ------ | -------- | ----------------- |
+| Homebrew | Local / native macOS | default build |
+| Cargo | From source, custom feature set | whatever you select |
+| Docker (`ghcr.io/a3s-lab/gateway`) | Containers, Compose, CI | `kube` + `redis` |
+| Helm / Kubernetes | Cluster ingress controller | `kube` + `redis` |
 
-### Custom Configuration
+## Homebrew
 
-Pass a custom `gateway.acl` via `--set-file`:
-
-```bash
-helm install gateway deploy/helm/a3s-gateway \
-  --set-file config=my-gateway.acl
-```
-
-Or override individual values:
-
-```bash
-helm install gateway deploy/helm/a3s-gateway \
-  --set replicaCount=3 \
-  --set service.type=LoadBalancer \
-  --set image.tag=0.1.0
-```
-
-### Autoscaling
+Native macOS install via the A3S tap:
 
 ```bash
-helm install gateway deploy/helm/a3s-gateway \
-  --set autoscaling.enabled=true \
-  --set autoscaling.minReplicas=2 \
-  --set autoscaling.maxReplicas=10 \
-  --set autoscaling.targetCPUUtilizationPercentage=70
+brew install a3s-lab/tap/a3s-gateway
+# or, equivalently
+brew tap a3s-lab/tap
+brew install a3s-gateway
+
+a3s-gateway --config gateway.acl
 ```
 
-### Ingress
+This is a default-feature build. The `kube` provider and `rate-limit-redis`
+middleware are **not** compiled in — a `providers.kubernetes` block only logs a
+warning, and a `rate-limit-redis` middleware fails config load. Use Docker or a
+`cargo install` with explicit features if you need those on macOS.
+
+## Cargo
 
 ```bash
-helm install gateway deploy/helm/a3s-gateway \
-  --set ingress.enabled=true \
-  --set ingress.className=nginx \
-  --set ingress.hosts[0].host=api.example.com \
-  --set ingress.hosts[0].paths[0].path=/ \
-  --set ingress.hosts[0].paths[0].pathType=Prefix
+# Default build (no kube / no redis)
+cargo install a3s-gateway
+
+# With the distributed rate limiter and the Kubernetes provider
+cargo install a3s-gateway --features kube,redis
 ```
 
-### CLI Management
-
-The chart exposes only the configured traffic entrypoints. Management is done
-with the CLI before rollout or from an operator/debug container:
+The config file **must** use the `.acl` extension — TOML/YAML/JSON/HCL files are
+rejected at load. Validate before you ship:
 
 ```bash
 a3s-gateway validate --config gateway.acl
-a3s-gateway config --config gateway.acl summary
 ```
 
-### Helm Values
-
-<TypeTable
-  type={{
-    replicaCount: { type: 'number', default: '1', description: 'Number of replicas' },
-    'image.repository': { type: 'string', default: '"ghcr.io/a3s-lab/gateway"', description: 'Container image' },
-    'image.tag': { type: 'string', default: 'Chart appVersion', description: 'Image tag' },
-    'service.type': { type: 'string', default: '"ClusterIP"', description: 'Service type' },
-    'service.port': { type: 'number', default: '8080', description: 'HTTP port' },
-    config: { type: 'string', default: 'minimal ACL', description: 'Gateway ACL configuration' },
-    'resources.requests.cpu': { type: 'string', default: '"100m"', description: 'CPU request' },
-    'resources.requests.memory': { type: 'string', default: '"64Mi"', description: 'Memory request' },
-    'resources.limits.cpu': { type: 'string', default: '"500m"', description: 'CPU limit' },
-    'resources.limits.memory': { type: 'string', default: '"256Mi"', description: 'Memory limit' },
-    'autoscaling.enabled': { type: 'bool', default: 'false', description: 'Enable HPA' },
-    'ingress.enabled': { type: 'bool', default: 'false', description: 'Enable Ingress' },
-  }}
-/>
-
-### Chart Structure
-
-```
-deploy/helm/a3s-gateway/
-├── Chart.yaml
-├── values.yaml
-└── templates/
-    ├── _helpers.tpl
-    ├── configmap.yaml       # gateway.acl from values.config
-    ├── deployment.yaml      # Pod spec with config volume
-    ├── service.yaml         # ClusterIP/NodePort for configured traffic
-    ├── serviceaccount.yaml
-    ├── ingress.yaml         # Optional
-    ├── hpa.yaml             # Optional
-    └── NOTES.txt
-```
-
-The ConfigMap checksum is included as a pod annotation, so config changes trigger a rolling restart automatically.
-
-## Docker
+## Binary + systemd
 
 ```bash
-docker run -d \
-  -v $(pwd)/gateway.acl:/etc/a3s-gateway/gateway.acl \
-  -p 8080:8080 \
-  -p 9090:9090 \
-  ghcr.io/a3s-lab/gateway:latest \
-  --config /etc/a3s-gateway/gateway.acl
-```
+# Run directly
+a3s-gateway --config gateway.acl
 
-## Binary
+# Optional: override the first entrypoint's listen address at startup
+a3s-gateway --config gateway.acl --listen 0.0.0.0:8080
 
-```bash
-# Download
-curl -L https://github.com/A3S-Lab/Gateway/releases/latest/download/a3s-gateway -o a3s-gateway
-chmod +x a3s-gateway
+# Validate a config without starting
+a3s-gateway validate --config gateway.acl
 
-# Run
-./a3s-gateway --config gateway.acl
-
-# Validate config
-./a3s-gateway validate --config gateway.acl
-
-# Systemd service
-cat > /etc/systemd/system/a3s-gateway.service << EOF
+# Systemd unit
+cat > /etc/systemd/system/a3s-gateway.service <<'EOF'
 [Unit]
 Description=A3S Gateway
 After=network.target
 
 [Service]
-ExecStart=/usr/local/bin/a3s-gateway --config /etc/a3s-gateway/gateway.acl
+ExecStart=/usr/local/bin/a3s-gateway --config /etc/gateway/gateway.acl
 Restart=always
 User=a3s-gateway
+# Required only if the management listener uses bearer auth (default token env var):
+# Environment=A3S_GATEWAY_ADMIN_TOKEN=...
 
 [Install]
 WantedBy=multi-user.target
@@ -144,10 +93,408 @@ EOF
 systemctl enable --now a3s-gateway
 ```
 
-## Homebrew
+### CLI reference
+
+The binary exposes a small set of subcommands. The global flags `--config`
+(default `gateway.acl`), `--listen`, and `--log-level` (default `info`) apply to
+the run command (no subcommand).
 
 ```bash
-brew tap a3s-lab/tap
-brew install a3s-gateway
-a3s-gateway --config gateway.acl
+# Validate without starting
+a3s-gateway validate --config gateway.acl
+
+# Inspect parsed config (subcommand goes AFTER the --config flag)
+a3s-gateway config --config gateway.acl summary       # compact summary
+a3s-gateway config --config gateway.acl entrypoints   # list entrypoints
+a3s-gateway config --config gateway.acl routes        # list routers
+a3s-gateway config --config gateway.acl services      # list services + backend counts
+a3s-gateway config --config gateway.acl middlewares   # list middleware names
+a3s-gateway config --config gateway.acl providers     # list enabled providers
+a3s-gateway config --config gateway.acl json          # full parsed config as JSON
+
+# Talk to a running management listener (see Management API below)
+a3s-gateway management events  --url http://127.0.0.1:9090/api/gateway
+a3s-gateway management validate --url http://127.0.0.1:9090/api/gateway --file gateway.acl
+a3s-gateway management reload   --url http://127.0.0.1:9090/api/gateway --file gateway.acl
+
+# Self-update
+a3s-gateway update
 ```
+
+The `management` subcommands accept `--token` / `--token-env` for bearer auth and
+`--ca-cert` / `--client-cert` / `--client-key` for TLS / mTLS against a
+TLS-protected management listener (plus `--insecure` for local diagnostics only).
+
+## Docker
+
+The published image is `ghcr.io/a3s-lab/gateway` (Alpine-based, runs as a
+non-root `gateway` user, multi-platform: `linux/amd64`, `linux/arm64`,
+`darwin/arm64`). It is built with `kube` + `redis` enabled.
+
+```bash
+docker run -d \
+  -v "$(pwd)/gateway.acl:/etc/gateway/gateway.acl" \
+  -p 8080:8080 \
+  -p 9090:9090 \
+  ghcr.io/a3s-lab/gateway:latest \
+  --config /etc/gateway/gateway.acl
+```
+
+The image `EXPOSE`s `80 443 8080`. Map whatever ports your entrypoints actually
+bind. The example above also publishes `9090` so the optional
+[management listener](#management-api--dashboard) is reachable.
+
+> **Healthcheck caveat.** The image ships a Docker `HEALTHCHECK` that runs
+> `wget http://localhost:8080/health`. The **data plane has no built-in
+> `/health` endpoint** — that path only succeeds if you define a router for it
+> (or proxy it to an upstream). The real health endpoint lives on the
+> *management* listener at `{path_prefix}/health` (default
+> `http://127.0.0.1:9090/api/gateway/health`), not on a traffic entrypoint.
+> For orchestrators, prefer a **TCP** readiness/liveness probe against a bound
+> entrypoint port (this is what the Helm chart does), or point an HTTP probe at
+> the management `health` endpoint.
+
+### docker compose
+
+```yaml
+services:
+  gateway:
+    image: ghcr.io/a3s-lab/gateway:latest
+    command: ["--config", "/etc/gateway/gateway.acl"]
+    ports:
+      - "8080:8080"
+      - "9090:9090"   # management listener (optional)
+    volumes:
+      - ./gateway.acl:/etc/gateway/gateway.acl:ro
+    environment:
+      # Only needed if management.enabled = true with default bearer auth
+      A3S_GATEWAY_ADMIN_TOKEN: "${A3S_GATEWAY_ADMIN_TOKEN}"
+    restart: unless-stopped
+```
+
+## Helm / Kubernetes
+
+The chart lives at `deploy/helm/a3s-gateway/`. It is intentionally minimal: a
+`Deployment`, a `Service`, and a `ConfigMap` that carries your `gateway.acl`.
+Chart version / appVersion is `1.0.2` and the default `values.yaml` ships an
+`image.tag` of `0.2.1` — both lag the `1.0.7` binary, so pin `image.tag`
+explicitly in production.
+
+### Install
+
+```bash
+helm install gateway deploy/helm/a3s-gateway \
+  --set image.repository=ghcr.io/a3s-lab/gateway \
+  --set image.tag=1.0.7 \
+  --set image.pullPolicy=IfNotPresent
+```
+
+> The default `image.repository` is `a3s-gateway` with `pullPolicy: Never`
+> (tuned for a local OrbStack/k8s shared-daemon dev loop). For a real cluster you
+> must override the repository, tag, and pull policy as shown above.
+
+### Custom configuration
+
+The gateway is configured entirely through its `gateway.acl`, surfaced as the
+`config` value and mounted from a `ConfigMap` at `/etc/gateway/gateway.acl`. The
+Deployment runs `--config /etc/gateway/gateway.acl`.
+
+Provide a complete config from a file:
+
+```bash
+helm install gateway deploy/helm/a3s-gateway \
+  --set image.tag=1.0.7 \
+  --set-file config=./gateway.acl
+```
+
+Expose it externally as a `LoadBalancer` instead of the default `NodePort`:
+
+```bash
+helm install gateway deploy/helm/a3s-gateway \
+  --set image.tag=1.0.7 \
+  --set service.type=LoadBalancer
+```
+
+### Helm values
+
+These are the **only** values the chart honors. (Earlier docs advertised
+`autoscaling.*`, `ingress.*`, and `resources.*` blocks — those templates do not
+exist in the chart and are silently ignored.)
+
+<TypeTable
+  type={{
+    replicaCount: { type: 'number', default: '1', description: 'Deployment replica count' },
+    'image.repository': { type: 'string', default: '"a3s-gateway"', description: 'Container image (set to ghcr.io/a3s-lab/gateway for clusters)' },
+    'image.tag': { type: 'string', default: '"0.2.1"', description: 'Image tag — pin to 1.0.7 in production' },
+    'image.pullPolicy': { type: 'string', default: '"Never"', description: 'Pull policy (use IfNotPresent/Always for real clusters)' },
+    'service.type': { type: 'string', default: '"NodePort"', description: 'Service type (ClusterIP / NodePort / LoadBalancer)' },
+    'service.port': { type: 'number', default: '8080', description: 'Service port; targetPort is fixed at 8080' },
+    'service.nodePort': { type: 'number', default: '30080', description: 'NodePort when service.type=NodePort' },
+    config: { type: 'string', default: 'nginx demo ACL', description: 'Full gateway.acl rendered into a ConfigMap' },
+  }}
+/>
+
+The Deployment hard-codes:
+
+- `containerPort: 8080` and `Service.targetPort: 8080` — your primary HTTP
+  entrypoint must bind `:8080` (the bundled demo config uses
+  `address = "0.0.0.0:8080"`).
+- **TCP** readiness and liveness probes on `8080` (readiness: 2s delay / 5s
+  period; liveness: 5s delay / 10s period). There is no HTTP health probe by
+  default — see the [healthcheck caveat](#docker) above.
+
+Scaling is via plain `replicaCount`; the chart does not template an HPA. If you
+want horizontal autoscaling, attach a standard Kubernetes `HorizontalPodAutoscaler`
+to the generated Deployment out-of-band.
+
+### Chart structure
+
+```
+deploy/helm/a3s-gateway/
+├── Chart.yaml              # version/appVersion 1.0.2
+├── values.yaml
+└── templates/
+    ├── configmap.yaml      # gateway.acl from .Values.config
+    ├── deployment.yaml     # pod spec + config volume + TCP probes
+    └── service.yaml        # NodePort (default) / ClusterIP / LoadBalancer
+```
+
+## Running as an Ingress Controller
+
+The gateway can act as a Kubernetes ingress controller by enabling the
+**`kubernetes` provider**. It watches `networking.k8s.io/v1` `Ingress` resources
+and synthesizes routers/services that are merged into the running config (static
+config always wins on a name collision). This requires the image built with the
+`kube` feature (the published `ghcr.io` image qualifies).
+
+### Provider configuration
+
+```acl
+providers {
+  kubernetes {
+    namespace           = ""               # "" = all namespaces; else a single namespace
+    label_selector      = "app=my-service" # optional; applied to the Ingress list
+    watch_interval_secs = 30               # poll interval (default 30)
+    ingress_route_crd   = false            # also watch IngressRoute ConfigMaps (default false)
+  }
+}
+```
+
+| Key | Default | Notes |
+| --- | ------- | ----- |
+| `namespace` | `""` (all namespaces) | Empty = cluster-wide watch; otherwise namespaced. |
+| `label_selector` | `""` (no filter) | Only applied to the `Ingress` list, not the IngressRoute watcher. |
+| `watch_interval_secs` | `30` | Both the Ingress and IngressRoute watchers poll on this interval. On failure they rebuild the kube client and back off exponentially (1s up to `max(interval, 30s)`). |
+| `ingress_route_crd` | `false` | When `true`, also spawns the Traefik-style IngressRoute watcher (see below). |
+
+> Without the `kube` feature, a `providers.kubernetes` block does nothing but log
+> a warning. Use the `ghcr.io` image or a `--features kube` build.
+
+### Annotations
+
+Generated routers/services are tuned via these annotations on the `Ingress`
+object. All use the `a3s-gateway.io/` prefix and are comma-separated lists where
+applicable:
+
+| Annotation | Effect | Default |
+| ---------- | ------ | ------- |
+| `a3s-gateway.io/entrypoints` | Entrypoint names the router binds to | empty (all entrypoints) |
+| `a3s-gateway.io/middlewares` | Ordered middleware chain | empty |
+| `a3s-gateway.io/strategy` | LB strategy: `round-robin` / `weighted` / `least-connections` / `random` | `round-robin` (invalid → round-robin) |
+| `a3s-gateway.io/priority` | Router priority (`i32`); **higher wins** (Traefik-style) | `0` |
+| `a3s-gateway.io/protocol` | `tcp` or `udp` generate a stream entrypoint and skip the HTTP router; anything else → HTTP | `http` |
+| `a3s-gateway.io/listen` | Listen address for `tcp`/`udp` protocol entrypoints | none (no entrypoint created if absent) |
+| `a3s-gateway.io/request-timeout` | Per-route upstream timeout (humantime, e.g. `600s`) on the generated service | `30s` |
+
+Routing rules are derived from the Ingress spec: a non-empty host becomes
+``Host(`h`)``; `pathType: Exact` becomes ``Path(`p`)`` while any other
+`pathType` becomes ``PathPrefix(`p`)``; a `/` or empty path is dropped (host-only
+rule, or a catch-all ``PathPrefix(`/`)`` when nothing else is present).
+
+Backends resolve to the in-cluster DNS name
+`http://{svc}.{namespace}.svc.cluster.local:{port}` (port from
+`backend.service.port.number`, else `80`). Generated names are
+`{namespace}-{ingressName}-{backendServiceName}`. As of v1.0.5 the provider
+hashes router+service **content**, so in-place Ingress edits are picked up (not
+just adds/removes).
+
+> **`a3s-gateway.io/type` is not an Ingress annotation.** It is the fixed
+> ConfigMap label selector (`a3s-gateway.io/type=ingressroute`) used by the
+> IngressRoute watcher. Do not place it on an `Ingress`.
+
+### IngressRoute (Traefik-style)
+
+Setting `ingress_route_crd = true` enables a second watcher. Note that in v1.0.7
+this does **not** read an installed CRD — it lists **ConfigMaps** labeled
+`a3s-gateway.io/type=ingressroute` and parses each one's `.data.spec` (JSON) as
+an `IngressRoute` (entrypoints, routes with `match`/`priority`/`middlewares`/
+`services`, and optional TLS secret). The watcher honors `namespace` but ignores
+`label_selector` (it always uses the fixed `a3s-gateway.io/type=ingressroute`
+selector) and has no change-detection hash, so it republishes every interval.
+
+### RBAC
+
+To watch `Ingress` resources cluster-wide (and ConfigMaps when
+`ingress_route_crd = true`), the gateway's ServiceAccount needs read/watch
+access. The bundled chart does not template RBAC, so apply it alongside the
+release:
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: a3s-gateway
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: a3s-gateway
+rules:
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
+  # Only required when ingress_route_crd = true
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: a3s-gateway
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: a3s-gateway
+subjects:
+  - kind: ServiceAccount
+    name: a3s-gateway
+    namespace: default
+```
+
+> Scope the `ClusterRole` to a `Role`/`RoleBinding` in a single namespace if you
+> set `providers.kubernetes.namespace` to a specific namespace.
+
+## Management API / Dashboard
+
+The optional management listener is a **dedicated, separate** TCP socket
+(`management {}` block; there is no separate `dashboard` block). It never
+intercepts user traffic. It is **disabled by default**.
+
+```acl
+management {
+  enabled        = true
+  address        = "127.0.0.1:9090"      # default
+  path_prefix    = "/api/gateway"        # default; must start with "/"
+  auth_token_env = "A3S_GATEWAY_ADMIN_TOKEN"  # env var NAME holding the bearer token
+  allowed_ips    = ["127.0.0.1", "::1"]  # default when key omitted
+
+  # Optional TLS / mTLS for the management listener:
+  tls {
+    cert_file          = "/etc/gateway/tls/mgmt.crt"
+    key_file           = "/etc/gateway/tls/mgmt.key"
+    client_ca_file     = "/etc/gateway/tls/client-ca.crt"  # required if require_client_cert
+    require_client_cert = true            # enforce mTLS
+    min_version        = "1.3"            # exactly "1.2" or "1.3"
+  }
+}
+```
+
+Behavioral notes:
+
+- `auth_token_env` holds the **name of an env var**, not the token. If that env
+  var is unset at startup the management listener **fails to start**. Setting
+  `auth_token_env = ""` disables bearer auth entirely.
+- `allowed_ips` defaults to loopback **only when the key is omitted**. Providing
+  the key replaces the default; an explicit `allowed_ips = []` disables IP
+  filtering (allow all).
+- Requests are checked in order: path-prefix → IP allowlist → bearer token.
+- `management.tls.min_version` is validated to be exactly `"1.2"` or `"1.3"`
+  (unlike entrypoint TLS, which is not validated at config time).
+
+Endpoints (all under `{path_prefix}`): `GET health`, `GET metrics` (Prometheus
+text), `GET config`, `GET routes` / `routes/{name}`, `GET services` /
+`services/{name}`, `GET backends`, `GET events` (`?limit=N`, default 100, max
+500), `GET version`, plus the two mutating endpoints `POST config/validate` and
+`POST config/reload` (request body capped at 1 MiB).
+
+```bash
+# Set the token the env var refers to, then hit the API
+export A3S_GATEWAY_ADMIN_TOKEN="$(openssl rand -hex 32)"
+curl -H "Authorization: Bearer $A3S_GATEWAY_ADMIN_TOKEN" \
+  http://127.0.0.1:9090/api/gateway/health
+```
+
+## Hot reload
+
+The gateway reloads configuration **without dropping connections**, driven by a
+`notify`-based file watcher. The watcher only runs when a `providers.file` block
+is present with `watch = true` (the default for that block).
+
+```acl
+providers {
+  file {
+    watch     = true                 # default
+    directory = "/etc/gateway/conf.d" # optional extra dir, watched recursively
+  }
+}
+```
+
+- The watcher monitors the main config file's parent directory (non-recursive)
+  plus the optional `directory` (recursive), debounced at 500 ms.
+- Only `.acl` files are treated as config; `.toml`/`.yaml`/`.json` fragments in
+  the watched dir are ignored. On reload the main file plus all sorted `.acl`
+  fragments are concatenated, re-parsed, and validated.
+- On a **parse/validate failure** the previous good config is kept and an error
+  is logged — a bad edit does not take down the running gateway.
+
+Reload strategy is chosen automatically:
+
+1. **Hot-swap (no rebind).** If `old.entrypoints == new.entrypoints` and neither
+   side has any UDP entrypoint, the runtime state is swapped in place without
+   touching sockets ("Runtime state hot-swapped without rebinding ports").
+2. **Incremental restart.** If only some HTTP/TCP entrypoints changed (and no
+   UDP), only the added/changed listeners are rebound; unchanged listeners keep
+   running.
+3. **Full restart.** Any UDP entrypoint, or larger changes, force a full
+   abort-and-rebind of all listeners.
+
+You can also drive a reload remotely through the management API:
+
+```bash
+a3s-gateway management reload \
+  --url http://127.0.0.1:9090/api/gateway \
+  --file gateway.acl
+```
+
+When running under Helm, edit the `config` value and `helm upgrade`. Because the
+config is mounted from a ConfigMap, you must trigger the pods to pick up the new
+file (e.g. a rolling restart, or rely on Kubernetes' eventual ConfigMap
+projection plus the in-pod file watcher).
+
+## TLS notes for deployments
+
+- Entrypoint TLS terminates with rustls (ring provider), ALPN `["h2","http/1.1"]`.
+  `min_version` accepts `"1.2"` (TLS 1.2 **and** 1.3) or `"1.3"` (1.3 only); it is
+  a minimum, not an exact version.
+- The `tls { acme = true }` flag enables the ACME manager's 12h
+  detection/renewal loop, but in v1.0.7 issued certificates are **not** hot-swapped
+  into the live acceptor and the HTTP-01 challenge endpoint is not served on the
+  data plane. Treat config-driven ACME as **not** end-to-end automatic HTTPS;
+  for production TLS, provision static `cert_file`/`key_file` PEMs (e.g. from
+  cert-manager or your CA) and let the file watcher pick up rotations. DNS-01 /
+  Cloudflare / Route53 ACME is **not** reachable from the ACL schema.
+
+## Cargo features
+
+```toml
+# default = []  (no features)
+# redis  -> distributed rate limiting (rate-limit-redis middleware)
+# kube   -> Kubernetes Ingress / IngressRoute controller
+```
+
+Published Linux binaries and `ghcr.io/a3s-lab/gateway` images are built with
+`kube` + `redis` enabled (the v1.0.1 release fixed earlier Linux artifacts that
+shipped without them). Homebrew and a plain `cargo install` produce a
+default-feature build unless you pass `--features kube,redis`.

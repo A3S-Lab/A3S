@@ -1,13 +1,24 @@
 ---
 title: A3S Gateway
-description: The traffic layer for AI-native services — SSE streaming, scale-to-zero, safe model rollouts, single Rust binary.
+description: The traffic layer for AI-native services — SSE streaming, scale-to-zero, revision splitting and traffic mirroring, in a single Rust binary.
 ---
 
 import { TypeTable } from 'fumadocs-ui/components/type-table';
+import { Callout } from 'fumadocs-ui/components/callout';
 
 # A3S Gateway
 
-A3S Gateway is the traffic layer for AI-native services. It is built on [hyper](https://hyper.rs/) and [rustls](https://github.com/rustls/rustls), ships as a single statically-linked binary, and is configured exclusively in ACL (Agent Configuration Language).
+A3S Gateway is the traffic layer for AI-native services. It is built on [hyper](https://hyper.rs/) and [rustls](https://github.com/rustls/rustls), ships as a single statically-linked binary, and is configured exclusively in ACL (Agent Configuration Language). Configuration files must use the `.acl` extension — HCL, TOML, YAML, and JSON config files are rejected at load.
+
+This page is an orientation. Each capability below links to the page that documents it in full:
+
+- [Quick Start](./quick-start) — install and run your first gateway
+- [Configuration](./configuration) — the full ACL schema (entrypoints, routers, services, middlewares, providers, management, observability)
+- [Routing](./routing) — Traefik-style rule matching and priority
+- [Middleware](./middleware) — the built-in request/response pipeline
+- [Services](./services) — load balancing, health checks, sticky sessions, failover, and AI-native scaling
+- [Observability](./observability) — Prometheus metrics, access logs, tracing, and the management API
+- [Deployment](./deployment) — Docker, Helm/Kubernetes, Homebrew, Cargo
 
 ## Why A3S Gateway
 
@@ -23,13 +34,17 @@ AI services have fundamentally different operational patterns than web applicati
 
 A3S Gateway is designed for the right column:
 
-- **SSE/Streaming** — chunked transfer relay with zero response buffering. The first token reaches the client the moment the model emits it, not when the full response is assembled.
-- **Scale-to-zero with request buffering** — when a model replica is cold, incoming requests are held in memory and replayed the instant the replica is ready. No request is dropped; no client sees a 503.
-- **Revision traffic splitting** — send a configurable percentage of live traffic to a new model version. Automatic rollback fires if error rate or p99 latency crosses a threshold.
-- **Traffic mirroring** — shadow-test a new model against real production requests before it handles a single live response. The client sees only the primary backend's reply.
-- **Circuit breaker** — when an AI backend is under load (slow inference, GPU OOM), open the circuit automatically to stop amplifying the problem.
+- **SSE / streaming** — chunked transfer relay with zero response buffering. The first token reaches the client the moment the model emits it, not when the full response is assembled. SSE is detected by `Accept: text/event-stream` (also `application/x-ndjson`, `application/stream+json`, and chunked `Transfer-Encoding`).
+- **Scale-to-zero with cold-start buffering** — a service can scale its replica floor down to zero (`min_replicas = 0`). When buffering is enabled (`buffer_enabled = true`), a request that arrives with no healthy backend is *held* in a bounded in-memory queue and re-dispatched the instant a backend becomes ready — the in-flight request is held, not recorded-and-replayed.
+- **Revision traffic splitting** — split live traffic across named revisions by weight (`traffic_percent` must sum to 100). Selection is deterministic weighted round-robin, and an unhealthy revision is skipped via fallthrough to the next revision with a healthy backend.
+- **Traffic mirroring** — copy a configurable `percentage` of live requests to a shadow service, fire-and-forget. The shadow response is discarded and never affects the client's reply or latency.
+- **Circuit breaker** — when an AI backend starts returning 5xx (slow inference, GPU OOM), open the circuit automatically to stop amplifying the problem.
 
 Everything else — routing, TLS, rate limiting, auth, Prometheus — is standard infrastructure that A3S Gateway includes so you don't need a second tool.
+
+<Callout type="info">
+**Gradual rollout** (`rollout { }`) is fully implemented and validated — `from`/`to` revisions, `step_percent`, `step_interval_secs`, and auto-rollback on `error_rate_threshold` / `latency_threshold_ms`. In v1.0.7 the rollout controller is **parsed and validated but not yet driven by a runtime loop**, so the config is inert at runtime. Use static [revision splitting](./services) to shift traffic manually today.
+</Callout>
 
 ## Architecture
 
@@ -38,50 +53,50 @@ Client Request
     ↓
 Entrypoint  (HTTP / HTTPS / TCP / UDP listener)
     ↓
-TLS Termination  (rustls + ACME / Let's Encrypt)
+TLS Termination  (rustls, static cert/key; min TLS 1.2 or 1.3)
     ↓
-Router  (Host / Path / Headers / Method / SNI matching)
+Router  (Host / Path / PathPrefix / Headers / Method matching, && only)
     ↓
-Middleware Pipeline  (Auth → RateLimit → CircuitBreaker → CORS → ...)
+Middleware Pipeline  (request order in, reverse order out; short-circuit allowed)
     ↓
-Service  (Load Balancer + Health Check + Failover + Mirror)
+Service  (load balancer + active/passive health + sticky + failover + mirror)
     ↓
-Scaling  (Knative autoscaler · request buffer · revision router)
+Scaling  (Knative autoscaler · cold-start request buffer · revision router)
     ↓
-Proxy  (HTTP / WebSocket / SSE / gRPC / TCP / UDP)
+Proxy  (HTTP / WebSocket / SSE / gRPC h2c / TCP / UDP)
     ↓
 Backend Service
 ```
 
-Hot reload replaces the router table and service registry atomically through a shared runtime snapshot. HTTP/TCP entrypoints are not rebound when listener configuration is unchanged. Added or moved HTTP/TCP listeners are reconciled by name, and unchanged listeners stay active if a new bind fails. UDP entrypoints restart explicitly.
+Hot reload replaces the router table and service registry atomically through a shared runtime snapshot. When listener configuration is unchanged (and no UDP entrypoint exists), HTTP/TCP sockets are *not* rebound — the runtime state is hot-swapped in place. Added or changed HTTP/TCP listeners are reconciled by name, and unchanged listeners stay active even if a new bind fails. Any UDP entrypoint forces a full restart.
 
 ## Core Components
 
 <TypeTable
   type={{
     "Gateway": {
-      description: "Lifecycle orchestrator — owns all subsystems, manages the Created → Running → Reloading → Stopped state machine",
+      description: "Lifecycle orchestrator — owns all subsystems and the Created → Starting → Running → Reloading → Stopping → Stopped state machine",
     },
     "Entrypoint": {
-      description: "Named network listener (HTTP, HTTPS, TCP, UDP) with optional TLS and per-protocol settings",
+      description: "Named network listener (HTTP / HTTPS / TCP / UDP) with optional TLS and per-protocol settings",
     },
     "Router": {
-      description: "Rule-based request matching using Traefik-compatible syntax: Host(), PathPrefix(), Path(), Headers(), Method(), HostSNI()",
+      description: "Rule-based request matching using Traefik-compatible syntax: Host(), Path(), PathPrefix(), Headers(), Method(), combined with &&",
     },
     "Middleware": {
-      description: "Composable request/response pipeline — 15 built-in types, pre-compiled per router at startup to eliminate per-request allocation",
+      description: "Composable request/response pipeline — 14 HTTP middleware types plus a connection-level TCP filter, compiled per router at startup",
     },
     "Service": {
-      description: "Backend pool with load balancing, active/passive health checks, sticky sessions, traffic mirroring, and failover",
+      description: "Backend pool with load balancing, active + passive health checks, sticky sessions, traffic mirroring, and failover",
     },
     "Scaling": {
-      description: "Knative-style autoscaler: desired = ⌈(in_flight + queue_depth) / (concurrency × utilization)⌉, with scale-to-zero, request buffering, and revision routing",
+      description: "Knative-style autoscaler: desired = ⌈(in_flight + queue_depth) / (concurrency × utilization)⌉, with scale-to-zero, cold-start buffering, and revision routing",
     },
     "Provider": {
-      description: "Dynamic configuration source — file watcher with hot reload, DNS discovery, health-based discovery, Kubernetes Ingress/IngressRoute",
+      description: "Dynamic configuration source — file watcher with hot reload, health-based discovery, Kubernetes Ingress/IngressRoute, and Docker labels",
     },
     "Proxy": {
-      description: "Protocol-specific forwarder — HTTP, WebSocket, SSE (zero-buffer streaming), gRPC, TCP, UDP",
+      description: "Protocol-specific forwarder — HTTP, WebSocket, SSE (zero-buffer streaming), gRPC h2c, TCP, UDP",
     },
   }}
 />
@@ -91,22 +106,22 @@ Hot reload replaces the router table and service registry atomically through a s
 <TypeTable
   type={{
     "HTTP/1.1 & HTTP/2": {
-      description: "Full reverse proxy with hop-by-hop header filtering, normalized X-Forwarded-* metadata, and connection pooling",
+      description: "Auto-negotiated reverse proxy (ALPN over TLS, prior-knowledge/upgrade over cleartext) with hop-by-hop header filtering, X-Forwarded-* metadata, and connection pooling",
     },
     "SSE / Streaming": {
       description: "Chunked transfer relay optimized for LLM token streams — first byte forwarded immediately, no response buffering",
     },
     "WebSocket": {
-      description: "Upgrade detection, bidirectional relay, named-channel multiplexing over a single connection",
+      description: "Upgrade detection (Upgrade: websocket) and bidirectional tungstenite relay with close propagation",
     },
     "gRPC": {
-      description: "HTTP/2 h2c forwarding with header translation for gRPC-Web compatibility",
+      description: "HTTP/2 cleartext (h2c) forwarding with grpc-status / grpc-message extraction; use an h2c:// backend URL",
     },
     "TCP": {
-      description: "Raw byte relay with SNI-based routing (HostSNI matcher), IP filtering, and connection limits",
+      description: "Raw byte relay with per-entrypoint connection limits (max_connections) and IP allowlist (tcp_allowed_ips)",
     },
     "UDP": {
-      description: "Session-based datagram relay for DNS, QUIC, and custom UDP protocols",
+      description: "Session-based datagram relay (default 30s session timeout, 10000 max sessions); a single upstream is resolved at startup",
     },
   }}
 />
@@ -126,36 +141,38 @@ pub enum GatewayState {
 
 ## Key Features
 
-**AI-native patterns**
-- SSE/streaming relay — zero-buffer chunked transfer for LLM outputs
-- Scale-to-zero — Knative autoscaling formula with cold-start request buffering
-- Gradual rollout — step-by-step traffic shift with automatic rollback on error rate or latency breach
-- Traffic mirroring — shadow-test new model versions with live production traffic
+**AI-native patterns** — see [Services](./services)
+- SSE / streaming relay — zero-buffer chunked transfer for LLM outputs
+- Scale-to-zero — Knative autoscaling formula with optional cold-start request buffering (`buffer_enabled`, off by default)
+- Revision splitting — deterministic weighted traffic split across named revisions (must sum to 100%)
+- Traffic mirroring — copy a percentage of live traffic to a shadow service, fire-and-forget
+- Gradual rollout — step-by-step traffic shift with auto-rollback on error rate or latency (implemented and validated; not yet driven at runtime in v1.0.7)
 
-**Core proxy**
-- Traefik-compatible rule syntax — `Host()`, `PathPrefix()`, `Headers()`, `Method()`, `&&`
-- 4 load balancing strategies — Round Robin, Weighted, Least Connections, Random
-- Active HTTP health probes + passive error-count backend eviction
-- Sticky sessions — cookie-based affinity with TTL and LRU eviction
-- Failover — automatic switch to secondary pool when primary has no healthy backends
-- Forwarded headers — normalized `X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`, and `X-Forwarded-Port` on upstream HTTP requests
-- Pure Rust TLS via rustls — ACME/Let's Encrypt with HTTP-01 and DNS-01 (Cloudflare, Route53)
-- Hot reload — inotify/kqueue file watcher, no traffic port rebind when HTTP/TCP entrypoints are unchanged
+**Core proxy** — see [Routing](./routing) and [Services](./services)
+- Traefik-compatible rule syntax — `Host()`, `Path()`, `PathPrefix()`, `Headers()`, `Method()`, joined with `&&` (AND only)
+- Router priority — higher positive `priority` wins (Traefik-style); otherwise the longest rule string wins
+- 4 load balancing strategies — round-robin (default), weighted, least-connections, random
+- Active HTTP health probes + always-on passive 5xx eviction with background half-open recovery
+- Sticky sessions — cookie-based affinity (cookie name configurable; TTL 1h and capacity fixed)
+- Failover — automatic switch to a secondary service when the primary has zero healthy backends
+- Forwarded headers — `X-Forwarded-For`, `-Host`, `-Proto`, `-Port` added unconditionally on upstream HTTP requests
+- Pure Rust TLS via rustls — static cert/key PEM, ALPN `h2` + `http/1.1`, minimum TLS 1.2 or 1.3
+- Hot reload — `inotify`/`kqueue` file watcher; no traffic-port rebind when HTTP/TCP entrypoints are unchanged
 
-**Middleware (15 built-in)**
-- Auth: JWT (HS256), API Key, Basic Auth, Forward Auth
-- Traffic: Rate Limit (in-process), Rate Limit (Redis distributed), Circuit Breaker, Retry, Body Limit
-- Transform: CORS, Headers, Strip Prefix, Compress (brotli/gzip/deflate)
-- Network: IP Allowlist, TCP Filter
+**Middleware (14 HTTP types + TCP filter)** — see [Middleware](./middleware)
+- Auth: API Key, Basic Auth, JWT (HS256), Forward Auth
+- Traffic: Rate Limit (in-process), Rate Limit (Redis, `redis` feature), Circuit Breaker, Retry, Body Limit
+- Transform: CORS, Headers, Strip Prefix (single-segment `/*` wildcard), Compress (br/gzip/deflate, marker only)
+- Network: IP Allowlist, plus a connection-level TCP filter configured on the entrypoint (`max_connections`, `tcp_allowed_ips`)
 
-**Observability**
-- Prometheus metrics — per-router/service/backend request counts, latency histograms, autoscaler state
-- Structured JSON access log — client IP, method, path, status, duration, backend, router
-- Distributed tracing — W3C Trace Context and B3/Zipkin propagation, child span injection
+**Observability** — see [Observability](./observability)
+- Prometheus metrics — request counters per router / service / backend, response status classes, bytes, and active connections (in-process, dependency-free)
+- Distributed tracing — inbound W3C Trace Context and B3 / Zipkin extraction; outbound injects a W3C `traceparent`
+- Management / Dashboard API — optional dedicated listener (disabled by default, loopback-bound) with bearer token, IP allowlist, and optional TLS/mTLS
 
-**Operations**
+**Operations** — see [Deployment](./deployment)
 - Single statically-linked binary — no runtime dependencies, no OpenSSL
-- ACL-only configuration — consistent, human-readable, version-controlled
-- CLI-first management with optional authenticated/mTLS Dashboard API on a dedicated listener
-- Helm chart for Kubernetes, Docker image, Homebrew formula
-- 1000+ tests across all modules
+- ACL-only configuration — human-readable, version-controlled (`.acl` extension required)
+- Hot reload via file watcher; optional file/discovery/kubernetes/docker config providers
+- Helm chart for Kubernetes, Docker image (`ghcr.io/a3s-lab/gateway`), Homebrew formula, `cargo install a3s-gateway`
+- Current release: **v1.0.7** (MSRV Rust 1.88); published Linux images/binaries enable the `kube` + `redis` features

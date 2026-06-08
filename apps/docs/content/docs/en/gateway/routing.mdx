@@ -1,48 +1,80 @@
 ---
 title: Routing
-description: Rule-based request matching with Host, Path, Headers, Method, and SNI matchers
+description: Rule-based request matching with Host, PathPrefix, Path, Headers, and Method matchers, plus router priority, entrypoint binding, and Kubernetes Ingress routing
 ---
 
 import { TypeTable } from 'fumadocs-ui/components/type-table';
+import { Callout } from 'fumadocs-ui/components/callout';
 
 # Routing
 
-A3S Gateway uses a Traefik-compatible rule syntax for matching incoming requests to services.
+A3S Gateway uses a Traefik-style rule engine to match incoming requests to a
+service and an ordered middleware chain. There are two independent routing
+tables:
+
+- The **HTTP router table** compiles every `routers` block into a route and
+  matches an incoming request by host, path, method, headers, and the
+  entrypoint it arrived on.
+- The **TCP router table** matches raw TLS connections by the SNI hostname from
+  the ClientHello.
+
+Config files use the `.acl` extension; HCL/TOML/YAML files are rejected at load.
 
 ## Rule Syntax
 
-```
+A rule is one or more matchers joined with the `&&` AND combinator. Arguments
+are backtick-delimited.
+
+```text
 rule = "Matcher(`value`) && Matcher(`value`)"
 ```
 
-### Supported Matchers
+<Callout type="info">
+The only combinator is `&&` (logical AND — every matcher must match). There is
+**no** `||` (OR), no negation, no regex, and no `ClientIP`/`Query` matchers. An
+empty rule (no matchers) is a parse error, and an unknown matcher name fails
+config loading.
+</Callout>
+
+### HTTP Matchers
 
 <TypeTable
   type={{
     "Host": {
-      description: "Description: Match by hostname · Example: Host(api.example.com)",
+      description: "Case-insensitive hostname match. A trailing :port is stripped from the request authority before comparing. Example: Host(`api.example.com`)",
     },
     "PathPrefix": {
-      description: "Description: Match by path prefix · Example: PathPrefix(/api)",
+      description: "Prefix match via starts_with — no path-segment boundary check. Example: PathPrefix(`/api`)",
     },
     "Path": {
-      description: "Description: Match exact path · Example: Path(/health)",
+      description: "Exact path equality. No trailing-slash normalization. Example: Path(`/health`)",
     },
     "Headers": {
-      description: "Description: Match by header key/value · Example: Headers(X-Api-Version, v2)",
+      description: "Header key (case-insensitive) plus EXACT, case-sensitive value comparison. Example: Headers(`X-Api-Version`, `v2`)",
     },
     "Method": {
-      description: "Description: Match by HTTP method · Example: Method(POST)",
-    },
-    "HostSNI": {
-      description: "Description: Match TCP by TLS SNI · Example: HostSNI(db.example.com)",
+      description: "Case-insensitive HTTP method match. Example: Method(`POST`)",
     },
   }}
 />
 
+<Callout type="warn">
+`PathPrefix()` is a raw string `starts_with` — it does **not** enforce path
+segment boundaries. `PathPrefix(`/api`)` matches `/api`, `/api/x`, **and**
+`/apixyz`. Use `Path()` for exact matches.
+</Callout>
+
+A few matcher edge cases worth knowing:
+
+- `Host()` returns false when there is no Host header (it never matches a
+  request with a missing authority).
+- `Headers()` returns false if the header is absent or its value is not valid
+  UTF-8. The **value comparison is exact and case-sensitive**; only the key
+  lookup is case-insensitive.
+
 ### Combining Matchers
 
-Use `&&` to combine multiple matchers (AND logic):
+Use `&&` to combine multiple matchers (AND logic — all must match):
 
 ```text
 routers "api-v1" {
@@ -61,15 +93,51 @@ routers "internal" {
 }
 ```
 
-## Priority
+### Host Port-Stripping
 
-When multiple routers match, the lowest `priority` value wins (default: `0`):
+The gateway strips a trailing `:port` from the request authority before
+comparing it against a `Host()` rule, so a request arriving on a non-default
+external port still matches a port-less rule:
 
 ```text
+# Matches a request with "Host: app.example.com" AND "Host: app.example.com:49164"
+routers "app" {
+  rule    = "Host(`app.example.com`)"
+  service = "app-service"
+}
+```
+
+IPv6 literals keep their `[...]` brackets intact — only a colon **after** the
+closing `]` is treated as the port separator. This behavior exists specifically
+so traffic on non-default ports doesn't fall through to a host-less catch-all.
+
+## Priority
+
+When multiple routers can match a request, the gateway picks the most specific
+one using an **effective priority** computed per route:
+
+- If the configured `priority` is **strictly greater than 0**, it is used
+  directly as the weight, and **higher wins** (Traefik-style).
+- Otherwise (priority of `0` or any non-positive value), the weight falls back
+  to the **rule string length** — the longer, more-specific rule wins.
+
+Routes are sorted by effective priority **descending**, with ties broken by
+router name ascending for deterministic ordering. The first matching route in
+that order is selected; matching is a linear scan that returns the first hit.
+
+<Callout type="warn">
+Setting a **negative** priority on an HTTP router does **not** raise its
+precedence — values of `0` or below are ignored and the rule-string length is
+used instead. Only a positive `priority` overrides the length-based default.
+Default `priority` is `0`.
+</Callout>
+
+```text
+# Explicit priority: higher wins
 routers "specific" {
   rule     = "Host(`api.example.com`) && Path(`/health`)"
   service  = "health-service"
-  priority = 0
+  priority = 100
 }
 
 routers "general" {
@@ -79,9 +147,37 @@ routers "general" {
 }
 ```
 
+Without explicit priorities, the longer rule string wins automatically. This is
+what prevents a host-less catch-all like `PathPrefix(`/`)` from swallowing more
+specific routers:
+
+```text
+# No priority set → both fall back to rule-string length.
+# "Host(`api.example.com`) && PathPrefix(`/v1`)" is longer, so it outranks
+# the bare "PathPrefix(`/`)" catch-all below.
+routers "api-v1" {
+  rule    = "Host(`api.example.com`) && PathPrefix(`/v1`)"
+  service = "api-v1"
+}
+
+routers "catch-all" {
+  rule    = "PathPrefix(`/`)"
+  service = "default-service"
+}
+```
+
+<Callout type="info">
+Length-based ordering compares the literal **rule string length**, not the
+number of matchers or path-segment specificity. A longer rule string outranks a
+shorter one even if it is not semantically more specific. When you need precise
+control, set an explicit positive `priority`.
+</Callout>
+
 ## Entrypoint Binding
 
-Routers only receive traffic from their bound entrypoints:
+Routers only receive traffic from the entrypoints they are bound to. An **empty**
+`entrypoints` list means the router matches on **all** entrypoints; a non-empty
+list restricts it to exactly those listener names.
 
 ```text
 entrypoints "web" {
@@ -109,24 +205,65 @@ routers "web" {
   service     = "web-service"
   entrypoints = ["web", "websecure"]
 }
+
+# Omitting entrypoints binds to ALL entrypoints
+routers "global-health" {
+  rule    = "Path(`/health`)"
+  service = "health-service"
+}
 ```
+
+Each name listed in `entrypoints` must reference an entrypoint that exists, or
+config validation fails.
 
 ## Middleware Chain
 
-Middlewares are applied in the order listed. If any middleware rejects the request, the pipeline short-circuits immediately.
+Middlewares are applied in the order listed on the request, and in reverse order
+on the response. If any middleware rejects the request, the pipeline
+short-circuits immediately and the remaining middlewares are skipped.
 
 ```text
 routers "api" {
   rule        = "Host(`api.example.com`)"
   service     = "api-service"
-  middlewares = ["ip-allow", "auth-jwt", "rate-limit", "cors"]
-  # Order: IP check → JWT auth → rate limit → CORS headers
+  middlewares = ["ip-allow", "rate-limit", "cors"]
+  # Order: IP check → rate limit → CORS headers
 }
 ```
 
-## TCP/UDP Routing
+Each name listed in `middlewares` must reference a `middlewares` block that
+exists. See the Middlewares page for the available types.
 
-TCP entrypoints use SNI from the TLS ClientHello:
+## TCP / SNI Routing
+
+The TCP router table matches raw TLS connections using `HostSNI()`, which is
+parsed from the SNI hostname in the TLS ClientHello:
+
+<TypeTable
+  type={{
+    "HostSNI(`*`)": {
+      description: "Catch-all. Matches any connection, including one with no SNI present.",
+    },
+    "HostSNI(`*.domain`)": {
+      description: "Wildcard. Matches strict subdomains only (lowercased) — the apex domain itself does NOT match.",
+    },
+    "HostSNI(`host`)": {
+      description: "Exact, case-insensitive (lowercased) hostname match. Requires SNI to be present.",
+    },
+  }}
+/>
+
+The TCP table uses the **opposite** priority convention from the HTTP table:
+TCP routes are sorted by `priority` **ascending** (lower value = higher
+priority).
+
+<Callout type="warn">
+`HostSNI()`-based TCP routing is part of the rule engine, but in v1.0.7 the SNI
+matcher is **not wired into the live TCP data plane**. A TCP entrypoint routes
+through the HTTP router table using the synthetic request
+`match_request(host=None, path="/", method="TCP", headers={}, entrypoint)`. In
+practice this means a live TCP route must match path `/` with method `TCP` —
+e.g. use `PathPrefix(`/`)` rather than `HostSNI()`:
 
 ```text
 entrypoints "tcp-secure" {
@@ -134,14 +271,118 @@ entrypoints "tcp-secure" {
   protocol = "tcp"
 }
 
+# Live TCP routing: matched via the HTTP table on path "/", method TCP.
 routers "postgres" {
-  rule        = "HostSNI(`db.example.com`)"
+  rule        = "PathPrefix(`/`)"
   service     = "postgres-service"
   entrypoints = ["tcp-secure"]
 }
 ```
+</Callout>
 
-UDP routing is port-based — each UDP entrypoint maps to a single service.
+UDP routing is port-based: each UDP entrypoint resolves a single upstream
+service at startup, so there is no per-request rule matching for UDP.
+
+## Kubernetes Ingress Routing
+
+When the Kubernetes provider is enabled (requires the `kube` cargo feature,
+shipped in the published Linux images), the gateway watches
+`networking.k8s.io/v1` `Ingress` resources and converts them into routers and
+services.
+
+For each Ingress rule/path it generates:
+
+- A **service** named `{namespace}-{ingressName}-{backendServiceName}` with the
+  backend URL `http://{svc}.{namespace}.svc.cluster.local:{port}` (port defaults
+  to `80` when unset).
+- A **router** with the same name. The rule is built from the host and path:
+  `Host(`h`)` when the host is non-empty, plus `Path(`p`)` for `pathType: Exact`
+  or `PathPrefix(`p`)` for any other `pathType`. A path of `/` or empty is
+  dropped from the rule; if nothing remains, the catch-all `PathPrefix(`/`)` is
+  used.
+
+### `a3s-gateway.io/*` Annotations
+
+Routing behavior is configured with annotations on the Ingress resource. All
+annotations below are read per-Ingress:
+
+<TypeTable
+  type={{
+    "a3s-gateway.io/entrypoints": {
+      type: "string (comma-separated)",
+      description: "Entrypoint names applied to the generated routers. Each is trimmed; empty entries are filtered. Missing → bind to all entrypoints.",
+    },
+    "a3s-gateway.io/middlewares": {
+      type: "string (comma-separated)",
+      description: "Middleware names applied to the generated routers, in order. Each is trimmed; empty entries are filtered.",
+    },
+    "a3s-gateway.io/strategy": {
+      type: "string",
+      description: "Load-balancing strategy: round-robin | weighted | least-connections | random. Invalid/missing → round-robin.",
+    },
+    "a3s-gateway.io/priority": {
+      type: "string (i32)",
+      description: "Router priority. Invalid/missing → 0. Higher wins (Traefik-style), consistent with static priority.",
+    },
+    "a3s-gateway.io/protocol": {
+      type: "string",
+      description: "tcp or udp generates a stream EntrypointConfig and SKIPS HTTP router generation; any other value (default http) generates an HTTP router.",
+    },
+    "a3s-gateway.io/listen": {
+      type: "string (host:port)",
+      description: "Listen address for tcp/udp protocol entrypoints. Used only when protocol is tcp/udp; if absent, no entrypoint is created.",
+    },
+    "a3s-gateway.io/request-timeout": {
+      type: "string (duration)",
+      description: "Per-route upstream request timeout (e.g. 600s), set on the generated service. Blank/missing → 30s. Useful for slow uploads that exceed the 30s default.",
+    },
+  }}
+/>
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api
+  namespace: prod
+  annotations:
+    a3s-gateway.io/entrypoints: "websecure"
+    a3s-gateway.io/middlewares: "rate-limit, cors"
+    a3s-gateway.io/strategy: "least-connections"
+    a3s-gateway.io/priority: "100"
+    a3s-gateway.io/request-timeout: "600s"
+spec:
+  rules:
+    - host: api.example.com
+      http:
+        paths:
+          - path: /v1
+            pathType: Prefix      # → PathPrefix(`/v1`)
+            backend:
+              service:
+                name: api-backend
+                port:
+                  number: 8080
+```
+
+<Callout type="warn">
+`a3s-gateway.io/type=ingressroute` is **not** a per-Ingress annotation. It is the
+fixed ConfigMap **label selector** used by the optional IngressRoute watcher
+(enabled via the provider's `ingress_route_crd = true`) to discover ConfigMaps
+carrying IngressRoute specs. Do not set it on an Ingress alongside the seven
+annotations above.
+</Callout>
+
+When using a tcp/udp protocol annotation, supply `a3s-gateway.io/listen` so a
+stream entrypoint is created (named `{svc}-tcp` / `{svc}-udp`); UDP entrypoints
+get a 30s session timeout:
+
+```yaml
+metadata:
+  annotations:
+    a3s-gateway.io/protocol: "tcp"
+    a3s-gateway.io/listen: "0.0.0.0:5432"
+```
 
 ## Examples
 
@@ -151,19 +392,20 @@ UDP routing is port-based — each UDP entrypoint maps to a single service.
 routers "api-v2" {
   rule     = "Host(`api.example.com`) && PathPrefix(`/v2`)"
   service  = "api-v2"
-  priority = 0
+  priority = 110
 }
 
 routers "api-v1" {
   rule     = "Host(`api.example.com`) && PathPrefix(`/v1`)"
   service  = "api-v1"
-  priority = 1
+  priority = 100
 }
 
+# Bare host fallback — keep it lower so the versioned prefixes win.
 routers "api-fallback" {
   rule     = "Host(`api.example.com`)"
   service  = "api-v2"
-  priority = 100
+  priority = 10
 }
 ```
 
@@ -184,15 +426,16 @@ routers "tenant-b" {
 ### Header-Based Canary
 
 ```text
+# More specific rule (host + header + prefix) — give it a positive priority so
+# it always beats the bare prefix below.
 routers "canary" {
   rule     = "Headers(`X-Canary`, `true`) && PathPrefix(`/api`)"
   service  = "canary-backend"
-  priority = 0
+  priority = 100
 }
 
 routers "stable" {
-  rule     = "PathPrefix(`/api`)"
-  service  = "stable-backend"
-  priority = 10
+  rule    = "PathPrefix(`/api`)"
+  service = "stable-backend"
 }
 ```

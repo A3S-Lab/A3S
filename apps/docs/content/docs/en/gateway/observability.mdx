@@ -1,87 +1,105 @@
 ---
 title: Observability
-description: Prometheus metrics, structured logging, distributed tracing, CLI inspection, and optional Dashboard API
+description: Prometheus metrics, structured JSON access logs, distributed tracing (W3C + B3/Zipkin), the observability toggles, and the Dashboard/management API
 ---
+
+import { TypeTable } from 'fumadocs-ui/components/type-table';
+import { Callout } from 'fumadocs-ui/components/callout';
 
 # Observability
 
-A3S Gateway provides built-in Prometheus metrics, structured access logging,
-distributed tracing, CLI-based configuration inspection, and an optional
-Dashboard API on a dedicated management listener.
+A3S Gateway ships a dependency-free observability stack: an in-process
+Prometheus metrics collector, structured JSON access-log entries, inbound
+distributed-trace context extraction (W3C + B3/Zipkin) with outbound W3C
+propagation, and an optional Dashboard/management API on a dedicated listener.
 
-## Management Inspection
+Everything in the data plane is governed by one top-level block,
+`observability {}`, plus the separate `management {}` block for the Dashboard.
 
-Use the CLI for local and CI/CD workflows:
+## The `observability` Block
 
-```bash
-a3s-gateway validate --config gateway.acl
-a3s-gateway config --config gateway.acl summary
-a3s-gateway config --config gateway.acl entrypoints
-a3s-gateway config --config gateway.acl routes
-a3s-gateway config --config gateway.acl services
-a3s-gateway config --config gateway.acl middlewares
-a3s-gateway config --config gateway.acl providers
-a3s-gateway config --config gateway.acl json
-a3s-gateway management events --url http://127.0.0.1:9090/api/gateway
-a3s-gateway management validate --url http://127.0.0.1:9090/api/gateway --file gateway.acl
-a3s-gateway management reload --url http://127.0.0.1:9090/api/gateway --file gateway.acl
-```
+The `observability {}` block has **exactly three boolean flags**, and **all
+three default to `true`**. There are no other keys (no OTLP endpoint, sample
+rate, propagation, or service-name keys — those belong to an internal struct
+that is not wired to ACL in v1.0.7).
 
-Enable the Dashboard API only when you need remote inspection:
-
-```text
-management {
-  enabled        = true
-  address        = "127.0.0.1:9090"
-  path_prefix    = "/api/gateway"
-  auth_token_env = "A3S_GATEWAY_ADMIN_TOKEN"
-  allowed_ips    = ["127.0.0.1", "::1"]
-
-  tls {
-    cert_file           = "/etc/a3s/admin/server.crt"
-    key_file            = "/etc/a3s/admin/server.key"
-    client_ca_file      = "/etc/a3s/admin/client-ca.crt"
-    require_client_cert = true
-  }
+```acl
+observability {
+  metrics_enabled    = true   # Prometheus per-router/-service/-backend counters
+  access_log_enabled = true   # structured access log per request
+  tracing_enabled    = true   # W3C Trace Context extraction + outbound traceparent
 }
 ```
 
-Dashboard requests must include `Authorization: Bearer <token>` when
-`auth_token_env` is set. Requests must also come from `allowed_ips`. When
-`management.tls.require_client_cert = true`, clients must present a certificate
-signed by `client_ca_file`.
+| Key | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `metrics_enabled` | bool | `true` | Records Prometheus counters/gauges on the hot path. When `false`, request/router/service/backend recording is skipped. |
+| `access_log_enabled` | bool | `true` | Creates the per-request duration tracker. |
+| `tracing_enabled` | bool | `true` | Extracts inbound trace context and injects an outbound W3C `traceparent` header. |
 
-For mTLS-protected management listeners, add `--ca-cert`, `--client-cert`, and
-`--client-key` to the `management events` CLI command.
-
-| Endpoint | Response |
-| --- | --- |
-| `GET /api/gateway/health` | Gateway health JSON |
-| `GET /api/gateway/metrics` | Prometheus text format |
-| `GET /api/gateway/config` | Active configuration JSON |
-| `GET /api/gateway/routes` | Configured routes |
-| `GET /api/gateway/services` | Services with backend health |
-| `GET /api/gateway/backends` | Backends with connection counts |
-| `GET /api/gateway/events` | Recent management security audit events |
-| `GET /api/gateway/version` | Binary version |
-| `POST /api/gateway/config/validate` | Validate an ACL payload without applying it |
-| `POST /api/gateway/config/reload` | Transactionally reload from an ACL payload |
+<Callout type="info">
+  Omitting the `observability {}` block entirely is equivalent to enabling all
+  three flags. Disable a flag only to shave per-request overhead.
+</Callout>
 
 ## Prometheus Metrics
 
+Metrics are an in-process collector (`GatewayMetrics`) with atomic
+counters/gauges. The dashboard renders them in Prometheus 0.0.4 text exposition
+format. The following series are populated on the live request path when
+`metrics_enabled = true`:
+
 ```text
+# HELP gateway_requests_total Total number of requests received
+# TYPE gateway_requests_total counter
 gateway_requests_total 12345
+
+# HELP gateway_responses_total Total responses by status class
+# TYPE gateway_responses_total counter
 gateway_responses_total{status_class="2xx"} 11000
 gateway_responses_total{status_class="3xx"} 500
 gateway_responses_total{status_class="4xx"} 700
 gateway_responses_total{status_class="5xx"} 145
+
+# HELP gateway_response_bytes_total Total response bytes sent to clients
+# TYPE gateway_response_bytes_total counter
 gateway_response_bytes_total 987654321
+
+# HELP gateway_active_connections Current active connections
+# TYPE gateway_active_connections gauge
 gateway_active_connections 42
-gateway_router_requests{router="api"} 8000
-gateway_router_requests{router="web"} 4345
-gateway_backend_requests{backend="http://127.0.0.1:8001"} 6000
-gateway_backend_requests{backend="http://127.0.0.1:8002"} 6345
+
+# Per-router / per-service / per-backend request counters (emitted only when non-empty)
+gateway_router_requests_total{router="api"} 8000
+gateway_router_requests_total{router="web"} 4345
+gateway_service_requests_total{service="api-backend"} 12345
+gateway_backend_requests_total{backend="http://127.0.0.1:8001"} 6000
+gateway_backend_requests_total{backend="http://127.0.0.1:8002"} 6345
 ```
+
+### Series Reference
+
+| Series | Type | Labels | Notes |
+| --- | --- | --- | --- |
+| `gateway_requests_total` | counter | — | Total requests received. HELP/TYPE always emitted. |
+| `gateway_responses_total` | counter | `status_class` | Fixed values `2xx`/`3xx`/`4xx`/`5xx` (`status / 100`). 1xx and ≥600 count toward `gateway_requests_total` but no class bucket. |
+| `gateway_response_bytes_total` | counter | — | Total bytes sent to clients. |
+| `gateway_active_connections` | gauge | — | The only gauge. Current active connections. |
+| `gateway_router_requests_total` | counter | `router` | Block emitted only when the map is non-empty. |
+| `gateway_service_requests_total` | counter | `service` | Emitted only when non-empty. |
+| `gateway_backend_requests_total` | counter | `backend` | Backend URL label; emitted only when non-empty. |
+
+<Callout type="warn">
+  **Defined but not populated in v1.0.7.** The collector also defines
+  `gateway_middleware_invocations_total{middleware=...}`,
+  `gateway_router_latency_microseconds_total{router=...}`,
+  `gateway_router_errors_total{router=...}`, and
+  `gateway_service_errors_total{service=...}`, but their `record_*` methods are
+  never called on the production request path, so these series stay
+  empty/absent at runtime. Note `gateway_router_latency_microseconds_total` is a
+  **cumulative counter** (microseconds), not a histogram. There is **no**
+  autoscaler / scaling / replica metric of any kind.
+</Callout>
 
 ### Grafana Queries
 
@@ -100,7 +118,10 @@ rate(gateway_responses_total{status_class="2xx"}[5m])
 gateway_active_connections
 
 # Traffic by router
-rate(gateway_router_requests[5m])
+rate(gateway_router_requests_total[5m])
+
+# Traffic by backend
+rate(gateway_backend_requests_total[5m])
 
 # Throughput (bytes/sec)
 rate(gateway_response_bytes_total[5m])
@@ -108,27 +129,55 @@ rate(gateway_response_bytes_total[5m])
 
 ## Access Logging
 
-Structured JSON access logs via the `tracing` crate:
+Each request produces a structured `AccessLogEntry`. The serde field names below
+are the exact JSON keys emitted (via the `tracing` crate, target
+`access_log`):
 
 ```json
 {
-  "timestamp": "2025-01-15T10:30:00Z",
+  "timestamp": "2026-06-07T10:30:00Z",
   "client_ip": "203.0.113.42",
   "method": "POST",
   "path": "/api/v1/chat",
+  "host": "api.example.com",
   "status": 200,
-  "request_duration_ms": 145,
-  "bytes_sent": 2048,
+  "response_bytes": 2048,
+  "duration_ms": 145,
+  "backend": "http://127.0.0.1:8001",
   "router": "api",
-  "service": "api-backend",
-  "backend": "http://127.0.0.1:8001"
+  "entrypoint": "web",
+  "user_agent": "curl/8.4.0"
 }
 ```
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `timestamp` | string | RFC 3339. |
+| `client_ip` | string | Peer/forwarded client IP. |
+| `method` | string | HTTP method. |
+| `path` | string | Request path. |
+| `host` | string \| null | Host header (optional). |
+| `status` | number (u16) | Response status. |
+| `response_bytes` | number (u64) | Bytes sent to the client. |
+| `duration_ms` | number (u64) | Request duration in milliseconds. |
+| `backend` | string \| null | Selected backend URL (optional). |
+| `router` | string \| null | Matched router (optional). |
+| `entrypoint` | string \| null | Listener the request arrived on (optional). |
+| `user_agent` | string \| null | Client User-Agent (optional). |
+
+<Callout type="warn">
+  **v1.0.7 limitation.** Although `access_log_enabled` defaults to `true`, no
+  per-request JSON access-log line is currently emitted: the request path only
+  creates the duration tracker and never hands an entry to the background log
+  task. The drain task and the entry schema above exist, but the hot path does
+  not feed them yet. Treat the schema as the contract for when emission lands;
+  rely on `RUST_LOG` / `info`-level logs for live request visibility today.
+</Callout>
 
 ### Log Levels
 
 ```bash
-# Via CLI
+# Via CLI flag
 a3s-gateway --config gateway.acl --log-level debug
 
 # Via environment
@@ -144,7 +193,7 @@ RUST_LOG=a3s_gateway=debug a3s-gateway --config gateway.acl
       description: "Rate limit hits, unhealthy backends, config issues",
     },
     "info": {
-      description: "Startup, shutdown, reload, access logs",
+      description: "Startup, shutdown, reload, audit events",
     },
     "debug": {
       description: "Routing decisions, middleware execution",
@@ -157,9 +206,147 @@ RUST_LOG=a3s_gateway=debug a3s-gateway --config gateway.acl
 
 ## Distributed Tracing
 
-A3S Gateway propagates trace context across services:
+When `tracing_enabled = true`, the gateway extracts an inbound trace context and
+injects a fresh child `traceparent` on the outbound request.
 
-- **W3C Trace Context**: `traceparent` / `tracestate` headers
-- **B3/Zipkin**: `X-B3-TraceId` / `X-B3-SpanId` headers
+**Inbound extraction** (first match wins) supports three formats:
 
-Spans are created for request lifecycle, backend connections, and health check probes.
+- **W3C Trace Context** — `traceparent` / `tracestate`. Parsing is strict:
+  `version` must be `00`, trace ID exactly 32 hex chars, parent/span ID 16 hex,
+  flags 2 hex. A new span ID is generated and the parsed span becomes the parent.
+- **B3 single header** — `b3: {traceid}-{spanid}-{sampled}[-{parentid}]`.
+  `sampled` values `1` / `true` are treated as sampled.
+- **B3 multi-header** — `X-B3-TraceId` / `X-B3-SpanId` / `X-B3-Sampled`. If
+  `X-B3-Sampled` is absent it defaults to sampled.
+
+<Callout type="warn">
+  **Outbound propagation is W3C-only.** Regardless of any propagation setting,
+  the production path always injects a W3C `traceparent` header to upstreams.
+  B3/Zipkin is honored only on **inbound** extraction; the B3-capable outbound
+  injector is not wired into the request path in v1.0.7. Do not expect
+  `b3` / `X-B3-*` headers to be re-emitted to backends.
+</Callout>
+
+## Dashboard / Management API
+
+The Dashboard is a **dedicated, optional listener** (`management {}` block). It
+is **disabled by default**, binds to `127.0.0.1:9090`, and never intercepts user
+traffic — `{path_prefix}/*` on your data-plane entrypoints stays normal user
+traffic.
+
+```acl
+management {
+  enabled        = true
+  address        = "127.0.0.1:9090"
+  path_prefix    = "/api/gateway"
+  auth_token_env = "A3S_GATEWAY_ADMIN_TOKEN"
+  allowed_ips    = ["127.0.0.1", "::1"]
+
+  tls {
+    cert_file           = "/etc/a3s/admin/server.crt"
+    key_file            = "/etc/a3s/admin/server.key"
+    client_ca_file      = "/etc/a3s/admin/client-ca.crt"
+    require_client_cert = true
+    min_version         = "1.2"
+  }
+}
+```
+
+### Configuration Keys
+
+| Key | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `enabled` | bool | `false` | Master switch for the management listener. |
+| `address` | string | `127.0.0.1:9090` | Listen address; parsed as a socket address. |
+| `path_prefix` | string | `/api/gateway` | Must start with `/`. All endpoints are served under it. |
+| `auth_token_env` | string | `A3S_GATEWAY_ADMIN_TOKEN` | Name of the **env var** holding the bearer token (not the token itself). |
+| `allowed_ips` | list&lt;string&gt; | `["127.0.0.1", "::1"]` | IP/CIDR client allowlist. |
+| `tls` | block | none | Optional TLS / mTLS for the listener. |
+
+| TLS key | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `cert_file` | string | required | Server cert PEM. |
+| `key_file` | string | required | Server key PEM. |
+| `client_ca_file` | string | none | CA bundle to verify client certs (mTLS). Required when `require_client_cert = true`. |
+| `require_client_cert` | bool | `false` | Enforce mTLS. |
+| `min_version` | string | `1.2` | Must be exactly `1.2` or `1.3`. |
+
+<Callout type="warn">
+  **Auth and IP-allowlist gotchas.**
+  <ul>
+    <li>`auth_token_env` names an **env var**. If that env var is unset at
+    startup, the management listener fails to start. Setting
+    `auth_token_env = ""` in ACL disables bearer auth entirely.</li>
+    <li>The `allowed_ips` default (`127.0.0.1`, `::1`) applies only when the key
+    is **omitted**. Providing an explicit empty list (`allowed_ips = []`)
+    **disables** IP filtering (allow all) — it does not keep the default.</li>
+    <li>With `client_ca_file` set but `require_client_cert = false`, client
+    certs are optional. `require_client_cert = true` without `client_ca_file`
+    fails validation.</li>
+  </ul>
+</Callout>
+
+### Request Authorization Order
+
+Each Dashboard request is checked in order: **path-prefix match → IP allowlist →
+bearer token**, with optional TLS/mTLS at the connection layer.
+
+- Requests outside `path_prefix` return `404 {"error":"Not found"}`.
+- IP rejections return `403` and record an `ip-rejected` audit event.
+- Token failures return `401` and record an `auth-rejected` audit event.
+- When the configured token env var resolves to no token (unset/empty),
+  `authorize()` passes all requests.
+- All Dashboard responses set `Cache-Control: no-store`.
+
+### Endpoints
+
+All paths are relative to `path_prefix` (default `/api/gateway`).
+
+| Endpoint | Method | Response |
+| --- | --- | --- |
+| `/` and `/health` | GET | Health JSON: `state`, `uptime_secs`, `active_connections`, `total_requests`. |
+| `/metrics` | GET | Prometheus text (`Content-Type: text/plain; version=0.0.4`). |
+| `/config` | GET | Active `GatewayConfig` as JSON. |
+| `/routes` (+ `/routes/{name}`) | GET | Route info: `name`, `rule`, `service`, `entrypoints`, `middlewares`, `priority`. |
+| `/services` (+ `/services/{name}`) | GET | Services with live backend health (`backends_total` / `healthy`). |
+| `/backends` | GET | Backend details with `active_connections`. |
+| `/events` | GET | Recent management security audit events. Supports `?limit=N` (default 100, max 500). |
+| `/version` | GET | `name` (`a3s-gateway`), `version` (crate version), `api_version` (`v1`). |
+| `/config/validate` | POST | Validate an ACL payload without applying it. |
+| `/config/reload` | POST | Validate then reload from an ACL payload (503 if no reload callback). |
+
+The two POST mutation endpoints cap their request body at 1 MiB and respond with
+`{ valid, reloaded, message }`.
+
+### Security Audit Log
+
+The management listener keeps an in-memory ring buffer (capacity 512) of
+security events surfaced via `/events`. Each event records `sequence`,
+`timestamp` (RFC 3339), `kind`, `remote_addr`, `path`, `status`, and `reason`.
+Event kinds: `not-found`, `ip-rejected`, `auth-rejected`, `tls-rejected`,
+`config-validated`, `config-reloaded`, `config-rejected`.
+
+## CLI Inspection
+
+Use the CLI for local and CI/CD workflows — no running gateway required for the
+`validate` / `config` subcommands:
+
+```bash
+a3s-gateway validate --config gateway.acl
+a3s-gateway config --config gateway.acl summary
+a3s-gateway config --config gateway.acl entrypoints
+a3s-gateway config --config gateway.acl routes
+a3s-gateway config --config gateway.acl services
+a3s-gateway config --config gateway.acl middlewares
+a3s-gateway config --config gateway.acl providers
+a3s-gateway config --config gateway.acl json
+
+# Against a running management listener
+a3s-gateway management events   --url http://127.0.0.1:9090/api/gateway
+a3s-gateway management validate --url http://127.0.0.1:9090/api/gateway --file gateway.acl
+a3s-gateway management reload   --url http://127.0.0.1:9090/api/gateway --file gateway.acl
+```
+
+For mTLS-protected management listeners, add `--ca-cert`, `--client-cert`, and
+`--client-key` to the `management` subcommands, and send
+`Authorization: Bearer <token>` when `auth_token_env` is set.
