@@ -1,52 +1,64 @@
 ---
 title: SDK
-description: A3S Box 工作负载的 Rust 执行抽象
+description: A3S Box 的 Rust SDK —— 可编程 CI/CD 流水线
 ---
 
 # SDK
 
-当前 SDK 面是 Rust crate：`a3s-box-sdk`。它不是 Docker 风格 client SDK，也没有旧文档中提到的 Python 或 TypeScript 客户端。
+`a3s-box-sdk` 是 A3S Box 的 Rust SDK。当前它提供**可编程 CI/CD 流水线** API
+（`a3s_box_sdk::pipeline`）：流水线就是一段 Rust 程序，每一步都跑在**自己的 MicroVM**
+里（每步一个 Linux 内核，所以不可信的步骤逃不到宿主机或兄弟步骤）。它是对 `a3s-box`
+CLI 的**零依赖**轻封装 —— DAG 就是你的代码，不是 YAML。这个 crate 刻意不局限于 CI，
+后续会持续增加能力。
 
-## 提供什么
+<Callout title="2.5.x 重命名">
+原来的 `a3s-box-sdk`（MicroVM 工作负载执行 SDK —— `ExecutionRegistry`、`VmExecutor`、
+`BoxWorkloadEnvelope`，用于把 Box 嵌入到 a3s-lambda 等更高层运行时）已更名为
+**`a3s-box-lambda`** crate。请把 `use a3s_box_sdk::…` 改为 `use a3s_box_lambda::…`。
+</Callout>
 
-- `ExecutionRegistry`：工作负载执行策略入口。
-- `ExecutionAdapter`：可插拔执行后端。
-- `BoxWorkloadEnvelope` 与 `BoxRuntimeSpec`：来自 `a3s-box-core` 的共享类型。
-- `VmExecutor` 与 pool stats 抽象：用于把 Box 集成到更高层运行时。
+## 可编程流水线
 
-## 示例
+把基础 box **暖一次**（clone + 装依赖）、做快照，然后每一步从快照 fork。某一步非零退出即
+快速失败（fail-fast）；内容寻址缓存会跳过输入未变的步骤。
 
 ```rust
-use a3s_box_sdk::{
-    BoxRuntimeSpec, BoxWorkloadEnvelope, ExecutionRegistry, RuntimeClass, WorkloadKind,
-};
-use std::time::Duration;
+use a3s_box_sdk::pipeline::{warm_base, WarmBase, FileCache, Step};
 
-#[tokio::main]
-async fn main() {
-    let registry = ExecutionRegistry::new();
-
-    let envelope = BoxWorkloadEnvelope {
-        runtime_class: RuntimeClass::A3sBox,
-        workload_kind: WorkloadKind::ExecutionTask,
-        runtime: BoxRuntimeSpec {
-            runtime: "a3s/executor/http".into(),
-            entrypoint: "a3s-executor".into(),
-            args: vec!["--handler".into(), "get".into()],
-            env: Default::default(),
-        },
-        input: serde_json::json!({"url": "https://example.com"}),
-        labels: Default::default(),
-    };
-
-    let result = registry
-        .execute_box_workload(&envelope, Duration::from_secs(300))
-        .await;
-
-    println!("{result:?}");
+fn main() -> Result<(), a3s_box_sdk::pipeline::PipelineError> {
+    let cache = FileCache::new(".ci-cache")?;            // 输入不变就跳过该步
+    let mut base = warm_base(
+        WarmBase::new("node:20", "git clone $REPO /w && cd /w && npm ci")  // 只跑一次
+            .env("REPO", "https://github.com/me/app")
+            .cache(&cache),
+    )?;
+    base.step(Step::new("lint",  "cd /w && npm run lint"))?;
+    base.step(Step::new("test",  "cd /w && npm test"))?;   // 非零退出 -> Err（fail-fast）
+    base.step(Step::new("build", "cd /w && npm run build"))?;
+    base.dispose();                                        // 删掉快照
+    Ok(())
 }
 ```
 
+DAG 就是你的代码：顺序用普通调用，扇出用线程。`Step::allow_failure()` 让非零退出不中断
+流水线；`Step::input(..)` 追加缓存键的组成部分。
+
+## 为什么 fork 很便宜
+
+每一步通过 A3S Box 的写时复制 `snapshot restore` 从暖快照 fork：fork 把快照的原始 rootfs
+当作**只读 overlay 下层**挂载、各自带上层 —— 秒级、每个 fork 仅几 MB、且互相隔离（一个
+fork 的写对另一个不可见）。所以"每步一快照"的扇出几乎零成本，不做整盘 rootfs 拷贝。
+`snapshot rm` / `prune` 会拒绝删除仍被活跃 fork 引用的快照。
+
+## 它帮你规避的坑
+
+CLI 的几个坑都封好了：`run`/`exec` 命令前要加 `--`；`snapshot restore` 出来的 box 是
+*created* 态、会先 `start` 再 exec；`snapshot rm` 认快照 ID 不认名字；`rm -f` 删不存在的
+box 是 no-op（可重复执行）。
+
+若 `a3s-box` CLI 不在 `PATH` 上，设置 `A3S_BOX` 指定其路径。
+
 ## 边界
 
-普通本地开发优先使用 CLI。需要把 A3S Box 嵌入另一个 Rust runtime，并且已经采用 Box workload envelope 和执行策略时，再使用 SDK。
+用 **`a3s-box-sdk`** 来脚本化流水线 / 从 Rust 驱动 Box。把 Box 嵌入到理解 Box workload
+envelope 与执行策略的更高层 Rust 运行时时，用 **`a3s-box-lambda`**。一般本地开发用 **CLI**。

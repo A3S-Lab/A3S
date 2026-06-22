@@ -1,52 +1,70 @@
 ---
 title: SDK
-description: Rust execution abstractions for A3S Box workloads
+description: Rust SDK for A3S Box — programmable CI/CD pipelines
 ---
 
 # SDK
 
-The current SDK surface is a Rust crate, `a3s-box-sdk`. It is not a Docker-style client SDK and does not currently provide the Python or TypeScript clients that older docs referenced.
+`a3s-box-sdk` is the Rust SDK for A3S Box. Today it provides a **programmable CI/CD
+pipeline** API (`a3s_box_sdk::pipeline`): a pipeline is a Rust program, and each step
+runs in its **own MicroVM** (one Linux kernel per step, so an untrusted step can't escape
+to the host or a sibling step). It is a thin, **dependency-free** wrapper over the
+`a3s-box` CLI — the DAG is your code, not YAML. The crate is intentionally not limited to
+CI; more capabilities will be added over time.
 
-## What It Provides
+<Callout title="Renamed in 2.5.x">
+The former `a3s-box-sdk` (MicroVM workload-execution SDK — `ExecutionRegistry`,
+`VmExecutor`, `BoxWorkloadEnvelope`, for embedding Box into higher-level runtimes such as
+a3s-lambda) is now the **`a3s-box-lambda`** crate. Update `use a3s_box_sdk::…` →
+`use a3s_box_lambda::…`.
+</Callout>
 
-- `ExecutionRegistry` as the entry point for workload execution policy.
-- `ExecutionAdapter` for pluggable backends.
-- `BoxWorkloadEnvelope` and `BoxRuntimeSpec` shared types from `a3s-box-core`.
-- `VmExecutor` and pool statistics abstractions for integrating Box into higher-level runtimes.
+## Programmable pipelines
 
-## Example
+Warm a base box **once** (clone + install deps), snapshot it, then fork the snapshot per
+step. A non-zero step exits the pipeline (fail-fast), and a content-addressed cache skips
+steps whose inputs are unchanged.
 
 ```rust
-use a3s_box_sdk::{
-    BoxRuntimeSpec, BoxWorkloadEnvelope, ExecutionRegistry, RuntimeClass, WorkloadKind,
-};
-use std::time::Duration;
+use a3s_box_sdk::pipeline::{warm_base, WarmBase, FileCache, Step};
 
-#[tokio::main]
-async fn main() {
-    let registry = ExecutionRegistry::new();
-
-    let envelope = BoxWorkloadEnvelope {
-        runtime_class: RuntimeClass::A3sBox,
-        workload_kind: WorkloadKind::ExecutionTask,
-        runtime: BoxRuntimeSpec {
-            runtime: "a3s/executor/http".into(),
-            entrypoint: "a3s-executor".into(),
-            args: vec!["--handler".into(), "get".into()],
-            env: Default::default(),
-        },
-        input: serde_json::json!({"url": "https://example.com"}),
-        labels: Default::default(),
-    };
-
-    let result = registry
-        .execute_box_workload(&envelope, Duration::from_secs(300))
-        .await;
-
-    println!("{result:?}");
+fn main() -> Result<(), a3s_box_sdk::pipeline::PipelineError> {
+    let cache = FileCache::new(".ci-cache")?;            // skip a step when inputs are unchanged
+    let mut base = warm_base(
+        WarmBase::new("node:20", "git clone $REPO /w && cd /w && npm ci")  // runs ONCE
+            .env("REPO", "https://github.com/me/app")
+            .cache(&cache),
+    )?;
+    base.step(Step::new("lint",  "cd /w && npm run lint"))?;
+    base.step(Step::new("test",  "cd /w && npm test"))?;   // nonzero exit -> Err (fail-fast)
+    base.step(Step::new("build", "cd /w && npm run build"))?;
+    base.dispose();                                        // drops the snapshot
+    Ok(())
 }
 ```
 
+The DAG is your code: sequence with plain calls, fan out with threads.
+`Step::allow_failure()` keeps the pipeline going on a non-zero exit; `Step::input(..)`
+adds extra cache-key parts.
+
+## Why forking is cheap
+
+Each step forks the warmed snapshot via A3S Box's copy-on-write `snapshot restore`: the
+fork mounts the snapshot's pristine rootfs as a **read-only overlay lower** with its own
+upper — near-instant, a few MB per fork, and isolated (one fork's writes are invisible to
+another). So snapshot-per-step fan-out costs almost nothing — no full rootfs copy.
+`snapshot rm` / `prune` refuse to delete a snapshot a live fork still references.
+
+## What it hides
+
+CLI footguns, so you don't hit them: `run`/`exec` need `--` before the command;
+`snapshot restore` yields a *created* box that is `start`ed before exec; `snapshot rm`
+keys on snapshot ID, not name; `rm -f` of a missing box is a no-op (idempotent reruns).
+
+Set `A3S_BOX` if the `a3s-box` CLI is not on `PATH`.
+
 ## Boundary
 
-Use the CLI for general local development. Use the SDK when embedding A3S Box into another Rust runtime that already understands Box workload envelopes and execution policy.
+Use **`a3s-box-sdk`** to script pipelines / drive Box from Rust. Use **`a3s-box-lambda`**
+when embedding Box into another Rust runtime that understands Box workload envelopes and
+execution policy. Use the **CLI** for general local development.

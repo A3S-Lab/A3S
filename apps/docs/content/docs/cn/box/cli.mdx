@@ -135,13 +135,14 @@ a3s-box export BOX -o FILE.tar
 a3s-box diff BOX
 
 a3s-box snapshot create BOX NAME
-a3s-box snapshot restore SNAPSHOT --name NEW_BOX
+a3s-box snapshot restore SNAPSHOT --name NEW_BOX   # 写时复制 fork（overlay）
 a3s-box snapshot ls
 a3s-box snapshot inspect SNAPSHOT
-a3s-box snapshot rm SNAPSHOT
+a3s-box snapshot rm SNAPSHOT [--force]
+a3s-box snapshot prune --keep N                    # 限制磁盘：只保留最新的 N 个
 ```
 
-快照不是 live memory checkpoint；应把它理解为 Box 管理的持久化状态/文件系统快照。
+快照不是 live memory checkpoint；应把它理解为 Box 管理的持久化状态/文件系统快照。`snapshot restore` 是**写时复制**的：还原出的 box 把快照 rootfs 当作只读 overlay 下层、各自带上层，所以从暖快照 fork 近乎即时且省空间（这正是 SDK 流水线 API 每步所做的 fork）。由于还原出的 box 会持续引用其快照，`snapshot rm` / `prune` **会拒绝删除仍被某个 box 使用的快照** —— 加 `--force` 可强制。
 
 ## Compose
 

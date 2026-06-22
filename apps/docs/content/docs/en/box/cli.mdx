@@ -135,13 +135,14 @@ a3s-box export BOX -o FILE.tar
 a3s-box diff BOX
 
 a3s-box snapshot create BOX NAME
-a3s-box snapshot restore SNAPSHOT --name NEW_BOX
+a3s-box snapshot restore SNAPSHOT --name NEW_BOX   # copy-on-write fork (overlay)
 a3s-box snapshot ls
 a3s-box snapshot inspect SNAPSHOT
-a3s-box snapshot rm SNAPSHOT
+a3s-box snapshot rm SNAPSHOT [--force]
+a3s-box snapshot prune --keep N                    # bound disk: keep the N newest
 ```
 
-Snapshots are not live memory checkpoints; treat them as Box-managed persisted state/filesystem snapshots.
+Snapshots are not live memory checkpoints; treat them as Box-managed persisted state/filesystem snapshots. `snapshot restore` is **copy-on-write**: the restored box shares the snapshot's rootfs as a read-only overlay lower with its own upper, so forking a warmed snapshot is near-instant and space-cheap (this is what the SDK's pipeline API forks per step). Because a restored box keeps referencing its snapshot, `snapshot rm` / `prune` **refuse to delete a snapshot still in use** by a box — pass `--force` to override.
 
 ## Compose
 
