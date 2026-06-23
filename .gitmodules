@@ -40,3 +40,6 @@
 [submodule "crates/observer"]
 	path = crates/observer
 	url = git@github.com:A3S-Lab/Observer.git
+[submodule "crates/cli"]
+	path = crates/cli
+	url = git@github.com:A3S-Lab/Cli.git
