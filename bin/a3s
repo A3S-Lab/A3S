@@ -1,0 +1,45 @@
+#!/usr/bin/env sh
+# a3s — umbrella CLI for the A3S platform.
+#
+# Dispatches `a3s <sub> [args...]` to the matching `a3s-<sub>` binary on PATH,
+# the same way `git foo` runs `git-foo`. No per-subcommand wiring lives here:
+# install any `a3s-<name>` (a3s-code, a3s-box, a3s-gateway, ...) and it works.
+#
+#   a3s code            →  a3s-code            (launches its TUI with no args)
+#   a3s box ps          →  a3s-box ps
+#   a3s code --help     →  a3s-code --help     (subcommand's own help)
+
+set -eu
+
+usage() {
+    cat <<'EOF'
+a3s — umbrella CLI for the A3S platform
+
+usage: a3s <command> [args...]
+
+Runs the matching a3s-<command> binary on PATH:
+  a3s code [args]   →  a3s-code   (its TUI when given no args)
+  a3s box  [args]   →  a3s-box
+  a3s <x>  [args]   →  a3s-<x>
+
+  a3s <command> --help   show a subcommand's own help
+  a3s --version          show this dispatcher's version
+EOF
+}
+
+case "${1:-}" in
+    ""|-h|--help|help) usage; exit 0 ;;
+    -V|--version)      echo "a3s 0.1.0 (dispatcher)"; exit 0 ;;
+esac
+
+sub=$1
+shift
+target="a3s-$sub"
+
+if ! command -v "$target" >/dev/null 2>&1; then
+    echo "a3s: unknown command '$sub' (no '$target' on PATH)" >&2
+    echo "run 'a3s --help' for usage" >&2
+    exit 127
+fi
+
+exec "$target" "$@"

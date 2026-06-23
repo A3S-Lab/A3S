@@ -56,6 +56,9 @@ config.acl
 /test-*.sh
 /test*.sh
 
+# Temporary directory
+/temp/
+
 # Node.js (root should not have these)
 /node_modules/
 /package.json
