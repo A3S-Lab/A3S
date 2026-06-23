@@ -1,0 +1,91 @@
+---
+title: A3S Observer
+description: eBPF-based, language-agnostic observability for AI agents — which agent ran which tools, called which LLM provider, and reached which endpoint, with zero code changes
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# A3S Observer
+
+`a3s-observer` turns kernel-level events into semantic AI-agent telemetry — **who**
+(process / k8s pod) ran **what** (tools, LLM calls) and reached **where** (endpoints) —
+captured with **eBPF**, with **zero changes to the agent**, across languages.
+
+```
+capture (eBPF probes)        enrich + correlate (userspace)      export
+─────────────────────        ──────────────────────────────     ─────────
+exec    (subprocess)         identity: /proc comm+ppid,          NDJSON
+tls-sni (LLM provider)                 k8s cgroup→pod             (or log)
+connect (peer IP)            (pid,fd)→peer correlation
+dns     (hostnames)
+```
+
+A single event answers who / what / where:
+
+```json
+{"identity":{"agent":"curl"},"provider":"Anthropic",
+ "event":{"Egress":{"sni":"api.anthropic.com","peer":"160.79.104.10","bytes":512}}}
+```
+
+## Why eBPF (not an SDK)
+
+- **Zero-instrumentation, language-agnostic** — observe any agent (Python / Node / Go /
+  Rust) without touching its code or SDK.
+- **Sees what the app won't tell you** — real subprocess execs, network egress, including
+  the tool subprocesses an agent spawns.
+- **Low overhead, security-relevant** — runs in the kernel; an agent can't easily evade it.
+
+<Callout type="info">
+v1 uses only language-agnostic kernel hooks (no per-language uprobes), so it works on any
+runtime. Trade-off: no LLM prompt / model-name / exact-token visibility — that needs an
+opt-in TLS-payload extension (roadmap). The default captures provider, endpoint, bytes,
+tools, and identity.
+</Callout>
+
+## What it captures
+
+| Probe | Hook | Gives |
+|---|---|---|
+| `exec` | `sched_process_exec` | tools / subprocesses (argv) — incl. ones that bypass app instrumentation |
+| `tls-sni` | TLS ClientHello on send | LLM **provider** (from SNI), language-agnostic |
+| `connect` | `sys_enter_connect` | peer **IP:port** |
+| `dns` | `sys_enter_sendto` :53 | resolved **hostnames** |
+
+Userspace enriches each event with **identity** (process `comm` + `ppid`, or k8s
+pod / container) and a `(pid,fd)→peer` correlation that fuses the LLM provider with its
+endpoint.
+
+## Architecture (minimal core + extensions)
+
+Swappable traits around the probe core:
+
+- `IdentityResolver` — `/proc` (bare host) · k8s cgroup→pod
+- `ServiceClassifier` — SNI / IP → `Provider`
+- `Exporter` — NDJSON · log · *(roadmap)* OTLP
+
+Crates: `a3s-observer` (contracts + model), `a3s-observer-common` (`no_std` shared types),
+`a3s-observer-ebpf` (the probes), `a3s-observer-collector` (loader + correlation + export).
+
+## Build & run
+
+The eBPF crate needs nightly + `rust-src` + `bpf-linker` (which borrows rustc's bundled
+LLVM — **no system LLVM required**):
+
+```bash
+rustup toolchain install nightly --component rust-src
+cargo install bpf-linker
+cargo build --release -p a3s-observer-collector
+
+# Linux only; needs root / CAP_BPF
+sudo ./target/release/a3s-observer-collector                          # human-readable log
+A3S_OBSERVER_JSON=1 sudo -E ./target/release/a3s-observer-collector   # NDJSON → vector/Loki/jq
+```
+
+## Status & roadmap
+
+**v1** (validated on Linux 6.8): `exec` / `tls-sni` / `connect` / `dns` probes, identity
+(proc + k8s), `(pid,fd)→peer` correlation, NDJSON + log export.
+
+**Roadmap:** OTLP exporter; byte / latency / TTFT metrics; an **opt-in SSL-payload**
+extension for prompt/response content (per TLS library, since it needs uprobes that aren't
+language-agnostic).

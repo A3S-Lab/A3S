@@ -11,6 +11,8 @@
     "---库---",
     "lane",
     "search",
-    "memory"
+    "memory",
+    "---可观测性---",
+    "observer"
   ]
 }

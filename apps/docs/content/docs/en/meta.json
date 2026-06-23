@@ -11,6 +11,8 @@
     "---Libraries---",
     "lane",
     "search",
-    "memory"
+    "memory",
+    "---Observability---",
+    "observer"
   ]
 }

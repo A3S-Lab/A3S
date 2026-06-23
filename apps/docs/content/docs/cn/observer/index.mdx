@@ -1,0 +1,86 @@
+---
+title: A3S Observer
+description: 基于 eBPF 的语言无关 AI Agent 可观测性 —— 哪个 agent 跑了哪些工具、调了哪个 LLM 厂商、连了哪个端点,零改代码
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# A3S Observer
+
+`a3s-observer` 把内核级事件翻译成语义化的 AI Agent 遥测 —— **谁**(进程 / k8s pod)跑了
+**什么**(工具、LLM 调用)、连到**哪里**(端点) —— 用 **eBPF** 捕获,**零改 agent 代码**、
+跨语言。
+
+```
+捕获 (eBPF 探针)            富化 + 关联 (用户态)               导出
+─────────────────         ──────────────────────────        ─────────
+exec    (子进程)           identity: /proc comm+ppid,         NDJSON
+tls-sni (LLM 厂商)                   k8s cgroup→pod            (或日志)
+connect (peer IP)         (pid,fd)→peer 关联
+dns     (主机名)
+```
+
+一条事件就回答 谁 / 什么 / 哪里:
+
+```json
+{"identity":{"agent":"curl"},"provider":"Anthropic",
+ "event":{"Egress":{"sni":"api.anthropic.com","peer":"160.79.104.10","bytes":512}}}
+```
+
+## 为什么用 eBPF(而不是 SDK)
+
+- **零侵入、语言无关** —— 不碰 agent 代码或 SDK,就能观测任意运行时(Python / Node / Go / Rust)。
+- **看到 app 不会告诉你的** —— 真实的子进程 exec、网络外联,包括 agent 派生的工具子进程。
+- **低开销、与安全相关** —— 跑在内核里,agent 难以规避。
+
+<Callout type="info">
+v1 只用语言无关的内核钩子(无按语言的 uprobe),因此对任意运行时都生效。代价:拿不到 LLM
+prompt / model 名 / 精确 token —— 那需要一个可选的 TLS-payload 扩展(路线图)。默认捕获厂商、
+端点、字节数、工具与身份。
+</Callout>
+
+## 它捕获什么
+
+| 探针 | 钩子 | 给你 |
+|---|---|---|
+| `exec` | `sched_process_exec` | 工具 / 子进程(argv)—— 包括绕过 app 插桩的那些 |
+| `tls-sni` | 发送时的 TLS ClientHello | LLM **厂商**(来自 SNI),语言无关 |
+| `connect` | `sys_enter_connect` | peer **IP:端口** |
+| `dns` | `sys_enter_sendto` :53 | 解析的**主机名** |
+
+用户态给每条事件富化**身份**(进程 `comm` + `ppid`,或 k8s pod / 容器)以及一个
+`(pid,fd)→peer` 关联,把 LLM 厂商与其端点融合到一起。
+
+## 架构(最小核心 + 扩展)
+
+探针核心外围是可替换的 trait:
+
+- `IdentityResolver` —— `/proc`(裸机) · k8s cgroup→pod
+- `ServiceClassifier` —— SNI / IP → `Provider`
+- `Exporter` —— NDJSON · 日志 · *(路线图)* OTLP
+
+Crates:`a3s-observer`(契约 + 模型)、`a3s-observer-common`(`no_std` 共享类型)、
+`a3s-observer-ebpf`(探针)、`a3s-observer-collector`(加载器 + 关联 + 导出)。
+
+## 构建与运行
+
+eBPF crate 需要 nightly + `rust-src` + `bpf-linker`(它借用 rustc 自带的 LLVM —— **无需系统
+LLVM**):
+
+```bash
+rustup toolchain install nightly --component rust-src
+cargo install bpf-linker
+cargo build --release -p a3s-observer-collector
+
+# 仅 Linux;需 root / CAP_BPF
+sudo ./target/release/a3s-observer-collector                          # 人类可读日志
+A3S_OBSERVER_JSON=1 sudo -E ./target/release/a3s-observer-collector   # NDJSON → vector/Loki/jq
+```
+
+## 状态与路线图
+
+**v1**(在 Linux 6.8 验证):`exec` / `tls-sni` / `connect` / `dns` 探针、身份(proc + k8s)、
+`(pid,fd)→peer` 关联、NDJSON + 日志导出。
+
+**路线图:** OTLP 导出器;字节 / 延迟 / TTFT 指标;一个**可选的 SSL-payload** 扩展用于
+prompt/响应内容(按 TLS 库实现,因为它需要非语言无关的 uprobe)。
