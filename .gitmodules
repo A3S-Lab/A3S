@@ -37,3 +37,6 @@
 [submodule "crates/tui"]
 	path = crates/tui
 	url = git@github.com:A3S-Lab/TUI.git
+[submodule "crates/observer"]
+	path = crates/observer
+	url = git@github.com:A3S-Lab/Observer.git

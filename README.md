@@ -35,6 +35,7 @@ a3s-gateway          <- application-agnostic ingress/reverse proxy layer
 | Ingress | a3s-gateway | Reverse proxy with middleware and routing |
 | Scheduling | a3s-lane | Per-session priority queues and retry/dead-letter behavior |
 | Infrastructure | a3s-power / a3s-search | LLM inference and meta search |
+| Observability | a3s-observer | eBPF-based, language-agnostic AI-agent telemetry (LLM calls, tools, files, egress) |
 | Libraries | a3s-acl / a3s-ahp / a3s-event / a3s-memory / a3s-common | Configuration, harness protocol, events, memory, shared types |
 
 ## Projects
@@ -51,6 +52,7 @@ a3s-gateway          <- application-agnostic ingress/reverse proxy layer
 | [a3s-ahp](crates/ahp/) | 2.4.0 | Agent Harness Protocol primitives | [README](crates/ahp/README.md) |
 | [a3s-acl](crates/acl/) | 0.2.1 | Agent Configuration Language (HCL-like config parser) | [README](crates/acl/README.md) |
 | [a3s-event](crates/event/) | 0.3.0 | Pluggable event subscription, dispatch, and persistence | [README](crates/event/README.md) |
+| [a3s-observer](crates/observer/) | 0.1.0 | eBPF-based, language-agnostic observability for AI agents (LLM calls, tools, files, network egress) | [README](crates/observer/README.md) |
 | [a3s-updater](crates/updater/) | 0.2.0 | Self-update for CLI binaries via GitHub Releases | [Source](crates/updater/) |
 | [a3s-tui](crates/tui/) | 0.1.0 | TEA (The Elm Architecture) framework for terminal UIs with Flexbox layout | [README](crates/tui/README.md) |
 | [a3s-common](crates/common/) | 0.1.1 | Shared primitives and transport types | [Source](crates/common/) |
@@ -84,6 +86,7 @@ a3s/
 │   ├── gateway/         # a3s-gateway
 │   ├── lane/            # a3s-lane scheduling
 │   ├── memory/          # a3s-memory
+│   ├── observer/        # a3s-observer eBPF observability
 │   ├── power/           # a3s-power LLM inference
 │   ├── search/          # a3s-search
 │   ├── tui/             # a3s-tui terminal UI framework
