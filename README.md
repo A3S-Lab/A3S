@@ -26,6 +26,8 @@ a3s-gateway          <- application-agnostic ingress/reverse proxy layer
 
 **a3s-gateway** is an application-agnostic reverse proxy with middleware, routing, and privacy features.
 
+**a3s** (the CLI) is the interactive terminal app: `a3s code` launches a Claude Code-class coding-agent TUI built on a3s-code and a3s-tui, with prebuilt binaries for macOS, Linux, and Windows.
+
 ## Architecture
 
 | Layer | Component | Role |
@@ -42,6 +44,7 @@ a3s-gateway          <- application-agnostic ingress/reverse proxy layer
 
 | Project | Version | Description | Docs |
 | --- | --- | --- | --- |
+| [a3s](crates/cli/) | 0.3.0 | Interactive terminal coding agent — `a3s code` launches a Claude Code-class TUI: streaming markdown, IDE-style diff editor, `/ide`, `/git`, `/effort` + ultracode, `/goal`, `/loop`, `/compact`, `@` file picker, image paste, CLAUDE.md compatibility, and `a3s update` self-upgrade. Prebuilt binaries for macOS, Linux, and Windows | [Source](crates/cli/) |
 | [a3s-code](crates/code/) | 3.1.0 | Harness-driven coding-agent runtime with ACL config, SDKs, structured output, planning, run replay, PTC, task/parallel_task delegation, automatic subagent delegation, `.a3s/agents`, memory, and a hexagonal workspace stack: local FS, S3 (ETag CAS, cost-bounded grep/glob), remote-git over HTTP/JSON, all with typed errors end-to-end | [README](crates/code/README.md) |
 | [a3s-box](crates/box/) | 2.0.4 | Docker-like MicroVM runtime for Linux OCI workloads | [README](crates/box/README.md) |
 | [a3s-gateway](crates/gateway/) | 0.2.5 | Reverse proxy with middleware, routing, and privacy features | [README](crates/gateway/README.md) |
@@ -54,12 +57,17 @@ a3s-gateway          <- application-agnostic ingress/reverse proxy layer
 | [a3s-event](crates/event/) | 0.3.0 | Pluggable event subscription, dispatch, and persistence | [README](crates/event/README.md) |
 | [a3s-observer](crates/observer/) | 0.1.0 | eBPF-based, language-agnostic observability for AI agents (LLM calls, tools, files, network egress) | [README](crates/observer/README.md) |
 | [a3s-updater](crates/updater/) | 0.2.0 | Self-update for CLI binaries via GitHub Releases | [Source](crates/updater/) |
-| [a3s-tui](crates/tui/) | 0.1.0 | TEA (The Elm Architecture) framework for terminal UIs with Flexbox layout | [README](crates/tui/README.md) |
+| [a3s-tui](crates/tui/) | 0.1.4 | TEA (The Elm Architecture) framework for terminal UIs with Flexbox layout | [README](crates/tui/README.md) |
 | [a3s-common](crates/common/) | 0.1.1 | Shared primitives and transport types | [Source](crates/common/) |
 
 ## Quick start
 
 ```bash
+# a3s CLI — interactive coding agent (`a3s code` launches the TUI)
+brew install a3s-lab/tap/a3s
+# or grab a prebuilt binary (macOS / Linux / Windows):
+#   https://github.com/A3S-Lab/Cli/releases/latest
+
 # Node.js SDK
 npm install @a3s-lab/code
 
@@ -80,6 +88,7 @@ a3s/
 │   ├── acl/             # a3s-acl config language
 │   ├── ahp/             # a3s-ahp harness protocol
 │   ├── box/             # a3s-box MicroVM runtime
+│   ├── cli/             # a3s — interactive coding-agent TUI (`a3s code`)
 │   ├── code/            # a3s-code agent framework
 │   ├── common/          # Shared types
 │   ├── event/           # a3s-event pub/sub
