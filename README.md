@@ -57,7 +57,7 @@ a3s-gateway          <- application-agnostic ingress/reverse proxy layer
 | [a3s-acl](crates/acl/) | 0.2.1 | Agent Configuration Language (HCL-like config parser) | [README](crates/acl/README.md) |
 | [a3s-event](crates/event/) | 0.3.0 | Pluggable event subscription, dispatch, and persistence | [README](crates/event/README.md) |
 | [a3s-observer](crates/observer/) | 0.11.0 | eBPF-based, language-agnostic observability for AI agents (LLM calls, tools, files, network egress) + opt-in intervention | [README](crates/observer/README.md) |
-| [a3s-sentry](crates/sentry/) | 0.2.2 | Tiered runtime security control — L1 rules / L2 LLM / L3 a3s-code agent judge observer events and block dangerous actions via observer's kernel guards; hot-reload policy + speculative parallel tiers; L2 validated against a live LLM | [README](crates/sentry/README.md) |
+| [a3s-sentry](crates/sentry/) | 0.3.0 | Tiered runtime security control — L1 rules / L2 LLM / L3 **real a3s-code agent** judge observer events and block dangerous actions via observer's kernel guards; hot-reload policy + speculative parallel tiers; L2 + L3 validated against a live LLM + agent | [README](crates/sentry/README.md) |
 | [a3s-updater](crates/updater/) | 0.2.0 | Self-update for CLI binaries via GitHub Releases | [Source](crates/updater/) |
 | [a3s-tui](crates/tui/) | 0.1.4 | TEA (The Elm Architecture) framework for terminal UIs with Flexbox layout | [README](crates/tui/README.md) |
 | [a3s-common](crates/common/) | 0.1.1 | Shared primitives and transport types | [Source](crates/common/) |
