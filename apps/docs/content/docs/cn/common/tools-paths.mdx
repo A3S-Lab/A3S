@@ -1,0 +1,42 @@
+---
+title: Tools And Paths
+description: A3S Common 的 shared tool metadata/result types 和 safe workspace path resolution helpers。
+---
+
+# Tools And Paths
+
+`a3s_common::tools` 包含其它 A3S crates 可复用的小型 shared types 和 path guards。
+
+## Tool Types
+
+| Type | Fields |
+| --- | --- |
+| `Tool` | `name`、`description`、作为 JSON schema/value metadata 的 `parameters`。 |
+| `ToolResult` | `success`、`output`、optional `error`。 |
+
+这些结构刻意保持简单。Product crates 如需 streaming、confirmation、sandboxing 或 schema-specific
+validation，可以在它们外面包更丰富的 contract。
+
+## Path Resolution
+
+| Function | Behavior |
+| --- | --- |
+| `resolve_path(workspace, path)` | 把 `path` join 到 `workspace`，canonicalize 两侧，并拒绝 workspace 外路径。Target 必须已存在。 |
+| `resolve_path_for_write(workspace, path)` | Canonicalize workspace 和已存在的 parent directory，再返回 resolved target path。最终 file 可以是新文件。 |
+
+两个函数都会通过检查 canonical resolved path 或 parent 是否仍位于 canonical workspace 下，拒绝 path
+traversal 或 symlink escape。
+
+## Failure Modes
+
+这些 helpers 会对以下情况返回 string errors：
+
+- workspace canonicalization failure
+- target 或 parent resolution failure
+- path escaping workspace
+- write 的 parent directory 缺失或无效
+
+## 边界
+
+Path resolution 是 guardrail，不是完整 authorization layer。调用方仍决定 tool 是否允许 read、write、
+overwrite、delete 或 execute resolved path。

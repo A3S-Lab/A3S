@@ -1,0 +1,66 @@
+---
+title: Privacy
+description: Sensitivity levels, regex rules, classification results, keyword matching, redaction, and TEE flags in A3S Common.
+---
+
+# Common Privacy
+
+`a3s_common::privacy` provides reusable classification primitives. It is a
+library layer, not a global privacy policy.
+
+## Sensitivity Levels
+
+`SensitivityLevel` is ordered from lowest to highest:
+
+| Level | Meaning |
+| --- | --- |
+| `Public` | Safe public data. |
+| `Normal` | Ordinary working data. |
+| `Sensitive` | Data that should trigger extra care. |
+| `HighlySensitive` | Data that generally requires stronger handling. |
+| `Critical` | Highest-risk match class. |
+
+The classifier marks `requires_tee` when the overall level is at least
+`Sensitive`.
+
+## Regex Classification
+
+`ClassificationRule` carries:
+
+| Field | Role |
+| --- | --- |
+| `name` | Rule identifier. |
+| `pattern` | Regex pattern compiled by `RegexClassifier::new`. |
+| `level` | Sensitivity assigned to each match. |
+| `description` | Human-readable description. |
+
+`RegexClassifier::classify(text)` returns `ClassificationResult` with the
+overall level, all `ClassificationMatch` records, and the TEE flag. Each match
+records the rule name, level, start/end offsets, and matched text.
+
+## Redaction
+
+`RedactionStrategy` supports:
+
+| Strategy | Behavior |
+| --- | --- |
+| `Mask` | Replace known match types with masked forms, or `[REDACTED]` for generic matches. |
+| `Remove` | Remove the matched text. |
+| `Hash` | Replace the match with a length-based placeholder. |
+
+`RegexClassifier::redact(text, strategy)` classifies first, then replaces
+matches in reverse offset order so earlier replacements do not shift later
+spans.
+
+## Keyword Matching
+
+`KeywordMatcherConfig` supports normal keywords, sensitive keywords,
+case-sensitive matching, and a `tee_threshold`. `KeywordMatcher::classify`
+returns the configured threshold when a sensitive keyword matches, `Normal` for
+regular keyword matches, and `Public` when no keyword matches.
+
+## Boundary
+
+Common detects and transforms text. Product components still decide what a
+match means for authorization, logging, tool execution, routing, or TEE
+enforcement.

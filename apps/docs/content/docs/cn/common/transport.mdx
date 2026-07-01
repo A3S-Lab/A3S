@@ -1,0 +1,66 @@
+---
+title: Transport
+description: A3S Common 的 async transport trait、frame wire format、codecs、mock transport、Unix sockets、vsock ports 和 TEE protocol types。
+---
+
+# Common Transport
+
+`a3s_common::transport` 提供小型 async framed transport abstraction，服务于 local IPC、test transports
+和 TEE-oriented protocol messages。
+
+## Frame Format
+
+Frames 使用固定 header：
+
+```text
+[type:u8][length:u32 big-endian][payload:length bytes]
+```
+
+| Item | Current value |
+| --- | --- |
+| Header size | 5 bytes |
+| Max payload | 16 MiB |
+| Frame types | `Data`、`Control`、`Heartbeat`、`Error`、`Close` |
+
+`Frame::decode` 对 incomplete buffers 返回 `None`，对 unknown frame types 或超过上限的 payload
+返回 error。
+
+## Codec
+
+| Type | 作用 |
+| --- | --- |
+| `FrameReader<R>` | 缓冲任意 `AsyncRead` stream，并产出完整 frames。 |
+| `FrameWriter<W>` | 把 frames 写入任意 `AsyncWrite` stream。 |
+| `FrameCodec<R, W>` | 组合 split read/write halves。 |
+
+`FrameWriter` 提供 data frames、control frames 和 JSON-serializable payloads 的 helpers。
+
+## Transport Trait
+
+`Transport` 是 `Send + Sync + Debug`，提供 async `connect`、`send`、`recv`、`close` 和
+connection-state methods。默认 frame methods 会在 raw byte send/receive 与 `Frame` values
+之间桥接。
+
+`MockTransport` 是 in-memory implementation，支持 optional response handler 和用于 tests 的 sent-message log。
+
+## Unix Transport
+
+在 Unix platforms 上，`UnixTransport` 包装 `tokio::net::UnixStream` 并使用 common frame codec。
+`UnixListener` 绑定 socket path，移除可能存在的 stale socket file，并产出 accepted `UnixTransport`
+connections。
+
+## Well-Known Ports
+
+crate 暴露 vsock port constants：
+
+| Constant | Port | Purpose |
+| --- | --- | --- |
+| `GRPC_AGENT` | `4088` | gRPC agent control channel。 |
+| `EXEC_SERVER` | `4089` | Guest command execution。 |
+| `PTY_SERVER` | `4090` | Interactive terminal。 |
+| `TEE_CHANNEL` | `4091` | Secure channel。 |
+
+## TEE Protocol Types
+
+TEE messages 包含 requests、responses、heartbeats 和 errors。Request types 覆盖 session initialization、
+message processing、tool execution、protected value storage/retrieval/deletion、session state 和 termination。

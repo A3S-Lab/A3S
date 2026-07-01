@@ -1,0 +1,61 @@
+---
+title: Privacy
+description: A3S Common 的 sensitivity levels、regex rules、classification results、keyword matching、redaction 和 TEE flags。
+---
+
+# Common Privacy
+
+`a3s_common::privacy` 提供可复用 classification primitives。它是 library layer，不是全局 privacy policy。
+
+## Sensitivity Levels
+
+`SensitivityLevel` 从低到高排序：
+
+| Level | 含义 |
+| --- | --- |
+| `Public` | 可公开数据。 |
+| `Normal` | 普通工作数据。 |
+| `Sensitive` | 需要额外谨慎处理的数据。 |
+| `HighlySensitive` | 通常需要更强处理的数据。 |
+| `Critical` | 最高风险 match class。 |
+
+当 overall level 至少是 `Sensitive` 时，classifier 会把 `requires_tee` 标为 true。
+
+## Regex Classification
+
+`ClassificationRule` 包含：
+
+| Field | 作用 |
+| --- | --- |
+| `name` | Rule identifier。 |
+| `pattern` | 由 `RegexClassifier::new` 编译的 regex pattern。 |
+| `level` | 每个 match 对应的 sensitivity。 |
+| `description` | Human-readable description。 |
+
+`RegexClassifier::classify(text)` 返回 `ClassificationResult`，包含 overall level、所有
+`ClassificationMatch` records 和 TEE flag。每个 match 记录 rule name、level、start/end offsets
+以及 matched text。
+
+## Redaction
+
+`RedactionStrategy` 支持：
+
+| Strategy | Behavior |
+| --- | --- |
+| `Mask` | 把已知 match types 替换成 masked forms，generic matches 使用 `[REDACTED]`。 |
+| `Remove` | 删除 matched text。 |
+| `Hash` | 用基于长度的 placeholder 替换 match。 |
+
+`RegexClassifier::redact(text, strategy)` 会先 classify，再按 reverse offset order 替换 matches，
+避免前面的替换移动后续 spans。
+
+## Keyword Matching
+
+`KeywordMatcherConfig` 支持 normal keywords、sensitive keywords、case-sensitive matching 和
+`tee_threshold`。`KeywordMatcher::classify` 在 sensitive keyword 命中时返回 configured threshold，
+regular keyword 命中时返回 `Normal`，没有命中时返回 `Public`。
+
+## 边界
+
+Common 负责检测和变换文本。Product components 仍然决定 match 对 authorization、logging、
+tool execution、routing 或 TEE enforcement 意味着什么。

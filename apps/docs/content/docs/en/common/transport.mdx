@@ -1,0 +1,69 @@
+---
+title: Transport
+description: Async transport trait, frame wire format, codecs, mock transport, Unix sockets, vsock ports, and TEE protocol types.
+---
+
+# Common Transport
+
+`a3s_common::transport` provides a small async framed transport abstraction for
+local IPC, test transports, and TEE-oriented protocol messages.
+
+## Frame Format
+
+Frames use a fixed header:
+
+```text
+[type:u8][length:u32 big-endian][payload:length bytes]
+```
+
+| Item | Current value |
+| --- | --- |
+| Header size | 5 bytes |
+| Max payload | 16 MiB |
+| Frame types | `Data`, `Control`, `Heartbeat`, `Error`, `Close` |
+
+`Frame::decode` returns `None` for incomplete buffers and errors on unknown
+frame types or payloads above the maximum.
+
+## Codec
+
+| Type | Role |
+| --- | --- |
+| `FrameReader<R>` | Buffers any `AsyncRead` stream and yields complete frames. |
+| `FrameWriter<W>` | Writes frames to any `AsyncWrite` stream. |
+| `FrameCodec<R, W>` | Combines split read/write halves. |
+
+`FrameWriter` includes helpers for data frames, control frames, and
+JSON-serializable payloads.
+
+## Transport Trait
+
+`Transport` is `Send + Sync + Debug` and provides async `connect`, `send`,
+`recv`, `close`, and connection-state methods. The default frame methods bridge
+raw byte send/receive with `Frame` values.
+
+`MockTransport` is an in-memory implementation with an optional response
+handler and a sent-message log for tests.
+
+## Unix Transport
+
+On Unix platforms, `UnixTransport` wraps `tokio::net::UnixStream` and uses the
+common frame codec. `UnixListener` binds a socket path, removes a stale socket
+file if present, and yields accepted `UnixTransport` connections.
+
+## Well-Known Ports
+
+The crate exposes vsock port constants:
+
+| Constant | Port | Purpose |
+| --- | --- | --- |
+| `GRPC_AGENT` | `4088` | gRPC agent control channel. |
+| `EXEC_SERVER` | `4089` | Guest command execution. |
+| `PTY_SERVER` | `4090` | Interactive terminal. |
+| `TEE_CHANNEL` | `4091` | Secure channel. |
+
+## TEE Protocol Types
+
+TEE messages include requests, responses, heartbeats, and errors. Request types
+cover session initialization, message processing, tool execution, protected
+value storage/retrieval/deletion, session state, and termination.

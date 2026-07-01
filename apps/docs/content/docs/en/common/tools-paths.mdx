@@ -1,0 +1,45 @@
+---
+title: Tools And Paths
+description: Shared tool metadata/result types and safe workspace path resolution helpers in A3S Common.
+---
+
+# Tools And Paths
+
+`a3s_common::tools` contains small shared types and path guards that other A3S
+crates can reuse.
+
+## Tool Types
+
+| Type | Fields |
+| --- | --- |
+| `Tool` | `name`, `description`, `parameters` as JSON schema/value metadata. |
+| `ToolResult` | `success`, `output`, optional `error`. |
+
+These structures are intentionally simple. Product crates can wrap them with
+their own richer contracts when they need streaming, confirmation, sandboxing,
+or schema-specific validation.
+
+## Path Resolution
+
+| Function | Behavior |
+| --- | --- |
+| `resolve_path(workspace, path)` | Joins `path` to `workspace`, canonicalizes both sides, and rejects paths outside the workspace. The target must already exist. |
+| `resolve_path_for_write(workspace, path)` | Canonicalizes the workspace and existing parent directory, then returns the resolved target path. The final file may be new. |
+
+Both functions reject path traversal or symlink escapes by checking that the
+canonical resolved path or parent remains under the canonical workspace.
+
+## Failure Modes
+
+The helpers return string errors for:
+
+- workspace canonicalization failure
+- target or parent resolution failure
+- path escaping the workspace
+- missing or invalid parent directory for writes
+
+## Boundary
+
+Path resolution is a guardrail, not a complete authorization layer. The caller
+still decides whether a tool is allowed to read, write, overwrite, delete, or
+execute the resolved path.

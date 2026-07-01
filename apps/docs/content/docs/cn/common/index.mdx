@@ -8,14 +8,25 @@ description: A3S crate 共享的 privacy、tool 和 transport 基础类型。
 `a3s-common` 包含 A3S crate 共享的基础类型。它不是产品表面，而是用于隐私分类、
 工具结果类型、安全 workspace 路径解析和 framed transport 的小型库。
 
+当前 crate version 是 `a3s-common` `0.1.1`。
+
 ## 能力地图
 
 | 领域 | 当前能力 |
 | --- | --- |
-| Privacy | 敏感级别、regex 分类规则、match metadata 和 redaction strategy。 |
+| Privacy | 敏感级别、regex 分类规则、match metadata、keyword matching、TEE thresholding 和 redaction strategies。 |
 | Tool types | 共享的 `Tool` 与 `ToolResult` 结构。 |
 | Workspace path | 安全读写路径解析，拒绝逃逸 workspace 的路径。 |
-| Transport | codec、frame、Unix transport、TEE transport 等 framed transport 模块。 |
+| Transport | Async transport trait、mock transport、5-byte frame header、payload limits、Unix socket transport、vsock port constants 和 TEE protocol types。 |
+
+## 从这里开始
+
+- [Privacy](/cn/docs/common/privacy) 覆盖 classification rules、match metadata、
+  keyword matching、redaction 和 TEE flags。
+- [Tools And Paths](/cn/docs/common/tools-paths) 覆盖 `Tool`、`ToolResult`、
+  `resolve_path` 和 `resolve_path_for_write`。
+- [Transport](/cn/docs/common/transport) 覆盖 frames、codecs、`Transport`、
+  `MockTransport`、Unix sockets、port constants 和 TEE messages。
 
 ## 边界
 

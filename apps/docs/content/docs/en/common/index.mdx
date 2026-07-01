@@ -9,14 +9,25 @@ description: Shared privacy, tool, and transport primitives used by A3S crates.
 surface; it is a small library for common privacy classification, tool result
 types, safe workspace path resolution, and framed transport types.
 
+The current crate version is `a3s-common` `0.1.1`.
+
 ## Capability Map
 
 | Area | Current capability |
 | --- | --- |
-| Privacy | Sensitivity levels, regex classification rules, match metadata, and redaction strategies. |
+| Privacy | Sensitivity levels, regex classification rules, match metadata, keyword matching, TEE thresholding, and redaction strategies. |
 | Tool types | Shared `Tool` and `ToolResult` structures for simple tool metadata and results. |
 | Workspace paths | Safe read and write path resolution that rejects paths escaping the workspace. |
-| Transport | Framed transport modules for codecs, frames, Unix transport, and TEE transport. |
+| Transport | Async transport trait, mock transport, 5-byte frame header, payload limits, Unix socket transport, vsock port constants, and TEE protocol types. |
+
+## Start Here
+
+- [Privacy](/docs/common/privacy) covers classification rules, match metadata,
+  keyword matching, redaction, and TEE flags.
+- [Tools And Paths](/docs/common/tools-paths) covers `Tool`, `ToolResult`,
+  `resolve_path`, and `resolve_path_for_write`.
+- [Transport](/docs/common/transport) covers frames, codecs, `Transport`,
+  `MockTransport`, Unix sockets, port constants, and TEE messages.
 
 ## Boundary
 

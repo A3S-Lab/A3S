@@ -1,4 +1,9 @@
 {
   "title": "A3S Common",
-  "pages": ["index"]
+  "pages": [
+    "index",
+    "privacy",
+    "tools-paths",
+    "transport"
+  ]
 }
