@@ -183,7 +183,8 @@ if __name__ == "__main__":
 - 除非最终步骤由受控自动化负责，否则 release 和 publish 操作（`bash(git push*)`、
   `bash(npm publish*)`）应保持在 `ask` 或 `deny` 路径上。
 - `session.tool()`、`session.bash()`、`session.git()` 这类宿主直接调用都是特权操作。
-  它们同样会经过相同的提供器和策略，因此应进行管控，而不是无防护地暴露出去。
+  它们由你的应用代码发起，应在调用 SDK 前先由宿主授权；上面的 permission policy 管控的是
+  `send`、`run` 和 `stream` 内由模型选择的工具调用。
 
 可运行的确认循环示例位于
 `crates/code/sdk/node/examples/streaming/hitl_confirmation_loop.ts` 和

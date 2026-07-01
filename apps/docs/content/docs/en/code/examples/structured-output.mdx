@@ -13,7 +13,10 @@ validated object only on a zero-exit result. Use it whenever you need
 machine-readable results: extraction, classification, config generation, or
 feeding another program.
 
-You call it through `session.tool('generate_object', ...)`. The tool result carries the validated object as JSON on `result.output` — parse it and read the `object` field. The same tool also supports agent-driven invocation, where the model decides to call it during a `send`.
+You can call it directly through `session.tool('generate_object', ...)`. The
+tool result carries the validated object as JSON on `result.output` — parse it
+and read the `object` field. The same tool also supports agent-driven
+invocation, where the model decides to call it during a `send`.
 
 ## Direct tool call
 
@@ -27,13 +30,7 @@ and parse the validated object out of the result.
 import { Agent } from '@a3s-lab/code';
 
 const agent = await Agent.create('agent.acl');
-const session = agent.session('.', {
-  builtinSkills: true,
-  permissionPolicy: {
-    allow: ['generate_object(*)'],
-    defaultDecision: 'deny',
-  },
-});
+const session = agent.session('.');
 
 const result = await session.tool('generate_object', {
   schema: {
@@ -70,16 +67,10 @@ session.close();
 
 ```python
 import json
-from a3s_code import Agent, SessionOptions, PermissionPolicy
+from a3s_code import Agent
 
 agent = Agent.create('agent.acl')
-opts = SessionOptions()
-opts.builtin_skills = True
-opts.permission_policy = PermissionPolicy(
-    allow=["generate_object(*)"],
-    default_decision="deny",
-)
-session = agent.session('.', opts)
+session = agent.session('.')
 
 result = session.tool("generate_object", {
     "schema": {
@@ -290,6 +281,7 @@ The built-in validator supports:
 
 - The validated value is on the `object` key of the parsed `result.output`. Pass `mode: 'tool'` for the current cross-provider default, or `mode: 'prompt'` for a prompt-only fallback. `auto`, `strict`, and `json` currently resolve to `tool` in this runtime path.
 - List every field you depend on in `required` — the runtime enforces it, so missing or mistyped fields fail validation instead of silently returning partial data.
-- `generate_object` is a built-in tool registered independently of built-in skills. The examples enable `builtinSkills` / `builtin_skills` because most real sessions also want the skill catalog, not because `generate_object` depends on it.
+- `generate_object` is a built-in tool registered independently of built-in skills.
+- Direct `session.tool(...)` calls are host control-plane calls. Use `permissionPolicy` when you let the model choose tools inside `send` / `run` / `stream`; use host authorization before direct SDK calls.
 
 A runnable version ships at `crates/code/sdk/node/examples/basic/test_generate_object.ts` and `crates/code/sdk/python/examples/test_generate_object.py`.

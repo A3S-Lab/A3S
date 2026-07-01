@@ -12,7 +12,7 @@ Prompt
   -> context assembly
   -> optional planning and automatic subagent delegation
   -> LLM generation
-  -> model-selected, delegated, direct, or programmatic tool calls
+  -> model-selected, delegated, or programmatic tool calls
   -> permission, hook, AHP, confirmation, and security checks
   -> tool execution
   -> observation
@@ -25,9 +25,10 @@ Prompt
 
 The kernel maintains sessions, calls providers, executes tools through one
 executor, records observations, and returns structured events and results. Tool
-calls can originate from the model, a direct SDK helper, a delegated child run,
-or the `program` tool; they still converge on the same registry, guards, trace
-sink, and workspace services.
+calls can originate from the model, a delegated child run, or the `program`
+tool. Direct SDK helpers are a separate host-control-plane entry point: the host
+authorizes them before calling the SDK, and they then use the same registry,
+workspace services, artifacts, and result shapes.
 
 ## Harness
 
@@ -49,13 +50,15 @@ product surface.
 
 Programmatic Tool Calling is a harness path for deterministic workflows. The
 `program` tool runs a JavaScript script in an embedded QuickJS VM with a
-controlled `ctx` object. A program call is still a tool call: permission
-policy, hook/AHP integration, timeouts, artifact limits, tracing, and workspace
-capability checks remain in the execution path. By default, scripts may call
-every registered tool except `program`; callers can narrow that surface with
-`allowed_tools`. The docs contract verifies scripts that compose `readFile`,
-`read`, `glob`, `grep`, `ls`, `bash`, `git`, and generic `tool(name, args)`,
-then return one structured result to the agent.
+controlled `ctx` object. When the model invokes `program` inside an agent turn,
+it goes through the same permission, hook/AHP, confirmation, timeout, artifact,
+trace, and workspace-capability path as other model-selected tools. When host
+code calls `session.program(...)` directly, it is a direct SDK call and must be
+authorized by the host first. By default, scripts may call every registered
+tool except `program`; callers can narrow that surface with `allowed_tools`.
+The docs contract verifies scripts that compose `readFile`, `read`, `glob`,
+`grep`, `ls`, `bash`, `git`, and generic `tool(name, args)`, then return one
+structured result to the agent.
 
 Use PTC when the operation is mostly mechanical:
 

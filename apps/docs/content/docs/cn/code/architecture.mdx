@@ -12,7 +12,7 @@ Prompt
   -> context assembly
   -> optional planning and automatic subagent delegation
   -> LLM generation
-  -> model-selected、delegated、direct 或 programmatic tool calls
+  -> model-selected、delegated 或 programmatic tool calls
   -> permission、hook、AHP、confirmation 与 security checks
   -> tool execution
   -> observation
@@ -21,7 +21,7 @@ Prompt
   -> compaction
 ```
 
-内核负责维护 session、调用 provider、通过同一个 executor 执行工具、记录 observation，并返回结构化事件和结果。工具调用可以来自模型、SDK 直接 helper、委派子运行，或 `program` 工具；它们仍会汇聚到同一个 registry、guard、trace sink 和 workspace services。
+内核负责维护 session、调用 provider、通过同一个 executor 执行工具、记录 observation，并返回结构化事件和结果。工具调用可以来自模型、委派子运行，或 `program` 工具。SDK 直接 helper 是另一条宿主控制面入口：宿主先授权，再调用 SDK；随后它们使用同一个 registry、workspace services、artifact 和结果形状。
 
 驾驭层协调上下文预算、工具可见性、permission/hooks/AHP/security-provider 集成点、输出摘要、完成验证，以及面向宿主应用暴露 run snapshot、TaskList 状态和 trace event。
 
@@ -29,7 +29,7 @@ Prompt
 
 ## PTC 路径
 
-Programmatic Tool Calling 是确定性工作流的驾驭路径。`program` 工具会在内嵌 QuickJS VM 中运行 JavaScript 脚本，并只暴露一个受控 `ctx` 对象。一次 program 调用仍然是工具调用：permission policy、hook/AHP 集成、timeout、artifact limit、trace 和 workspace capability check 都仍在执行路径上。默认情况下，脚本可以调用除 `program` 之外的所有已注册工具；调用方也可以用 `allowed_tools` 收窄工具面。脚本可以组合 `readFile`、`read`、`glob`、`grep`、`ls`、`bash`、`git` 和通用 `tool(name, args)`，并把一个结构化结果交给 agent。
+Programmatic Tool Calling 是确定性工作流的驾驭路径。`program` 工具会在内嵌 QuickJS VM 中运行 JavaScript 脚本，并只暴露一个受控 `ctx` 对象。当模型在 agent turn 内调用 `program` 时，它和其他模型选择的工具一样经过 permission、hook/AHP、confirmation、timeout、artifact、trace 和 workspace-capability 路径。宿主代码直接调用 `session.program(...)` 时，它是 direct SDK call，必须先由宿主授权。默认情况下，脚本可以调用除 `program` 之外的所有已注册工具；调用方也可以用 `allowed_tools` 收窄工具面。脚本可以组合 `readFile`、`read`、`glob`、`grep`、`ls`、`bash`、`git` 和通用 `tool(name, args)`，并把一个结构化结果交给 agent。
 
 适合使用 PTC 的场景包括：
 

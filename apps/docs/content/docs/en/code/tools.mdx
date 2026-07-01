@@ -21,8 +21,13 @@ hide tools it cannot service.
 
 Use `toolNames()` / `toolDefinitions()` in tests or application diagnostics when
 a workflow depends on a specific tool being visible. Tool visibility is not a
-security grant; visible calls still pass through permission policy,
-confirmation, hooks/AHP, timeouts, artifact limits, and workspace path checks.
+security grant. Model-selected tool calls inside `send`, `run`, and `stream`
+pass through permission policy, confirmation, hooks/AHP, timeouts, artifact
+limits, and workspace path checks. Direct SDK calls such as `session.tool(...)`
+are host control-plane calls; authorize them in your application before calling
+the SDK.
+Use `activeTools()` for a different question: which tool calls are currently
+running in an active operation.
 
 ## Structured Output with `generate_object`
 

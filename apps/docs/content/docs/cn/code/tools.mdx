@@ -18,8 +18,10 @@ workspace capability 与 session 级集成共同组装；因此非本地 workspa
 | Dynamic integrations | `mcp__<server>__<tool>` 与宿主注册工具 | 从 MCP manager 或宿主代码发现后加入。 |
 
 当某个工作流依赖特定工具可见时，在测试或应用诊断中使用 `toolNames()` /
-`toolDefinitions()` 验证。工具可见性不是安全授权；可见调用仍会经过 permission policy、
-confirmation、hooks/AHP、timeout、artifact limit 与 workspace path check。
+`toolDefinitions()` 验证。工具可见性不是安全授权。`send`、`run`、`stream`
+中的模型选择工具调用会经过 permission policy、confirmation、hooks/AHP、timeout、
+artifact limit 与 workspace path check。`session.tool(...)` 这类 direct SDK call 是宿主控制面调用；调用 SDK 前应先在你的应用中授权。
+`activeTools()` 回答的是另一个问题：当前 active operation 中哪些工具调用正在运行。
 
 ```ts
 const files = await session.glob('src/**/*.rs');

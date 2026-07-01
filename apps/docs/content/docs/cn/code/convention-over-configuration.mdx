@@ -177,7 +177,8 @@ A3S Code 的工具面分三层：
 
 - `stream()` 输出增量事件。
 - `runs()`、`runSnapshot()`、`runEvents()` 查看当前和历史 run。
-- `activeTools()` 查看可用工具。
+- `toolNames()` / `toolDefinitions()` 查看可见工具表面。
+- `activeTools()` 查看当前正在运行的工具调用快照。
 - `cancelRun(runId)` 中止正在执行的回合。
 - `traceEvents()` 读取压缩、委派、工具和验证证据。
 - `verificationSummaryText` 给发布或审核流程使用。

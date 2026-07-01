@@ -183,7 +183,8 @@ Long-running agents must be observable and interruptible. A3S Code's core observ
 
 - `stream()` for incremental events.
 - `runs()`, `runSnapshot()`, and `runEvents()` for active and historical runs.
-- `activeTools()` for the visible tool surface.
+- `toolNames()` / `toolDefinitions()` for the visible tool surface.
+- `activeTools()` for currently running tool-call snapshots.
 - `cancelRun(runId)` to interrupt an active turn.
 - `traceEvents()` for compaction, delegation, tools, and verification evidence.
 - `verificationSummaryText` for release or review gates.

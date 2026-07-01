@@ -188,8 +188,9 @@ if __name__ == "__main__":
 - Keep release and publish actions (`bash(git push*)`, `bash(npm publish*)`) on the
   `ask` or `deny` path unless automation owns the final step.
 - Direct host calls such as `session.tool()`, `session.bash()`, and `session.git()`
-  are privileged host operations. They flow through the same provider and policy, so
-  gate them rather than exposing them unguarded.
+  are privileged host operations initiated by your application code. Authorize
+  them in the host before calling the SDK; the permission policy above gates
+  model-selected tool calls inside `send`, `run`, and `stream`.
 
 A runnable confirmation loop ships at
 `crates/code/sdk/node/examples/streaming/hitl_confirmation_loop.ts` and
