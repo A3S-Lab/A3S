@@ -76,7 +76,13 @@ const { object } = JSON.parse(result.output);
 通过 `session.stream()` 调用时，部分对象以 `tool_output_delta` 事件发出：
 
 ```ts
-for await (const ev of await session.stream('提取所有发票...')) {
+const stream = await session.stream('提取所有发票...');
+
+while (true) {
+  const { value: ev, done } = await stream.next();
+  if (done) break;
+  if (!ev) continue;
+
   if (ev.type === 'tool_output_delta' && ev.toolName === 'generate_object') {
     const { object_partial } = JSON.parse(ev.text);
     renderProgress(object_partial);

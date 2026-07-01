@@ -83,7 +83,13 @@ When called through `session.stream()`, partial objects are emitted as
 `tool_output_delta` events:
 
 ```ts
-for await (const ev of await session.stream('Extract all invoices...')) {
+const stream = await session.stream('Extract all invoices...');
+
+while (true) {
+  const { value: ev, done } = await stream.next();
+  if (done) break;
+  if (!ev) continue;
+
   if (ev.type === 'tool_output_delta' && ev.toolName === 'generate_object') {
     const { object_partial } = JSON.parse(ev.text);
     renderProgress(object_partial);

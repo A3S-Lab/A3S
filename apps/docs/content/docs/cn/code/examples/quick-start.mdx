@@ -24,7 +24,7 @@ const result = await session.send('List the files in this directory.');
 console.log(result.text);
 
 // What the runtime checked while producing that turn.
-console.log(session.verificationSummaryText());
+console.log(result.verificationSummaryText);
 
 session.close();
 ```
@@ -43,7 +43,7 @@ result = session.send('List the files in this directory.')
 print(result.text)
 
 # What the runtime checked while producing that turn.
-print(session.verification_summary_text())
+print(result.verification_summary_text)
 
 session.close()
 ```
