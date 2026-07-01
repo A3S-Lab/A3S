@@ -30,15 +30,18 @@ product UI.
 
 | Area | Current capability |
 | --- | --- |
-| Agent sessions | `Agent` / `AgentSession` expose `send`, `stream`, direct tools, run state, cancellation, persistence, and lifecycle cleanup. |
+| Agent sessions | `Agent` / `AgentSession` expose `send`, `run`, `stream`, object-shaped requests, explicit-history calls, attachments, direct tools, run state, cancellation, persistence, and lifecycle cleanup. |
 | TUI | [`a3s code`](/docs/code/tui) streams runtime events into a terminal transcript with tool activity, approvals, memory, git/file panels, and session controls. |
 | Filesystem-first | [Filesystem-first](/docs/code/filesystem-first) organizes `AGENTS.md`, `agent.acl`, `.a3s/agents/`, `skills/`, `tools/`, and `schedules/` into a reviewable agent product interface. |
 | Tools | Stable tool names cover files, search, shell, git, web fetch/search, batch execution, structured output, programmatic QuickJS tool chains, skills, MCP tools, and child-task delegation. |
+| Commands | [Commands](/docs/code/commands) separates TUI slash commands from the SDK command registry used for host-defined `/command` handlers. |
 | Delegation | Built-in roles and custom Markdown/YAML agents are available through `task`, `parallel_task`, `session.task(...)`, `session.tasks(...)`, and automatic delegation controls. |
 | Orchestration | [`session.parallel`](/docs/code/orchestration), `session.pipeline`, workflow phases, resumable checkpoints, loop caps, and workflow budget ledgers provide deterministic host-driven fan-out. |
+| Serving | [AgentDir](/docs/code/agent-dir) can be served as scheduled harness turns through `serveAgentDir` / `serve_agent_dir`, with one stable `schedule:<name>` session per enabled schedule. |
 | Safety | Permission policies, HITL confirmation, workspace path checks, tool timeouts, sandbox handles, security providers, and prompt boundary injection all feed the same execution path. |
 | Workspaces | [Workspace Backends](/docs/code/workspace-backends) let built-in tools target local files, host-provided workspaces, optional S3-compatible storage, and optional remote-git services. |
-| Persistence | Memory/file stores, session IDs, auto-save, run snapshots/events, trace artifacts, memory recall, and retention caps support resumable sessions and replayable product state. |
+| Persistence | Memory/file stores, session IDs, auto-save, run snapshots/events, trace artifacts, loop/workflow checkpoints, memory recall, and retention caps support resumable sessions and replayable product state. |
+| Verification | [Verification](/docs/code/verification) covers explicit verification commands, presets, structured reports, summaries, artifacts, trace events, and run replay evidence. |
 
 The execution shape is:
 
@@ -146,6 +149,9 @@ const session = agent.session('/path/to/workspace', {
 const result = await session.send('Find the authentication entry points.');
 console.log(result.text);
 console.log(result.verificationSummaryText);
+
+session.close();
+await agent.close();
 ```
 
 ## Entry Points
@@ -154,8 +160,13 @@ console.log(result.verificationSummaryText);
 - [Filesystem-first](/docs/code/filesystem-first) covers reviewable project and AgentDir conventions.
 - [API Contract](/docs/code/api-contract) documents the integration-tested Node SDK surface.
 - [Sessions](/docs/code/sessions) covers lifecycle, streaming, run state, persistence, and cancellation.
+- [Commands](/docs/code/commands) distinguishes TUI commands from SDK command registry handlers.
 - [Tools](/docs/code/tools) covers direct tools, typed tool errors, structured output, and QuickJS programs.
+- [Verification](/docs/code/verification) covers command evidence, reports, and summaries.
 - [Tasks](/docs/code/tasks) covers model-driven child-task delegation.
 - [Orchestration](/docs/code/orchestration) covers host-driven fan-out, pipelines, and resumable workflows.
 - [Security](/docs/code/security) covers permissions, confirmations, hooks, and verification gates.
+- [Hooks](/docs/code/hooks) covers lifecycle interception for tools, prompts, skills, sessions, and errors.
+- [Agent Directory](/docs/code/agent-dir) covers durable filesystem-first agents, tools, and schedules.
+- [Memory](/docs/code/memory) and [Persistence](/docs/code/persistence) cover reusable facts, session snapshots, and recovery paths.
 - [Providers](/docs/code/providers) covers ACL provider configuration and environment injection.
