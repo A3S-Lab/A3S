@@ -1,0 +1,58 @@
+---
+title: Rendering And Testing
+description: Incremental rendering、markdown、streaming、animation/theme support、examples、tests 和 benchmarks。
+---
+
+# Rendering And Testing
+
+A3S TUI 把 element tree 渲染成 terminal grid，然后只写入发生变化的行。这适合 streaming
+agent output，因为大部分屏幕区域在相邻帧之间保持稳定。
+
+## Rendering Pipeline
+
+| 阶段 | Module | 作用 |
+| --- | --- | --- |
+| Layout | `layout_engine`、`layout`、Taffy | 根据 Flexbox-like constraints 计算 boxes。 |
+| Paint | `paint`、`grid` | 把 styled text 和 component output 绘制到 cells。 |
+| Diff | `diff`、`renderer` | 比较上一帧和下一帧，并输出 incremental changes。 |
+| Terminal | `terminal`、Crossterm | 应用 output、alternate screen、input、resize、mouse 和 cursor 行为。 |
+
+Text rendering 使用 display-width helpers，因此 ANSI styling 和 CJK-width text 不会破坏 layout。
+
+## Rich Text And Streaming
+
+| Module | 能力 |
+| --- | --- |
+| `markdown` | CommonMark rendering，并通过 `syntect` 语法高亮。 |
+| `streaming` | 面向 LLM-style output 的 real-time text streaming。 |
+| `animation` | Easing、frame animation 和 transitions。 |
+| `theme` | 用于一致 color/style 选择的 theme tokens。 |
+
+## Examples
+
+crate 包含 counter apps、chat UI、dashboard、data table、forms、layout、markdown、mouse
+input、styles、theme/animation、widgets 和完整 component demo 等 examples。
+
+在 `crates/tui` 中运行聚焦 examples：
+
+```bash
+cargo run --example counter_element
+cargo run --example demo
+cargo run --example chat
+```
+
+## Tests And Benchmarks
+
+| Check | 覆盖内容 |
+| --- | --- |
+| `cargo test --test terminal_integration` | 从 element tree 到 layout、grid painting、ANSI snapshots、resize、truncation、incremental diff changes 的 headless terminal pipeline。 |
+| `cargo bench --bench rendering` | Hot rendering paths、width helpers、主要 components、markdown 和 viewport selection rendering。 |
+
+常规 crate 工作应在 `crates/tui` 内运行聚焦检查，而不是 monorepo root。
+
+## 边界
+
+- 它是 terminal renderer，不是 browser 或 native GUI framework。
+- 它不拥有 A3S Code 的 agent loop，也不执行 model/tool。
+- 它不替代 persistence、event transport 或 security policy。
+- Component APIs 是 Rust-first；应用通过组合 models、messages、elements 和 components 构建终端界面。

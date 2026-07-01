@@ -9,6 +9,8 @@ description: Rust TEA framework for terminal applications with Flexbox layout, i
 model, update, view. It is the UI framework used by the `a3s code` terminal
 agent, but it is a reusable library rather than the agent runtime.
 
+The current crate is `a3s-tui` `0.1.4`.
+
 ## Capability Map
 
 | Area | Current capability |
@@ -20,6 +22,12 @@ agent, but it is a reusable library rather than the agent runtime.
 | Markdown | CommonMark rendering with syntax highlighting through `syntect`. |
 | Components | Rich component set including tables, tabs, modals, diff views, git panels, task queues, text editors, logs, timelines, split panes, and status bars. |
 | Validation | Headless terminal integration tests and rendering benchmarks. |
+
+## Start Here
+
+- [Architecture](/docs/tui/architecture) explains the TEA flow, element model, program builders, layout, and input model.
+- [Components](/docs/tui/components) maps the component families exported by `a3s_tui::components`.
+- [Rendering And Testing](/docs/tui/rendering-testing) covers incremental rendering, markdown, animation/theme support, examples, tests, and benchmarks.
 
 ## Relationship To `a3s code`
 

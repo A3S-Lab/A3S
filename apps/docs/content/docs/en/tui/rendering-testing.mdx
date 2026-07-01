@@ -1,0 +1,63 @@
+---
+title: Rendering And Testing
+description: Incremental rendering, markdown, streaming, animation/theme support, examples, tests, and benchmarks.
+---
+
+# Rendering And Testing
+
+A3S TUI renders an element tree into a terminal grid, then writes only the lines
+that changed. This makes it suitable for streaming agent output where most of
+the screen is stable between frames.
+
+## Rendering Pipeline
+
+| Stage | Module | Role |
+| --- | --- | --- |
+| Layout | `layout_engine`, `layout`, Taffy | Compute boxes from Flexbox-like constraints. |
+| Paint | `paint`, `grid` | Paint styled text and component output into cells. |
+| Diff | `diff`, `renderer` | Compare previous and next frames and emit incremental changes. |
+| Terminal | `terminal`, Crossterm | Apply output, alternate screen, input, resize, mouse, and cursor behavior. |
+
+Text rendering uses display-width helpers, so ANSI styling and CJK-width text
+can be measured without corrupting layout.
+
+## Rich Text And Streaming
+
+| Module | Capability |
+| --- | --- |
+| `markdown` | CommonMark rendering with syntax highlighting through `syntect`. |
+| `streaming` | Real-time text streaming for LLM-style output. |
+| `animation` | Easing, frame animation, and transitions. |
+| `theme` | Theme tokens for consistent color and style choices. |
+
+## Examples
+
+The crate includes examples for counter apps, chat UI, dashboard, data table,
+forms, layout, markdown, mouse input, styles, theme/animation, widgets, and the
+full component demo.
+
+Run focused examples from `crates/tui`:
+
+```bash
+cargo run --example counter_element
+cargo run --example demo
+cargo run --example chat
+```
+
+## Tests And Benchmarks
+
+| Check | What it covers |
+| --- | --- |
+| `cargo test --test terminal_integration` | Headless terminal pipeline from element tree through layout, grid painting, ANSI snapshots, resize, truncation, and incremental diff changes. |
+| `cargo bench --bench rendering` | Hot rendering paths, width helpers, major components, markdown, and viewport selection rendering. |
+
+For normal crate work, run focused checks from `crates/tui`, not the monorepo
+root.
+
+## Boundaries
+
+- It is a terminal renderer, not a browser or native GUI framework.
+- It does not own A3S Code's agent loop or model/tool execution.
+- It does not replace persistence, event transport, or security policy.
+- Component APIs are Rust-first; application authors build terminal interfaces
+  by composing models, messages, elements, and components.

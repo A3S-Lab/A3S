@@ -1,4 +1,9 @@
 {
   "title": "A3S TUI",
-  "pages": ["index"]
+  "pages": [
+    "index",
+    "architecture",
+    "components",
+    "rendering-testing"
+  ]
 }

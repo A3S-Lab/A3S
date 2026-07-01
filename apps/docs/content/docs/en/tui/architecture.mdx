@@ -1,0 +1,68 @@
+---
+title: Architecture
+description: The Elm Architecture flow, element trees, commands, layout, input, and runtime boundaries in A3S TUI.
+---
+
+# TUI Architecture
+
+A3S TUI is a Rust implementation of The Elm Architecture for terminal apps. The
+core loop is:
+
+```text
+terminal event -> Msg -> update(model) -> view(model) -> Element tree
+              -> Taffy layout -> grid paint -> incremental terminal diff
+```
+
+## Core Traits And Builders
+
+| API | Role |
+| --- | --- |
+| `ElementModel` | Application model with `update(msg)` and `view()`. |
+| `ElementProgramBuilder` | Builder for element-tree apps; supports alternate screen, target FPS, and mouse input. |
+| `Program` / `ProgramBuilder` | Lower-level program model for apps that do not use `Element`. |
+| `Cmd` | Command returned from `update`, including quit and async-style effects. |
+| `Event` | Terminal input event converted into the app's `Msg`. |
+
+The typical app defines a model struct, a message enum, `From<Event> for Msg`,
+and an `ElementModel` implementation.
+
+## Element Tree
+
+The public element model exposes:
+
+| Element | Purpose |
+| --- | --- |
+| `Element::Box` / `BoxElement` | Container with Flexbox layout and children. |
+| `Element::Text` / `TextElement` | Styled text with color, weight, wrapping, and display-width handling. |
+| `Element::Spacer` | Flexible layout space. |
+
+Macros keep view code compact:
+
+| Macro | Meaning |
+| --- | --- |
+| `col![...]` | Vertical column. |
+| `row![...]` | Horizontal row. |
+| `text!("...")` | Text element shorthand. |
+| `spacer!()` | Flexible spacer. |
+
+## Layout And Styling
+
+Layout is powered by Taffy. A3S TUI exposes familiar layout concepts:
+
+- `FlexDirection`, `AlignItems`, `JustifyContent`, and `Overflow`.
+- `Dimension::Auto`, point dimensions, and percentages.
+- Margins, padding, gap, and borders.
+- ANSI colors plus RGB colors.
+- Text styles such as bold, italic, underline, dim, and strikethrough.
+
+## Input And State
+
+Input modules include keyboard and mouse events, focus management, and keymap
+helpers. `FocusManager`, `FocusId`, `KeyBinding`, and `Keymap` are available for
+apps that need multi-pane navigation or Vim-like shortcuts.
+
+## Boundary
+
+A3S TUI is not the A3S Code runtime. It renders terminal surfaces. Agent loops,
+tools, model calls, persistence, and policy remain owned by A3S Code or by the
+host application.

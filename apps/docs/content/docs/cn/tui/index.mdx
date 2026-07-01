@@ -8,6 +8,8 @@ description: Rust TEA 终端 UI 框架，支持 Flexbox 布局、增量渲染和
 `a3s-tui` 是基于 The Elm Architecture 的 Rust 终端 UI 框架：model、update、view。
 它是 `a3s code` 终端智能体使用的 UI 框架，但它本身不是 agent runtime。
 
+当前 crate 是 `a3s-tui` `0.1.4`。
+
 ## 能力地图
 
 | 领域 | 当前能力 |
@@ -19,6 +21,12 @@ description: Rust TEA 终端 UI 框架，支持 Flexbox 布局、增量渲染和
 | Markdown | CommonMark 渲染与 `syntect` 语法高亮。 |
 | 组件 | 表格、tabs、modal、diff view、git panel、task queue、文本编辑器、日志、timeline、split pane、status bar 等组件。 |
 | 验证 | Headless terminal integration tests 和 rendering benchmarks。 |
+
+## 从这里开始
+
+- [Architecture](/cn/docs/tui/architecture) 解释 TEA flow、element model、program builders、layout 和 input model。
+- [Components](/cn/docs/tui/components) 映射 `a3s_tui::components` 导出的 component families。
+- [Rendering And Testing](/cn/docs/tui/rendering-testing) 覆盖 incremental rendering、markdown、animation/theme support、examples、tests 和 benchmarks。
 
 ## 与 `a3s code` 的关系
 

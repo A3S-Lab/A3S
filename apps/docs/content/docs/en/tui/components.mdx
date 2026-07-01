@@ -1,0 +1,78 @@
+---
+title: Components
+description: Component families exported by a3s_tui::components and how to choose them.
+---
+
+# TUI Components
+
+`a3s_tui::components` exports a broad component library for agent consoles,
+dashboards, editors, and operational tools. The exact set evolves, so use the
+crate exports as the source of truth.
+
+## Agent Console Components
+
+| Component | Use |
+| --- | --- |
+| `ActivityBlock` | In-flight activity with optional live output tail. |
+| `ConnectorBlock` | Connector-led compact output and task-summary rows. |
+| `GutterBlock` | Transcript/message block with marker gutter and optional bubble background. |
+| `OutputBlock` | Status-marked transcript or tool output with tail preview. |
+| `ToolLogView` | Completed tool/command history with arguments and output. |
+| `SessionStatus` | Agent/session footer row with live chips. |
+| `TaskQueue` | Pinned running and queued task panel. |
+| `SubagentTracker` | Parallel subagent or background work tracker. |
+| `SideNotePanel` | Compact side-channel question and answer panel. |
+| `WelcomeBanner` | First-run banner with metadata, tips, and notices. |
+
+## Navigation And Selection
+
+| Component | Use |
+| --- | --- |
+| `Tabs` / `TabbedMenuPanel` | Tab navigation and command palette-style overlays. |
+| `MenuPanel` | Titled scroll-aware menus. |
+| `List`, `Select`, `MultiSelect` | Single and multi-selection controls. |
+| `Tree`, `TreePicker` | Expandable hierarchy and file/tree pickers. |
+| `Breadcrumb` | Hierarchical path navigation. |
+| `PreviewPanel` | Selectable item list with live preview. |
+| `Viewport` | Scrollable content plus text-selection helpers. |
+
+## Data And Inspection
+
+| Component | Use |
+| --- | --- |
+| `Table` / `DataTable` | Tabular data with headers and responsive rows. |
+| `DetailPanel` | Selected-row metadata and actions. |
+| `KeyValue` | Labeled metadata rows. |
+| `MetricTrend`, `Meter`, `Progress`, `Sparkline` | Compact status and trend visualization. |
+| `Timeline` | Sectioned timeline with colored nodes and selected rows. |
+| `GitPanel` | Git status/log panel with files, commits, diffs, and commit input. |
+| `DiffView` | Unified diff renderer for edits and tool output. |
+
+## Input And Overlays
+
+| Component | Use |
+| --- | --- |
+| `TextInput` | Single-line input. |
+| `Textarea` | Multi-line editor with scrolling. |
+| `PromptLine` | Prompt-prefixed input with aligned continuation rows. |
+| `CursorLine` | Display-width-aware editor line with block cursor. |
+| `Confirm` / `ChoicePrompt` | Approval, rejection, and numbered action prompts. |
+| `Modal` / `TextOverlay` / `ToastManager` | Dialogs, transient overlays, and notifications. |
+
+## Text And Chrome
+
+| Component | Use |
+| --- | --- |
+| `Paragraph` | Width-aware wrapping. |
+| `Alert`, `Badge`, `ChipStrip` | Compact status and callout text. |
+| `HelpPanel`, `ModeLine`, `StatusBar` | Shortcut help, current mode, and bottom status rows. |
+| `Divider`, `Scrollbar`, `SplitPane`, `InputBorder` | Layout chrome and framing. |
+| `Spinner`, `ShimmerText` | Loading and activity animation. |
+
+## Choosing Components
+
+- Use `Element` primitives for custom layout and simple text.
+- Use components for repeated console patterns: approvals, logs, transcripts,
+  tasks, diffs, and tables.
+- Keep input state in your model; components should render state and emit
+  messages rather than own the whole application loop.

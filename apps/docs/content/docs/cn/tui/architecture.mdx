@@ -1,0 +1,65 @@
+---
+title: Architecture
+description: A3S TUI 的 Elm Architecture flow、element trees、commands、layout、input 和 runtime 边界。
+---
+
+# TUI Architecture
+
+A3S TUI 是面向终端应用的 Rust The Elm Architecture 实现。核心循环是：
+
+```text
+terminal event -> Msg -> update(model) -> view(model) -> Element tree
+              -> Taffy layout -> grid paint -> incremental terminal diff
+```
+
+## Core Traits 和 Builders
+
+| API | 作用 |
+| --- | --- |
+| `ElementModel` | 应用 model，提供 `update(msg)` 和 `view()`。 |
+| `ElementProgramBuilder` | element-tree app builder；支持 alternate screen、target FPS 和 mouse input。 |
+| `Program` / `ProgramBuilder` | 不使用 `Element` 的更底层 program model。 |
+| `Cmd` | `update` 返回的 command，包括 quit 和 async-style effects。 |
+| `Event` | 终端输入事件，会转换成应用自己的 `Msg`。 |
+
+典型应用会定义 model struct、message enum、`From<Event> for Msg`，并实现
+`ElementModel`。
+
+## Element Tree
+
+公开 element model 包括：
+
+| Element | 用途 |
+| --- | --- |
+| `Element::Box` / `BoxElement` | 带 Flexbox layout 和 children 的容器。 |
+| `Element::Text` / `TextElement` | 带颜色、weight、wrapping 和 display-width handling 的文本。 |
+| `Element::Spacer` | 弹性布局空白。 |
+
+Macros 让 view code 更紧凑：
+
+| Macro | 含义 |
+| --- | --- |
+| `col![...]` | 纵向 column。 |
+| `row![...]` | 横向 row。 |
+| `text!("...")` | Text element shorthand。 |
+| `spacer!()` | Flexible spacer。 |
+
+## Layout 和 Styling
+
+Layout 由 Taffy 驱动。A3S TUI 暴露熟悉的布局概念：
+
+- `FlexDirection`、`AlignItems`、`JustifyContent` 和 `Overflow`。
+- `Dimension::Auto`、point dimensions 和 percentages。
+- Margin、padding、gap 和 borders。
+- ANSI colors 加 RGB colors。
+- bold、italic、underline、dim、strikethrough 等 text styles。
+
+## Input 和 State
+
+输入模块包括 keyboard/mouse events、focus management 和 keymap helpers。需要多 pane
+导航或类 Vim shortcuts 的应用可以使用 `FocusManager`、`FocusId`、`KeyBinding` 和 `Keymap`。
+
+## 边界
+
+A3S TUI 不是 A3S Code runtime。它负责渲染终端界面；agent loop、tools、model calls、
+persistence 和 policy 仍由 A3S Code 或宿主应用负责。

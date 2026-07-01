@@ -1,0 +1,75 @@
+---
+title: Components
+description: a3s_tui::components 导出的 component families 与选择方式。
+---
+
+# TUI Components
+
+`a3s_tui::components` 导出面向 agent consoles、dashboards、editors 和 operational tools
+的组件库。组件集合会随 crate 演进，因此以 crate exports 为准。
+
+## Agent Console Components
+
+| Component | 用途 |
+| --- | --- |
+| `ActivityBlock` | 运行中 activity，带可选 live output tail。 |
+| `ConnectorBlock` | Connector-led compact output 和 task-summary rows。 |
+| `GutterBlock` | 带 marker gutter 和可选 bubble background 的 transcript/message block。 |
+| `OutputBlock` | 带 status 标记的 transcript 或 tool output，支持 tail preview。 |
+| `ToolLogView` | 已完成 tool/command history，含 arguments 和 output。 |
+| `SessionStatus` | Agent/session footer row，带 live chips。 |
+| `TaskQueue` | 固定显示 running 和 queued task panel。 |
+| `SubagentTracker` | Parallel subagent 或 background work tracker。 |
+| `SideNotePanel` | 紧凑 side-channel question/answer panel。 |
+| `WelcomeBanner` | First-run banner，带 metadata、tips 和 notices。 |
+
+## Navigation And Selection
+
+| Component | 用途 |
+| --- | --- |
+| `Tabs` / `TabbedMenuPanel` | Tab navigation 和 command palette-style overlays。 |
+| `MenuPanel` | 带 title 的 scroll-aware menus。 |
+| `List`、`Select`、`MultiSelect` | 单选和多选控件。 |
+| `Tree`、`TreePicker` | 可展开 hierarchy 和 file/tree pickers。 |
+| `Breadcrumb` | Hierarchical path navigation。 |
+| `PreviewPanel` | 带 live preview 的 selectable item list。 |
+| `Viewport` | Scrollable content 加 text-selection helpers。 |
+
+## Data And Inspection
+
+| Component | 用途 |
+| --- | --- |
+| `Table` / `DataTable` | 带 headers 和 responsive rows 的 tabular data。 |
+| `DetailPanel` | Selected-row metadata 和 actions。 |
+| `KeyValue` | Labeled metadata rows。 |
+| `MetricTrend`、`Meter`、`Progress`、`Sparkline` | 紧凑 status 和 trend visualization。 |
+| `Timeline` | 带 colored nodes 和 selected rows 的 sectioned timeline。 |
+| `GitPanel` | Git status/log panel，含 files、commits、diffs 和 commit input。 |
+| `DiffView` | 用于 edits 和 tool output 的 unified diff renderer。 |
+
+## Input And Overlays
+
+| Component | 用途 |
+| --- | --- |
+| `TextInput` | Single-line input。 |
+| `Textarea` | 带 scrolling 的 multi-line editor。 |
+| `PromptLine` | 带 prefix 和 aligned continuation rows 的输入行。 |
+| `CursorLine` | Display-width-aware editor line，带 block cursor。 |
+| `Confirm` / `ChoicePrompt` | Approval、rejection 和 numbered action prompts。 |
+| `Modal` / `TextOverlay` / `ToastManager` | Dialogs、transient overlays 和 notifications。 |
+
+## Text And Chrome
+
+| Component | 用途 |
+| --- | --- |
+| `Paragraph` | Width-aware wrapping。 |
+| `Alert`、`Badge`、`ChipStrip` | 紧凑 status 和 callout text。 |
+| `HelpPanel`、`ModeLine`、`StatusBar` | Shortcut help、current mode 和 bottom status rows。 |
+| `Divider`、`Scrollbar`、`SplitPane`、`InputBorder` | Layout chrome 和 framing。 |
+| `Spinner`、`ShimmerText` | Loading 和 activity animation。 |
+
+## 如何选择
+
+- 简单布局和文本优先使用 `Element` primitives。
+- 审批、日志、transcripts、tasks、diffs、tables 等重复 console pattern 使用组件。
+- 输入状态应放在你的 model 中；组件负责渲染 state 并发出 messages，而不是接管整个 app loop。
