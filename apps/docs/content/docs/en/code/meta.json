@@ -3,6 +3,7 @@
   "pages": [
     "index",
     "examples",
+    "tui",
     "---Filesystem-First---",
     "filesystem-first",
     "convention-over-configuration",

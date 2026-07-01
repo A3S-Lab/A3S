@@ -3,6 +3,7 @@
   "pages": [
     "index",
     "examples",
+    "tui",
     "---文件系统优先---",
     "filesystem-first",
     "convention-over-configuration",

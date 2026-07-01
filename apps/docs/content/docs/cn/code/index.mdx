@@ -14,11 +14,21 @@ workspace 访问、持久化、验证证据与 run replay。
 A3S Code session，并用 [`a3s-tui`](https://github.com/A3S-Lab/TUI) 框架渲染
 事件流。想要现成 TUI 时安装 CLI；要构建自己的 harness 或产品 UI 时安装 SDK。
 
+## Surfaces
+
+| 名称 | 用途 | 仓库 |
+| --- | --- | --- |
+| `a3s-code` | 通过 Rust、Node.js 或 Python API 嵌入 coding-agent session。 | [AI45Lab/Code](https://github.com/AI45Lab/Code) |
+| `a3s code` TUI | 运行现成的终端编程 agent。 | [A3S-Lab/Cli](https://github.com/A3S-Lab/Cli) |
+| `a3s-tui` | 构建终端 UI surface；它是 UI 框架，不是 agent runtime。 | [A3S-Lab/TUI](https://github.com/A3S-Lab/TUI) |
+| A3S monorepo | 产品文档、发布编排、submodule pin 与相关 crates。 | [A3S-Lab/a3s](https://github.com/A3S-Lab/a3s) |
+
 ## 当前能力图
 
 | 领域 | 当前能力 |
 | --- | --- |
 | Agent 会话 | `Agent` / `AgentSession` 暴露 `send`、`stream`、直接工具、run 状态、取消、持久化与生命周期清理。 |
+| TUI | [`a3s code`](/cn/docs/code/tui) 将运行时事件流渲染为终端 transcript，并提供 tool activity、approval、memory、git/file panel 与 session controls。 |
 | 文件系统优先 | [文件系统优先](/cn/docs/code/filesystem-first)把 `AGENTS.md`、`agent.acl`、`.a3s/agents/`、`skills/`、`tools/` 与 `schedules/` 组织成可审查的 Agent 产品接口。 |
 | 工具 | 稳定工具名覆盖文件、搜索、shell、git、web fetch/search、batch、结构化输出、QuickJS 程序化工具链、skills、MCP tools 与子任务委派。 |
 | 委派 | 内置角色与自定义 Markdown/YAML agents 可通过 `task`、`parallel_task`、`session.task(...)`、`session.tasks(...)` 和自动委派控制使用。 |
@@ -131,6 +141,7 @@ console.log(result.verificationSummaryText);
 
 ## 入口
 
+- [A3S Code TUI](/cn/docs/code/tui) 说明安装、配置发现、slash commands，以及 CLI 与 runtime 的区别。
 - [文件系统优先](/cn/docs/code/filesystem-first)覆盖可审查的项目约定和 AgentDir 约定。
 - [API 契约](/cn/docs/code/api-contract)说明经过集成测试的 Node SDK surface。
 - [会话](/cn/docs/code/sessions)覆盖生命周期、streaming、run 状态、持久化与取消。

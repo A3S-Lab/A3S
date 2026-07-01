@@ -17,11 +17,21 @@ it drives A3S Code sessions and renders their event stream with the
 ready TUI; install the SDK packages when you are building your own harness or
 product UI.
 
+## Surfaces
+
+| Name | Use it for | Repository |
+| --- | --- | --- |
+| `a3s-code` | Embedding coding-agent sessions through Rust, Node.js, or Python APIs. | [AI45Lab/Code](https://github.com/AI45Lab/Code) |
+| `a3s code` TUI | Running the ready terminal coding agent. | [A3S-Lab/Cli](https://github.com/A3S-Lab/Cli) |
+| `a3s-tui` | Building terminal UI surfaces; it is the UI framework, not the agent runtime. | [A3S-Lab/TUI](https://github.com/A3S-Lab/TUI) |
+| A3S monorepo | Product docs, release orchestration, submodule pins, and related crates. | [A3S-Lab/a3s](https://github.com/A3S-Lab/a3s) |
+
 ## Current Capability Map
 
 | Area | Current capability |
 | --- | --- |
 | Agent sessions | `Agent` / `AgentSession` expose `send`, `stream`, direct tools, run state, cancellation, persistence, and lifecycle cleanup. |
+| TUI | [`a3s code`](/docs/code/tui) streams runtime events into a terminal transcript with tool activity, approvals, memory, git/file panels, and session controls. |
 | Filesystem-first | [Filesystem-first](/docs/code/filesystem-first) organizes `AGENTS.md`, `agent.acl`, `.a3s/agents/`, `skills/`, `tools/`, and `schedules/` into a reviewable agent product interface. |
 | Tools | Stable tool names cover files, search, shell, git, web fetch/search, batch execution, structured output, programmatic QuickJS tool chains, skills, MCP tools, and child-task delegation. |
 | Delegation | Built-in roles and custom Markdown/YAML agents are available through `task`, `parallel_task`, `session.task(...)`, `session.tasks(...)`, and automatic delegation controls. |
@@ -136,6 +146,7 @@ console.log(result.verificationSummaryText);
 
 ## Entry Points
 
+- [A3S Code TUI](/docs/code/tui) explains install, config discovery, slash commands, and how the CLI differs from the runtime.
 - [Filesystem-first](/docs/code/filesystem-first) covers reviewable project and AgentDir conventions.
 - [API Contract](/docs/code/api-contract) documents the integration-tested Node SDK surface.
 - [Sessions](/docs/code/sessions) covers lifecycle, streaming, run state, persistence, and cancellation.

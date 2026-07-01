@@ -1,0 +1,151 @@
+---
+title: "A3S Code TUI"
+description: "Install, configure, and use the a3s code terminal application"
+---
+
+# A3S Code TUI
+
+`a3s code` is the interactive terminal application for A3S Code. It is shipped
+by the [`a3s` CLI](https://github.com/A3S-Lab/Cli), embeds the `a3s-code-core`
+runtime, and renders the runtime event stream with
+[`a3s-tui`](https://github.com/A3S-Lab/TUI).
+
+Use the TUI when you want a ready coding-agent terminal. Use the SDK packages
+when you are building your own harness, IDE extension, server worker, workflow
+runner, or product UI.
+
+## Surface Map
+
+| Surface | Repository | Responsibility |
+| --- | --- | --- |
+| `a3s-code` | [AI45Lab/Code](https://github.com/AI45Lab/Code) | Runtime crates plus Node.js and Python SDKs. |
+| `a3s code` | [A3S-Lab/Cli](https://github.com/A3S-Lab/Cli) | Terminal coding-agent application that drives A3S Code sessions. |
+| `a3s-tui` | [A3S-Lab/TUI](https://github.com/A3S-Lab/TUI) | Terminal UI framework used by the CLI. It is not the agent runtime. |
+| A3S monorepo | [A3S-Lab/a3s](https://github.com/A3S-Lab/a3s) | Product docs, release orchestration, submodule pins, and related crates. |
+
+## Install
+
+Install the CLI, then run `a3s code` from the workspace you want the agent to
+inspect:
+
+```bash
+brew install A3S-Lab/tap/a3s
+
+# or from crates.io
+cargo install a3s
+
+# or from the CLI repository
+cargo install --git https://github.com/A3S-Lab/Cli
+```
+
+```bash
+a3s code
+a3s code resume <session-id>
+a3s update
+```
+
+`a3s code update` is also accepted by the CLI and routes to the same updater.
+
+## Configuration
+
+The TUI discovers config in this order:
+
+1. `A3S_CONFIG_FILE`
+2. `.a3s/config.acl` walking upward from the current directory
+3. `~/.a3s/config.acl`
+
+The TUI uses `.a3s/config.acl` for project-local configuration. SDK examples
+often use `agent.acl` because embedders pass the config path explicitly with
+`Agent.create("agent.acl")`. Both are ACL files; the important difference is
+who discovers the file.
+
+Keep real keys, private provider URLs, tenant identifiers, and user-specific
+paths out of commits. Public templates should resolve credentials through
+environment variables:
+
+```text
+default_model = "provider/model-id"
+
+providers "provider" {
+  apiKey = env("PROVIDER_API_KEY")
+  baseUrl = env("PROVIDER_BASE_URL")
+
+  models "model-id" {
+    tool_call = true
+    limit = {
+      context = 128000
+      output = 4096
+    }
+  }
+}
+```
+
+## Filesystem-First Workflow
+
+The TUI is workspace-oriented. When launched in a repository, it can load the
+same filesystem-first conventions used by SDK sessions:
+
+| Path | TUI role |
+| --- | --- |
+| `AGENTS.md` | Project instructions loaded into context. |
+| `.a3s/config.acl` | Project-local model, provider, skill, storage, and delegation policy. |
+| `.a3s/agents/` | Worker roles available to `task`, `parallel_task`, and automatic delegation. |
+| `.a3s/skills/` and `skills/` | Reusable project skills surfaced to the session. |
+| `.a3s/kb/` | Project knowledge base used by TUI knowledge workflows. |
+
+These files make behavior reviewable, but they do not bypass runtime gates.
+Permission policy, confirmation prompts, workspace checks, tool visibility,
+response contracts, and verification still run through A3S Code.
+
+## Runtime Event Stream
+
+The TUI treats `AgentSession::stream()` as the source of truth. Runtime events
+drive transcript text, tool-call progress, planning state, approval prompts,
+memory views, git/file panels, verification evidence, and replayable run state.
+
+This split matters for product builders: the TUI is one opinionated client over
+the runtime. SDK embedders can build different controls over the same session,
+tool, event, persistence, and verification APIs.
+
+## Slash Commands
+
+Built-in slash commands include:
+
+| Command | Purpose |
+| --- | --- |
+| `/model` | Switch among configured models and signed-in account models. |
+| `/init` | Analyze the workspace and generate `AGENTS.md`. |
+| `/config` | Open `.a3s/config.acl` in the editor. |
+| `/theme` | Cycle the code-highlighting theme. |
+| `/workflow` | View the latest dynamic workflow. |
+| `/output` | View tool calls made during the session. |
+| `/login` and `/logout` | Sign in to or out of a configured account integration. |
+| `/view` | Open the last generated account view in a native window. |
+| `/plugin` and `/reload` | Enable, disable, and rescan skills/plugins. |
+| `/btw` | Ask a background side question. |
+| `/top` | Open the live process and agent monitor. |
+| `/ide` | Open the workspace file tree and code viewer. |
+| `/git` | Inspect git status, diff, staging, and commit flows. |
+| `/memory` | Browse long-term memory. |
+| `/kb` | Add text, files, or folders to the project knowledge base. |
+| `/effort` | Adjust model effort when the selected model/provider supports it. |
+| `/compact` | Summarize and compact conversation context. |
+| `/goal` | Set a persistent goal for the session. |
+| `/loop` | Run a task with auto-continuation until completion or stop. |
+| `/relay` | Continue an unfinished task from another agent. |
+| `/help` | Show commands and shortcuts. |
+| `/clear` | Reset the conversation. |
+| `/auto` | Switch to auto-approve mode. |
+| `/update` | Upgrade the CLI to the latest release. |
+| `/exit` | Quit `a3s code`. |
+
+Some commands are accepted only while the session is idle because they mutate
+conversation, model, context, or process state.
+
+## Related Pages
+
+1. [Filesystem-First](/docs/code/filesystem-first)
+2. [Sessions](/docs/code/sessions)
+3. [Commands](/docs/code/commands)
+4. [Tools](/docs/code/tools)
+5. [Security](/docs/code/security)

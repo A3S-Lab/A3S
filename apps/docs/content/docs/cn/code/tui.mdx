@@ -1,0 +1,146 @@
+---
+title: "A3S Code TUI"
+description: "安装、配置并使用 a3s code 终端应用"
+---
+
+# A3S Code TUI
+
+`a3s code` 是 A3S Code 的交互式终端应用。它由
+[`a3s` CLI](https://github.com/A3S-Lab/Cli) 发布，嵌入
+`a3s-code-core` 运行时，并使用 [`a3s-tui`](https://github.com/A3S-Lab/TUI)
+渲染运行时事件流。
+
+需要现成的终端编程 agent 时使用 TUI；要构建自己的 harness、IDE 扩展、
+server worker、workflow runner 或产品 UI 时使用 SDK 包。
+
+## Surface Map
+
+| Surface | 仓库 | 职责 |
+| --- | --- | --- |
+| `a3s-code` | [AI45Lab/Code](https://github.com/AI45Lab/Code) | 运行时 crates，以及 Node.js 和 Python SDK。 |
+| `a3s code` | [A3S-Lab/Cli](https://github.com/A3S-Lab/Cli) | 驱动 A3S Code session 的终端编程 agent 应用。 |
+| `a3s-tui` | [A3S-Lab/TUI](https://github.com/A3S-Lab/TUI) | CLI 使用的终端 UI 框架，不是 agent runtime。 |
+| A3S monorepo | [A3S-Lab/a3s](https://github.com/A3S-Lab/a3s) | 产品文档、发布编排、submodule pin 与相关 crates。 |
+
+## 安装
+
+先安装 CLI，然后在希望 agent 检查的 workspace 中运行 `a3s code`：
+
+```bash
+brew install A3S-Lab/tap/a3s
+
+# 或从 crates.io 安装
+cargo install a3s
+
+# 或从 CLI 仓库安装
+cargo install --git https://github.com/A3S-Lab/Cli
+```
+
+```bash
+a3s code
+a3s code resume <session-id>
+a3s update
+```
+
+`a3s code update` 也会被 CLI 接受，并路由到同一个 updater。
+
+## 配置
+
+TUI 按以下顺序发现配置：
+
+1. `A3S_CONFIG_FILE`
+2. 从当前目录向上查找的 `.a3s/config.acl`
+3. `~/.a3s/config.acl`
+
+TUI 使用 `.a3s/config.acl` 作为项目本地配置。SDK 示例经常使用
+`agent.acl`，因为 embedders 会通过 `Agent.create("agent.acl")` 显式传入
+配置路径。二者都是 ACL 文件；关键区别在于由谁发现文件。
+
+不要把真实 key、私有 provider URL、tenant 标识或用户本地路径提交到仓库。
+公开模板应通过环境变量解析凭据：
+
+```text
+default_model = "provider/model-id"
+
+providers "provider" {
+  apiKey = env("PROVIDER_API_KEY")
+  baseUrl = env("PROVIDER_BASE_URL")
+
+  models "model-id" {
+    tool_call = true
+    limit = {
+      context = 128000
+      output = 4096
+    }
+  }
+}
+```
+
+## 文件系统优先工作流
+
+TUI 面向 workspace。它在仓库中启动时，可以加载 SDK session 也会使用的
+filesystem-first 约定：
+
+| 路径 | TUI 中的作用 |
+| --- | --- |
+| `AGENTS.md` | 加载到上下文中的项目说明。 |
+| `.a3s/config.acl` | 项目本地模型、provider、skill、storage 和 delegation 策略。 |
+| `.a3s/agents/` | 可供 `task`、`parallel_task` 和自动委派使用的 worker role。 |
+| `.a3s/skills/` 与 `skills/` | 暴露给 session 的可复用项目 skills。 |
+| `.a3s/kb/` | TUI knowledge workflows 使用的项目知识库。 |
+
+这些文件让行为可审查，但不会绕过运行时边界。权限策略、确认提示、
+workspace 检查、工具可见性、响应契约与验证仍然通过 A3S Code 执行路径。
+
+## Runtime Event Stream
+
+TUI 将 `AgentSession::stream()` 视为事实来源。运行时事件驱动 transcript 文本、
+tool-call 进度、planning 状态、approval prompt、memory view、git/file panel、
+verification evidence 与可 replay 的 run state。
+
+这个分层对产品构建者很重要：TUI 只是 runtime 上方的一个有主张的客户端。
+SDK embedders 可以基于同样的 session、tool、event、persistence 与
+verification API 构建不同控制面。
+
+## Slash Commands
+
+内置 slash commands 包括：
+
+| 命令 | 作用 |
+| --- | --- |
+| `/model` | 在已配置模型和已登录账号模型之间切换。 |
+| `/init` | 分析 workspace 并生成 `AGENTS.md`。 |
+| `/config` | 在编辑器中打开 `.a3s/config.acl`。 |
+| `/theme` | 切换代码高亮主题。 |
+| `/workflow` | 查看最新 dynamic workflow。 |
+| `/output` | 查看本 session 中的 tool calls。 |
+| `/login` 与 `/logout` | 登录或退出已配置的账号集成。 |
+| `/view` | 在原生窗口中打开最近生成的账号视图。 |
+| `/plugin` 与 `/reload` | 启用、禁用并重新扫描 skills/plugins。 |
+| `/btw` | 提出后台 side question。 |
+| `/top` | 打开实时进程与 agent monitor。 |
+| `/ide` | 打开 workspace 文件树和代码查看器。 |
+| `/git` | 查看 git status、diff、staging 与 commit flow。 |
+| `/memory` | 浏览长期记忆。 |
+| `/kb` | 把文本、文件或目录加入项目知识库。 |
+| `/effort` | 在当前模型/provider 支持时调整 model effort。 |
+| `/compact` | 总结并压缩对话上下文。 |
+| `/goal` | 为 session 设置持续目标。 |
+| `/loop` | 自动继续执行任务，直到完成或停止。 |
+| `/relay` | 从另一个 agent 接续未完成任务。 |
+| `/help` | 显示 commands 与 shortcuts。 |
+| `/clear` | 重置 conversation。 |
+| `/auto` | 切换到 auto-approve mode。 |
+| `/update` | 将 CLI 升级到最新 release。 |
+| `/exit` | 退出 `a3s code`。 |
+
+部分命令只能在 session 空闲时执行，因为它们会改变 conversation、model、
+context 或 process state。
+
+## 相关页面
+
+1. [文件系统优先](/cn/docs/code/filesystem-first)
+2. [会话](/cn/docs/code/sessions)
+3. [命令](/cn/docs/code/commands)
+4. [工具](/cn/docs/code/tools)
+5. [安全](/cn/docs/code/security)
