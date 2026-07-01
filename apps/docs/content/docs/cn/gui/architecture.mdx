@@ -1,20 +1,21 @@
 ---
 title: Architecture
-description: A3S GUI 的 Web-compatible authoring layer、native IR、renderer、command stream、host boundary 和 style contract。
+description: A3S GUI 的 structured input、native IR、renderer、command stream、host boundary 和 style contract。
 ---
 
 # GUI Architecture
 
-A3S GUI 的目标是让 Web developer 用 React/TSX 和 React Aria 语义编写原生应用 UI，
-同时 runtime 渲染真实 native controls，而不是把 HTML 放进 WebView。
+A3S GUI 接受结构化 JSX/protocol element records，并输出 native platform
+commands。React Aria component names、HTML/SVG intrinsic names、DOM-style props
+和 style input 会在 Rust core 中映射到 native IR。
 
 ```text
-React / TSX source
+JSX / TSX element records
         -> @a3s-lab/gui JSX runtime
         -> React Compiler output
         -> UiFrame protocol
         -> ReactCompilerBridge
-        -> React Aria semantic tree
+        -> semantic UI tree
         -> A3S Native UI IR
         -> keyed renderer diff engine
         -> native command stream
@@ -23,18 +24,18 @@ React / TSX source
         -> HostEvent
         -> InteractionState
         -> EventRouter
-        -> Web-authored action ids
+        -> serialized action ids
 ```
 
 ## Layers
 
 | Layer | 职责 |
 | --- | --- |
-| Web-compatible authoring | 接受 JSX/TSX 形态的 React Aria tree，包含 DOM-style props、inline styles、`aria-*`、`data-*` 和命名事件回调。 |
+| Structured input | 接受 JSX/protocol element records，包含 semantic component names、DOM-style props、inline styles、`aria-*`、`data-*` 和命名事件回调。 |
 | Native UI IR | 保留 roles、labels、values、state、events、metadata、children、accessibility roles 和 portable style tokens。 |
 | Renderer | 对 keyed tree 做 reconciliation，并输出 create、update、insert child、remove、set-root commands。 |
 | Native host | 把 commands 应用到 AppKit、WinUI、GTK 或 headless recording backend。 |
-| Event bridge | 把 native input 转成 `HostEvent`，更新 portable interaction state，再路由到已注册的 Web action ids。 |
+| Event bridge | 把 native input 转成 `HostEvent`，更新 portable interaction state，再路由到已注册的 action ids。 |
 
 ## NativeHost Boundary
 
@@ -79,7 +80,8 @@ events 和 metadata。
 - border radius
 - opacity
 
-不支持的 style declarations 会保留为 author intent，方便 compiler 或 design tooling 告警，而不是静默丢弃。
+不支持的 style declarations 会保留为 source declarations，方便 compiler 或 design tooling
+报告未映射属性。
 
 ## 边界
 

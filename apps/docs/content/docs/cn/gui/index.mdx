@@ -1,29 +1,24 @@
 ---
 title: A3S GUI
-description: 面向 React Aria 语义 UI 树的原生 GUI renderer；当前存在于工作区，但未作为 submodule 固定。
+description: 结构化 UI 协议到原生平台命令流的 GUI renderer。
 ---
-
-import { Callout } from 'fumadocs-ui/components/callout';
 
 # A3S GUI
 
-`a3s-gui` 是 A3S 应用的原生 UI renderer 原型。它接受 React-Aria 形态的语义 UI 树，
-并把它们降成紧凑的 native UI IR，再交给平台 adapter 渲染，无需 WebView。
+`a3s-gui` 是将结构化 UI 输入转换为 native UI IR 和 platform command stream
+的 Rust crate。它接受 `UiFrame` protocol frames、JSX-generated element records
+和 `NativeElement` trees；platform adapters 将 command stream 应用到 AppKit、
+WinUI 或 GTK。
 
-当前本地 crate 是 `a3s-gui` `0.1.0`。它的 repository metadata 指向
-[`A3S-Lab/GUI`](https://github.com/A3S-Lab/GUI)。
-
-<Callout type="warn">
-在当前 monorepo 工作区中，`crates/gui` 存在，但未记录在 `.gitmodules` 中。这个页面
-描述的是当前本地项目形态，不应被理解为已发布 submodule 契约。
-</Callout>
+crate metadata 指向 [`A3S-Lab/GUI`](https://github.com/A3S-Lab/GUI)，并作为
+`crates/gui` submodule 固定在当前 monorepo 中。
 
 ## 能力地图
 
 | 领域 | 当前能力 |
 | --- | --- |
-| Authoring model | Web 兼容的 React/TSX 形态 tree，支持 React Aria 语义、DOM 风格 props、inline style、aria/data attribute 和命名事件回调。 |
-| Native IR | Accessibility-first tree，包含 native role、state、label、value、style token、event 和 children。 |
+| Input model | 支持 JSX-generated element records、React Aria semantic identifiers、HTML/SVG intrinsic names、DOM-style props、inline style、aria/data attributes 和命名事件回调。 |
+| Native IR | Typed tree，包含 native role、state、label、value、accessibility metadata、style token、event 和 children。 |
 | Runtime | `GuiRuntime`、keyed renderer diff engine、action registration、event routing，以及用于验证的 headless recording backend。 |
 | Command stream | 可序列化 native command，例如 create、update、insert child、remove、set root。 |
 | Platform planning | AppKit、WinUI、GTK planning adapter 将 IR 映射为 native widget blueprint。 |
@@ -43,5 +38,5 @@ import { Callout } from 'fumadocs-ui/components/callout';
 
 ## 边界
 
-A3S GUI 和 A3S WebView 不同。WebView 在嵌入式浏览器中渲染 web 内容；GUI 的目标是把
-Web 兼容的语义 UI 直接渲染成原生控件。
+Native feature paths 从 command stream 创建平台控件，不嵌入 browser engine。A3S WebView
+是单独的组件，用于 embedded web content。

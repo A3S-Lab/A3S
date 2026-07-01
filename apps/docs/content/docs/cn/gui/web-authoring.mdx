@@ -1,14 +1,15 @@
 ---
 title: Web Authoring
-description: A3S GUI 的 React Aria authoring、compiler bridge shape、native lowering rules 和 portability boundaries。
+description: A3S GUI 的 JSX input、compiler bridge shape、native lowering rules 和 portability boundaries。
 ---
 
 # Web Authoring
 
-A3S GUI 从 Web developer experience 出发：应用作者写 React/TSX 和 React Aria 形态组件，
-bridge 再把语义 tree 降成 native controls。
+TypeScript SDK 可以把 TSX element records 序列化为 `UiFrame` protocol data。Rust
+bridge 读取 React Aria component identities、DOM-style props、style input 和事件绑定，
+并将它们映射到 native IR。
 
-目标 TypeScript surface 是普通 TSX：
+TypeScript input example:
 
 ```tsx
 /** @jsxImportSource @a3s-lab/gui */
@@ -41,11 +42,13 @@ export const frame = createUiFrame('profile', root, {
 });
 ```
 
-常规 screen 的应用作者不需要导入 native widget 名，也不需要写 Rust UI code。
+Frame data contains protocol records. Platform widget classes are selected by
+the Rust renderer and native host adapter.
 
 ## Compiler Bridge Shape
 
-React Compiler integration 会把 TSX 降成可序列化 tree，携带 JSX props 中的同类信息：
+The compiler bridge expects serializable JSX output that carries the same
+information as JSX props:
 
 - React Aria component identity
 - 用于 reconciliation 的 stable keys
@@ -63,7 +66,7 @@ Rust core 通过 `ReactCompilerBridge` 映射这棵 tree，再交给 `GuiRuntime
 
 ## Native Lowering Rules
 
-| Web-authored input | Native IR output |
+| Input field | Native IR output |
 | --- | --- |
 | `className` | 保留在 `WebProps.class_name`，用于 style resolution。 |
 | `style={{...}}` | 保留在 `WebProps.style`，并解析为 `PortableStyle`。 |
@@ -77,10 +80,11 @@ Rust core 通过 `ReactCompilerBridge` 映射这棵 tree，再交给 `GuiRuntime
 | `TextField` + `Label` + `Input` | 折叠成一个 native text field。 |
 | `Select` + `ListBoxItem` | 折叠成带 native options 的 native select。 |
 
-当 `onPress` 和 `onClick` 同时存在时，React Aria 的 `onPress` 优先，因此作者可以使用惯用
-React Aria API，同时保留 native press 语义。
+当 `onPress` 和 `onClick` 同时存在时，React Aria 的 `onPress` 优先，并映射到 native
+press action。
 
 ## Portable Contract
 
-语法是 Web-compatible，runtime 是 native。依赖 live browser DOM、CSSOM、browser layout APIs
-或具体 `HTMLElement` 实例的代码不属于 portable contract，应在 runtime 前被捕获。
+Portable input 使用 JSX 和 DOM-style props 的数据形态；runtime execution 使用 native
+command stream。依赖 live browser DOM、CSSOM、browser layout APIs 或具体
+`HTMLElement` 实例的代码不属于 portable contract，应在 runtime 前被捕获。
