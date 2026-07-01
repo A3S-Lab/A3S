@@ -136,13 +136,12 @@ opts = SessionOptions()
 # Orchestrator stays on the stronger model.
 opts.model = 'provider/review-model'
 # High-volume exploration runs on the cheaper model.
-opts.worker_agents = [
-    WorkerAgentSpec(
-        name='scout',
-        description='Reads files and reports findings.',
-        model='provider/fast-model',
-    ),
-]
+scout = WorkerAgentSpec(
+    name='scout',
+    description='Reads files and reports findings.',
+)
+scout.model = 'provider/fast-model'
+opts.worker_agents = [scout]
 session = agent.session('/repo', opts)
 
 # Delegate exploration to the cheaper worker, then reason on the strong model.
