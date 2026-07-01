@@ -1,0 +1,45 @@
+---
+title: Platforms And Boundaries
+description: A3S WebView 的 WKWebView、WebKitGTK、WebView2、navigation controls、fallback ownership 和 non-goals。
+---
+
+# Platforms And Boundaries
+
+A3S WebView 使用 `tao` 提供 native window/event loop，并使用 `wry` 提供 platform WebView。
+
+## Platform Backends
+
+| Platform | Backend | Notes |
+| --- | --- | --- |
+| macOS | WKWebView | 使用系统 WebKit framework。Navigation controls 是 native AppKit titlebar buttons。 |
+| Linux | WebKitGTK | 从源码构建时需要 WebKitGTK runtime/development packages。Navigation controls 注入页面。 |
+| Windows | WebView2 | 使用 WebView2 runtime。Navigation controls 注入页面。 |
+
+## Navigation Controls
+
+所有平台都支持 back、forward、reload：
+
+| Platform | Implementation |
+| --- | --- |
+| macOS | `NSTitlebarAccessoryViewController` 中的 native `NSButton` controls；点击会把 `UserEvent` 发送回 Tao event loop。 |
+| Linux / Windows | `DOMContentLoaded` 后注入 top-right HTML toolbar；按钮调用 `history.back()`、`history.forward()`、`location.reload()`。 |
+
+Event loop 等待 native events，并在 `CloseRequested` 时退出。
+
+## Fallback Ownership
+
+如果缺少 `a3s-webview`，`a3s code` 可以 fallback 到系统浏览器。这个 fallback 属于 TUI host。
+Helper process 自身不负责发现或启动 alternate browsers。
+
+## Non-Goals
+
+A3S WebView 不是：
+
+- documentation site UI
+- A3S Code agent runtime
+- general browser
+- multi-tab shell
+- credential manager
+- 替代普通 inspectable links 的常用浏览器
+
+它适用于 terminal workflow 旁边的 trusted、sized runtime popups。

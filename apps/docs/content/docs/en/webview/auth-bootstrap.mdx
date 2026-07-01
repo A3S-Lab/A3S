@@ -1,0 +1,53 @@
+---
+title: Auth Bootstrap
+description: Browser-storage auth seeding, refresh-token support, same-origin user bootstrap, and argv safety in A3S WebView.
+---
+
+# Auth Bootstrap
+
+Some embedded runtime pages restore authentication from browser storage. A fresh
+WebView would otherwise load the page before the application can see the host
+session. `a3s-webview` handles that with an initialization script that runs at
+document start.
+
+## What Gets Seeded
+
+When auth is enabled and the access token environment variable is present, the
+helper writes:
+
+| Storage key | Source |
+| --- | --- |
+| `access_token` | Access token read from `--token-env` or the default token environment variable. |
+| `auth_token` | Same access token value, for apps that restore from this key. |
+| `refresh_token` | Optional refresh token environment variable, when present. |
+| `auth_user` | Same-origin `GET /api/v1/users/me` response, stored before the page boots. |
+
+The user bootstrap request is same-origin and sends the access token as an
+Authorization header inside the embedded page context.
+
+## Why Environment Variables
+
+The access token is read from an environment variable so the value does not need
+to appear in command-line arguments. Hosts can override the variable name with
+`--token-env NAME`.
+
+Use `--no-auth` when the page should load without storage seeding, or when the
+URL is a public page.
+
+## Timing
+
+The initialization script runs before the page's own scripts. The current-user
+request is intentionally synchronous so `auth_user` exists before a single-page
+app tries to restore its session.
+
+## Failure Behavior
+
+If no access token is present, auth seeding is skipped and the URL still opens.
+If the current-user request fails or returns a shape the page does not use, the
+helper does not block navigation; the embedded app decides what to show.
+
+## Boundary
+
+The helper seeds browser storage for a trusted popup. It does not mint tokens,
+refresh sessions, validate account policy, or persist credentials outside the
+WebView's normal storage behavior.

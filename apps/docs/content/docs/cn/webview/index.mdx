@@ -11,19 +11,32 @@ description: 从 a3s code TUI 打开 runtime viewUrl 弹窗的原生 WebView hel
 
 它会打开一个原生窗口，加载一个 `http://` 或 `https://` URL，并在窗口关闭时退出。
 
+当前 crate version 是 `a3s-webview` `0.1.1`。它的 repository metadata 指向
+[`A3S-Lab/WebView`](https://github.com/A3S-Lab/WebView)。
+
 ## 能力地图
 
 | 领域 | 当前能力 |
 | --- | --- |
 | Window helper | 按请求的逻辑尺寸和标题打开一个聚焦的原生窗口。 |
-| URL 策略 | 只接受 `http://` 和 `https://`；拒绝 `file:`、`data:` 与自定义 scheme。 |
+| URL 策略 | 要求 `--url`，只接受 `http://` 和 `https://`；unsupported schemes 或 unknown arguments 会以 usage error 退出。 |
 | 尺寸保护 | 宽度限制在 `240..4000`，高度限制在 `180..3000`；默认尺寸为 `900 x 680`。 |
 | Auth seeding | 导航前从环境变量读取 access token，并写入 browser storage，避免 token 出现在 argv。 |
 | Refresh token | 存在 `A3S_OS_REFRESH_TOKEN` 时，也会写入 `refresh_token`。 |
 | 用户初始化 | 通过同源 `GET /api/v1/users/me` 写入 `auth_user`，让嵌入页能恢复登录态。 |
 | Headers | 支持重复 `--header 'Name: Value'` 参数，注入宿主提供的请求 metadata。 |
-| 导航控件 | macOS 使用原生 titlebar 按钮；Linux/Windows 注入小型 back/forward/reload toolbar。 |
+| 导航控件 | macOS 使用原生 AppKit titlebar 按钮；Linux/Windows 注入小型 back/forward/reload toolbar。 |
 | 平台后端 | 通过 `wry` 和 `tao` 使用 macOS WKWebView、Linux WebKitGTK、Windows WebView2。 |
+
+## 从这里开始
+
+- [Usage](/cn/docs/webview/usage) 覆盖 command-line arguments、URL validation、
+  headers、size clamp behavior 和 install paths。
+- [Auth Bootstrap](/cn/docs/webview/auth-bootstrap) 解释 storage seeding、
+  same-origin user bootstrap，以及为什么 tokens 不进入 argv。
+- [Platforms And Boundaries](/cn/docs/webview/platforms-boundaries) 覆盖
+  WKWebView、WebKitGTK、WebView2、navigation controls、fallback ownership，以及
+  这个 helper 不承担什么。
 
 ## 用法
 

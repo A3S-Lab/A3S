@@ -1,0 +1,57 @@
+---
+title: Usage
+description: a3s-webview 的 command-line flags、URL policy、size clamping、headers、install paths 和 process behavior。
+---
+
+# WebView Usage
+
+`a3s-webview` 是 one-window helper。它解析参数、验证 URL、创建 native window、构建 WebView，
+并在窗口关闭时退出。
+
+```text
+a3s-webview --url <http(s)://URL> [--width N] [--height N] [--title T]
+            [--header 'Name: Value']... [--token-env NAME] [--no-auth]
+```
+
+## Arguments
+
+| Flag | Required | Behavior |
+| --- | --- | --- |
+| `--url` | Yes | 必须以 `http://` 或 `https://` 开头。其它 schemes 会在创建窗口前被拒绝。 |
+| `--width` | No | 逻辑宽度；默认 `900`，并 clamp 到 `240..4000`。 |
+| `--height` | No | 逻辑高度；默认 `680`，并 clamp 到 `180..3000`。 |
+| `--title` | No | Native window title；宿主应使用适合产品的标题。 |
+| `--header` | No | 添加 request header，可重复。必须使用 `Name: Value` syntax。 |
+| `--token-env` | No | 用于 access-token auth seeding 的 environment variable name。 |
+| `--no-auth` | No | 禁用所有 browser-storage auth seeding。 |
+| `--help` | No | 打印 usage 并退出。 |
+
+Unknown arguments 或缺失 flag values 会返回 usage error，并以 status `2` 退出。
+
+## Example
+
+```bash
+a3s-webview \
+  --url https://example.com/view \
+  --width 960 \
+  --height 720 \
+  --title "A3S View" \
+  --header "X-A3S-Source: tui"
+```
+
+除非宿主进程模型已经把 command-line arguments 当作受保护数据，否则不要通过 `--header` 传 bearer
+credentials。Session credentials 应优先使用环境变量。
+
+## Install
+
+```bash
+brew install a3s-lab/tap/a3s-webview
+cargo install --git https://github.com/A3S-Lab/WebView
+```
+
+macOS 上，Homebrew `a3s` formula 可以随 umbrella CLI 一起安装这个 helper。
+
+## Process Model
+
+Helper 打开一个 focused window，并等待 native event loop。它不管理 multiple tabs、long-running
+background sessions，也不在 embedded WebView process 外维护 browser profile。

@@ -13,19 +13,32 @@ sized popup instead of a full browser tab.
 It opens one native window, loads one `http://` or `https://` URL, and exits
 when the window is closed.
 
+The current crate version is `a3s-webview` `0.1.1`. Its repository metadata
+points to [`A3S-Lab/WebView`](https://github.com/A3S-Lab/WebView).
+
 ## Capability Map
 
 | Area | Current capability |
 | --- | --- |
 | Window helper | Opens one focused native window at a requested logical size and title. |
-| URL policy | Accepts only `http://` and `https://`; `file:`, `data:`, and custom schemes are rejected. |
+| URL policy | Requires `--url`, accepts only `http://` and `https://`, and exits with usage errors for unsupported schemes or unknown arguments. |
 | Size guardrails | Width is clamped to `240..4000`; height is clamped to `180..3000`. Defaults are `900 x 680`. |
 | Auth seeding | Reads an access token from an environment variable before navigation and seeds browser storage without putting the token in argv. |
 | Refresh token | Also reads `A3S_OS_REFRESH_TOKEN` when present and stores it with the session. |
 | User bootstrap | Uses same-origin `GET /api/v1/users/me` to seed the user object before the embedded app boots. |
 | Headers | Supports repeated `--header 'Name: Value'` arguments for host-provided request metadata. |
-| Navigation | macOS uses native titlebar buttons; Linux and Windows inject a small back/forward/reload toolbar. |
+| Navigation | macOS uses native AppKit titlebar buttons; Linux and Windows inject a small back/forward/reload toolbar. |
 | Platform backends | macOS WKWebView, Linux WebKitGTK, and Windows WebView2 through `wry` and `tao`. |
+
+## Start Here
+
+- [Usage](/docs/webview/usage) covers command-line arguments, URL validation,
+  headers, size clamp behavior, and install paths.
+- [Auth Bootstrap](/docs/webview/auth-bootstrap) explains storage seeding,
+  same-origin user bootstrap, and why tokens stay out of argv.
+- [Platforms And Boundaries](/docs/webview/platforms-boundaries) covers
+  WKWebView, WebKitGTK, WebView2, navigation controls, fallback ownership, and
+  what this helper does not try to be.
 
 ## Usage
 

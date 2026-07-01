@@ -1,0 +1,48 @@
+---
+title: Platforms And Boundaries
+description: WKWebView, WebKitGTK, WebView2, navigation controls, fallback ownership, and non-goals for A3S WebView.
+---
+
+# Platforms And Boundaries
+
+A3S WebView uses `tao` for the native window/event loop and `wry` for the
+platform WebView.
+
+## Platform Backends
+
+| Platform | Backend | Notes |
+| --- | --- | --- |
+| macOS | WKWebView | Uses the system WebKit framework. Navigation controls are native AppKit titlebar buttons. |
+| Linux | WebKitGTK | Requires WebKitGTK runtime/development packages when building from source. Navigation controls are injected into the page. |
+| Windows | WebView2 | Uses the WebView2 runtime. Navigation controls are injected into the page. |
+
+## Navigation Controls
+
+All platforms support back, forward, and reload:
+
+| Platform | Implementation |
+| --- | --- |
+| macOS | Native `NSButton` controls in an `NSTitlebarAccessoryViewController`; clicks post `UserEvent`s back into the Tao event loop. |
+| Linux / Windows | A small top-right HTML toolbar injected after `DOMContentLoaded`; buttons call `history.back()`, `history.forward()`, and `location.reload()`. |
+
+The event loop waits for native events and exits on `CloseRequested`.
+
+## Fallback Ownership
+
+If `a3s-webview` is missing, `a3s code` may fall back to opening a normal system
+browser. That fallback belongs to the TUI host. The helper process itself does
+not discover or launch alternate browsers.
+
+## Non-Goals
+
+A3S WebView is not:
+
+- the documentation site UI
+- the A3S Code agent runtime
+- a general browser
+- a multi-tab shell
+- a credential manager
+- a replacement for inspectable links that should open in the user's normal
+  browser
+
+Use it for trusted, sized runtime popups that accompany a terminal workflow.

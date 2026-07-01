@@ -1,0 +1,61 @@
+---
+title: Usage
+description: a3s-webview command-line flags, URL policy, size clamping, headers, install paths, and process behavior.
+---
+
+# WebView Usage
+
+`a3s-webview` is a one-window helper. It parses arguments, validates the URL,
+creates a native window, builds a WebView, and exits when the window is closed.
+
+```text
+a3s-webview --url <http(s)://URL> [--width N] [--height N] [--title T]
+            [--header 'Name: Value']... [--token-env NAME] [--no-auth]
+```
+
+## Arguments
+
+| Flag | Required | Behavior |
+| --- | --- | --- |
+| `--url` | Yes | Must start with `http://` or `https://`. Other schemes are rejected before the window is created. |
+| `--width` | No | Logical width; defaults to `900` and clamps to `240..4000`. |
+| `--height` | No | Logical height; defaults to `680` and clamps to `180..3000`. |
+| `--title` | No | Native window title; hosts should use a product-appropriate title. |
+| `--header` | No | Adds a request header. Repeatable. Must use `Name: Value` syntax. |
+| `--token-env` | No | Environment variable name used for access-token auth seeding. |
+| `--no-auth` | No | Disables all browser-storage auth seeding. |
+| `--help` | No | Prints usage and exits. |
+
+Unknown arguments or missing flag values return a usage error and exit with
+status `2`.
+
+## Example
+
+```bash
+a3s-webview \
+  --url https://example.com/view \
+  --width 960 \
+  --height 720 \
+  --title "A3S View" \
+  --header "X-A3S-Source: tui"
+```
+
+Do not pass bearer credentials through `--header` unless the host process model
+already treats command-line arguments as protected. Prefer environment variables
+for session credentials.
+
+## Install
+
+```bash
+brew install a3s-lab/tap/a3s-webview
+cargo install --git https://github.com/A3S-Lab/WebView
+```
+
+On macOS, the Homebrew `a3s` formula can install the helper alongside the
+umbrella CLI.
+
+## Process Model
+
+The helper opens one focused window and waits in the native event loop. It does
+not manage multiple tabs, long-running background sessions, or a browser profile
+outside the embedded WebView process.

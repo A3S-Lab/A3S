@@ -1,0 +1,45 @@
+---
+title: Auth Bootstrap
+description: A3S WebView 的 browser-storage auth seeding、refresh-token support、same-origin user bootstrap 和 argv safety。
+---
+
+# Auth Bootstrap
+
+有些 embedded runtime pages 会从 browser storage 恢复认证。Fresh WebView 否则会在 application
+看到 host session 前加载页面。`a3s-webview` 用 document start 运行的 initialization script 处理这个问题。
+
+## What Gets Seeded
+
+当 auth 启用且 access token environment variable 存在时，helper 会写入：
+
+| Storage key | Source |
+| --- | --- |
+| `access_token` | 从 `--token-env` 或默认 token environment variable 读取的 access token。 |
+| `auth_token` | 同一个 access token value，用于从该 key 恢复的应用。 |
+| `refresh_token` | 可选 refresh token environment variable，存在时写入。 |
+| `auth_user` | 同源 `GET /api/v1/users/me` response，在页面启动前存储。 |
+
+User bootstrap request 是 same-origin，并在 embedded page context 内用 Authorization header 发送
+access token。
+
+## Why Environment Variables
+
+Access token 从环境变量读取，因此 value 不需要出现在 command-line arguments 中。宿主可以用
+`--token-env NAME` 覆盖变量名。
+
+当页面应以未登录状态加载，或 URL 是公开页面时，使用 `--no-auth`。
+
+## Timing
+
+Initialization script 会在页面自己的 scripts 之前运行。Current-user request 刻意保持同步，让
+single-page app restore session 前 `auth_user` 已经存在。
+
+## Failure Behavior
+
+如果没有 access token，auth seeding 会被跳过，URL 仍会打开。如果 current-user request 失败，
+或返回的 shape 不是页面使用的格式，helper 不阻塞 navigation；embedded app 决定展示内容。
+
+## 边界
+
+Helper 为 trusted popup seed browser storage。它不签发 tokens、不刷新 sessions、不验证 account policy，
+也不在 WebView normal storage behavior 之外持久化 credentials。
