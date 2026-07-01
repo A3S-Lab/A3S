@@ -102,11 +102,14 @@ providers "provider" {
 agent_dirs = ["./.a3s/agents"]
 skill_dirs = ["./skills"]
 storage_backend = "file"
+sessions_dir = ".a3s/sessions"
 ```
 
 `auto_parallel = false` disables automatic parallel child-agent fan-out only.
 Manual `parallel_task` and SDK `session.tasks(...)` remain available unless
 manual delegation is disabled separately.
+For local session persistence, pair `storage_backend = "file"` with
+`sessions_dir`; SDK embedders can also pass a typed `FileSessionStore`.
 
 ## Use The TUI
 

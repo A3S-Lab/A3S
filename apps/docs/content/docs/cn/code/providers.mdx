@@ -30,6 +30,7 @@ providers "provider" {
 }
 
 storage_backend = "file"
+sessions_dir = ".a3s/sessions"
 ```
 
 `apiKey` 与 `api_key` 都可用，`baseUrl` 与 `base_url` 都可用。仓库里只提交模板
@@ -77,9 +78,10 @@ storage_backend = "file"
 sessions_dir = ".a3s/sessions"
 ```
 
-短测试使用 memory；通过 ACL 加载的可恢复本地 session 使用 `sessions_dir`。
-`storage_url` 会被解析为自定义存储元数据，但它本身不会创建文件型 session
-store。SDK 宿主也可以直接传 `sessionStore: new FileSessionStore(...)` /
+短测试使用 memory；通过 ACL 加载的可恢复本地 session 使用
+`storage_backend = "file"` 和 `sessions_dir`。`storage_url` 会被解析为自定义
+存储元数据，但它本身不会创建文件型 session store。SDK 宿主也可以直接传
+`sessionStore: new FileSessionStore(...)` /
 `opts.session_store = FileSessionStore(...)`。
 
 ## 私有 Provider 检查

@@ -31,6 +31,7 @@ providers "provider" {
 }
 
 storage_backend = "file"
+sessions_dir = ".a3s/sessions"
 ```
 
 `apiKey` and `api_key` are accepted aliases. `baseUrl` and `base_url` are
@@ -82,10 +83,11 @@ storage_backend = "file"
 sessions_dir = ".a3s/sessions"
 ```
 
-Use memory storage for short-lived tests. Use `sessions_dir` for resumable
-local sessions loaded from ACL. `storage_url` is parsed for custom storage
-metadata, but it does not create a file-backed session store by itself. SDK
-hosts can always pass `sessionStore: new FileSessionStore(...)` /
+Use memory storage for short-lived tests. Use `storage_backend = "file"` plus
+`sessions_dir` for resumable local sessions loaded from ACL. `storage_url` is
+parsed for custom storage metadata, but it does not create a file-backed
+session store by itself. SDK hosts can always pass
+`sessionStore: new FileSessionStore(...)` /
 `opts.session_store = FileSessionStore(...)` directly.
 
 ## Private Provider Checks
