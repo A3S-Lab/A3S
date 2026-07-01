@@ -18,7 +18,7 @@ curl http://localhost:11434/health
 ```json
 {
   "status": "ok",
-  "version": "0.2.0",
+  "version": "0.4.2",
   "uptime_seconds": 3600,
   "loaded_models": 2,
   "tee": {
@@ -43,9 +43,13 @@ curl http://localhost:11434/metrics
   type={{
     "power_requests_total": { description: "Total requests by method, path, and status code" },
     "power_request_duration_seconds": { description: "Request duration histogram" },
-    "power_concurrent_requests": { description: "Current number of in-flight requests" },
+    "power_active_requests": { description: "Current number of active inference requests" },
+    "power_requests_running": { description: "Admitted inference requests currently holding an admission permit" },
+    "power_requests_waiting": { description: "Requests queued waiting for an admission permit when max_concurrent_requests is reached" },
   }}
 />
+
+`max_concurrent_requests` applies backpressure instead of rejecting excess inference requests. Waiting requests are counted in `power_requests_waiting`, and admitted requests hold their permit until the streamed response completes.
 
 ### Inference Metrics
 
@@ -72,9 +76,8 @@ curl http://localhost:11434/metrics
 
 <TypeTable
   type={{
-    "power_gpu_utilization_percent": { description: "GPU utilization percentage" },
-    "power_gpu_memory_used_bytes": { description: "GPU memory used" },
-    "power_gpu_memory_total_bytes": { description: "GPU memory total" },
+    "power_gpu_utilization": { description: "GPU compute utilization as a 0.0-1.0 gauge" },
+    "power_gpu_memory_bytes": { description: "GPU memory usage in bytes, labelled by device" },
   }}
 />
 

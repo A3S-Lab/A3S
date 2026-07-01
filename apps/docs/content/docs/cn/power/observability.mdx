@@ -18,7 +18,7 @@ curl http://localhost:11434/health
 ```json
 {
   "status": "ok",
-  "version": "0.2.0",
+  "version": "0.4.2",
   "uptime_seconds": 3600,
   "loaded_models": 2,
   "tee": {
@@ -43,9 +43,13 @@ curl http://localhost:11434/metrics
   type={{
     "power_requests_total": { description: "按方法、路径和状态码统计的总请求数" },
     "power_request_duration_seconds": { description: "请求耗时直方图" },
-    "power_concurrent_requests": { description: "当前并发请求数" },
+    "power_active_requests": { description: "当前活跃推理请求数" },
+    "power_requests_running": { description: "已经获得 admission permit、正在运行的推理请求数" },
+    "power_requests_waiting": { description: "达到 max_concurrent_requests 后，正在等待 admission permit 的排队请求数" },
   }}
 />
+
+`max_concurrent_requests` 使用背压而不是直接拒绝超量推理请求。等待中的请求计入 `power_requests_waiting`，已放行请求会持有 permit 直到流式响应结束。
 
 ### 推理指标
 
@@ -72,9 +76,8 @@ curl http://localhost:11434/metrics
 
 <TypeTable
   type={{
-    "power_gpu_utilization_percent": { description: "GPU 利用率百分比" },
-    "power_gpu_memory_used_bytes": { description: "GPU 已用内存" },
-    "power_gpu_memory_total_bytes": { description: "GPU 总内存" },
+    "power_gpu_utilization": { description: "GPU 计算利用率，范围为 0.0-1.0" },
+    "power_gpu_memory_bytes": { description: "按 device 标签统计的 GPU 内存占用字节数" },
   }}
 />
 

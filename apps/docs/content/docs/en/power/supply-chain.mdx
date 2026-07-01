@@ -1,0 +1,108 @@
+---
+title: Supply Chain
+description: tee-minimal profile, dependency surface, and audit checklist for TEE inference
+---
+
+import { TypeTable } from 'fumadocs-ui/components/type-table';
+
+# Supply Chain
+
+TEE inference turns the model runtime into part of the trusted computing base. A3S Power keeps the default developer path productive, but gives production TEE operators a smaller `tee-minimal` profile for security review.
+
+## Feature Profiles
+
+<TypeTable
+  type={{
+    "default": {
+      description: "Enables mistralrs for broad local inference support. Good for development and non-TEE deployments where model compatibility matters more than the smallest audit surface.",
+    },
+    "llamacpp": {
+      description: "Enables llama.cpp through llama-cpp-2. Useful for llama.cpp capabilities, but introduces a C++ inference dependency chain.",
+    },
+    "picolm": {
+      description: "Enables the pure Rust layer-streaming GGUF backend. Designed for TEE memory pressure and Rust-only inference-path review.",
+    },
+    "tee-minimal": {
+      description: "Composite profile: picolm + tls + vsock, with default mistralrs disabled by the build command. Recommended for production TEE deployments that need the smallest practical Power runtime.",
+    },
+  }}
+/>
+
+## Recommended TEE Profile
+
+Use `tee-minimal` when the deployment target is AMD SEV-SNP or Intel TDX and the operator wants to avoid large inference dependency trees:
+
+```bash
+cargo build --release --no-default-features --features tee-minimal
+```
+
+This profile includes:
+
+- picolm pure Rust GGUF layer-streaming inference.
+- TEE detection and attestation paths for SEV-SNP, TDX, and simulation.
+- Model SHA-256 integrity checks and attestation model binding.
+- AES-256-GCM encrypted model loading, memory zeroing, and log redaction.
+- RA-TLS transport through the `tls` feature.
+- AF_VSOCK transport through the `vsock` feature for a3s-box MicroVM deployments.
+
+It excludes:
+
+- mistralrs / candle as the default broad-compatibility backend.
+- llama-cpp-2 and the llama.cpp C++ inference engine.
+- Hugging Face pull support unless `hf` is explicitly enabled.
+
+TLS and HTTP crypto dependencies may still include native crypto build components such as `ring` or `aws-lc-sys`; `tee-minimal` removes native inference engines, not every native dependency in the full network stack.
+
+## Backend Audit Surface
+
+The picolm path is split into small Rust modules under `src/backend/picolm.rs`, `src/backend/gguf_stream.rs`, and `src/backend/picolm_ops/`. It currently covers:
+
+- GGUF v2/v3 parsing with zero-copy tensor slices and bounds checks.
+- `madvise(MADV_DONTNEED)` page release after layer processing.
+- Multi-head / GQA attention, SwiGLU / GeGLU feed-forward, RoPE, RMSNorm, and KV cache.
+- Q4_K, Q5_K, Q6_K, Q8_0, Q4_0, F16, and F32 dequantization.
+- Fused dequant+dot kernels, Rayon matmul, NEON and AVX2 optimized paths.
+- JSON grammar-constrained output, tool-call parsing, and speculative decoding.
+
+Run these checks from `crates/power` when auditing a release:
+
+```bash
+# Compare dependency surfaces.
+cargo tree --no-default-features --features tee-minimal --edges no-dev | wc -l
+cargo tree --edges no-dev | wc -l
+
+# Review unsafe blocks in the layer-streaming inference path.
+rg -n "unsafe" src/backend/picolm.rs src/backend/gguf_stream.rs src/backend/picolm_ops src/tee/encrypted_model.rs src/tee/epc.rs
+
+# List native build scripts in the selected profile.
+cargo tree --no-default-features --features tee-minimal --edges build
+```
+
+## Encrypted Model Handling
+
+Power has three encrypted model paths:
+
+<TypeTable
+  type={{
+    "DecryptedModel": {
+      description: "Decrypts to a temporary plaintext file and overwrites/deletes it on drop. Useful for compatibility, not preferred for hostile host storage.",
+    },
+    "MemoryDecryptedModel": {
+      description: "Decrypts the full model into mlock-pinned RAM and zeroizes it on drop. Compatible with full-model backends.",
+    },
+    "LayerStreamingDecryptedModel": {
+      description: "Decrypts the full model into mlock-pinned RAM, then exposes zeroizing chunk reads for picolm layer processing. Avoids plaintext disk writes and bounds the active working copy, but AES-GCM still authenticates/decrypts the full payload once.",
+    },
+  }}
+/>
+
+## Audit Checklist
+
+- Pin the exact Power version and feature profile.
+- Reproduce the dependency tree for the release artifact.
+- Review all `unsafe` blocks in the selected inference and TEE paths.
+- Verify model hashes are configured before enabling `tee_mode`.
+- Check that attestation `report_data` binds `[nonce(32)][model_sha256(32)]` for model-specific verification.
+- Keep `redact_logs = true` and `suppress_token_metrics = true` for sensitive deployments.
+- Prefer `streaming_decrypt = true` with `picolm` or `in_memory_decrypt = true` for other backends when plaintext disk writes are unacceptable.
+- Validate RA-TLS clients extract and verify the custom attestation X.509 extension before sending prompts.

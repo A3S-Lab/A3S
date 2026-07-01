@@ -1,0 +1,108 @@
+---
+title: 供应链
+description: 面向 TEE 推理的 tee-minimal profile、依赖面和审计清单
+---
+
+import { TypeTable } from 'fumadocs-ui/components/type-table';
+
+# 供应链
+
+TEE 推理会把模型运行时变成可信计算基的一部分。A3S Power 保留了适合开发的默认路径，同时为生产 TEE 操作者提供更小的 `tee-minimal` profile，便于安全审计。
+
+## Feature Profile
+
+<TypeTable
+  type={{
+    "default": {
+      description: "启用 mistralrs，提供更广的本地推理兼容性。适合开发环境和非 TEE 部署，此时模型兼容性通常比最小审计面更重要。",
+    },
+    "llamacpp": {
+      description: "通过 llama-cpp-2 启用 llama.cpp。适合需要 llama.cpp 能力的场景，但会引入 C++ 推理依赖链。",
+    },
+    "picolm": {
+      description: "启用纯 Rust 层流式 GGUF 后端。面向 TEE 内存压力和 Rust-only 推理路径审计。",
+    },
+    "tee-minimal": {
+      description: "组合 profile：picolm + tls + vsock，并通过构建命令关闭默认 mistralrs。推荐用于需要尽量小 Power 运行时的生产 TEE 部署。",
+    },
+  }}
+/>
+
+## 推荐的 TEE Profile
+
+当部署目标是 AMD SEV-SNP 或 Intel TDX，且操作者希望避免大型推理依赖树时，使用 `tee-minimal`：
+
+```bash
+cargo build --release --no-default-features --features tee-minimal
+```
+
+该 profile 包含：
+
+- picolm 纯 Rust GGUF 层流式推理。
+- SEV-SNP、TDX 和模拟模式的 TEE 检测与证明路径。
+- 模型 SHA-256 完整性检查，以及 attestation 与模型绑定。
+- AES-256-GCM 加密模型加载、内存清零和日志脱敏。
+- 通过 `tls` feature 启用 RA-TLS 传输。
+- 通过 `vsock` feature 为 a3s-box MicroVM 部署启用 AF_VSOCK 传输。
+
+该 profile 排除：
+
+- 作为默认广兼容后端的 mistralrs / candle。
+- llama-cpp-2 与 llama.cpp C++ 推理引擎。
+- Hugging Face pull 支持，除非显式启用 `hf`。
+
+TLS 与 HTTP 加密依赖仍可能包含 `ring` 或 `aws-lc-sys` 等 native crypto 构建组件；`tee-minimal` 移除的是 native 推理引擎，而不是完整网络栈中的每一个 native 依赖。
+
+## 后端审计面
+
+picolm 路径拆分在 `src/backend/picolm.rs`、`src/backend/gguf_stream.rs` 和 `src/backend/picolm_ops/` 的小型 Rust 模块中。当前覆盖：
+
+- 带边界检查的 GGUF v2/v3 解析和零拷贝张量切片。
+- 层处理后通过 `madvise(MADV_DONTNEED)` 释放页面。
+- 多头 / GQA attention、SwiGLU / GeGLU feed-forward、RoPE、RMSNorm 和 KV cache。
+- Q4_K、Q5_K、Q6_K、Q8_0、Q4_0、F16、F32 dequantization。
+- 融合 dequant+dot 内核、Rayon matmul、NEON 与 AVX2 优化路径。
+- JSON grammar 约束输出、工具调用解析和 speculative decoding。
+
+审计某个发布版本时，在 `crates/power` 中运行：
+
+```bash
+# 对比依赖面。
+cargo tree --no-default-features --features tee-minimal --edges no-dev | wc -l
+cargo tree --edges no-dev | wc -l
+
+# 审查层流式推理路径中的 unsafe block。
+rg -n "unsafe" src/backend/picolm.rs src/backend/gguf_stream.rs src/backend/picolm_ops src/tee/encrypted_model.rs src/tee/epc.rs
+
+# 列出所选 profile 的 native build scripts。
+cargo tree --no-default-features --features tee-minimal --edges build
+```
+
+## 加密模型处理
+
+Power 提供三条加密模型路径：
+
+<TypeTable
+  type={{
+    "DecryptedModel": {
+      description: "解密到临时明文文件，并在 drop 时覆盖和删除。适合兼容性场景，不建议用于不可信宿主机存储。",
+    },
+    "MemoryDecryptedModel": {
+      description: "将完整模型解密到 mlock 锁定内存，并在 drop 时清零。兼容需要完整模型的后端。",
+    },
+    "LayerStreamingDecryptedModel": {
+      description: "将完整模型解密到 mlock 锁定内存，然后为 picolm 层处理暴露自动清零的 chunk 读取。它避免明文落盘并限制活跃工作副本，但 AES-GCM 仍会对完整 payload 执行一次认证解密。",
+    },
+  }}
+/>
+
+## 审计清单
+
+- 固定准确的 Power 版本和 feature profile。
+- 复现发布产物的依赖树。
+- 审查所选推理路径和 TEE 路径中的所有 `unsafe` block。
+- 启用 `tee_mode` 前确认已配置模型哈希。
+- 检查 attestation 的 `report_data` 对模型级验证绑定 `[nonce(32)][model_sha256(32)]`。
+- 敏感部署中保持 `redact_logs = true` 和 `suppress_token_metrics = true`。
+- 明文不能落盘时，picolm 优先使用 `streaming_decrypt = true`，其他后端使用 `in_memory_decrypt = true`。
+- RA-TLS 客户端应在发送提示词之前提取并验证自定义 attestation X.509 扩展。

@@ -9,7 +9,7 @@ import { TypeTable } from 'fumadocs-ui/components/type-table';
 
 ## Backends
 
-A3S Power uses a pluggable `Backend` trait. Three implementations are available:
+A3S Power uses a pluggable `Backend` trait. Four implementations are available depending on feature flags and configuration:
 
 <TypeTable
   type={{
@@ -20,7 +20,10 @@ A3S Power uses a pluggable `Backend` trait. Three implementations are available:
       description: "C++ llama.cpp via llama-cpp-2 bindings. Requires C++ compiler + CMake. Feature flag: --features llamacpp.",
     },
     "picolm (optional)": {
-      description: "Pure Rust layer-streaming GGUF inference. Peak RAM = O(layer_size) not O(model_size). Enables 7B+ models in 512MB TEE EPC. Feature flag: --features picolm.",
+      description: "Pure Rust layer-streaming GGUF inference for TEE memory pressure. Implements the transformer forward path, fused dequant+dot kernels, FP16 KV cache, batch prefill, JSON grammar constraints, tool-call parsing, and speculative decoding. Feature flag: --features picolm.",
+    },
+    "proxy (configured)": {
+      description: "Forwards Remote model manifests to an OpenAI-compatible upstream such as vLLM, TGI, SGLang, or OpenAI. Registered when proxy_upstreams are configured.",
     },
   }}
 />
@@ -161,24 +164,32 @@ The implementation has two components:
 
 **`gguf_stream.rs` — Zero-Copy GGUF Parser**: Opens the GGUF file via `mmap(PROT_READ)`. Parses the header and tensor descriptors but loads no weight data. When picolm requests a layer's weights, `tensor_bytes(name)` returns a `&[u8]` slice directly into the mmap region — zero copy, zero allocation. The OS pages in data on demand and reclaims it under memory pressure.
 
-**`picolm.rs` — Layer-Streaming Forward Pass**: Iterates through each transformer layer (`blk.0.*` to `blk.{n-1}.*`), applying weights to the hidden state, then moving on. After processing layer N, its weight pages are no longer referenced and the OS can reclaim them before layer N+1 is paged in.
+**`picolm.rs` and `picolm_ops/` — Layer-Streaming Forward Pass**: Iterate through each transformer layer (`blk.0.*` to `blk.{n-1}.*`), applying attention, feed-forward, normalization, RoPE, KV-cache, sampling, grammar, and tool-call logic before moving on. After processing layer N, `madvise(MADV_DONTNEED)` releases its mapped pages before layer N+1 is paged in.
 
 ### Memory Comparison
 
 | Model | Traditional | picolm | Reduction |
 |-------|------------|--------|-----------|
-| 3B Q4_K_M (~2 GB) | ~2 GB | ~60 MB | 33× |
-| 7B Q4_K_M (~4 GB) | ~4 GB | ~120 MB | 33× |
-| 13B Q4_K_M (~7 GB) | ~7 GB | ~200 MB | 35× |
-| 70B Q4_K_M (~40 GB) | ~40 GB | ~1.1 GB | 36× |
+| 3B Q4_K_M (~2 GB) | ~2 GB | ~60 MB + KV | 33× |
+| 7B Q4_K_M (~4 GB) | ~4 GB | ~120 MB + KV | 33× |
+| 13B Q4_K_M (~7 GB) | ~7 GB | ~200 MB + KV | 35× |
+| 70B Q4_K_M (~40 GB) | ~40 GB | ~1.1 GB + KV | 36× |
 
 ### Encrypted Model Support
 
-For encrypted models (`.enc`), `LayerStreamingDecryptedModel` decrypts one chunk at a time. Each chunk is wrapped in `Zeroizing<Vec<u8>>` — automatically zeroed when dropped. Only one layer's plaintext weights exist in RAM at any moment.
+For encrypted models (`.enc`), `streaming_decrypt = true` uses `LayerStreamingDecryptedModel`: the full plaintext is decrypted into `mlock`-pinned RAM once, zeroized on drop, and exposed through chunk reads wrapped in `Zeroizing<Vec<u8>>`. picolm can process one layer-sized chunk at a time so only the active working copy needs to survive between layer steps. AES-256-GCM is authenticated but not seekable, so this mode avoids plaintext disk writes and bounds the active working set; it does not make ciphertext randomly decryptable by layer.
 
-### Current Status
+### Implemented Forward Path
 
-The layer-streaming infrastructure (mmap parser, layer iteration, sampling, encrypted streaming) is production-ready. The forward pass currently uses stub arithmetic — real transformer matrix operations are the next milestone.
+picolm is an implemented pure Rust inference path, not a placeholder. Current source includes:
+
+- Multi-head attention with Grouped-Query Attention (GQA) and Q/K/V bias support.
+- SwiGLU and GeGLU feed-forward variants.
+- RoPE tables, RMSNorm, FP16 KV cache, and fused f16 dot/accumulate paths.
+- Q4_K, Q5_K, Q6_K, Q8_0, Q4_0, F16, and F32 dequantization support.
+- Fused dequant+dot kernels, Rayon parallel matmul, aarch64 NEON and x86_64 AVX2 hot paths.
+- Batch prefill, grammar-constrained JSON output, tool-call parsing, and selectable speculative-decoding modes.
+- Startup self-tests for critical numeric kernels before serving a picolm model.
 
 ## Auto-Loading
 
