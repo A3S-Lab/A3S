@@ -484,7 +484,7 @@ const count = await session.addMcpServer(
   'echo',
   'stdio',
   process.execPath,
-  ['tools/mcp_echo_server.mjs', 'secret'],
+  ['tools/mcp_echo_server.mjs', 'example-value'],
 );
 
 console.log(count);
@@ -502,8 +502,14 @@ Tools from the server are named `mcp__<server>__<tool>`.
 Constructor shape and `kind` values were verified:
 
 ```ts
-new HttpTransport('http://localhost:8080/ahp', 'token').kind; // 'http'
-new WebSocketTransport('ws://localhost:8080/ahp', 'token').kind; // 'websocket'
+new HttpTransport(
+  'http://localhost:8080/ahp',
+  process.env.AHP_AUTH_TOKEN,
+).kind; // 'http'
+new WebSocketTransport(
+  'ws://localhost:8080/ahp',
+  process.env.AHP_AUTH_TOKEN,
+).kind; // 'websocket'
 new StdioTransport('node', ['server.mjs']).kind; // 'stdio'
 new UnixSocketTransport('/tmp/a3s.sock').kind; // 'unix_socket'
 ```

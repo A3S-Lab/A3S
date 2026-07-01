@@ -13,7 +13,7 @@ const count = await session.addMcpServer(
   'echo',
   'stdio',
   process.execPath,
-  ['tools/mcp_echo_server.mjs', 'secret'],
+  ['tools/mcp_echo_server.mjs', 'example-value'],
 );
 
 console.log(await session.mcpStatus());

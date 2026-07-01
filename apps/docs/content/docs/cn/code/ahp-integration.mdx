@@ -20,7 +20,10 @@ import { Agent, HttpTransport } from '@a3s-lab/code';
 const agent = await Agent.create('agent.acl');
 
 const session = agent.session('/repo', {
-  ahpTransport: new HttpTransport('http://localhost:8080/ahp', 'token'),
+  ahpTransport: new HttpTransport(
+    'http://localhost:8080/ahp',
+    process.env.AHP_AUTH_TOKEN,
+  ),
 });
 ```
 
@@ -36,11 +39,16 @@ Windows target 不支持 Unix socket。
 Python 使用 `opts.ahp_transport`：
 
 ```python
+import os
+
 from a3s_code import Agent, HttpTransport, SessionOptions
 
 agent = Agent.create(open("agent.acl").read())
 opts = SessionOptions()
-opts.ahp_transport = HttpTransport("http://localhost:8080/ahp", "token")
+opts.ahp_transport = HttpTransport(
+    "http://localhost:8080/ahp",
+    os.environ.get("AHP_AUTH_TOKEN"),
+)
 session = agent.session("/repo", opts)
 ```
 
