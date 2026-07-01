@@ -27,11 +27,12 @@ the product flow that depends on it.
 
 ## Structured Output with `generate_object`
 
-The `generate_object` tool produces a JSON object that strictly conforms to a
-provided JSON Schema. It works in two ways:
+The `generate_object` tool asks the configured LLM for a JSON object, validates
+the response against a JSON Schema, and returns the validated object only on a
+zero-exit result. It works in two ways:
 
 1. **Agent-driven**: The LLM sees `generate_object` in its tool list and calls it autonomously when structured output is needed.
-2. **Direct call**: Your application calls `session.tool('generate_object', ...)` to bypass the LLM and get deterministic structured output.
+2. **Direct call**: Your application calls `session.tool('generate_object', ...)` to bypass model-driven tool selection. The tool itself still calls the configured LLM.
 
 ```ts
 const result = await session.tool('generate_object', {
@@ -45,9 +46,13 @@ const result = await session.tool('generate_object', {
   },
   prompt: 'Classify: "This product is amazing!"',
   schema_name: 'sentiment',
-  mode: 'tool',           // 'auto' | 'tool' | 'prompt'
+  mode: 'tool',
   max_repair_attempts: 2, // retries if schema validation fails
 });
+
+if (result.exitCode !== 0) {
+  throw new Error(result.output);
+}
 
 const { object } = JSON.parse(result.output);
 // object = { sentiment: "positive", confidence: 0.95 }
@@ -57,19 +62,20 @@ const { object } = JSON.parse(result.output);
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
-| `schema` | object | yes | JSON Schema the output must conform to |
+| `schema` | object | yes | JSON Schema used to validate the output |
 | `prompt` | string | yes | What to generate or extract |
 | `schema_name` | string | no | Short name (default: "result") |
 | `schema_description` | string | no | Description for the synthetic tool |
 | `system` | string | no | Optional system prompt |
-| `mode` | string | no | `"auto"` / `"tool"` / `"prompt"` (default: auto) |
+| `mode` | string | no | `"auto"` / `"strict"` / `"json"` / `"tool"` / `"prompt"` (default: auto) |
 | `max_repair_attempts` | integer | no | 0–5 (default: 2) |
 
 ### Modes
 
-- **tool** (default): Injects a synthetic tool whose parameters IS the schema. The LLM is forced to call it. Most reliable across all providers.
-- **prompt**: Appends schema instructions to the prompt. Less reliable but works without tool-calling support.
-- **auto**: Selects the best mode for the provider (currently resolves to `tool`).
+- **tool**: Injects a synthetic tool whose parameters are the schema. This is the current cross-provider default.
+- **prompt**: Appends schema instructions to the prompt. It is useful as a prompt-only fallback, but depends more on model compliance.
+- **auto**: Currently resolves to `tool`.
+- **strict** / **json**: Accepted by the API, but currently resolve to `tool` because provider-level `response_format` wiring is not enabled in this runtime path.
 
 ### Streaming
 

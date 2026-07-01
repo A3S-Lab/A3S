@@ -9,6 +9,11 @@ A3S Code 是 `a3s code` 与语言 SDK 背后的驾驭式运行时。它让 agent
 保持可观测，同时由 harness 负责上下文组装、工具执行、权限策略、任务委派、
 workspace 访问、持久化、验证证据与 run replay。
 
+`a3s-code` 是可嵌入的运行时和 SDK surface。`a3s code` 是
+[`a3s` CLI](https://github.com/A3S-Lab/Cli) 提供的交互式终端应用；它驱动
+A3S Code session，并用 [`a3s-tui`](https://github.com/A3S-Lab/TUI) 框架渲染
+事件流。想要现成 TUI 时安装 CLI；要构建自己的 harness 或产品 UI 时安装 SDK。
+
 ## 当前能力图
 
 | 领域 | 当前能力 |

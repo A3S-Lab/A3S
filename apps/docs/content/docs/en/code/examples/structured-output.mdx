@@ -7,13 +7,18 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 # Structured Output
 
-The built-in `generate_object` tool produces JSON objects that strictly conform to a JSON Schema you supply, instead of free-form text. Use it whenever you need machine-readable results: extraction, classification, config generation, or feeding another program.
+The built-in `generate_object` tool asks the configured LLM for a JSON object,
+validates the response against a JSON Schema you supply, and returns the
+validated object only on a zero-exit result. Use it whenever you need
+machine-readable results: extraction, classification, config generation, or
+feeding another program.
 
 You call it through `session.tool('generate_object', ...)`. The tool result carries the validated object as JSON on `result.output` — parse it and read the `object` field. The same tool also supports agent-driven invocation, where the model decides to call it during a `send`.
 
 ## Direct tool call
 
-The simplest path: call `generate_object` directly and parse the validated object out of the result.
+The simplest path: call `generate_object` directly, check the tool exit code,
+and parse the validated object out of the result.
 
 <Tabs groupId="lang" items={['Node.js', 'Python']}>
 <Tab value="Node.js">
@@ -46,6 +51,10 @@ const result = await session.tool('generate_object', {
   mode: 'tool',
 });
 
+if (result.exitCode !== 0) {
+  throw new Error(result.output);
+}
+
 const { object } = JSON.parse(result.output);
 console.log(object);
 // { name: "Alice", age: 28, skills: ["Rust", "TypeScript", "Python"] }
@@ -60,7 +69,7 @@ await session.close();
 import json
 from a3s_code import Agent, SessionOptions, PermissionPolicy
 
-agent = Agent.create(open('config.acl').read())
+agent = Agent.create('config.acl')
 opts = SessionOptions()
 opts.builtin_skills = True
 opts.permission_policy = PermissionPolicy(default_decision="allow")
@@ -85,6 +94,9 @@ result = session.tool("generate_object", {
     "mode": "tool",
 })
 
+if result.exit_code != 0:
+    raise RuntimeError(result.output)
+
 obj = json.loads(result.output)["object"]
 print(obj)
 # {"name": "Alice", "age": 28, "skills": ["Rust", "TypeScript", "Python"]}
@@ -95,11 +107,15 @@ session.close()
 </Tab>
 </Tabs>
 
-The validated value lives on the `object` key of the parsed output. Every field declared in `required` is guaranteed present and correctly typed; if the model cannot satisfy the schema the tool reports a non-zero exit code on `result.exitCode` (Node) / `result.exit_code` (Python).
+The validated value lives on the `object` key of the parsed output. When
+`result.exitCode` (Node) / `result.exit_code` (Python) is zero, fields declared
+in `required` have passed runtime validation. If the model cannot satisfy the
+schema after repair attempts, the tool reports a non-zero exit code.
 
 ## Enum classification
 
-Constrain a field to a fixed set with `enum`. This turns the model into a reliable classifier.
+Constrain a field to a fixed set with `enum`. This turns a free-form model
+classification into a schema-gated result.
 
 <Tabs groupId="lang" items={['Node.js', 'Python']}>
 <Tab value="Node.js">
@@ -266,7 +282,7 @@ The built-in validator supports:
 
 ## Notes
 
-- The validated value is on the `object` key of the parsed `result.output`. Pass `mode: 'tool'` for direct structured calls, or `mode: 'prompt'` for a prompt-only fallback.
+- The validated value is on the `object` key of the parsed `result.output`. Pass `mode: 'tool'` for the current cross-provider default, or `mode: 'prompt'` for a prompt-only fallback. `auto`, `strict`, and `json` currently resolve to `tool` in this runtime path.
 - List every field you depend on in `required` — the runtime enforces it, so missing or mistyped fields fail validation instead of silently returning partial data.
 - `generate_object` is a built-in tool registered independently of built-in skills. The examples enable `builtinSkills` / `builtin_skills` because most real sessions also want the skill catalog, not because `generate_object` depends on it.
 

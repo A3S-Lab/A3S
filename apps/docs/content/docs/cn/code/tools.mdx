@@ -22,10 +22,11 @@ const schemas = session.toolDefinitions();
 
 ## 结构化输出：`generate_object`
 
-`generate_object` 工具生成严格符合 JSON Schema 的对象。它有两种使用方式：
+`generate_object` 工具会让配置的 LLM 生成 JSON 对象，对响应执行 JSON Schema
+校验，并且只在零退出码结果中返回校验后的对象。它有两种使用方式：
 
 1. **智能体自主调用**：LLM 在工具列表中看到 `generate_object`，在需要结构化输出时自行决定调用。
-2. **直接调用**：应用通过 `session.tool('generate_object', ...)` 绕过 LLM 决策，获得确定性结构化输出。
+2. **直接调用**：应用通过 `session.tool('generate_object', ...)` 绕过模型驱动的工具选择步骤；工具内部仍会调用配置的 LLM。
 
 ```ts
 const result = await session.tool('generate_object', {
@@ -43,6 +44,10 @@ const result = await session.tool('generate_object', {
   max_repair_attempts: 2,
 });
 
+if (result.exitCode !== 0) {
+  throw new Error(result.output);
+}
+
 const { object } = JSON.parse(result.output);
 // object = { sentiment: "positive", confidence: 0.95 }
 ```
@@ -51,19 +56,20 @@ const { object } = JSON.parse(result.output);
 
 | 参数 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `schema` | object | 是 | 输出必须符合的 JSON Schema |
+| `schema` | object | 是 | 用于校验输出的 JSON Schema |
 | `prompt` | string | 是 | 描述要生成或提取的内容 |
 | `schema_name` | string | 否 | 短名称（默认 "result"） |
 | `schema_description` | string | 否 | 合成工具的描述 |
 | `system` | string | 否 | 可选系统提示 |
-| `mode` | string | 否 | `"auto"` / `"tool"` / `"prompt"`（默认 auto） |
+| `mode` | string | 否 | `"auto"` / `"strict"` / `"json"` / `"tool"` / `"prompt"`（默认 auto） |
 | `max_repair_attempts` | integer | 否 | 0–5（默认 2） |
 
 ### 模式
 
-- **tool**（默认）：注入一个合成工具，其参数就是 schema。LLM 被强制调用它。跨 provider 最可靠。
-- **prompt**：将 schema 指令追加到 prompt 中。可靠性较低，但不依赖 tool-calling 能力。
-- **auto**：根据 provider 能力自动选择最佳模式（当前解析为 `tool`）。
+- **tool**：注入一个合成工具，其参数就是 schema。这是当前跨 provider 的默认路径。
+- **prompt**：将 schema 指令追加到 prompt 中。它适合作为仅 prompt 的回退路径，但更依赖模型遵循指令。
+- **auto**：当前解析为 `tool`。
+- **strict** / **json**：API 接受这两个值，但当前运行路径会解析为 `tool`，因为 provider 级 `response_format` 尚未在这里启用。
 
 ### 流式
 

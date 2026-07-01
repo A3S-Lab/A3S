@@ -7,13 +7,15 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 # 结构化输出
 
-内置的 `generate_object` 工具会生成严格符合你所提供 JSON Schema 的 JSON 对象，而不是自由文本。当你需要机器可读的结果时使用它：抽取、分类、配置生成，或者作为另一个程序的输入。
+内置的 `generate_object` 工具会让配置的 LLM 生成 JSON 对象，对响应执行你提供的
+JSON Schema 校验，并且只在零退出码结果中返回校验后的对象。当你需要机器可读的结果时
+使用它：抽取、分类、配置生成，或者作为另一个程序的输入。
 
 你通过 `session.tool('generate_object', ...)` 调用它。工具结果会把校验后的对象以 JSON 形式放在 `result.output` 上——解析它并读取 `object` 字段。同一个工具也支持 agent 自主调用，即模型在 `send` 过程中自行决定调用它。
 
 ## 直接工具调用
 
-最简单的方式：直接调用 `generate_object`，并从结果中解析出校验后的对象。
+最简单的方式：直接调用 `generate_object`，先检查工具退出码，再从结果中解析出校验后的对象。
 
 <Tabs groupId="lang" items={['Node.js', 'Python']}>
 <Tab value="Node.js">
@@ -46,6 +48,10 @@ const result = await session.tool('generate_object', {
   mode: 'tool',
 });
 
+if (result.exitCode !== 0) {
+  throw new Error(result.output);
+}
+
 const { object } = JSON.parse(result.output);
 console.log(object);
 // { name: "Alice", age: 28, skills: ["Rust", "TypeScript", "Python"] }
@@ -60,7 +66,7 @@ await session.close();
 import json
 from a3s_code import Agent, SessionOptions, PermissionPolicy
 
-agent = Agent.create(open('config.acl').read())
+agent = Agent.create('config.acl')
 opts = SessionOptions()
 opts.builtin_skills = True
 opts.permission_policy = PermissionPolicy(default_decision="allow")
@@ -85,6 +91,9 @@ result = session.tool("generate_object", {
     "mode": "tool",
 })
 
+if result.exit_code != 0:
+    raise RuntimeError(result.output)
+
 obj = json.loads(result.output)["object"]
 print(obj)
 # {"name": "Alice", "age": 28, "skills": ["Rust", "TypeScript", "Python"]}
@@ -95,11 +104,13 @@ session.close()
 </Tab>
 </Tabs>
 
-校验后的值位于解析输出的 `object` 键上。`required` 中声明的每个字段都保证存在且类型正确；如果模型无法满足 schema，工具会在 `result.exitCode`（Node）/ `result.exit_code`（Python）上报告非零退出码。
+校验后的值位于解析输出的 `object` 键上。当 `result.exitCode`（Node）/
+`result.exit_code`（Python）为零时，`required` 中声明的字段已经通过运行时校验。
+如果模型在修复重试后仍无法满足 schema，工具会报告非零退出码。
 
 ## 枚举分类
 
-用 `enum` 把字段约束到一个固定集合。这会把模型变成一个可靠的分类器。
+用 `enum` 把字段约束到一个固定集合。这会把自由文本分类变成带 schema 闸门的结果。
 
 <Tabs groupId="lang" items={['Node.js', 'Python']}>
 <Tab value="Node.js">
@@ -266,7 +277,7 @@ print(f"tool calls: {result.tool_calls_count}, tokens: {result.total_tokens}")
 
 ## 说明
 
-- 校验后的值位于解析后 `result.output` 的 `object` 键上。直接结构化调用传 `mode: 'tool'`，仅 prompt 的回退方式传 `mode: 'prompt'`。
+- 校验后的值位于解析后 `result.output` 的 `object` 键上。当前跨 provider 默认路径传 `mode: 'tool'`，仅 prompt 的回退方式传 `mode: 'prompt'`。`auto`、`strict` 和 `json` 在当前运行路径中都会解析为 `tool`。
 - 把你依赖的每个字段都列入 `required`——运行时会强制执行，因此缺失或类型错误的字段会导致校验失败，而不是悄悄返回部分数据。
 - `generate_object` 是独立注册的内置工具，不依赖 built-in skills。示例启用 `builtinSkills` / `builtin_skills` 是因为多数真实 session 也需要 skill catalog，而不是因为 `generate_object` 需要它。
 
