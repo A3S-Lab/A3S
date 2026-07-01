@@ -119,6 +119,24 @@ object listing and bounded downloads. Configure `maxObjectsScanned`,
 `maxGrepBytesPerObject`, and `searchConcurrency` when the bucket can be large or
 the endpoint rate-limits.
 
+### S3 Options
+
+| Node.js option | Python option | Required | Purpose |
+| --- | --- | --- | --- |
+| `bucket` | `bucket` | yes | S3 bucket that stores the workspace objects. |
+| `prefix` | `prefix` | yes | Logical workspace root inside the bucket; use `""` for the bucket root. |
+| `accessKeyId` | `access_key_id` | yes | Access key id, normally read from the host environment. |
+| `secretAccessKey` | `secret_access_key` | yes | Secret access key, normally read from the host environment or a secret manager. |
+| `endpoint` | `endpoint` | no | Custom S3-compatible endpoint; omit for AWS S3 defaults. |
+| `region` | `region` | no | Region, defaulting to `us-east-1` when omitted. |
+| `sessionToken` | `session_token` | no | STS session token when temporary credentials are used. |
+| `forcePathStyle` | `force_path_style` | no | Set `true` for MinIO, RustFS, and most non-AWS endpoints. |
+| `maxReadBytes` | `max_read_bytes` | no | Per-read size ceiling; defaults to 10 MiB. |
+| `searchEnabled` | `search_enabled` | no | Enables degraded S3 `grep` / `glob`; defaults to false. |
+| `maxObjectsScanned` | `max_objects_scanned` | no | Per-search object scan cap; used only when search is enabled. |
+| `maxGrepBytesPerObject` | `max_grep_bytes_per_object` | no | Per-object download cap for `grep`; used only when search is enabled. |
+| `searchConcurrency` | `search_concurrency` | no | Concurrent object downloads during `grep`; used only when search is enabled. |
+
 ## Remote Git
 
 `remoteGit` attaches an HTTP/JSON git provider on top of `workspaceBackend`. It is
@@ -189,8 +207,21 @@ session = agent.session("s3://workspace-bucket/sessions/example", opts)
 </Tab>
 </Tabs>
 
-Keep gitserver credentials out of `agent.acl` and agent directories. Inject them
+Keep remote git credentials out of `agent.acl` and agent directories. Inject them
 from the host environment or secret manager.
+
+### Remote Git Options
+
+| Node.js option | Python option | Required | Purpose |
+| --- | --- | --- | --- |
+| `baseUrl` | `base_url` | yes | Remote git service base URL, without a trailing slash. |
+| `repoId` | `repo_id` | yes | Opaque repository id negotiated with the remote git service. |
+| `bearerToken` | `bearer_token` | production | Bearer credential for the remote git service; omit only in trusted development setups. |
+| `clientCertPem` | `client_cert_pem` | no | mTLS client certificate path; must be paired with the client key. |
+| `clientKeyPem` | `client_key_pem` | no | mTLS client key path; must be paired with the certificate. |
+| `requestTimeoutMs` | `request_timeout_ms` | no | Per-call HTTP timeout in milliseconds; defaults to 30000. |
+| `maxDiffBytes` | `max_diff_bytes` | no | Client-side cap on `diff` response bytes; defaults to 1 MiB. |
+| `maxLogEntries` | `max_log_entries` | no | Client-side cap on `log` entries; defaults to 200. |
 
 ## Choosing A Backend
 
