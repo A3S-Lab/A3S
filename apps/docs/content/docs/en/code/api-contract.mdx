@@ -482,12 +482,15 @@ Ordinary sessions are queue-free unless `queueConfig` is provided.
 The integration check covers a live stdio MCP server:
 
 ```ts
-const count = await session.addMcpServer(
-  'echo',
-  'stdio',
-  process.execPath,
-  ['tools/mcp_echo_server.mjs', 'example-value'],
-);
+const count = await session.addMcp({
+  name: 'echo',
+  transport: {
+    type: 'stdio',
+    command: process.execPath,
+    args: ['tools/mcp_echo_server.mjs', 'example-value'],
+  },
+  timeoutMs: 30000,
+});
 
 console.log(count);
 console.log(await session.mcpStatus());
@@ -498,6 +501,8 @@ await session.removeMcpServer('echo');
 ```
 
 Tools from the server are named `mcp__<server>__<tool>`.
+`addMcpServer(...)` and `addMcpServerConfig(...)` remain compatibility aliases;
+new examples use the compact object-shaped `addMcp(...)` API.
 
 ## AHP Transport Objects
 

@@ -6,24 +6,23 @@ description: "Tool selection, direct tool calls, and verification evidence"
 # Tools
 
 A3S Code keeps a registry of available tools. `toolNames()` returns the current
-session tool surface.
+session tool surface. That surface is assembled from the workspace capability
+set plus session-level integrations, so a non-local workspace can intentionally
+hide tools it cannot service.
 
-## Default Core Tools
+## Tool Surface
 
-| Category | Tools |
-| --- | --- |
-| Files | `read`, `write`, `edit`, `patch` |
-| Search | `grep`, `glob`, `ls` |
-| Shell | `bash` |
-| Delegation | `task`, `parallel_task` |
-| Skills | `search_skills`, `Skill` |
-| Structured Output | `generate_object` |
+| Layer | Tools | Registration rule |
+| --- | --- | --- |
+| Workspace-gated builtins | `read`, `write`, `edit`, `patch`, `grep`, `glob`, `ls`, `bash`, `git` | Registered only when `WorkspaceServices` advertises the required capability. For example, a browser or S3 workspace can expose file tools while hiding `bash` or local git. |
+| Runtime builtins | `web_fetch`, `web_search`, `batch`, `program` | Registered by the core tool executor. `batch` and `program` wrap the current registry, so their usable inner tools still depend on the session surface. |
+| Session bootstrap tools | `task`, `parallel_task`, `generate_object`, `search_skills`, `Skill` | Added while building an `AgentSession`. Delegation tools disappear when manual delegation is disabled; `generate_object` requires the configured LLM client; skill tools use the effective skill registry. |
+| Dynamic integrations | `mcp__<server>__<tool>` and host-registered tools | Added from MCP managers or host code after discovery. |
 
-## Additional Registered Tools
-
-`web_fetch`, `web_search`, `git`, `batch`, `program`, and MCP tools are also
-part of the broader tool surface. Validate model-visible selection behavior in
-the product flow that depends on it.
+Use `toolNames()` / `toolDefinitions()` in tests or application diagnostics when
+a workflow depends on a specific tool being visible. Tool visibility is not a
+security grant; visible calls still pass through permission policy,
+confirmation, hooks/AHP, timeouts, artifact limits, and workspace path checks.
 
 ## Structured Output with `generate_object`
 

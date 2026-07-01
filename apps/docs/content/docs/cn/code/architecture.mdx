@@ -11,10 +11,9 @@ A3S Code 围绕小运行时内核和控制执行循环的驾驭层组织。
 Prompt
   -> context assembly
   -> optional planning and automatic subagent delegation
-  -> tool selection
   -> LLM generation
-  -> programmatic tool calling
-  -> 已配置的 permission/security integration
+  -> model-selected、delegated、direct 或 programmatic tool calls
+  -> permission、hook、AHP、confirmation 与 security checks
   -> tool execution
   -> observation
   -> verification
@@ -22,11 +21,15 @@ Prompt
   -> compaction
 ```
 
-内核负责维护 session、调用 provider、执行工具、记录 observation 并返回结构化事件。驾驭层协调上下文预算、工具可见性、permission/hooks/AHP/security-provider 集成点、输出摘要、完成验证，以及面向宿主应用暴露 run snapshot、TaskList 状态和 trace event。
+内核负责维护 session、调用 provider、通过同一个 executor 执行工具、记录 observation，并返回结构化事件和结果。工具调用可以来自模型、SDK 直接 helper、委派子运行，或 `program` 工具；它们仍会汇聚到同一个 registry、guard、trace sink 和 workspace services。
+
+驾驭层协调上下文预算、工具可见性、permission/hooks/AHP/security-provider 集成点、输出摘要、完成验证，以及面向宿主应用暴露 run snapshot、TaskList 状态和 trace event。
+
+这个边界很重要：runtime 不会把 TUI 当成特殊路径。`a3s code` 只是把这些事件流渲染到终端的一个客户端；SDK 宿主可以在自己的产品界面中渲染、审批、持久化和回放同一组事实。
 
 ## PTC 路径
 
-Programmatic Tool Calling 是确定性工作流的驾驭路径。`program` 工具会在内嵌 QuickJS VM 中运行 JavaScript 脚本，并只暴露一个受控 `ctx` 对象。默认情况下，脚本可以调用除 `program` 之外的所有已注册工具；调用方也可以用 `allowed_tools` 收窄工具面。脚本可以组合 `readFile`、`read`、`glob`、`grep`、`ls`、`bash`、`git` 和通用 `tool(name, args)`，并把一个结构化结果交给 agent。
+Programmatic Tool Calling 是确定性工作流的驾驭路径。`program` 工具会在内嵌 QuickJS VM 中运行 JavaScript 脚本，并只暴露一个受控 `ctx` 对象。一次 program 调用仍然是工具调用：permission policy、hook/AHP 集成、timeout、artifact limit、trace 和 workspace capability check 都仍在执行路径上。默认情况下，脚本可以调用除 `program` 之外的所有已注册工具；调用方也可以用 `allowed_tools` 收窄工具面。脚本可以组合 `readFile`、`read`、`glob`、`grep`、`ls`、`bash`、`git` 和通用 `tool(name, args)`，并把一个结构化结果交给 agent。
 
 适合使用 PTC 的场景包括：
 

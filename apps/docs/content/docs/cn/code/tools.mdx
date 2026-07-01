@@ -5,9 +5,21 @@ description: "工具选择、直接工具调用与验证证据"
 
 # 工具
 
-A3S Code 会保留工具注册表。`toolNames()` 返回当前 session 的工具表面。
+A3S Code 会保留工具注册表。`toolNames()` 返回当前 session 的工具表面。这个表面由
+workspace capability 与 session 级集成共同组装；因此非本地 workspace 可以有意隐藏它无法提供服务的工具。
 
-默认核心工具包括 `read`、`write`、`edit`、`patch`、`grep`、`glob`、`ls`、`bash`、`task`、`parallel_task`、`search_skills`、`Skill` 和 `generate_object`。`web_fetch`、`web_search`、`git`、`batch`、`program` 与 MCP 工具属于更宽的工具表面；模型可见选择行为应在依赖它的产品流程中单独验证。
+## 工具表面
+
+| 层级 | 工具 | 注册规则 |
+| --- | --- | --- |
+| Workspace-gated builtins | `read`、`write`、`edit`、`patch`、`grep`、`glob`、`ls`、`bash`、`git` | 仅在 `WorkspaceServices` 声明具备所需 capability 时注册。例如 browser 或 S3 workspace 可以暴露文件工具，同时隐藏 `bash` 或本地 git。 |
+| Runtime builtins | `web_fetch`、`web_search`、`batch`、`program` | 由 core tool executor 注册。`batch` 和 `program` 会包住当前 registry，因此其内部可用工具仍取决于当前 session surface。 |
+| Session bootstrap tools | `task`、`parallel_task`、`generate_object`、`search_skills`、`Skill` | 构建 `AgentSession` 时加入。关闭 manual delegation 后会移除委派工具；`generate_object` 需要已配置的 LLM client；skill 工具使用有效 skill registry。 |
+| Dynamic integrations | `mcp__<server>__<tool>` 与宿主注册工具 | 从 MCP manager 或宿主代码发现后加入。 |
+
+当某个工作流依赖特定工具可见时，在测试或应用诊断中使用 `toolNames()` /
+`toolDefinitions()` 验证。工具可见性不是安全授权；可见调用仍会经过 permission policy、
+confirmation、hooks/AHP、timeout、artifact limit 与 workspace path check。
 
 ```ts
 const files = await session.glob('src/**/*.rs');

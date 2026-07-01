@@ -12,20 +12,33 @@ removed. Tools from a server are registered into the session and named
 
 ## Add A Server
 
+Use the object-shaped `addMcp(...)` API for new code. It maps directly to the
+core `McpServerConfig` shape and avoids the positional overload's argument
+ordering.
+
 ```ts
-const count = await session.addMcpServer(
-  'echo',
-  'stdio',
-  process.execPath,
-  ['tools/mcp_echo_server.mjs', 'example-value'],
-);
+const count = await session.addMcp({
+  name: 'echo',
+  transport: {
+    type: 'stdio',
+    command: process.execPath,
+    args: ['tools/mcp_echo_server.mjs', 'example-value'],
+  },
+  timeoutMs: 30000,
+});
 
 console.log('registered tools:', count);
 ```
 
-The TypeScript signature also exposes `'http'` and `'streamable-http'`
-transport values. Validate those against your server before relying on them in
-production docs or release notes.
+Python exposes the same object-shaped API as `session.add_mcp({...})`.
+`addMcpServer(...)` / `add_mcp_server(...)` and
+`addMcpServerConfig(...)` / `add_mcp_server_config(...)` remain compatibility
+aliases.
+
+For remote servers, use a nested transport object with `type: 'http'` or
+`type: 'streamable-http'`. Supply credentials from the host environment or a
+secret manager, and validate the server before relying on it in production docs
+or release notes.
 
 ## Inspect And Remove
 

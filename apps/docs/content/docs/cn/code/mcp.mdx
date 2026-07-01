@@ -6,24 +6,43 @@ description: "Model Context Protocol 服务集成"
 # MCP
 
 MCP 把 A3S Code session 连接到外部工具服务器。stdio server 可以加入 live
-session、检查状态、通过注册工具调用，并在不需要时移除。
+session、检查状态、通过注册工具调用，并在不需要时移除。server 的工具会注册到
+session 中，名称格式为 `mcp__<server>__<tool>`。
+
+## 添加 Server
+
+新代码优先使用 object-shaped `addMcp(...)` API。它直接对应 core 的
+`McpServerConfig` 形状，避免 positional overload 的参数顺序问题。
 
 ```ts
-const count = await session.addMcpServer(
-  'echo',
-  'stdio',
-  process.execPath,
-  ['tools/mcp_echo_server.mjs', 'example-value'],
-);
+const count = await session.addMcp({
+  name: 'echo',
+  transport: {
+    type: 'stdio',
+    command: process.execPath,
+    args: ['tools/mcp_echo_server.mjs', 'example-value'],
+  },
+  timeoutMs: 30000,
+});
 
+console.log('registered tools:', count);
+```
+
+Python 暴露相同的对象式 API：`session.add_mcp({...})`。
+`addMcpServer(...)` / `add_mcp_server(...)` 和
+`addMcpServerConfig(...)` / `add_mcp_server_config(...)` 仍作为兼容别名保留。
+
+远程 server 使用嵌套 transport object，`type` 取 `'http'` 或
+`'streamable-http'`。凭据应由宿主环境或 secret manager 注入；在生产文档或发布说明依赖前，先针对你的 server 做集成测试。
+
+## 检查和移除
+
+```ts
 console.log(await session.mcpStatus());
 console.log(session.toolNames().filter(name => name.startsWith('mcp__')));
 await session.tool('mcp__echo__echo', { message: 'docs mcp ok' });
 await session.removeMcpServer('echo');
 ```
-
-MCP tool 名称格式是 `mcp__server__tool`。TypeScript signature 也暴露
-`'http'` 和 `'streamable-http'` transport 值；在生产文档或发布说明里依赖前，应先针对你的 server 做集成测试。外部 tool server 应视为特权集成，secret 放在环境变量里。
 
 ## Idle Disconnect
 
@@ -46,3 +65,7 @@ print('disconnected:', dropped)
 运行成千上万长期 session 的 host 应通过 sweeper 周期性调用它（例如每 60s、阈值 5 分钟）。对已断开 server 的后续 tool 调用会从其保留的 config 重新建立连接——无需重新注册。
 
 disconnect 还会清除孤儿时间戳：`touch()`-without-connect 的条目（为一个从未真正连接过的 server 记录的时间戳）会在每次 `disconnect_idle` 调用时被清扫，使活动映射在 manager 的长期生命周期内不会无限增长（CHANGELOG [3.3.0] Fixed "MCP timestamp leak"）。
+
+## 安全
+
+外部 tool server 应视为特权集成，凭据只放在环境变量或宿主 secret manager 中。

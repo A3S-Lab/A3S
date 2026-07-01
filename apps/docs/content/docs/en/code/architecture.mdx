@@ -11,10 +11,9 @@ A3S Code is organized around a small runtime kernel and a harness that controls 
 Prompt
   -> context assembly
   -> optional planning and automatic subagent delegation
-  -> tool selection
   -> LLM generation
-  -> programmatic tool calling
-  -> configured permission/security integration
+  -> model-selected, delegated, direct, or programmatic tool calls
+  -> permission, hook, AHP, confirmation, and security checks
   -> tool execution
   -> observation
   -> verification
@@ -24,7 +23,11 @@ Prompt
 
 ## Kernel
 
-The kernel maintains sessions, calls providers, executes tools through one executor, records observations, and returns structured events and results.
+The kernel maintains sessions, calls providers, executes tools through one
+executor, records observations, and returns structured events and results. Tool
+calls can originate from the model, a direct SDK helper, a delegated child run,
+or the `program` tool; they still converge on the same registry, guards, trace
+sink, and workspace services.
 
 ## Harness
 
@@ -37,15 +40,22 @@ The harness coordinates:
 - which verification evidence is required before completion
 - how run snapshots, TaskList state, and trace events are exposed to host applications
 
+This is the key boundary: the runtime does not treat the TUI as special.
+`a3s code` is one client that streams these events into a terminal, while SDK
+hosts can render, approve, persist, and replay the same facts in their own
+product surface.
+
 ## PTC Path
 
 Programmatic Tool Calling is a harness path for deterministic workflows. The
 `program` tool runs a JavaScript script in an embedded QuickJS VM with a
-controlled `ctx` object. By default, scripts may call every registered tool
-except `program`; callers can narrow that surface with `allowed_tools`. The docs
-contract verifies scripts that compose `readFile`, `read`, `glob`, `grep`, `ls`,
-`bash`, `git`, and generic `tool(name, args)`, then return one structured result
-to the agent.
+controlled `ctx` object. A program call is still a tool call: permission
+policy, hook/AHP integration, timeouts, artifact limits, tracing, and workspace
+capability checks remain in the execution path. By default, scripts may call
+every registered tool except `program`; callers can narrow that surface with
+`allowed_tools`. The docs contract verifies scripts that compose `readFile`,
+`read`, `glob`, `grep`, `ls`, `bash`, `git`, and generic `tool(name, args)`,
+then return one structured result to the agent.
 
 Use PTC when the operation is mostly mechanical:
 

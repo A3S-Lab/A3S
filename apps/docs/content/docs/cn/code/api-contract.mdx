@@ -462,12 +462,15 @@ await queued.deadLetters();
 集成检查覆盖一个真实 stdio MCP server：
 
 ```ts
-const count = await session.addMcpServer(
-  'echo',
-  'stdio',
-  process.execPath,
-  ['tools/mcp_echo_server.mjs', 'example-value'],
-);
+const count = await session.addMcp({
+  name: 'echo',
+  transport: {
+    type: 'stdio',
+    command: process.execPath,
+    args: ['tools/mcp_echo_server.mjs', 'example-value'],
+  },
+  timeoutMs: 30000,
+});
 
 console.log(count);
 console.log(await session.mcpStatus());
@@ -478,6 +481,7 @@ await session.removeMcpServer('echo');
 ```
 
 server 注册出的 tool 名称格式是 `mcp__<server>__<tool>`。
+`addMcpServer(...)` 和 `addMcpServerConfig(...)` 仍是兼容别名；新示例使用更紧凑的 object-shaped `addMcp(...)` API。
 
 ## AHP Transport Objects
 
