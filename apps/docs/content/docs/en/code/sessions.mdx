@@ -85,6 +85,8 @@ const session = agent.resumeSession('release-review', {
 ```
 
 Set `autoSave: true` or call `await session.save()` when using a session store.
+This resumes a saved session snapshot; interrupted run checkpoints use
+`session.resumeRun(runId)` instead. See [Persistence](/docs/code/persistence).
 
 ## Lifecycle and Close
 

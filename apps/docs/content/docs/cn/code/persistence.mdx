@@ -7,6 +7,14 @@ description: "保存与恢复 session"
 
 持久化让 session 可以跨进程恢复，也让产品界面拥有稳定 session ID。
 
+A3S Code 会持久化三种相关但不同的对象：
+
+| 对象 | 写入方 | 恢复入口 | 用途 |
+| --- | --- | --- | --- |
+| Session snapshot | `session.save()` 或 `autoSave` | `agent.resumeSession(id, options)` | 恢复对话，以及 artifact、trace、run record、verification report、subagent task snapshot 等运行证据。 |
+| Loop checkpoint | run 执行中的 agent loop | `session.resumeRun(runId)` | 从上一个完成的 tool-round 边界继续一次被中断的 run。进程内正常完成的 run 会删除这个 checkpoint。 |
+| Workflow checkpoint | `parallelResumable` / workflow phase | `parallelResumable(specs, workflowId)` | 进程重启后跳过已经完成的编排 step。 |
+
 ## File Session Store
 
 ```ts
@@ -30,9 +38,14 @@ const resumed = agent.resumeSession('release-review', {
 });
 ```
 
+`resumeSession` 恢复的是已保存的 session snapshot。它不同于
+`resumeRun`：用户继续一个已保存对话时用 `resumeSession`；只有存在中断 run 的
+checkpoint 时，才用 `resumeRun(runId)`。
+
 ## Memory And Sessions
 
-Session 持久化保存对话状态；memory 保存可复用任务事实。当你需要既可恢复、又能从重复任务中学习的工作流时，两者一起使用。
+Session 持久化保存对话和可回放证据；memory 保存可复用任务事实。当你需要既可
+恢复、又能从重复任务中学习的工作流时，两者一起使用。
 
 ## Loop Checkpoints and Run Resumption
 
@@ -48,6 +61,9 @@ tool（write、bash）比让 LLM 重新提问更糟。
 中，resume 可以发生在**任何**共享该 store 的节点上。累计计量会延续而不是从零
 重启：`total_usage` 和 `tool_calls_count` 从 checkpoint 继续累加。resume 出来的
 工作会分配一个新的 run ID；新旧 run 的关系是宿主元数据，框架不予解释。
+
+已正常完成的 run 不通过 `resumeRun` 恢复；它们的最终状态应通过 `runs()`、
+`runEvents(runId)`、artifacts、verification reports 和 session snapshot 查看。
 
 ```ts
 const result = await session.resumeRun('run-abc123');

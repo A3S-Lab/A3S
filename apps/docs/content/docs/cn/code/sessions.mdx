@@ -81,6 +81,8 @@ const session = agent.resumeSession('release-review', {
 ```
 
 使用 session store 时设置 `autoSave: true`，或显式调用 `await session.save()`。
+这里恢复的是已保存的 session snapshot；中断 run 的 checkpoint 通过
+`session.resumeRun(runId)` 恢复。参见[持久化](/cn/docs/code/persistence)。
 
 ## Lifecycle and Close
 

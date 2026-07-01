@@ -7,6 +7,14 @@ description: "Saving and resuming sessions"
 
 Persistence lets a session survive process restarts and gives product surfaces a stable session ID.
 
+A3S Code persists three related but different things:
+
+| Object | Written by | Resumed by | Purpose |
+| --- | --- | --- | --- |
+| Session snapshot | `session.save()` or `autoSave` | `agent.resumeSession(id, options)` | Rehydrate a conversation plus runtime evidence such as artifacts, traces, run records, verification reports, and subagent task snapshots. |
+| Loop checkpoint | Agent loop while a run is in progress | `session.resumeRun(runId)` | Continue an interrupted run from the last completed tool-round boundary. Completed in-process runs delete this checkpoint. |
+| Workflow checkpoint | `parallelResumable` / workflow phases | `parallelResumable(specs, workflowId)` | Skip already-completed orchestration steps after a process restart. |
+
 ## File Session Store
 
 ```ts
@@ -30,9 +38,16 @@ const resumed = agent.resumeSession('release-review', {
 });
 ```
 
+`resumeSession` restores a saved session snapshot. It is not the same as
+`resumeRun`: use `resumeSession` when the user is continuing a saved
+conversation, and use `resumeRun(runId)` only when a run checkpoint exists for
+an interrupted run.
+
 ## Memory And Sessions
 
-Session persistence stores conversation state. Memory stores reusable task facts. Use both when you want resumable workflows that also learn from repeated tasks.
+Session persistence stores conversation and replay evidence. Memory stores
+reusable task facts. Use both when you want resumable workflows that also learn
+from repeated tasks.
 
 ## Loop Checkpoints and Run Resumption
 
@@ -51,6 +66,10 @@ shares it. Cumulative accounting continues rather than restarting at zero:
 `total_usage` and `tool_calls_count` carry forward from the checkpoint. A new run
 ID is allocated for the resumed work; the old-to-new relationship is host
 metadata, not interpreted by the framework.
+
+Completed runs are not resumed through `resumeRun`; their final state is
+available through `runs()`, `runEvents(runId)`, artifacts, verification reports,
+and session snapshots.
 
 ```ts
 const result = await session.resumeRun('run-abc123');
