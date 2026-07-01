@@ -11,6 +11,9 @@ import { Callout } from 'fumadocs-ui/components/callout';
 React-Aria-shaped semantic UI trees and lowers them into a compact native UI IR
 that platform adapters can render without a WebView.
 
+The current local crate is `a3s-gui` `0.1.0`. Its repository metadata points to
+[`A3S-Lab/GUI`](https://github.com/A3S-Lab/GUI).
+
 <Callout type="warn">
 In the current monorepo worktree, `crates/gui` exists but is not tracked in
 `.gitmodules`. Treat this page as documenting the present local project shape,
@@ -28,6 +31,17 @@ not a published submodule contract.
 | Platform planning | AppKit, WinUI, and GTK planning adapters map the IR to native widget blueprints. |
 | Native paths | Feature-gated AppKit, WinUI, and GTK native adapter paths are present in the crate manifest. |
 | TypeScript bridge | Prototype TypeScript SDK under `sdk/typescript` provides JSX/runtime protocol helpers. |
+
+## Start Here
+
+- [Architecture](/docs/gui/architecture) explains the TSX-to-native pipeline,
+  host boundary, command stream, and style contract.
+- [Web Authoring](/docs/gui/web-authoring) documents the React Aria authoring
+  surface and native lowering rules.
+- [Platforms](/docs/gui/platforms) maps supported semantic parts to AppKit,
+  WinUI, and GTK planning/native backends.
+- [Protocol And Events](/docs/gui/protocol-events) covers `UiFrame`,
+  `NativeProtocolSession`, host events, action routing, and native input flow.
 
 ## Boundary
 

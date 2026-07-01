@@ -1,0 +1,92 @@
+---
+title: Architecture
+description: The Web-compatible authoring layer, native IR, renderer, command stream, host boundary, and style contract in A3S GUI.
+---
+
+# GUI Architecture
+
+A3S GUI is designed to let Web developers author native application UI with
+React/TSX and React Aria semantics while the runtime renders real native
+controls instead of HTML in a WebView.
+
+```text
+React / TSX source
+        -> @a3s-lab/gui JSX runtime
+        -> React Compiler output
+        -> UiFrame protocol
+        -> ReactCompilerBridge
+        -> React Aria semantic tree
+        -> A3S Native UI IR
+        -> keyed renderer diff engine
+        -> native command stream
+        -> NativeHost adapter
+        -> native events
+        -> HostEvent
+        -> InteractionState
+        -> EventRouter
+        -> Web-authored action ids
+```
+
+## Layers
+
+| Layer | Responsibility |
+| --- | --- |
+| Web-compatible authoring | Accept JSX/TSX-shaped React Aria trees with DOM-style props, inline styles, `aria-*`, `data-*`, and named event callbacks. |
+| Native UI IR | Preserve roles, labels, values, state, events, metadata, children, accessibility roles, and portable style tokens. |
+| Renderer | Reconcile keyed trees and emit create, update, insert child, remove, and set-root commands. |
+| Native host | Apply commands to AppKit, WinUI, GTK, or a headless recording backend. |
+| Event bridge | Convert native input into `HostEvent`, update portable interaction state, and route to registered Web action ids. |
+
+## NativeHost Boundary
+
+Every platform adapter implements the same host operations:
+
+- create a native widget for a `NativeElement`
+- update native properties without remounting stable controls
+- insert a native child at a stable index
+- remove a native subtree
+- set the root widget for a window or surface
+
+The renderer owns reconciliation. Platform adapters own native object lifetime,
+thread affinity, focus integration, accessibility integration, and event
+delivery. Native hosts and widget drivers are not required to be `Send`, because
+real AppKit, WinUI, and GTK handles often belong to a UI thread.
+
+## Planning Hosts And Real Hosts
+
+`PlatformPlanningHost` implements the same `NativeHost` contract without linking
+platform SDKs. It records the native widget class, accessibility role, action
+binding, style tokens, events, and metadata that a real backend must apply.
+
+Real host paths consume the same command stream:
+
+| Host path | Role |
+| --- | --- |
+| `CommandExecutingHost` | Wraps a platform adapter plus command executor and executes commands immediately. |
+| `DriverCommandExecutor` | Shared interpreter for platform commands. |
+| `NativeWidgetDriver` | OS-binding contract for create/update/attach/remove/root operations. |
+| `HandleWidgetDriver` | Stores thread-affine native handles returned by a `NativeHandleAdapter`. |
+| `NativeWidgetSurface` | Setter-first contract for direct platform SDK calls. |
+| `RecordingBackend` | Pure Rust object tree used for validation and headless tests. |
+
+## Style Contract
+
+`WebProps` preserves original Web props. `PortableStyle` parses the subset that
+native adapters can apply deterministically:
+
+- display and flex direction
+- alignment and justification
+- width, height, min/max sizes
+- gap, padding, and margin
+- foreground and background color
+- border radius
+- opacity
+
+Unsupported style declarations are preserved as author intent so compiler or
+design tooling can warn without silently dropping information.
+
+## Boundary
+
+A3S GUI is not a browser runtime. Portable code should not depend on live DOM
+access, CSSOM inspection, browser layout measurement, or `HTMLElement` object
+identity.

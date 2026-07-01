@@ -1,4 +1,10 @@
 {
   "title": "A3S GUI",
-  "pages": ["index"]
+  "pages": [
+    "index",
+    "architecture",
+    "web-authoring",
+    "platforms",
+    "protocol-events"
+  ]
 }

@@ -10,6 +10,9 @@ import { Callout } from 'fumadocs-ui/components/callout';
 `a3s-gui` 是 A3S 应用的原生 UI renderer 原型。它接受 React-Aria 形态的语义 UI 树，
 并把它们降成紧凑的 native UI IR，再交给平台 adapter 渲染，无需 WebView。
 
+当前本地 crate 是 `a3s-gui` `0.1.0`。它的 repository metadata 指向
+[`A3S-Lab/GUI`](https://github.com/A3S-Lab/GUI)。
+
 <Callout type="warn">
 在当前 monorepo 工作区中，`crates/gui` 存在，但未记录在 `.gitmodules` 中。这个页面
 描述的是当前本地项目形态，不应被理解为已发布 submodule 契约。
@@ -26,6 +29,17 @@ import { Callout } from 'fumadocs-ui/components/callout';
 | Platform planning | AppKit、WinUI、GTK planning adapter 将 IR 映射为 native widget blueprint。 |
 | Native paths | crate manifest 中存在 feature-gated AppKit、WinUI、GTK native adapter paths。 |
 | TypeScript bridge | `sdk/typescript` 下有原型 TypeScript SDK，提供 JSX/runtime protocol helper。 |
+
+## 从这里开始
+
+- [Architecture](/cn/docs/gui/architecture) 解释 TSX-to-native pipeline、host
+  boundary、command stream 和 style contract。
+- [Web Authoring](/cn/docs/gui/web-authoring) 说明 React Aria authoring surface
+  与 native lowering rules。
+- [Platforms](/cn/docs/gui/platforms) 映射 supported semantic parts 到 AppKit、
+  WinUI 和 GTK planning/native backends。
+- [Protocol And Events](/cn/docs/gui/protocol-events) 覆盖 `UiFrame`、
+  `NativeProtocolSession`、host events、action routing 和 native input flow。
 
 ## 边界
 

@@ -1,0 +1,77 @@
+---
+title: Protocol And Events
+description: A3S GUI 的 UiFrame、NativeProtocolSession、command responses、HostEvent、InteractionState、EventRouter 和 action routing。
+---
+
+# Protocol And Events
+
+A3S GUI 明确分离 JavaScript/Rust 与 native-host boundaries。Compiled React output 以
+`UiFrame` 进入 Rust；native input 以 `HostEvent` 返回，并解析成已验证的 action invocations。
+
+## Host Protocol Types
+
+| Type | 用途 |
+| --- | --- |
+| `UiFrame` | compiled React tree 加 stable action ids。 |
+| `WindowOptions` | frame 可选 native window title、dimensions 和 resizable flag。 |
+| `RenderedFrame` | 渲染 frame 后产生的 native root。 |
+| `NativeRenderResponse` | native root 加一次 render pass 输出的 incremental platform commands。 |
+| `HostEvent` | platform backend 发出的 native event。 |
+| `HostEventResponse` | host event 对应的已验证 Web action invocation。 |
+
+协议让 React authoring 和 platform backends 解耦。JavaScript 看不到 native widget handles；
+native backends 也看不到 JSX。
+
+## Frame Boundary
+
+`NativeProtocolSession` 是 native platform process 的目标 host boundary。它拥有
+`GuiRuntime<PlatformPlanningHost<_>>`，接收 `UiFrame`，返回一次 render pass 新产生的
+`PlatformCommand` records，并把 `HostEvent` 派发回已注册的 Web action ids。
+
+当 `UiFrame.window` 存在时，Rust core 会把 compiled React root 包进 native window role。同一条
+command stream 随后创建 `NSWindow`、`Microsoft.UI.Xaml.Window` 或 `gtk::ApplicationWindow`，
+再把 frame content 插为 child。
+
+## Native Commands
+
+Renderer 输出一组很小的 command vocabulary：
+
+| Command | Effect |
+| --- | --- |
+| `Create` | 根据 `NativeWidgetBlueprint` 创建 native widget。 |
+| `Update` | 更新已有 native widget。 |
+| `InsertChild` | 按稳定 index 把 child attach 到 parent。 |
+| `Remove` | 删除 native subtree。 |
+| `SetRoot` | 设置 surface 或 window root。 |
+
+`NativeWidgetBlueprint` 携带 platform family、widget class、native role、accessibility
+role、labels、values、React Aria control state、Web metadata、event bindings 和解析后的
+portable style。Platform bindings 可以派生 `NativeWidgetSetter` operations，例如 `SetLabel`、
+`SetEnabled`、`SetPlaceholder`、`SetMinimum`、`SetMaximum`、`SetCurrent`、`SetEvents`、
+`SetMetadata`。
+
+## Event Flow
+
+React callbacks 会编译成 stable action identifiers。Native adapters 发出 typed events。
+`GuiRuntime` 先在 `InteractionState` 中更新 portable focus、value、selection、checked、
+expanded state；然后 `EventRouter` 把 native event 映射回 Web-authored action id，
+`ActionRegistry` 再验证 action 存在。
+
+```text
+onPress={saveProfile}
+        -> events: {"onPress": "saveProfile"}
+        -> native callback
+        -> NativeEventSource queue
+        -> NativeEventKind::Press
+        -> ActionInvocation { action: "saveProfile" }
+```
+
+Native paths 会按平台控件 enqueue press、change、focus、blur、toggle、selection-change 和
+ranged-value events。Programmatic setter updates 与 native user input 分离，因此 render diffs
+不会触发 Web-authored actions。
+
+## Native Host Responsibility
+
+Native host 可以每个 window 或 embedded surface 保持一个 session，在 UI thread 应用返回的 commands，
+并通过同一 session 发送 host events。Host 不需要理解 React component instances；它只需要可序列化
+protocol records 和 platform command stream。

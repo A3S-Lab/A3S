@@ -1,0 +1,86 @@
+---
+title: Web Authoring
+description: A3S GUI 的 React Aria authoring、compiler bridge shape、native lowering rules 和 portability boundaries。
+---
+
+# Web Authoring
+
+A3S GUI 从 Web developer experience 出发：应用作者写 React/TSX 和 React Aria 形态组件，
+bridge 再把语义 tree 降成 native controls。
+
+目标 TypeScript surface 是普通 TSX：
+
+```tsx
+/** @jsxImportSource @a3s-lab/gui */
+import {Button, Input, Label, TextField} from 'react-aria-components';
+import {createAction, createUiFrame, defineAction} from '@a3s-lab/gui';
+
+const setEmail = createAction('setEmail', 'Set email');
+const saveProfile = createAction('saveProfile', 'Save profile');
+
+const root = (
+  <form className="profile-form" data-screen="profile">
+    <TextField name="email" isRequired>
+      <Label>Email</Label>
+      <Input
+        placeholder="you@example.com"
+        style={{minWidth: 280}}
+        onChange={setEmail}
+      />
+    </TextField>
+
+    <Button aria-label="Save profile" onPress={saveProfile}>
+      Save
+    </Button>
+  </form>
+);
+
+export const frame = createUiFrame('profile', root, {
+  window: {title: 'Profile', width: 640, height: 480},
+  actions: [defineAction(setEmail), defineAction(saveProfile)],
+});
+```
+
+常规 screen 的应用作者不需要导入 native widget 名，也不需要写 Rust UI code。
+
+## Compiler Bridge Shape
+
+React Compiler integration 会把 TSX 降成可序列化 tree，携带 JSX props 中的同类信息：
+
+- React Aria component identity
+- 用于 reconciliation 的 stable keys
+- text children
+- `className`
+- inline `style`
+- `aria-*`、`data-*` 和 portable HTML attributes
+- 带命名回调的 `onClick`、`onChange`、`onPress` 等 event props
+- `isDisabled`、`isSelected`、`isRequired`、`isInvalid` 等 React Aria state props
+- `disabled`、`required`、`aria-expanded`、`aria-valuemin`、`aria-valuemax`、
+  `aria-valuenow` 等 HTML/ARIA aliases
+
+Rust core 通过 `ReactCompilerBridge` 映射这棵 tree，再交给 `GuiRuntime` 和 keyed
+`Renderer` 渲染。
+
+## Native Lowering Rules
+
+| Web-authored input | Native IR output |
+| --- | --- |
+| `className` | 保留在 `WebProps.class_name`，用于 style resolution。 |
+| `style={{...}}` | 保留在 `WebProps.style`，并解析为 `PortableStyle`。 |
+| `aria-label` | 在没有显式或可见 label 时作为 native accessibility label。 |
+| `aria-*` | 作为 accessibility metadata 保留；受支持的 state attributes 也会进入 native control state。 |
+| `data-*` | 作为 tests、analytics、automation metadata 保留。 |
+| `disabled` / `required` / `checked` / `selected` | 归一化成 React Aria-style native control state。 |
+| `min` / `max` / `aria-valuenow` | 归一化成 native ranged control state。 |
+| `onClick` / `onPress` | 归一化成 primary native action。 |
+| `onChange` | 归一化成 value controls 的 primary action。 |
+| `TextField` + `Label` + `Input` | 折叠成一个 native text field。 |
+| `Select` + `ListBoxItem` | 折叠成带 native options 的 native select。 |
+
+当 `onPress` 和 `onClick` 同时存在时，React Aria 的 `onPress` 优先，因此作者可以使用惯用
+React Aria API，同时保留 native press 语义。
+
+## Portable Contract
+
+语法是 Web-compatible，runtime 是 native。依赖 live browser DOM、CSSOM、browser layout APIs
+或具体 `HTMLElement` 实例的代码不属于 portable contract，应在 runtime 前被捕获。

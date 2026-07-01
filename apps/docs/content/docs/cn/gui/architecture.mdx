@@ -1,0 +1,87 @@
+---
+title: Architecture
+description: A3S GUI 的 Web-compatible authoring layer、native IR、renderer、command stream、host boundary 和 style contract。
+---
+
+# GUI Architecture
+
+A3S GUI 的目标是让 Web developer 用 React/TSX 和 React Aria 语义编写原生应用 UI，
+同时 runtime 渲染真实 native controls，而不是把 HTML 放进 WebView。
+
+```text
+React / TSX source
+        -> @a3s-lab/gui JSX runtime
+        -> React Compiler output
+        -> UiFrame protocol
+        -> ReactCompilerBridge
+        -> React Aria semantic tree
+        -> A3S Native UI IR
+        -> keyed renderer diff engine
+        -> native command stream
+        -> NativeHost adapter
+        -> native events
+        -> HostEvent
+        -> InteractionState
+        -> EventRouter
+        -> Web-authored action ids
+```
+
+## Layers
+
+| Layer | 职责 |
+| --- | --- |
+| Web-compatible authoring | 接受 JSX/TSX 形态的 React Aria tree，包含 DOM-style props、inline styles、`aria-*`、`data-*` 和命名事件回调。 |
+| Native UI IR | 保留 roles、labels、values、state、events、metadata、children、accessibility roles 和 portable style tokens。 |
+| Renderer | 对 keyed tree 做 reconciliation，并输出 create、update、insert child、remove、set-root commands。 |
+| Native host | 把 commands 应用到 AppKit、WinUI、GTK 或 headless recording backend。 |
+| Event bridge | 把 native input 转成 `HostEvent`，更新 portable interaction state，再路由到已注册的 Web action ids。 |
+
+## NativeHost Boundary
+
+每个平台 adapter 实现同一组 host operations：
+
+- 为 `NativeElement` 创建 native widget
+- 不 remount stable controls 的情况下更新 native properties
+- 按稳定 index 插入 native child
+- 删除 native subtree
+- 设置 window 或 surface 的 root widget
+
+Renderer 负责 reconciliation。Platform adapters 负责 native object lifetime、
+thread affinity、focus integration、accessibility integration 和 event delivery。
+Native hosts 与 widget drivers 不要求 `Send`，因为真实 AppKit、WinUI、GTK handles 通常属于 UI thread。
+
+## Planning Hosts 和 Real Hosts
+
+`PlatformPlanningHost` 不链接平台 SDK，但实现同一个 `NativeHost` contract。它记录真实
+backend 必须应用的 native widget class、accessibility role、action binding、style tokens、
+events 和 metadata。
+
+真实 host path 消费同一个 command stream：
+
+| Host path | 作用 |
+| --- | --- |
+| `CommandExecutingHost` | 包装 platform adapter 和 command executor，并立即执行 commands。 |
+| `DriverCommandExecutor` | 共享 platform commands interpreter。 |
+| `NativeWidgetDriver` | OS-binding contract，负责 create/update/attach/remove/root operations。 |
+| `HandleWidgetDriver` | 保存 `NativeHandleAdapter` 返回的 thread-affine native handles。 |
+| `NativeWidgetSurface` | 面向直接 platform SDK 调用的 setter-first contract。 |
+| `RecordingBackend` | 用于验证和 headless tests 的纯 Rust object tree。 |
+
+## Style Contract
+
+`WebProps` 保留原始 Web props。`PortableStyle` 解析 native adapter 能确定性应用的子集：
+
+- display 和 flex direction
+- alignment 和 justification
+- width、height、min/max sizes
+- gap、padding、margin
+- foreground/background color
+- border radius
+- opacity
+
+不支持的 style declarations 会保留为 author intent，方便 compiler 或 design tooling 告警，而不是静默丢弃。
+
+## 边界
+
+A3S GUI 不是 browser runtime。可移植代码不应依赖 live DOM access、CSSOM inspection、
+browser layout measurement 或 `HTMLElement` object identity。

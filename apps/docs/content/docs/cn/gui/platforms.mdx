@@ -1,0 +1,62 @@
+---
+title: Platforms
+description: React Aria semantic parts 与 AppKit、WinUI、GTK planning/native backend mappings。
+---
+
+# Platforms
+
+A3S GUI 保持一套 semantic native IR，再映射到各平台 native widgets。同一条 renderer command
+stream 可以面向 planning adapters、handle drivers、surface drivers 或 headless recording backend。
+
+## Semantic Mapping
+
+| React Aria semantic part | Native IR role |
+| --- | --- |
+| `Button` | `Button` |
+| `TextField` + `Label` + `Input` | 一个 native `TextField` |
+| `Checkbox` | `Checkbox` |
+| `Switch` | `Switch` |
+| `RadioGroup` + `Radio` | 带 native radio buttons 的 native radio group |
+| `Select` + `ListBox` + `ListBoxItem` | 带 native options 的 native select |
+| `ListBox` + `ListBoxItem` | native list |
+| `Dialog` / `Popover` | native modal 或 popover surface |
+| `Tabs` / `TabList` / `Tab` / `TabPanel` | native tabs |
+| `Separator` | native separator |
+| `Slider` / `ProgressBar` | native ranged controls |
+| `Toolbar` | native toolbar container |
+
+## Platform Widget Families
+
+| Native role | macOS AppKit | Windows WinUI | Linux GTK4 |
+| --- | --- | --- | --- |
+| `Button` | `NSButton` | `Microsoft.UI.Xaml.Controls.Button` | `gtk::Button` |
+| `TextField` | `NSTextField(input)` | `Microsoft.UI.Xaml.Controls.TextBox` | `gtk::Entry` |
+| `Checkbox` | `NSButton(checkbox)` | `Microsoft.UI.Xaml.Controls.CheckBox` | `gtk::CheckButton` |
+| `Switch` | `NSSwitch` | `ToggleSwitch` binding 不可用时使用 CheckBox-backed toggle | `gtk::Switch` |
+| `RadioGroup` | `NSStackView(radio-group)` | `RadioButtons` / `RadioButton` family | `gtk::Box(radio-group)` |
+| `Select` | `NSComboBox` | `ComboBox` | `gtk::DropDown` |
+| `ListBox` | `NSScrollView` 加 row controls | `ListBox` | `gtk::ListBox` |
+| `Tabs` | `NSTabView` / `NSTabViewItem` | `TabView` / `TabViewItem` | `gtk::Notebook` |
+| `Separator` | `NSBox(separator)` | `Border(separator)` | `gtk::Separator` |
+| `Slider` | `NSSlider` | `Slider` | `gtk::Scale` |
+| `ProgressBar` | `NSProgressIndicator` | `ProgressBar` | `gtk::ProgressBar` |
+
+## Feature Paths
+
+| Feature | Platform | 能力 |
+| --- | --- | --- |
+| `headless` | Portable default | 启用不链接 OS SDK 的纯 Rust recording/validation。 |
+| `appkit` | macOS planning/driver path | 在 `AppKitWidgetDriver` 和 `AppKitHandleAdapter` 后映射 AppKit classes。 |
+| `appkit-native` | macOS native path | 通过 `AppKitNativeSurface` 创建真实 AppKit windows、views、controls、tabs、sliders 和 progress indicators。 |
+| `winui` | Windows planning/driver path | 在 `WinUiWidgetDriver` 和 `WinUiHandleAdapter` 后映射 WinUI classes。 |
+| `winui-native` | Windows native path | 通过 `WinUiNativeSurface` 创建真实 WinUI 3/XAML widgets；不会启用 WebView2。 |
+| `gtk4` | Linux planning/driver path | 在 `Gtk4WidgetDriver` 和 `Gtk4HandleAdapter` 后映射 GTK classes。 |
+| `gtk4-native` | Linux native path | 通过 `Gtk4NativeSurface` 创建真实 GTK4 windows、boxes、entries、buttons、lists、tabs、sliders 和 progress bars。 |
+
+Native feature paths 受 OS 约束。Windows native 工作需要 Windows App SDK 环境。Linux native 工作需要
+GTK4 development libraries 和 `pkg-config`。
+
+## WebView Boundary
+
+A3S GUI 不在这些路径里使用 browser engine。A3S WebView 面向 embedded Web content；A3S GUI
+面向把 Web-compatible semantics 降成 native platform controls。

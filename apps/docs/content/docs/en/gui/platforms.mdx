@@ -1,0 +1,65 @@
+---
+title: Platforms
+description: React Aria semantic parts and their AppKit, WinUI, and GTK planning/native backend mappings.
+---
+
+# Platforms
+
+A3S GUI keeps one semantic native IR and maps it to platform-specific native
+widgets. The same renderer command stream can target planning adapters, handle
+drivers, surface drivers, or the headless recording backend.
+
+## Semantic Mapping
+
+| React Aria semantic part | Native IR role |
+| --- | --- |
+| `Button` | `Button` |
+| `TextField` + `Label` + `Input` | one native `TextField` |
+| `Checkbox` | `Checkbox` |
+| `Switch` | `Switch` |
+| `RadioGroup` + `Radio` | native radio group with native radio buttons |
+| `Select` + `ListBox` + `ListBoxItem` | native select with native options |
+| `ListBox` + `ListBoxItem` | native list |
+| `Dialog` / `Popover` | native modal or popover surface |
+| `Tabs` / `TabList` / `Tab` / `TabPanel` | native tabs |
+| `Separator` | native separator |
+| `Slider` / `ProgressBar` | native ranged controls |
+| `Toolbar` | native toolbar container |
+
+## Platform Widget Families
+
+| Native role | macOS AppKit | Windows WinUI | Linux GTK4 |
+| --- | --- | --- | --- |
+| `Button` | `NSButton` | `Microsoft.UI.Xaml.Controls.Button` | `gtk::Button` |
+| `TextField` | `NSTextField(input)` | `Microsoft.UI.Xaml.Controls.TextBox` | `gtk::Entry` |
+| `Checkbox` | `NSButton(checkbox)` | `Microsoft.UI.Xaml.Controls.CheckBox` | `gtk::CheckButton` |
+| `Switch` | `NSSwitch` | CheckBox-backed toggle while `ToggleSwitch` binding is unavailable | `gtk::Switch` |
+| `RadioGroup` | `NSStackView(radio-group)` | `RadioButtons` / `RadioButton` family | `gtk::Box(radio-group)` |
+| `Select` | `NSComboBox` | `ComboBox` | `gtk::DropDown` |
+| `ListBox` | `NSScrollView` plus row controls | `ListBox` | `gtk::ListBox` |
+| `Tabs` | `NSTabView` / `NSTabViewItem` | `TabView` / `TabViewItem` | `gtk::Notebook` |
+| `Separator` | `NSBox(separator)` | `Border(separator)` | `gtk::Separator` |
+| `Slider` | `NSSlider` | `Slider` | `gtk::Scale` |
+| `ProgressBar` | `NSProgressIndicator` | `ProgressBar` | `gtk::ProgressBar` |
+
+## Feature Paths
+
+| Feature | Platform | Capability |
+| --- | --- | --- |
+| `headless` | Portable default | Enables pure Rust recording/validation without linking OS SDKs. |
+| `appkit` | macOS planning/driver path | Maps AppKit classes behind `AppKitWidgetDriver` and `AppKitHandleAdapter`. |
+| `appkit-native` | macOS native path | Creates real AppKit windows, views, controls, tabs, sliders, and progress indicators through `AppKitNativeSurface`. |
+| `winui` | Windows planning/driver path | Maps WinUI classes behind `WinUiWidgetDriver` and `WinUiHandleAdapter`. |
+| `winui-native` | Windows native path | Creates real WinUI 3/XAML widgets through `WinUiNativeSurface`; it does not enable WebView2. |
+| `gtk4` | Linux planning/driver path | Maps GTK classes behind `Gtk4WidgetDriver` and `Gtk4HandleAdapter`. |
+| `gtk4-native` | Linux native path | Creates real GTK4 windows, boxes, entries, buttons, lists, tabs, sliders, and progress bars through `Gtk4NativeSurface`. |
+
+The native feature paths are OS-bound. Windows native work requires a Windows
+App SDK environment. Linux native work requires GTK4 development libraries and
+`pkg-config`.
+
+## WebView Boundary
+
+A3S GUI does not use a browser engine for these paths. A3S WebView is the
+project for embedded Web content; A3S GUI is the project for lowering
+Web-compatible semantics into native platform controls.
