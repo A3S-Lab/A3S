@@ -13,34 +13,30 @@ Engines like Google, Baidu, and Bing China require JavaScript rendering. A3S Sea
 
 A3S Search supports two headless browser backends:
 
-- **Lightpanda** (default) — Lightweight browser (59MB, &lt;100ms startup), Linux/macOS only
-- **Chrome** (fallback) — Chrome for Testing (200MB, 1-2s startup), all platforms
+- **Chrome/Chromium** — Available with the `headless` feature; auto-detected or downloaded as Chrome for Testing.
+- **Lightpanda** — Available with the `lightpanda` feature on Linux/macOS; this feature implies `headless`.
 
-The SDK automatically selects Lightpanda on supported platforms and falls back to Chrome on Windows or if Lightpanda is unavailable.
+`BrowserBackend::default()` selects Lightpanda when the crate is compiled with `lightpanda`; otherwise it selects Chrome.
 
 ## Feature Gate
 
-Headless browser support is **enabled by default** in SDKs, **opt-in** in Rust library:
+Headless browser support is opt-in in the Rust crate:
 
 ```toml
-# Rust library (opt-in for smaller binary)
+# Rust library (default: HTTP engines only)
 [dependencies]
-a3s-search = "0.9"  # HTTP engines only
+a3s-search = "1.3"
 
-# With Chrome backend
+# With Chrome/Chromium headless backend
 [dependencies]
-a3s-search = { version = "0.9", features = ["chromium"] }
+a3s-search = { version = "1.3", features = ["headless"] }
 
-# With Lightpanda backend (Linux/macOS only)
+# With Lightpanda backend (Linux/macOS only; implies headless)
 [dependencies]
-a3s-search = { version = "0.9", features = ["lightpanda"] }
-
-# With both backends
-[dependencies]
-a3s-search = { version = "0.9", features = ["all-headless"] }
+a3s-search = { version = "1.3", features = ["lightpanda"] }
 ```
 
-**Python/Node.js SDKs**: Both Chrome and Lightpanda backends are enabled by default.
+The Rust crate exposes only two relevant feature flags: `headless` and `lightpanda`.
 
 ## BrowserPool
 
@@ -51,21 +47,22 @@ use a3s_search::browser::{BrowserPool, BrowserPoolConfig, BrowserBackend};
 use std::sync::Arc;
 
 let pool = Arc::new(BrowserPool::new(BrowserPoolConfig {
-    backend: BrowserBackend::Lightpanda,  // or BrowserBackend::Chrome
+    backend: BrowserBackend::Chrome,
     max_tabs: 4,
     headless: true,
     chrome_path: None,
-    lightpanda_path: None,
     proxy_url: None,
     launch_args: vec![],
 }));
 ```
 
+When compiled with `features = ["lightpanda"]`, `BrowserBackend::Lightpanda` and `lightpanda_path` are also available.
+
 ### Configuration
 
 <TypeTable
   type={{
-    backend: { type: 'BrowserBackend', default: 'Lightpanda', description: 'Browser backend: Lightpanda (default) or Chrome' },
+    backend: { type: 'BrowserBackend', default: 'Chrome, or Lightpanda with the lightpanda feature', description: 'Browser backend selected by compile-time features' },
     max_tabs: { type: 'usize', default: '4', description: 'Maximum concurrent browser tabs' },
     headless: { type: 'bool', default: 'true', description: 'Run browser without UI' },
     chrome_path: { type: 'Option<String>', default: 'None', description: 'Explicit Chrome binary path (only used when backend=Chrome)' },
@@ -173,10 +170,7 @@ use std::sync::Arc;
 
 let pool = Arc::new(BrowserPool::new(BrowserPoolConfig {
     max_tabs: 4,
-    headless: true,
-    chrome_path: None,
-    proxy_url: None,
-    launch_args: vec![],
+    ..Default::default()
 }));
 
 let google_fetcher = Arc::new(
@@ -224,7 +218,7 @@ pub trait PageFetcher: Send + Sync {
       description: "Proxy pool rotation per request",
     },
     "BrowserFetcher": {
-      description: "Headless Chrome via BrowserPool",
+      description: "Headless browser rendering via BrowserPool",
     },
   }}
 />

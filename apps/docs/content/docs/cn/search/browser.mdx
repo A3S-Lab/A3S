@@ -13,34 +13,30 @@ Google、Baidu 和 Bing China 等引擎需要 JavaScript 渲染。A3S Search 提
 
 A3S Search 支持两种无头浏览器后端：
 
-- **Lightpanda**（默认）— 轻量级浏览器（59MB，&lt;100ms 启动），仅支持 Linux/macOS
-- **Chrome**（备用）— Chrome for Testing（200MB，1-2s 启动），支持所有平台
+- **Chrome/Chromium** — 通过 `headless` 特性启用；可自动检测本机浏览器，也可下载 Chrome for Testing
+- **Lightpanda** — 通过 `lightpanda` 特性在 Linux/macOS 上启用；该特性会隐式启用 `headless`
 
-SDK 会在支持的平台上自动选择 Lightpanda，在 Windows 或 Lightpanda 不可用时回退到 Chrome。
+`BrowserBackend::default()` 在编译启用 `lightpanda` 时选择 Lightpanda，否则选择 Chrome。
 
 ## 功能开关
 
-无头浏览器支持在 **SDK 中默认启用**，在 **Rust 库中需要手动启用**：
+无头浏览器支持在 Rust crate 中需要手动启用：
 
 ```toml
-# Rust 库（手动启用以减小二进制体积）
+# Rust 库（默认只启用 HTTP 引擎）
 [dependencies]
-a3s-search = "0.9"  # 仅 HTTP 引擎
+a3s-search = "1.3"
 
-# 使用 Chrome 后端
+# 使用 Chrome/Chromium 无头后端
 [dependencies]
-a3s-search = { version = "0.9", features = ["chromium"] }
+a3s-search = { version = "1.3", features = ["headless"] }
 
-# 使用 Lightpanda 后端（仅 Linux/macOS）
+# 使用 Lightpanda 后端（仅 Linux/macOS；隐式启用 headless）
 [dependencies]
-a3s-search = { version = "0.9", features = ["lightpanda"] }
-
-# 同时启用两个后端
-[dependencies]
-a3s-search = { version = "0.9", features = ["all-headless"] }
+a3s-search = { version = "1.3", features = ["lightpanda"] }
 ```
 
-**Python/Node.js SDK**：默认启用 Chrome 和 Lightpanda 两个后端。
+Rust crate 当前只暴露两个相关特性：`headless` 和 `lightpanda`。
 
 ## BrowserPool
 
@@ -51,21 +47,22 @@ use a3s_search::browser::{BrowserPool, BrowserPoolConfig, BrowserBackend};
 use std::sync::Arc;
 
 let pool = Arc::new(BrowserPool::new(BrowserPoolConfig {
-    backend: BrowserBackend::Lightpanda,  // 或 BrowserBackend::Chrome
+    backend: BrowserBackend::Chrome,
     max_tabs: 4,
     headless: true,
     chrome_path: None,
-    lightpanda_path: None,
     proxy_url: None,
     launch_args: vec![],
 }));
 ```
 
+编译启用 `features = ["lightpanda"]` 后，也可以使用 `BrowserBackend::Lightpanda` 和 `lightpanda_path`。
+
 ### 配置项
 
 <TypeTable
   type={{
-    backend: { type: 'BrowserBackend', default: 'Lightpanda', description: '浏览器后端：Lightpanda（默认）或 Chrome' },
+    backend: { type: 'BrowserBackend', default: 'Chrome，启用 lightpanda 特性时为 Lightpanda', description: '由编译期特性选择的浏览器后端' },
     max_tabs: { type: 'usize', default: '4', description: '最大并发浏览器标签页数' },
     headless: { type: 'bool', default: 'true', description: '无 UI 模式运行浏览器' },
     chrome_path: { type: 'Option<String>', default: 'None', description: '显式指定 Chrome 二进制路径（仅当 backend=Chrome 时使用）' },
@@ -139,15 +136,26 @@ let fetcher = Arc::new(
   }}
 />
 
-## Chrome 自动检测
+## 浏览器自动检测
 
-当 `chrome_path` 为 `None` 时，A3S Search 按以下顺序查找 Chrome：
+当 `chrome_path` 或 `lightpanda_path` 为 `None` 时，A3S Search 会自动检测或下载浏览器：
+
+### Lightpanda（启用 `lightpanda` 特性时）
+
+1. `LIGHTPANDA` 环境变量
+2. 系统 PATH（`lightpanda` 命令）
+3. 缓存目录：`~/.a3s/lightpanda/<tag>/lightpanda`
+4. 从 GitHub releases 自动下载
+
+支持的平台：macOS（arm64、x64）和 Linux（x64、arm64）。首次运行可能需要下载约 59MB。
+
+### Chrome/Chromium
 
 1. `CHROME` 环境变量
 2. 系统 PATH（`google-chrome`、`chromium`、`chrome` 等）
 3. 常见安装路径（macOS `/Applications/...`、Linux `/usr/bin/...`、Windows `C:\Program Files\...`）
-4. 从 Google CDN 自动下载 Chrome for Testing
-5. 缓存至 `~/.a3s/chromium/`
+4. 缓存目录：`~/.a3s/chromium/<version>/`
+5. 从 Google CDN 自动下载 Chrome for Testing
 
 支持的平台：macOS（arm64、x64）、Linux（x64）和 Windows（x64、x86）。首次运行可能需要下载约 150MB。
 
@@ -162,10 +170,7 @@ use std::sync::Arc;
 
 let pool = Arc::new(BrowserPool::new(BrowserPoolConfig {
     max_tabs: 4,
-    headless: true,
-    chrome_path: None,
-    proxy_url: None,
-    launch_args: vec![],
+    ..Default::default()
 }));
 
 let google_fetcher = Arc::new(
@@ -213,7 +218,7 @@ pub trait PageFetcher: Send + Sync {
       description: "Proxy pool rotation per request",
     },
     "BrowserFetcher": {
-      description: "Headless Chrome via BrowserPool",
+      description: "通过 BrowserPool 进行无头浏览器渲染",
     },
   }}
 />

@@ -84,8 +84,8 @@ a3s-search "Rust 编程" -e baidu,bing_cn
       default: "None",
     },
     "-f, --format": {
-      description: "Output format: default, json, compact",
-      default: "default",
+      description: "Output format: text, json, compact",
+      default: "text",
     },
     "-v, --verbose": {
       description: "Enable verbose logging",
@@ -96,7 +96,7 @@ a3s-search "Rust 编程" -e baidu,bing_cn
 
 ## Output Formats
 
-### Default
+### Text
 
 Human-readable output with title, URL, snippet, and metadata:
 
@@ -128,7 +128,7 @@ Machine-readable JSON with full result metadata.
 $ a3s-search "rust" -f compact
 ```
 
-Tab-separated output: `score\ttitle\turl` — useful for piping to other tools.
+Tab-separated output: `title\turl` — useful for piping to other tools.
 
 ## Available Engines
 
@@ -179,19 +179,19 @@ a3s-search "rust" -p http://127.0.0.1:8080
 a3s-search "rust" -p socks5://127.0.0.1:1080
 ```
 
-## Chrome Auto-Install
+## Browser Auto-Install
 
-When using headless engines (`g`, `baidu`, `bing_cn`), Chrome is required. A3S Search handles this automatically:
+When using headless engines (`g`, `baidu`, `bing_cn`), A3S Search uses the browser backend compiled into the binary and detects or downloads the matching browser automatically.
 
 ```bash
-# First run: Chrome is auto-downloaded if not installed
+# First run: the required browser is auto-downloaded if not installed
 a3s-search "rust" -e g
-# Downloading Chrome for Testing v145.0.7632.46 (mac-arm64)...
-# Chrome for Testing installed successfully!
+# Downloading browser...
+# Browser installed successfully!
 
-# Subsequent runs: uses cached Chrome instantly
+# Subsequent runs: uses the cached browser
 a3s-search "rust" -e g
 
-# Or set CHROME env var to use a specific binary
+# Or set CHROME / LIGHTPANDA to use a specific binary
 CHROME=/usr/bin/chromium a3s-search "rust" -e g
 ```

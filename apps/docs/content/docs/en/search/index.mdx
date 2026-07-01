@@ -17,8 +17,8 @@ A3S Search is an embeddable meta search engine library inspired by [SearXNG](htt
 - **Dynamic Proxy Pool** — Round-robin and random rotation with pluggable `ProxyProvider` trait and `spawn_auto_refresh`.
 - **Health Monitor** — Automatic engine suspension after repeated failures with configurable recovery.
 - **ACL Configuration** — Load engine weights, health settings, and timeouts from `.acl` config files.
-- **Headless Browser** — Lightpanda (default, 59MB, &lt;100ms) or Chrome for JS-rendered engines (Google, Baidu, Bing China).
-- **Auto-Install Browser** — Detects or downloads Lightpanda/Chrome for Testing when no browser is found.
+- **Headless Browser** — Chrome/Chromium via `headless`, plus Lightpanda via `lightpanda` for JS-rendered engines (Google, Baidu, Bing China).
+- **Auto-Install Browser** — Detects or downloads Chrome for Testing, or Lightpanda when the `lightpanda` feature is enabled.
 - **PageFetcher Abstraction** — Pluggable fetching: `HttpFetcher`, `PooledHttpFetcher`, or `BrowserFetcher`.
 - **CLI Tool** — Command-line interface with multiple output formats and Homebrew distribution.
 - **Native SDKs** — TypeScript (NAPI-RS) and Python (PyO3) bindings with async support, headless browser enabled by default.
@@ -93,7 +93,7 @@ Search
 <TypeTable
   type={{
     "Rust": {
-      description: "Package: [a3s-search](https://crates.io/crates/a3s-search) · Install: a3s-search = '0.9' in Cargo.toml",
+      description: "Package: [a3s-search](https://crates.io/crates/a3s-search) · Install: a3s-search = '1.3' in Cargo.toml",
     },
     "Python": {
       description: "Package: [a3s-search](https://pypi.org/project/a3s-search/) · Install: pip install a3s-search",
