@@ -1,0 +1,1 @@
+../../../crates/box/integrations/skills/a3s-box/SKILL.md
