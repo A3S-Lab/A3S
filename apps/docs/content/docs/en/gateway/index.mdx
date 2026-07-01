@@ -13,6 +13,7 @@ A3S Gateway is the traffic layer for AI-native services. It is built on [hyper](
 This page is an orientation. Each capability below links to the page that documents it in full:
 
 - [Quick Start](./quick-start) — install and run your first gateway
+- [Wire Firewall](./wire-firewall) — optional inline LLM/MCP proxy that masks secrets and runs Sentry inspection before forwarding
 - [Configuration](./configuration) — the full ACL schema (entrypoints, routers, services, middlewares, providers, management, observability)
 - [Routing](./routing) — Traefik-style rule matching and priority
 - [Middleware](./middleware) — the built-in request/response pipeline
@@ -43,7 +44,7 @@ A3S Gateway is designed for the right column:
 Everything else — routing, TLS, rate limiting, auth, Prometheus — is standard infrastructure that A3S Gateway includes so you don't need a second tool.
 
 <Callout type="info">
-**Gradual rollout** (`rollout { }`) is fully implemented and validated — `from`/`to` revisions, `step_percent`, `step_interval_secs`, and auto-rollback on `error_rate_threshold` / `latency_threshold_ms`. In v1.0.7 the rollout controller is **parsed and validated but not yet driven by a runtime loop**, so the config is inert at runtime. Use static [revision splitting](./services) to shift traffic manually today.
+**Gradual rollout** (`rollout { }`) is fully implemented and validated — `from`/`to` revisions, `step_percent`, `step_interval_secs`, and auto-rollback on `error_rate_threshold` / `latency_threshold_ms`. In v1.0.11 the rollout controller is **parsed and validated but not yet driven by a runtime loop**, so the config is inert at runtime. Use static [revision splitting](./services) to shift traffic manually today.
 </Callout>
 
 ## Architecture
@@ -143,10 +144,11 @@ pub enum GatewayState {
 
 **AI-native patterns** — see [Services](./services)
 - SSE / streaming relay — zero-buffer chunked transfer for LLM outputs
+- Inline wire firewall — feature-gated `/wire/<agent>/...` proxy for secret/PII masking and Sentry request inspection
 - Scale-to-zero — Knative autoscaling formula with optional cold-start request buffering (`buffer_enabled`, off by default)
 - Revision splitting — deterministic weighted traffic split across named revisions (must sum to 100%)
 - Traffic mirroring — copy a percentage of live traffic to a shadow service, fire-and-forget
-- Gradual rollout — step-by-step traffic shift with auto-rollback on error rate or latency (implemented and validated; not yet driven at runtime in v1.0.7)
+- Gradual rollout — step-by-step traffic shift with auto-rollback on error rate or latency (implemented and validated; not yet driven at runtime in v1.0.11)
 
 **Core proxy** — see [Routing](./routing) and [Services](./services)
 - Traefik-compatible rule syntax — `Host()`, `Path()`, `PathPrefix()`, `Headers()`, `Method()`, joined with `&&` (AND only)
@@ -175,4 +177,4 @@ pub enum GatewayState {
 - ACL-only configuration — human-readable, version-controlled (`.acl` extension required)
 - Hot reload via file watcher; optional file/discovery/kubernetes/docker config providers
 - Helm chart for Kubernetes, Docker image (`ghcr.io/a3s-lab/gateway`), Homebrew formula, `cargo install a3s-gateway`
-- Current release: **v1.0.7** (MSRV Rust 1.88); published Linux images/binaries enable the `kube` + `redis` features
+- Current release: **v1.0.11** (MSRV Rust 1.88); published Linux images/binaries enable the `kube` + `redis` features

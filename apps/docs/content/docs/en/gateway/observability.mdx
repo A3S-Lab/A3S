@@ -21,7 +21,7 @@ Everything in the data plane is governed by one top-level block,
 The `observability {}` block has **exactly three boolean flags**, and **all
 three default to `true`**. There are no other keys (no OTLP endpoint, sample
 rate, propagation, or service-name keys — those belong to an internal struct
-that is not wired to ACL in v1.0.7).
+that is not wired to ACL in v1.0.11).
 
 ```text
 observability {
@@ -90,7 +90,7 @@ gateway_backend_requests_total{backend="http://127.0.0.1:8002"} 6345
 | `gateway_backend_requests_total` | counter | `backend` | Backend URL label; emitted only when non-empty. |
 
 <Callout type="warn">
-  **Defined but not populated in v1.0.7.** The collector also defines
+  **Defined but not populated in v1.0.11.** The collector also defines
   `gateway_middleware_invocations_total{middleware=...}`,
   `gateway_router_latency_microseconds_total{router=...}`,
   `gateway_router_errors_total{router=...}`, and
@@ -166,7 +166,7 @@ are the exact JSON keys emitted (via the `tracing` crate, target
 | `user_agent` | string \| null | Client User-Agent (optional). |
 
 <Callout type="warn">
-  **v1.0.7 limitation.** Although `access_log_enabled` defaults to `true`, no
+  **v1.0.11 limitation.** Although `access_log_enabled` defaults to `true`, no
   per-request JSON access-log line is currently emitted: the request path only
   creates the duration tracker and never hands an entry to the background log
   task. The drain task and the entry schema above exist, but the hot path does
@@ -223,7 +223,7 @@ injects a fresh child `traceparent` on the outbound request.
   **Outbound propagation is W3C-only.** Regardless of any propagation setting,
   the production path always injects a W3C `traceparent` header to upstreams.
   B3/Zipkin is honored only on **inbound** extraction; the B3-capable outbound
-  injector is not wired into the request path in v1.0.7. Do not expect
+  injector is not wired into the request path in v1.0.11. Do not expect
   `b3` / `X-B3-*` headers to be re-emitted to backends.
 </Callout>
 

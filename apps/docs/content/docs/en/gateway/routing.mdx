@@ -258,7 +258,7 @@ TCP routes are sorted by `priority` **ascending** (lower value = higher
 priority).
 
 <Callout type="warn">
-`HostSNI()`-based TCP routing is part of the rule engine, but in v1.0.7 the SNI
+`HostSNI()`-based TCP routing is part of the rule engine, but in v1.0.11 the SNI
 matcher is **not wired into the live TCP data plane**. A TCP entrypoint routes
 through the HTTP router table using the synthetic request
 `match_request(host=None, path="/", method="TCP", headers={}, entrypoint)`. In

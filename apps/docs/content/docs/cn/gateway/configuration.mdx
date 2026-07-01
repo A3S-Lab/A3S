@@ -7,7 +7,7 @@ import { Callout } from 'fumadocs-ui/components/callout';
 
 # 配置
 
-A3S Gateway 仅使用 ACL（Agent Configuration Language）进行配置。本页是 **v1.0.7** 配置 schema 的完整参考：每一个块、每一个键、其类型及其默认值。
+A3S Gateway 仅使用 ACL（Agent Configuration Language）进行配置。本页是 **v1.0.11** 配置 schema 的完整参考：每一个块、每一个键、其类型及其默认值。
 
 配置文件**必须**使用 `.acl` 扩展名。加载器会拒绝 `.toml`、`.yaml`、`.yml` 和 `.json` 文件。配置支持通过文件监听实现热重载（参见 [文件提供者](#file-provider)）。
 
@@ -188,7 +188,7 @@ entrypoints "websecure" {
 ```
 
 <Callout type="warn">
-在 v1.0.7 中，来自配置的 ACME **仅支持 HTTP-01**。`tls` 块只暴露上述键。从 ACL 中**无法**访问 DNS-01 / Cloudflare / Route53 键——这些 solver 存在于运行时，但未接入配置 schema。挑战类型始终是 HTTP-01，DNS 提供者始终为 `None`。
+在 v1.0.11 中，来自配置的 ACME **仅支持 HTTP-01**。`tls` 块只暴露上述键。从 ACL 中**无法**访问 DNS-01 / Cloudflare / Route53 键——这些 solver 存在于运行时，但未接入配置 schema。挑战类型始终是 HTTP-01，DNS 提供者始终为 `None`。
 </Callout>
 
 ## 路由
@@ -476,7 +476,7 @@ services "api-service" {
 ```
 
 <Callout type="warn">
-在 v1.0.7 中，`rollout` 会被解析和校验，但在运行时**处于惰性状态**——没有循环驱动 rollout 控制器，因此 `step_interval_secs`、`step_percent`、`error_rate_threshold` 和 `latency_threshold_ms` 目前尚无实际效果。Revision 选择采用确定性加权 round-robin（而非随机）。
+在 v1.0.11 中，`rollout` 会被解析和校验，但在运行时**处于惰性状态**——没有循环驱动 rollout 控制器，因此 `step_interval_secs`、`step_percent`、`error_rate_threshold` 和 `latency_threshold_ms` 目前尚无实际效果。Revision 选择采用确定性加权 round-robin（而非随机）。
 </Callout>
 
 负载均衡、健康检查和扩缩容行为的深入说明，参见 [服务](./services)。
@@ -613,7 +613,7 @@ observability {
 }
 ```
 
-此块中没有 `otlp` / `sample_rate` / `propagation` / `service_name` 键。关于 v1.0.7 实际发出哪些指标和追踪格式，参见 [可观测性](./observability)。
+此块中没有 `otlp` / `sample_rate` / `propagation` / `service_name` 键。关于 v1.0.11 实际发出哪些指标和追踪格式，参见 [可观测性](./observability)。
 
 ## 管理
 
@@ -681,7 +681,7 @@ management {
 
 ## 提供者
 
-动态配置源。`providers` 下只识别四个块（`file`、`discovery`、`kubernetes`、`docker`）；其他任何块都会被拒绝（`Unknown providers ACL block`）。发现的条目会被**添加**到静态配置中，并且**名称冲突时静态配置胜出**（Docker 提供者除外，它会覆盖）。v1.0.7 中没有 `dns` 提供者。
+动态配置源。`providers` 下只识别四个块（`file`、`discovery`、`kubernetes`、`docker`）；其他任何块都会被拒绝（`Unknown providers ACL block`）。发现的条目会被**添加**到静态配置中，并且**名称冲突时静态配置胜出**（Docker 提供者除外，它会覆盖）。v1.0.11 中没有 `dns` 提供者。
 
 ### 文件提供者
 

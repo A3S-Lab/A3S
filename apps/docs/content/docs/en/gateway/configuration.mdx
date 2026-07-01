@@ -7,7 +7,7 @@ import { Callout } from 'fumadocs-ui/components/callout';
 
 # Configuration
 
-A3S Gateway is configured exclusively in ACL (Agent Configuration Language). This page is the complete reference for the configuration schema in **v1.0.7**: every block, every key, its type, and its default.
+A3S Gateway is configured exclusively in ACL (Agent Configuration Language). This page is the complete reference for the configuration schema in **v1.0.11**: every block, every key, its type, and its default.
 
 Configuration files **must** use the `.acl` extension. The loader rejects `.toml`, `.yaml`, `.yml`, and `.json` files. Configuration supports hot reload via file watching (see [File Provider](#file-provider)).
 
@@ -188,7 +188,7 @@ entrypoints "websecure" {
 ```
 
 <Callout type="warn">
-ACME from configuration is **HTTP-01 only** in v1.0.7. The `tls` block exposes only the keys above. There are **no** DNS-01 / Cloudflare / Route53 keys reachable from ACL — those solvers exist in the runtime but are not wired to the configuration schema. The challenge type is always HTTP-01 and the DNS provider is always `None`.
+ACME from configuration is **HTTP-01 only** in v1.0.11. The `tls` block exposes only the keys above. There are **no** DNS-01 / Cloudflare / Route53 keys reachable from ACL — those solvers exist in the runtime but are not wired to the configuration schema. The challenge type is always HTTP-01 and the DNS provider is always `None`.
 </Callout>
 
 ## Routers
@@ -476,7 +476,7 @@ services "api-service" {
 ```
 
 <Callout type="warn">
-`rollout` is parsed and validated but **inert at runtime** in v1.0.7 — no loop drives the rollout controller, so `step_interval_secs`, `step_percent`, `error_rate_threshold`, and `latency_threshold_ms` have no live effect yet. Revision selection is deterministic weighted round-robin (not random).
+`rollout` is parsed and validated but **inert at runtime** in v1.0.11 — no loop drives the rollout controller, so `step_interval_secs`, `step_percent`, `error_rate_threshold`, and `latency_threshold_ms` have no live effect yet. Revision selection is deterministic weighted round-robin (not random).
 </Callout>
 
 See [Services](./services) for load balancing, health, and scaling behavior in depth.
@@ -613,7 +613,7 @@ observability {
 }
 ```
 
-There are no `otlp` / `sample_rate` / `propagation` / `service_name` keys in this block. See [Observability](./observability) for which metrics and trace formats are actually emitted in v1.0.7.
+There are no `otlp` / `sample_rate` / `propagation` / `service_name` keys in this block. See [Observability](./observability) for which metrics and trace formats are actually emitted in v1.0.11.
 
 ## Management
 
@@ -681,7 +681,7 @@ If `auth_token_env` names a variable that is unset at startup, the management li
 
 ## Providers
 
-Dynamic configuration sources. Only four blocks are recognized under `providers` (`file`, `discovery`, `kubernetes`, `docker`); any other is rejected (`Unknown providers ACL block`). Discovered entries are **added** to static config, and **static config wins on name collisions** (except the Docker provider, which overwrites). There is no `dns` provider in v1.0.7.
+Dynamic configuration sources. Only four blocks are recognized under `providers` (`file`, `discovery`, `kubernetes`, `docker`); any other is rejected (`Unknown providers ACL block`). Discovered entries are **added** to static config, and **static config wins on name collisions** (except the Docker provider, which overwrites). There is no `dns` provider in v1.0.11.
 
 ### File provider
 

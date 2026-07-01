@@ -1,0 +1,117 @@
+---
+title: Wire Firewall
+description: Optional inline LLM/MCP proxy that masks secrets, runs A3S Sentry inspection, forwards faithfully, and audits response leaks.
+---
+
+# Gateway Wire Firewall
+
+The wire firewall is an optional Gateway mode behind the `wire` Cargo feature. It is not part of the normal router/middleware/service data plane. Instead, it runs a local LLM/MCP proxy at `/wire/<agent>/...`, calls A3S Sentry's inline inspection, masks concrete secret/PII spans before the upstream sees them, and restores placeholders on the response.
+
+```text
+agent request -> /wire/<agent>/... -> Sentry inspect_wire -> masked request -> provider
+                                                     <- restored response <-
+```
+
+Use it for traffic that can be routed through a local provider base URL. Keep Observer plus Sentry as the kernel backstop for raw sockets or agents that bypass the proxy.
+
+## Enable
+
+The default Gateway build does not include Sentry. Build with the `wire` feature:
+
+```bash
+cargo build --features wire --bin a3s-gateway
+```
+
+Run the proxy with a single upstream provider origin:
+
+```bash
+./target/debug/a3s-gateway wire \
+  --listen 127.0.0.1:9877 \
+  --upstream "${PROVIDER_BASE_URL}" \
+  --sentry-config sentry.acl
+```
+
+Point an agent provider base URL at:
+
+```text
+http://127.0.0.1:9877/wire/<agent>
+```
+
+`--sentry-config` accepts a Sentry ACL file path or inline ACL content. Empty config uses Sentry built-ins with fail-open posture: masking still applies, but ambiguous malicious content only escalates unless a deeper guard or fail-closed mode blocks it.
+
+## What The Gate Does
+
+| Step | Behavior |
+| --- | --- |
+| Path split | `/wire/<agent>/<rest>` becomes agent identity plus the upstream path. Path and query are forwarded verbatim. |
+| Request body | UTF-8 bodies are buffered under an 8 MiB cap, inspected, and masked. Non-UTF-8 bodies pass through ungated to avoid corruption. |
+| Blocking | If Sentry returns a blocking inline decision, Gateway returns `403` JSON and never contacts the upstream. |
+| Forwarding | Host, content length, and accept-encoding are removed; other headers, including provider auth, pass through. |
+| Response | Upstream status and content-type are preserved. Placeholders are restored for the paired response. |
+| Audit | Request decisions produce one NDJSON trace line. Response scanning is audit-only and logs if the model output trips detectors. |
+
+## Correctness Hardening
+
+- Query strings are preserved, so provider-specific query parameters survive.
+- `accept-encoding` is stripped to avoid compressed responses defeating placeholder restoration.
+- Restore maps are per request, so one request cannot restore another request's placeholder.
+- The proxy preserves upstream status and content type instead of forcing success or JSON.
+- Oversized request bodies return `413`.
+- Non-wire paths return `404`.
+
+## Trace Shape
+
+Each request trace includes:
+
+```json
+{
+  "agent": "agent-name",
+  "path": "/v1/messages",
+  "direction": "request",
+  "verdict": "allow",
+  "tier": "Rules",
+  "severity": "Info",
+  "reason": "allowed",
+  "redacted": 1,
+  "blocked": false
+}
+```
+
+Treat these NDJSON lines as local security audit output. Do not put provider credentials or real prompt payloads into committed examples.
+
+## Embedding
+
+The wire module can also be embedded:
+
+```rust
+use a3s_gateway::wire::{serve, WireGate};
+use std::{net::SocketAddr, sync::Arc};
+
+let gate = Arc::new(WireGate::from_acl("sentry.acl")?);
+let upstream = Arc::new(std::env::var("PROVIDER_BASE_URL")?);
+serve("127.0.0.1:9877".parse::<SocketAddr>()?, gate, upstream).await?;
+```
+
+The pure `WireGate` methods are separately unit-tested without a live upstream.
+
+## Tests And Soak
+
+The source includes unit and transport tests for:
+
+- `/wire/<agent>` path parsing, including query preservation.
+- Secret masking and response restoration.
+- Fail-closed prompt-injection blocking.
+- Benign pass-through.
+- Response audit without blocking.
+- `accept-encoding` stripping.
+- Upstream status and content-type preservation.
+- Non-wire `404`.
+
+`scripts/soak-wire.sh` drives sustained concurrent secret-bearing requests through a live proxy and asserts that the secret does not reach the upstream, the response is restored, RSS stays bounded, and the proxy stays alive.
+
+## Boundaries
+
+- Placeholder relocation is still possible: a model can echo a placeholder into a dangerous location, and restoration is position-blind. Hard-blocking that completion requires a stronger response guard.
+- Encoded secrets can bypass byte-level regex detectors.
+- Provider authorization headers pass through because the upstream needs them; masking targets prompt/body secrets, not the call credential itself.
+- The proxy only sees traffic pointed at `/wire/<agent>/...`; Observer remains the backstop for bypass traffic.

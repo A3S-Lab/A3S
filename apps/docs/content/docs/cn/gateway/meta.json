@@ -3,6 +3,7 @@
   "pages": [
     "index",
     "quick-start",
+    "wire-firewall",
     "---核心---",
     "configuration",
     "routing",

@@ -270,7 +270,7 @@ desired = ceil((in_flight + queue_depth) / (container_concurrency * target_utili
 并钳制到 `[min_replicas, max_replicas]`。校验会强制 `min_replicas <= max_replicas` 且 `target_utilization` 在 `(0.0, 1.0]` 内。
 
 <Callout type="warn">
-  v1.0.7 中存在若干运行时注意事项：
+  v1.0.11 中存在若干运行时注意事项：
 
   - 自动扩缩循环**仅**对 `container_concurrency > 0` 的服务运行。使用默认值 `0` 时，该服务不会构建自动扩缩器（也不会构建并发限制器）。
   - tick 间隔硬编码为 **2 秒**。
@@ -360,7 +360,7 @@ services "api" {
 渐进式发布要求至少有一个 revision，且 `from`/`to` 必须命名已存在的 revision。
 
 <Callout type="warn">
-  渐进式发布控制器已完整实现并通过校验，但在 v1.0.7 中它**未被任何运行时循环驱动**——没有调度器调用其推进步骤。因此 `step_percent`、`step_interval_secs`、`error_rate_threshold` 和 `latency_threshold_ms` 会被解析和校验，但目前在运行时处于惰性状态。
+  渐进式发布控制器已完整实现并通过校验，但在 v1.0.11 中它**未被任何运行时循环驱动**——没有调度器调用其推进步骤。因此 `step_percent`、`step_interval_secs`、`error_rate_threshold` 和 `latency_threshold_ms` 会被解析和校验，但目前在运行时处于惰性状态。
 </Callout>
 
 ---
@@ -370,7 +370,7 @@ services "api" {
 服务发现 provider 会轮询或监视外部数据源，生成 router 和 service，并将它们与静态配置合并。它们在顶层 `providers` 块中声明。仅识别四种 provider 块——`file`、`discovery`、`kubernetes` 和 `docker`——任何其他名称都是配置错误（`Unknown providers ACL block`）。
 
 <Callout type="warn">
-  **合并优先级并不统一。** `discovery` 和 `kubernetes` provider 会**添加**发现到的条目，但在名称冲突时**静态配置优先**。而 `docker` provider 在名称相同时会**覆盖**静态条目。v1.0.7 中**不存在 `providers.dns` 块**（见下文）。
+  **合并优先级并不统一。** `discovery` 和 `kubernetes` provider 会**添加**发现到的条目，但在名称冲突时**静态配置优先**。而 `docker` provider 在名称相同时会**覆盖**静态条目。v1.0.11 中**不存在 `providers.dns` 块**（见下文）。
 </Callout>
 
 ### File Provider
@@ -511,7 +511,7 @@ providers {
 
 ### IngressRoute CRD
 
-当 `ingress_route_crd = true` 时，Gateway 还会监视一种 Traefik 风格的 IngressRoute 规约。在 v1.0.7 中这**不是一个真正安装的 CRD**——监视器会列出标签为 `a3s-gateway.io/type=ingressroute` 的 ConfigMap，并解析每个 ConfigMap 的 `.data.spec` 中的 JSON。该规约携带 `entrypoints[]`、`routes[]`（每条带 `match`、`priority`、`middlewares[]`、`services[]`）以及可选的 `tls`。
+当 `ingress_route_crd = true` 时，Gateway 还会监视一种 Traefik 风格的 IngressRoute 规约。在 v1.0.11 中这**不是一个真正安装的 CRD**——监视器会列出标签为 `a3s-gateway.io/type=ingressroute` 的 ConfigMap，并解析每个 ConfigMap 的 `.data.spec` 中的 JSON。该规约携带 `entrypoints[]`、`routes[]`（每条带 `match`、`priority`、`middlewares[]`、`services[]`）以及可选的 `tls`。
 
 <Callout type="warn">
   CRD 监视器遵循 `namespace`（全部 vs. 单命名空间），但**忽略 `label_selector`**——它始终使用固定的 `a3s-gateway.io/type=ingressroute` 选择器。它也没有变更检测哈希，因此每隔 `watch_interval_secs` 都会重新发送合并后的配置。
@@ -519,4 +519,4 @@ providers {
 
 ### DNS Provider（不可用）
 
-源码中存在一个 DNS provider，但仅为库代码，在 v1.0.7 中**未接入**：没有 `providers.dns` 块，且 Gateway 从不启动它。请勿配置基于 DNS 的发现——它没有任何 ACL 入口。
+源码中存在一个 DNS provider，但仅为库代码，在 v1.0.11 中**未接入**：没有 `providers.dns` 块，且 Gateway 从不启动它。请勿配置基于 DNS 的发现——它没有任何 ACL 入口。

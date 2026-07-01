@@ -315,7 +315,7 @@ clamped to `[min_replicas, max_replicas]`. Validation enforces
 `min_replicas <= max_replicas` and `target_utilization` in `(0.0, 1.0]`.
 
 <Callout type="warn">
-  Several runtime caveats apply in v1.0.7:
+  Several runtime caveats apply in v1.0.11:
 
   - The autoscaler loop runs **only** for services with `container_concurrency > 0`. With the default `0`, no autoscaler (and no concurrency limiter) is built for that service.
   - The tick interval is hardcoded to **2 seconds**.
@@ -414,7 +414,7 @@ Rollout requires at least one revision, and `from`/`to` must name existing
 revisions.
 
 <Callout type="warn">
-  The rollout controller is fully implemented and validated, but in v1.0.7 it is
+  The rollout controller is fully implemented and validated, but in v1.0.11 it is
   **not driven by any runtime loop** — no scheduler calls its advance step. So
   `step_percent`, `step_interval_secs`, `error_rate_threshold`, and
   `latency_threshold_ms` are parsed and validated but currently inert at runtime.
@@ -434,7 +434,7 @@ error (`Unknown providers ACL block`).
   **Merge precedence is not uniform.** The `discovery` and `kubernetes`
   providers ADD discovered entries but the **static config wins** on name
   collisions. The `docker` provider instead **overwrites** a static entry that
-  shares a name. There is **no `providers.dns` block** in v1.0.7 (see below).
+  shares a name. There is **no `providers.dns` block** in v1.0.11 (see below).
 </Callout>
 
 ### File Provider
@@ -599,7 +599,7 @@ Supported Ingress annotations:
 ### IngressRoute CRD
 
 When `ingress_route_crd = true`, the gateway also watches a Traefik-style
-IngressRoute spec. In v1.0.7 this is **not a real installed CRD** — the watcher
+IngressRoute spec. In v1.0.11 this is **not a real installed CRD** — the watcher
 lists ConfigMaps labeled `a3s-gateway.io/type=ingressroute` and parses the JSON
 in each ConfigMap's `.data.spec`. The spec carries `entrypoints[]`, `routes[]`
 (each with `match`, `priority`, `middlewares[]`, `services[]`), and optional
@@ -615,5 +615,5 @@ in each ConfigMap's `.data.spec`. The spec carries `entrypoints[]`, `routes[]`
 ### DNS Provider (not available)
 
 A DNS provider is present in the source as library-only code but is **not wired
-in v1.0.7**: there is no `providers.dns` block, and the gateway never spawns it.
+in v1.0.11**: there is no `providers.dns` block, and the gateway never spawns it.
 Do not configure DNS-based discovery — it has no ACL surface.

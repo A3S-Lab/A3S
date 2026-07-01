@@ -1,0 +1,117 @@
+---
+title: Wire Firewall
+description: 可选 inline LLM/MCP proxy，负责 secret masking、A3S Sentry inspection、faithful forwarding 和 response leak audit。
+---
+
+# Gateway Wire Firewall
+
+Wire firewall 是 `wire` Cargo feature 后的可选 Gateway 模式。它不是普通 router/middleware/service data plane 的一部分，而是在 `/wire/<agent>/...` 运行一个本地 LLM/MCP proxy，调用 A3S Sentry inline inspection，在上游看到请求前 mask 具体 secret/PII span，并在响应回来时恢复 placeholder。
+
+```text
+agent request -> /wire/<agent>/... -> Sentry inspect_wire -> masked request -> provider
+                                                     <- restored response <-
+```
+
+它适用于可以通过本地 provider base URL 路由的流量。Raw sockets 或绕过 proxy 的 agent 仍需要 Observer plus Sentry 作为 kernel backstop。
+
+## Enable
+
+默认 Gateway build 不包含 Sentry。需要启用 `wire` feature：
+
+```bash
+cargo build --features wire --bin a3s-gateway
+```
+
+用单个 upstream provider origin 运行 proxy：
+
+```bash
+./target/debug/a3s-gateway wire \
+  --listen 127.0.0.1:9877 \
+  --upstream "${PROVIDER_BASE_URL}" \
+  --sentry-config sentry.acl
+```
+
+将 agent provider base URL 指向：
+
+```text
+http://127.0.0.1:9877/wire/<agent>
+```
+
+`--sentry-config` 接受 Sentry ACL file path 或 inline ACL content。空配置使用 Sentry built-ins 和 fail-open posture：masking 仍会执行，但模糊恶意内容只会 escalate，除非更深 guard 或 fail-closed mode 进行 block。
+
+## What The Gate Does
+
+| Step | Behavior |
+| --- | --- |
+| Path split | `/wire/<agent>/<rest>` 被拆成 agent identity 和 upstream path。Path 与 query 会原样转发。 |
+| Request body | UTF-8 body 在 8 MiB cap 下被缓冲、inspection 和 masking。Non-UTF-8 body 为避免损坏会 ungated pass-through。 |
+| Blocking | 如果 Sentry 返回 blocking inline decision，Gateway 返回 `403` JSON，且不会联系 upstream。 |
+| Forwarding | Host、content length 和 accept-encoding 会被移除；其它 headers，包括 provider auth，会 pass through。 |
+| Response | 保留 upstream status 和 content-type。对配对 response 恢复 placeholders。 |
+| Audit | Request decision 产生一行 NDJSON trace。Response scanning 仅 audit，模型输出触发 detectors 时才记录。 |
+
+## Correctness Hardening
+
+- Query strings 会保留，因此 provider-specific query parameters 不会丢失。
+- `accept-encoding` 会被 strip，避免 compressed response 破坏 placeholder restoration。
+- Restore maps 是 per request 的，一个请求不会恢复另一个请求的 placeholder。
+- Proxy 保留 upstream status 和 content type，不强制 success 或 JSON。
+- 超过上限的 request body 返回 `413`。
+- Non-wire path 返回 `404`。
+
+## Trace Shape
+
+每个 request trace 包含：
+
+```json
+{
+  "agent": "agent-name",
+  "path": "/v1/messages",
+  "direction": "request",
+  "verdict": "allow",
+  "tier": "Rules",
+  "severity": "Info",
+  "reason": "allowed",
+  "redacted": 1,
+  "blocked": false
+}
+```
+
+这些 NDJSON lines 是本地 security audit output。不要把 provider credentials 或真实 prompt payload 写进提交的示例。
+
+## Embedding
+
+Wire module 也可以嵌入使用：
+
+```rust
+use a3s_gateway::wire::{serve, WireGate};
+use std::{net::SocketAddr, sync::Arc};
+
+let gate = Arc::new(WireGate::from_acl("sentry.acl")?);
+let upstream = Arc::new(std::env::var("PROVIDER_BASE_URL")?);
+serve("127.0.0.1:9877".parse::<SocketAddr>()?, gate, upstream).await?;
+```
+
+纯 `WireGate` methods 可以在没有 live upstream 的情况下单独 unit-test。
+
+## Tests And Soak
+
+源码包含 unit 和 transport tests，覆盖：
+
+- `/wire/<agent>` path parsing，包括 query preservation。
+- Secret masking 和 response restoration。
+- Fail-closed prompt-injection blocking。
+- Benign pass-through。
+- Response audit without blocking。
+- `accept-encoding` stripping。
+- Upstream status 和 content-type preservation。
+- Non-wire `404`。
+
+`scripts/soak-wire.sh` 会用持续并发 secret-bearing requests 穿过 live proxy，并断言 secret 不会到达 upstream、response 会恢复、RSS 保持有界、proxy 保持存活。
+
+## Boundaries
+
+- Placeholder relocation 仍然可能发生：model 可以把 placeholder 回显到危险位置，而 restoration 是 position-blind。要 hard-block 这类 completion，需要更强 response guard。
+- Encoded secrets 可能绕过 byte-level regex detectors。
+- Provider authorization headers 会 pass through，因为 upstream 需要它们；masking 针对 prompt/body secrets，而不是调用 credential 本身。
+- Proxy 只能看到指向 `/wire/<agent>/...` 的流量；绕过流量仍需要 Observer 作为 backstop。

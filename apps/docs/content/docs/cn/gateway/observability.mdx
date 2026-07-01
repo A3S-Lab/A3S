@@ -19,7 +19,7 @@ W3C 传播，还有一个运行在独立 listener 上的可选 Dashboard/管理 
 
 `observability {}` 块**恰好包含三个布尔开关**，且**三者都默认为 `true`**。除此
 之外没有其他键（没有 OTLP endpoint、采样率、传播或服务名等键 —— 那些键属于一个
-内部结构体，在 v1.0.7 中尚未接入 ACL）。
+内部结构体，在 v1.0.11 中尚未接入 ACL）。
 
 ```text
 observability {
@@ -87,7 +87,7 @@ gateway_backend_requests_total{backend="http://127.0.0.1:8002"} 6345
 | `gateway_backend_requests_total` | counter | `backend` | 标签为 backend URL；仅当非空时才输出。 |
 
 <Callout type="warn">
-  **在 v1.0.7 中已定义但未填充。** 采集器还定义了
+  **在 v1.0.11 中已定义但未填充。** 采集器还定义了
   `gateway_middleware_invocations_total{middleware=...}`、
   `gateway_router_latency_microseconds_total{router=...}`、
   `gateway_router_errors_total{router=...}` 和
@@ -161,7 +161,7 @@ JSON 键（通过 `tracing` crate，target 为 `access_log`）：
 | `user_agent` | string \| null | 客户端 User-Agent（可选）。 |
 
 <Callout type="warn">
-  **v1.0.7 限制。** 尽管 `access_log_enabled` 默认为 `true`，但目前并不会输出每请求
+  **v1.0.11 限制。** 尽管 `access_log_enabled` 默认为 `true`，但目前并不会输出每请求
   的 JSON 访问日志行：请求路径只创建耗时追踪器，从不把条目交给后台日志任务。drain
   任务与上面的条目 schema 都已存在，但热路径尚未向它们投喂数据。请把该 schema 视为
   日后真正落地输出时的契约；现阶段请依赖 `RUST_LOG` / `info` 级别日志来获得实时请求
@@ -217,7 +217,7 @@ RUST_LOG=a3s_gateway=debug a3s-gateway --config gateway.acl
 <Callout type="warn">
   **出站传播仅支持 W3C。** 无论任何传播设置，生产路径始终向上游注入 W3C
   `traceparent` 请求头。B3/Zipkin 仅在**入站**提取时被识别；具备 B3 能力的出站
-  注入器在 v1.0.7 中并未接入请求路径。不要期望 `b3` / `X-B3-*` 请求头会被重新
+  注入器在 v1.0.11 中并未接入请求路径。不要期望 `b3` / `X-B3-*` 请求头会被重新
   发往 backend。
 </Callout>
 

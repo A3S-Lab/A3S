@@ -13,6 +13,7 @@ A3S Gateway 是 AI 原生服务的流量层。它基于 [hyper](https://hyper.rs
 本页是一份概览。下文每项能力都链接到完整记录它的页面：
 
 - [快速开始](./quick-start) — 安装并运行你的第一个网关
+- [Wire Firewall](./wire-firewall) — 可选 inline LLM/MCP proxy，在转发前 mask secrets 并运行 Sentry inspection
 - [配置](./configuration) — 完整的 ACL schema（entrypoints、routers、services、middlewares、providers、management、observability）
 - [路由](./routing) — Traefik 风格的规则匹配与优先级
 - [中间件](./middleware) — 内置的请求/响应管道
@@ -43,7 +44,7 @@ A3S Gateway 为右列而设计：
 其余部分——路由、TLS、限流、认证、Prometheus——是标准基础设施，A3S Gateway 已内置，无需引入第二个工具。
 
 <Callout type="info">
-**灰度发布**（`rollout { }`）已完整实现并通过验证 —— `from`/`to` 版本、`step_percent`、`step_interval_secs`，以及在 `error_rate_threshold` / `latency_threshold_ms` 触发时的自动回滚。在 v1.0.7 中，灰度发布控制器**已被解析和验证，但尚未由运行时循环驱动**，因此该配置在运行时是惰性的。当前请使用静态[版本分割](./services)手动切换流量。
+**灰度发布**（`rollout { }`）已完整实现并通过验证 —— `from`/`to` 版本、`step_percent`、`step_interval_secs`，以及在 `error_rate_threshold` / `latency_threshold_ms` 触发时的自动回滚。在 v1.0.11 中，灰度发布控制器**已被解析和验证，但尚未由运行时循环驱动**，因此该配置在运行时是惰性的。当前请使用静态[版本分割](./services)手动切换流量。
 </Callout>
 
 ## 架构
@@ -143,10 +144,11 @@ pub enum GatewayState {
 
 **AI 原生模式** — 参见[服务](./services)
 - SSE/流式中继 — 针对 LLM 输出的零缓冲分块传输
+- Inline wire firewall — feature-gated `/wire/<agent>/...` proxy，用于 secret/PII masking 和 Sentry request inspection
 - 缩容到零 — Knative 自动扩缩容公式，可选冷启动请求缓冲（`buffer_enabled`，默认关闭）
 - 版本分割 — 在命名版本之间进行确定性加权流量分割（之和必须为 100%）
 - 流量镜像 — 将一定比例的实时流量复制到影子服务，发出即不管
-- 灰度发布 — 逐步流量切换，错误率或延迟触发时自动回滚（已实现并通过验证；v1.0.7 中尚未在运行时驱动）
+- 灰度发布 — 逐步流量切换，错误率或延迟触发时自动回滚（已实现并通过验证；v1.0.11 中尚未在运行时驱动）
 
 **核心代理** — 参见[路由](./routing)和[服务](./services)
 - 兼容 Traefik 的规则语法 — `Host()`、`Path()`、`PathPrefix()`、`Headers()`、`Method()`，以 `&&` 连接（仅 AND）
@@ -175,4 +177,4 @@ pub enum GatewayState {
 - 仅 ACL 配置 — 人类可读、可版本控制（必须使用 `.acl` 扩展名）
 - 通过文件监听热重载；可选 file/discovery/kubernetes/docker 配置 provider
 - 面向 Kubernetes 的 Helm Chart、Docker 镜像（`ghcr.io/a3s-lab/gateway`）、Homebrew 公式、`cargo install a3s-gateway`
-- 当前版本：**v1.0.7**（MSRV Rust 1.88）；发布的 Linux 镜像/二进制启用 `kube` + `redis` 特性
+- 当前版本：**v1.0.11**（MSRV Rust 1.88）；发布的 Linux 镜像/二进制启用 `kube` + `redis` 特性

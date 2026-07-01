@@ -1,18 +1,18 @@
 ---
 title: Deployment
-description: Deploy A3S Gateway (v1.0.7) with Homebrew, Cargo, Docker, or Helm/Kubernetes — production configuration, RBAC, and hot reload
+description: Deploy A3S Gateway (v1.0.11) with Homebrew, Cargo, Docker, or Helm/Kubernetes — production configuration, RBAC, and hot reload
 ---
 
 import { TypeTable } from 'fumadocs-ui/components/type-table';
 
 # Deployment
 
-A3S Gateway v1.0.7 ships as a single self-contained binary. The same binary runs
+A3S Gateway v1.0.11 ships as a single self-contained binary. The same binary runs
 as a standalone reverse proxy, a Docker container, or a Kubernetes ingress
 controller. This page covers every supported install path and the
 production-relevant behavior of each.
 
-> **Version note.** The crate version is `1.0.7` (`Cargo.toml`). The MSRV is
+> **Version note.** The crate version is `1.0.11` (`Cargo.toml`). The MSRV is
 > Rust `1.88`. Published Linux binaries and OCI images are built with the
 > `kube` and `redis` Cargo features enabled (see [Cargo features](#cargo-features));
 > a default-feature build has neither.
@@ -177,7 +177,7 @@ services:
 The chart lives at `deploy/helm/a3s-gateway/`. It is intentionally minimal: a
 `Deployment`, a `Service`, and a `ConfigMap` that carries your `gateway.acl`.
 Chart version / appVersion is `1.0.2` and the default `values.yaml` ships an
-`image.tag` of `0.2.1` — both lag the `1.0.7` binary, so pin `image.tag`
+`image.tag` of `0.2.1` — both lag the `1.0.11` binary, so pin `image.tag`
 explicitly in production.
 
 ### Install
@@ -185,7 +185,7 @@ explicitly in production.
 ```bash
 helm install gateway deploy/helm/a3s-gateway \
   --set image.repository=ghcr.io/a3s-lab/gateway \
-  --set image.tag=1.0.7 \
+  --set image.tag=1.0.11 \
   --set image.pullPolicy=IfNotPresent
 ```
 
@@ -203,7 +203,7 @@ Provide a complete config from a file:
 
 ```bash
 helm install gateway deploy/helm/a3s-gateway \
-  --set image.tag=1.0.7 \
+  --set image.tag=1.0.11 \
   --set-file config=./gateway.acl
 ```
 
@@ -211,7 +211,7 @@ Expose it externally as a `LoadBalancer` instead of the default `NodePort`:
 
 ```bash
 helm install gateway deploy/helm/a3s-gateway \
-  --set image.tag=1.0.7 \
+  --set image.tag=1.0.11 \
   --set service.type=LoadBalancer
 ```
 
@@ -225,7 +225,7 @@ exist in the chart and are silently ignored.)
   type={{
     replicaCount: { type: 'number', default: '1', description: 'Deployment replica count' },
     'image.repository': { type: 'string', default: '"a3s-gateway"', description: 'Container image (set to ghcr.io/a3s-lab/gateway for clusters)' },
-    'image.tag': { type: 'string', default: '"0.2.1"', description: 'Image tag — pin to 1.0.7 in production' },
+    'image.tag': { type: 'string', default: '"0.2.1"', description: 'Image tag — pin to 1.0.11 in production' },
     'image.pullPolicy': { type: 'string', default: '"Never"', description: 'Pull policy (use IfNotPresent/Always for real clusters)' },
     'service.type': { type: 'string', default: '"NodePort"', description: 'Service type (ClusterIP / NodePort / LoadBalancer)' },
     'service.port': { type: 'number', default: '8080', description: 'Service port; targetPort is fixed at 8080' },
@@ -324,7 +324,7 @@ just adds/removes).
 
 ### IngressRoute (Traefik-style)
 
-Setting `ingress_route_crd = true` enables a second watcher. Note that in v1.0.7
+Setting `ingress_route_crd = true` enables a second watcher. Note that in v1.0.11
 this does **not** read an installed CRD — it lists **ConfigMaps** labeled
 `a3s-gateway.io/type=ingressroute` and parses each one's `.data.spec` (JSON) as
 an `IngressRoute` (entrypoints, routes with `match`/`priority`/`middlewares`/
@@ -479,7 +479,7 @@ projection plus the in-pod file watcher).
   `min_version` accepts `"1.2"` (TLS 1.2 **and** 1.3) or `"1.3"` (1.3 only); it is
   a minimum, not an exact version.
 - The `tls { acme = true }` flag enables the ACME manager's 12h
-  detection/renewal loop, but in v1.0.7 issued certificates are **not** hot-swapped
+  detection/renewal loop, but in v1.0.11 issued certificates are **not** hot-swapped
   into the live acceptor and the HTTP-01 challenge endpoint is not served on the
   data plane. Treat config-driven ACME as **not** end-to-end automatic HTTPS;
   for production TLS, provision static `cert_file`/`key_file` PEMs (e.g. from
