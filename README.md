@@ -82,7 +82,7 @@ so each crate can be built, tested, versioned, and released independently.
 | [a3s-acl](crates/acl/) | 0.2.1 | Agent Configuration Language (HCL-like parser) |
 | [a3s-event](crates/event/) | 0.3.0 | Pluggable event subscription, dispatch, and persistence |
 | [a3s-tui](crates/tui/) | 0.1.4 | TEA framework for terminal UIs with Flexbox layout |
-| [a3s-gui](crates/gui/) | 0.1.0 | Native cross-platform GUI renderer for JSX/React-style UI trees using AppKit, WinUI, and GTK targets |
+| [a3s-gui](crates/gui/) | 0.1.0 | Native GUI runtime for structured UI protocol frames with AppKit, WinUI, and GTK targets |
 | [a3s-webview](crates/webview/) | 0.1.1 | Native WebView popup helper for the a3s code TUI (RemoteUI); renders Shu'an OS viewUrls |
 | [a3s-common](crates/common/) | 0.1.1 | Shared primitives and transport types |
 | [a3s-updater](crates/updater/) | 0.2.0 | Self-update for CLI binaries via GitHub Releases |
