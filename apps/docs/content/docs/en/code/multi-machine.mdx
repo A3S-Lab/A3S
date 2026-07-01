@@ -157,9 +157,11 @@ const outcomes = await session.parallelResumable([
 ```
 
 ```python
-from a3s_code import Agent, FileSessionStore
+from a3s_code import Agent, FileSessionStore, SessionOptions
 
-session = agent.session("/repo", session_store=FileSessionStore("./.a3s/sessions"))
+opts = SessionOptions()
+opts.session_store = FileSessionStore("./.a3s/sessions")
+session = agent.session("/repo", opts)
 
 outcomes = session.parallel_resumable([
     {"task_id": "a", "agent": "explore", "description": "survey", "prompt": "Map the auth module"},
