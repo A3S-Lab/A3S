@@ -1,0 +1,25 @@
+---
+title: A3S Common
+description: Shared privacy, tool, and transport primitives used by A3S crates.
+---
+
+# A3S Common
+
+`a3s-common` contains shared primitives for A3S crates. It is not a product
+surface; it is a small library for common privacy classification, tool result
+types, safe workspace path resolution, and framed transport types.
+
+## Capability Map
+
+| Area | Current capability |
+| --- | --- |
+| Privacy | Sensitivity levels, regex classification rules, match metadata, and redaction strategies. |
+| Tool types | Shared `Tool` and `ToolResult` structures for simple tool metadata and results. |
+| Workspace paths | Safe read and write path resolution that rejects paths escaping the workspace. |
+| Transport | Framed transport modules for codecs, frames, Unix transport, and TEE transport. |
+
+## Boundary
+
+Common deliberately avoids owning product policy. A component may reuse the
+privacy classifier or path resolver, but final authorization decisions stay in
+the component or host runtime.

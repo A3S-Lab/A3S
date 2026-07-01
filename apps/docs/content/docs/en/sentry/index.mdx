@@ -1,0 +1,39 @@
+---
+title: A3S Sentry
+description: Tiered runtime security control for AI agents, built on observer events and kernel guard enforcement.
+---
+
+# A3S Sentry
+
+`a3s-sentry` is the policy brain for A3S Observer. Observer emits what an agent
+actually did; Sentry judges those events through escalating tiers and writes
+deny decisions for Observer's kernel guards to enforce.
+
+```text
+observer NDJSON -> L1 rules -> L2 LLM -> L3 A3S Code agent
+                 -> deny files -> observer guards -> kernel denies
+```
+
+## Capability Map
+
+| Area | Current capability |
+| --- | --- |
+| L1 rules | Deterministic regex rule engine, configurable with ACL policy, including built-in rules for dangerous commands, credential access, SSRF, prompt injection markers, and secret-like content. |
+| L2 judge | Fast OpenAI-compatible LLM classifier for events L1 escalates. |
+| L3 judge | Deep A3S Code agent investigation with security skills for events that need contextual reasoning. |
+| SAE tier | Sparse-autoencoder signal path for model-output activations emitted by A3S Power. |
+| Inline gate | `inspect_wire` can judge decoded LLM/MCP wire content and mask concrete secret/PII spans before forwarding. |
+| Enforcement | Writes egress, exec, or file deny records consumed by Observer guards. |
+| Operation modes | Rules-only, dry-run, fail-closed, hot-reloaded policy, speculative parallel L2/L3 on high-risk events. |
+| SDKs | Native Python and TypeScript SDKs expose in-process evaluation over the same Rust engine. |
+
+## Relationship To Observer
+
+Observer supplies the signal and the kernel enforcement primitive. Sentry owns
+policy evaluation. This keeps observe and intervene separated: telemetry can
+continue even when an enforcement policy is disabled or being tuned.
+
+## Boundary
+
+Sentry does not enforce by itself. It emits decisions and deny records; Observer
+guards perform the kernel-level block.

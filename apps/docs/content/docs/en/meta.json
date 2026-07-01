@@ -4,15 +4,25 @@
   "pages": [
     "---Frameworks---",
     "code",
+    "cli",
     "---Applications---",
     "box",
     "power",
     "gateway",
+    "webview",
+    "gui",
     "---Libraries---",
+    "acl",
+    "ahp",
+    "event",
     "lane",
     "search",
     "memory",
+    "tui",
+    "common",
+    "updater",
     "---Observability---",
-    "observer"
+    "observer",
+    "sentry"
   ]
 }

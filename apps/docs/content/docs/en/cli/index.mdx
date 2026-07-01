@@ -1,0 +1,45 @@
+---
+title: A3S CLI
+description: Umbrella command for the A3S stack and the entry point for the a3s code terminal agent.
+---
+
+# A3S CLI
+
+`a3s` is the umbrella command for the A3S stack. It packages the interactive
+coding-agent terminal experience and delegates product commands to the matching
+component binary.
+
+## What It Does
+
+| Surface | Capability |
+| --- | --- |
+| `a3s code` | Launches the interactive coding-agent TUI backed by `a3s-code-core` and rendered with `a3s-tui`. |
+| `a3s box ...` | Proxies to `a3s-box ...` and can bootstrap the Box runtime on first use. |
+| `a3s list` | Lists installed `a3s-*` tools visible to the CLI. |
+| `a3s <tool> --help` | Passes help through to the selected tool. |
+| `/update` in the TUI | Updates the installed CLI from Homebrew or release assets, then verifies the reported target version. |
+
+## Install
+
+```bash
+brew install A3S-Lab/tap/a3s
+cargo install a3s
+cargo install --git https://github.com/A3S-Lab/Cli
+```
+
+## `a3s code`
+
+The terminal agent is not a separate hosted service. It is an application that
+embeds A3S Code, streams `AgentEvent` updates, and adds terminal controls for
+models, config, git, memory, files, plugins, updates, and A3S OS views.
+
+It can use normal ACL model configuration and, where the host has opted in,
+account-backed model tabs. The CLI keeps host tools inside the A3S Code adapter
+path rather than handing arbitrary tool execution to another runtime.
+
+## Boundaries
+
+- The CLI is packaging and UX glue; the agent loop lives in A3S Code.
+- `a3s-box`, `a3s-webview`, and other helpers are separate binaries.
+- Local credentials and account state are local runtime state; they should not be
+  committed into repository docs or examples.

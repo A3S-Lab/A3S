@@ -1,0 +1,42 @@
+---
+title: A3S CLI
+description: A3S 栈的统一命令入口，也是 a3s code 终端智能体的入口。
+---
+
+# A3S CLI
+
+`a3s` 是 A3S 栈的统一命令。它把交互式编程智能体终端体验打包成一个入口，
+并把产品命令转发给对应组件二进制。
+
+## 它负责什么
+
+| 表面 | 能力 |
+| --- | --- |
+| `a3s code` | 启动交互式编程智能体 TUI，底层由 `a3s-code-core` 驱动，由 `a3s-tui` 渲染。 |
+| `a3s box ...` | 转发到 `a3s-box ...`，并可在首次使用时引导安装 Box 运行时。 |
+| `a3s list` | 列出当前可见的已安装 `a3s-*` 工具。 |
+| `a3s <tool> --help` | 把 help 请求转发给对应工具。 |
+| TUI 内 `/update` | 从 Homebrew 或 release assets 更新 CLI，并验证安装后的目标版本。 |
+
+## 安装
+
+```bash
+brew install A3S-Lab/tap/a3s
+cargo install a3s
+cargo install --git https://github.com/A3S-Lab/Cli
+```
+
+## `a3s code`
+
+终端智能体不是托管服务。它是一个嵌入 A3S Code 的应用：消费
+`AgentEvent` 流，并在终端里提供模型、配置、Git、记忆、文件、插件、更新和
+A3S OS 视图等控制。
+
+它可以使用普通 ACL 模型配置；在宿主明确接入时，也可以展示账号模型标签页。
+CLI 会让宿主工具继续走 A3S Code 适配路径，而不是把任意工具执行交给另一个运行时。
+
+## 边界
+
+- CLI 是打包和 UX 胶水；agent loop 属于 A3S Code。
+- `a3s-box`、`a3s-webview` 等是独立 helper 二进制。
+- 本地凭据和账号状态是本地运行态，不应进入仓库文档或示例。

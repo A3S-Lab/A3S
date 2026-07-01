@@ -1,0 +1,37 @@
+---
+title: Agent Harness Protocol
+description: 面向自主智能体监督的传输无关 JSON-RPC 协议。
+---
+
+# Agent Harness Protocol
+
+AHP 把 agent 执行和策略执行分开。agent 在关键控制点发出结构化事件，harness
+评估事件并返回 decision，agent 在继续执行前应用该 decision。
+
+## 能力地图
+
+| 领域 | 当前能力 |
+| --- | --- |
+| 协议 | JSON-RPC 2.0 方法：`ahp/handshake`、`ahp/event`、`ahp/query`、`ahp/batch`。 |
+| 传输 | Rust client/server 支持 stdio、HTTP、WebSocket 和 Unix socket。 |
+| 认证 | HTTP 和 WebSocket client 可选 API key 与 bearer auth。 |
+| 兼容性 | handshake 会拒绝协议 major 版本不匹配，并公布 harness limits。 |
+| Decision | 通用 `Decision`，以及 context、memory、planning、reasoning、rate limit、confirmation、idle、intent detection 等专用 payload。 |
+| 运行时契约 | run lifecycle、task-list snapshot、verification evidence 的持久非阻塞事件。 |
+| 批处理 | 通用 decision event 支持 batch request；handler 失败走 fail-closed。 |
+
+## 事件族
+
+阻塞请求包括 pre-action、pre-prompt、idle、intent detection、context perception、
+memory recall、planning、reasoning、rate limit 和 confirmation。通知包括
+post-action、post-response、session lifecycle、heartbeat、error、run lifecycle、
+task list 和 verification。
+
+## 在系统中的位置
+
+当产品希望用一个监督平面管理多个 agent runtime 时，AHP 很适合。A3S Code 可以接入
+AHP hooks；其它 runtime 也可以说同一套协议，而不需要采用 A3S Code 内部实现。
+
+## 边界
+
+AHP 定义线协议和 decision 形状；真正执行 decision 的仍是接收 decision 的 agent 或 runtime。

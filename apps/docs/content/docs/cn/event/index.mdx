@@ -1,0 +1,35 @@
+---
+title: A3S Event
+description: Provider 无关的事件发布、订阅、历史、路由、schema 与持久化基础设施。
+---
+
+# A3S Event
+
+`a3s-event` 是 provider 无关的事件总线，覆盖 publish、subscribe、history 和
+persistence。应用依赖 `EventBus` 和 `EventProvider` trait，再选择内存 provider、
+NATS JetStream 或自定义后端。
+
+## 能力地图
+
+| 领域 | 当前能力 |
+| --- | --- |
+| Provider | `MemoryProvider` 用于本地/测试；`NatsProvider` 用于 JetStream 分布式投递。 |
+| 事件 API | Publish、subscribe、durable subscribe、history、counts、health、provider info 和 subscription 管理。 |
+| Subject 模型 | 点分 subject，例如 `events.system.deploy.gateway`；支持 `events.market.>` 等 wildcard。 |
+| 可靠性 | manual ack/nak、dead-letter queue trait、provider 状态报告。 |
+| Schema | Schema registry，支持事件类型校验和兼容性检查。 |
+| Metrics | publish、subscribe、error、latency 的 lock-free 计数器。 |
+| 可选特性 | AES-256-GCM payload encryption、CloudEvents v1.0 转换、Knative 风格 routing、trigger 和 sink。 |
+
+## Feature Flags
+
+默认构建启用 NATS、encryption、CloudEvents 和 routing。最小构建可以不带可选后端依赖：
+
+```toml
+a3s-event = { version = "0.3", default-features = false }
+```
+
+## 边界
+
+A3S Event 不是工作流引擎。它提供事件传输、存储和路由基础设施；调度与编排属于
+Lane、Code、Gateway 或宿主应用。

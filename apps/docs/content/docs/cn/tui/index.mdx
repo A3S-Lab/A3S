@@ -1,0 +1,33 @@
+---
+title: A3S TUI
+description: Rust TEA 终端 UI 框架，支持 Flexbox 布局、增量渲染和可复用组件。
+---
+
+# A3S TUI
+
+`a3s-tui` 是基于 The Elm Architecture 的 Rust 终端 UI 框架：model、update、view。
+它是 `a3s code` 终端智能体使用的 UI 框架，但它本身不是 agent runtime。
+
+## 能力地图
+
+| 领域 | 当前能力 |
+| --- | --- |
+| 架构 | TEA model-update-view loop，基于 Tokio async runtime。 |
+| 渲染 | 声明式 element tree、Taffy Flexbox 布局、增量 line-diff 渲染。 |
+| 终端输入 | 键盘、resize、鼠标、focus 管理、类 Vim keymap helper。 |
+| 样式 | ANSI/RGB 颜色、border、spacing、dimension、文本样式、换行、CJK 宽度处理。 |
+| Markdown | CommonMark 渲染与 `syntect` 语法高亮。 |
+| 组件 | 表格、tabs、modal、diff view、git panel、task queue、文本编辑器、日志、timeline、split pane、status bar 等组件。 |
+| 验证 | Headless terminal integration tests 和 rendering benchmarks。 |
+
+## 与 `a3s code` 的关系
+
+`a3s code` 使用 A3S Code 运行 agent loop，使用 A3S TUI 渲染终端界面。runtime API
+和 UI 框架刻意分离：产品可以在同一 A3S Code event stream 上构建不同 UI。
+
+## 安装
+
+```toml
+[dependencies]
+a3s-tui = "0.1"
+```

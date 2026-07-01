@@ -1,0 +1,40 @@
+---
+title: Agent Harness Protocol
+description: Transport-agnostic JSON-RPC protocol for supervising autonomous agents.
+---
+
+# Agent Harness Protocol
+
+AHP separates agent execution from policy enforcement. The agent emits structured
+events at control points, the harness evaluates them, and the agent applies the
+returned decision before continuing.
+
+## Capability Map
+
+| Area | Current capability |
+| --- | --- |
+| Protocol | JSON-RPC 2.0 methods: `ahp/handshake`, `ahp/event`, `ahp/query`, and `ahp/batch`. |
+| Transports | Rust client/server support for stdio, HTTP, WebSocket, and Unix socket transports. |
+| Auth | Optional API key and bearer auth for HTTP and WebSocket clients. |
+| Compatibility | Handshake rejects protocol major-version mismatches and advertises harness limits. |
+| Decisions | Generic `Decision` plus specialized payloads for context, memory, planning, reasoning, rate limits, confirmation, idle, and intent detection. |
+| Runtime contracts | Durable non-blocking events for run lifecycle, task-list snapshots, and verification evidence. |
+| Batching | Batch requests for generic decision events with fail-closed handler behavior. |
+
+## Event Families
+
+Blocking requests include pre-action, pre-prompt, idle, intent detection,
+context perception, memory recall, planning, reasoning, rate limit, and
+confirmation. Notifications include post-action, post-response, session
+lifecycle, heartbeat, errors, run lifecycle, task list, and verification.
+
+## Where It Fits
+
+AHP is useful when a product wants one supervision plane for multiple agent
+runtimes. A3S Code can integrate with AHP hooks; other runtimes can speak the
+same protocol without adopting A3S Code internals.
+
+## Boundary
+
+AHP defines the wire contract and typed decisions. Enforcement still belongs to
+the agent or runtime that receives the decision.

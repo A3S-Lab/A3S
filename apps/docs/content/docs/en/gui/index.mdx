@@ -1,0 +1,36 @@
+---
+title: A3S GUI
+description: Native GUI renderer for React Aria semantic UI trees, currently present in the worktree but not pinned as a submodule.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# A3S GUI
+
+`a3s-gui` is the native UI renderer prototype for A3S applications. It accepts
+React-Aria-shaped semantic UI trees and lowers them into a compact native UI IR
+that platform adapters can render without a WebView.
+
+<Callout type="warn">
+In the current monorepo worktree, `crates/gui` exists but is not tracked in
+`.gitmodules`. Treat this page as documenting the present local project shape,
+not a published submodule contract.
+</Callout>
+
+## Capability Map
+
+| Area | Current capability |
+| --- | --- |
+| Authoring model | Web-compatible React/TSX-shaped trees with React Aria semantics, DOM-style props, inline style objects, aria/data attributes, and named event callbacks. |
+| Native IR | Accessibility-first tree of native roles, state, labels, values, style tokens, events, and children. |
+| Runtime | `GuiRuntime`, keyed renderer diff engine, action registration, event routing, and headless recording backend for validation. |
+| Command stream | Serializable native commands such as create, update, insert child, remove, and set root. |
+| Platform planning | AppKit, WinUI, and GTK planning adapters map the IR to native widget blueprints. |
+| Native paths | Feature-gated AppKit, WinUI, and GTK native adapter paths are present in the crate manifest. |
+| TypeScript bridge | Prototype TypeScript SDK under `sdk/typescript` provides JSX/runtime protocol helpers. |
+
+## Boundary
+
+A3S GUI is different from A3S WebView. WebView renders web content in an embedded
+browser. GUI aims to render Web-compatible semantic UI directly as native
+controls.

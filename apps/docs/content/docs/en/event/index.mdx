@@ -1,0 +1,37 @@
+---
+title: A3S Event
+description: Provider-agnostic event publish, subscribe, history, routing, schema, and persistence primitives.
+---
+
+# A3S Event
+
+`a3s-event` is a provider-agnostic event bus for publish, subscribe, history,
+and persistence. Applications depend on `EventBus` and `EventProvider` traits,
+then choose an in-memory provider, NATS JetStream, or a custom backend.
+
+## Capability Map
+
+| Area | Current capability |
+| --- | --- |
+| Providers | `MemoryProvider` for local/test use; `NatsProvider` for distributed JetStream-backed delivery. |
+| Event API | Publish, subscribe, durable subscribe, history, counts, health, provider info, and subscription management. |
+| Subject model | Dot-separated subjects such as `events.system.deploy.gateway`; wildcard patterns such as `events.market.>`. |
+| Reliability | Manual ack/nak support, dead-letter queue traits, and provider status reporting. |
+| Schema | Schema registry with event-type validation and compatibility checks. |
+| Metrics | Lock-free counters for publish, subscribe, errors, and latency. |
+| Optional features | AES-256-GCM payload encryption, CloudEvents v1.0 conversion, and Knative-inspired routing with triggers and sinks. |
+
+## Feature Flags
+
+The default build enables NATS, encryption, CloudEvents, and routing. The minimal
+build can compile with no optional backend dependencies:
+
+```toml
+a3s-event = { version = "0.3", default-features = false }
+```
+
+## Boundary
+
+A3S Event is not a workflow engine. It provides event transport, storage, and
+routing primitives; scheduling and orchestration belong to Lane, Code, Gateway,
+or the host application.

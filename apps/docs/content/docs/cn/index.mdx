@@ -1,44 +1,51 @@
 ---
 title: A3S 文档
-description: A3S 生态系统文档——安全 AI 基础设施
+description: A3S 生态系统文档——agent runtime、隔离、路由、记忆、可观测性与运行时控制
 ---
 
 # A3S 文档
 
-欢迎阅读 A3S 文档。A3S 是一套用 Rust 构建的安全 AI 基础设施生态系统。
+A3S 是面向生产环境自主 AI Agent 的基础设施。它从 agent 的真实性质出发：
+agent 会自己生成行动、作用于真实世界、不能被信任会诚实插桩，并且在行动危险时需要
+一个外部运行时 veto。
 
 ## 项目
 
-- [A3S Code](/cn/docs/code) — 驾驭式编程智能体运行时，覆盖 ACL 配置、工具选择、权限策略、QuickJS programs、run replay、planning、任务委派与 Rust/Node/Python SDK
-- [A3S Box](/cn/docs/box) — 面向 Linux OCI 工作负载的类 Docker MicroVM 运行时，明确标注平台边界、实验性 CRI 和硬件依赖的 TEE 路径
-- [A3S Gateway](/cn/docs/gateway) — AI 原生反向代理，支持多协议、15 个中间件和 Knative 风格自动扩缩容
-- [A3S Power](/cn/docs/power) — 本地 LLM 推理引擎，支持 TEE 远程证明、RA-TLS 和 OpenAI 兼容 API
-- [A3S Flow](/cn/docs/flow) — 轻量级工作流引擎，支持 DAG 执行、波次并行和多语言 SDK（Rust、Python、TypeScript）
-- [A3S Lane](/cn/docs/lane) — 优先级队列，内置 6 条通道、重试/死信队列、限流和持久化存储
-- [A3S Search](/cn/docs/search) — 聚合 9 个搜索引擎的元搜索引擎，支持共识排名和代理轮换
-- [A3S Memory](/cn/docs/memory) — 可插拔的智能体记忆存储，支持情节、语义、程序和工作记忆类型
+| 需求 | 项目 | 角色 |
+| --- | --- | --- |
+| 驱动 agent loop | [A3S Code](/cn/docs/code) | 驾驭式编程智能体运行时，覆盖工具、权限、记忆、planning、MCP、verification、TUI 集成与 Rust/Node/Python SDK。 |
+| 打包整个栈 | [A3S CLI](/cn/docs/cli) | 统一 CLI；`a3s code` 启动交互式终端智能体，`a3s box ...` 委托给 Box。 |
+| 隔离 agent 行动 | [A3S Box](/cn/docs/box) | 面向 Linux OCI 工作负载的类 Docker MicroVM 运行时，覆盖 CRI、image、network、SDK 与 TEE-oriented 路径。 |
+| 服务模型 | [A3S Power](/cn/docs/power) | 本地 LLM 推理，提供 OpenAI-compatible API、tool/structured-output 路径、观测与 TEE privacy 工作。 |
+| 路由流量 | [A3S Gateway](/cn/docs/gateway) | AI-native reverse proxy，覆盖 routing、services、middleware、streaming 与部署。 |
+| 调度工作 | [A3S Lane](/cn/docs/lane) | 优先级队列，支持 lanes、retries、dead-lettering、event stream、persistence 与 observability。 |
+| 记忆与检索 | [A3S Memory](/cn/docs/memory) · [A3S Search](/cn/docs/search) | 可插拔记忆存储与可嵌入元搜索引擎。 |
+| 观测真实行动 | [A3S Observer](/cn/docs/observer) | Linux eBPF 遥测，覆盖 agent tools、files、LLM calls、DNS、egress 与可选 kernel guards。 |
+| 停止危险行动 | [A3S Sentry](/cn/docs/sentry) | L1/L2/L3 分层运行时安全控制，判断 Observer events 并写出 kernel enforcement deny records。 |
+| 渲染终端 UI | [A3S TUI](/cn/docs/tui) | TEA 终端 UI 框架，支持 Flexbox layout、incremental rendering 与可复用组件。 |
+| 渲染原生 UI | [A3S GUI](/cn/docs/gui) · [A3S WebView](/cn/docs/webview) | 原生语义 UI renderer 原型，以及面向 A3S OS views 的 WebView popup helper。 |
+| 共享基础能力 | [A3S ACL](/cn/docs/acl) · [A3S AHP](/cn/docs/ahp) · [A3S Event](/cn/docs/event) · [A3S Common](/cn/docs/common) · [A3S Updater](/cn/docs/updater) | 配置语言、监督协议、事件总线、共享基础类型和自更新库。 |
 
 ## 架构
 
 ```
-┌─────────────────────────────────────────────┐
-│              A3S Gateway                     │
-│    （流量路由、TLS、认证、自动扩缩容）        │
-└──────────────────┬──────────────────────────┘
-                   │
-┌──────────────────▼──────────────────────────┐
-│              A3S Box VM                      │
-│  ┌──────────────────────────────────────┐   │
-│  │              A3S Code                 │   │
-│  │           （Agent 运行时）             │   │
-│  └──────────────────┬───────────────────┘   │
-│         TEE 内存加密            │             │
-└────────────────────────────────┼────────────┘
-                                 │
-              ┌──────────────────┼──────────────┐
-              │                  │              │
-     ┌────────▼──────┐  ┌───────▼──────┐  ┌───▼──────────┐
-     │   A3S Lane    │  │  A3S Memory  │  │  A3S Search  │
-     │  （任务队列） │  │  （存储层）  │  │  （搜索）     │
-     └───────────────┘  └──────────────┘  └──────────────┘
+you -> a3s CLI / SDKs
+       |
+       v
+    A3S Code  -- tools, memory, planning, MCP, subagents, verification
+       |
+       +--> A3S Box      -- isolated Linux OCI execution
+       +--> A3S Power    -- model serving
+       +--> A3S Gateway  -- ingress, proxying, middleware
+       +--> Lane/Search/Memory/Event
+
+kernel/user boundary:
+    A3S Observer -> A3S Sentry -> Observer guards -> kernel denies
+
+shared contracts:
+    ACL config · AHP supervision · Common transport/privacy/tool types
 ```
+
+主线是 drive -> isolate -> serve/route -> observe -> govern。Observer 和 Sentry
+包住其它组件：agent 无论通过 Code 行动、在 Box 中执行，还是经 Gateway 出入，都应该可见，
+并且能被外部控制平面追责和阻断。

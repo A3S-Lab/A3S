@@ -1,0 +1,35 @@
+---
+title: A3S WebView
+description: 从 a3s code TUI 渲染 A3S OS viewUrl 的原生弹窗 helper。
+---
+
+# A3S WebView
+
+`a3s-webview` 是 `a3s code` 终端 UI 的小型原生 WebView helper。终端网格不能嵌入
+浏览器视图，所以当 A3S OS 返回一个用于固定尺寸弹窗的 partial `viewUrl` 时，TUI
+可以启动这个 helper。
+
+## 能力地图
+
+| 领域 | 当前能力 |
+| --- | --- |
+| Window helper | 按请求的逻辑尺寸和标题打开一个原生窗口。 |
+| URL 策略 | 只接受 `http://` 与 `https://` URL；普通链接仍可打开系统浏览器。 |
+| Auth seeding | 从环境变量读取认证值，在导航前写入 browser storage，避免敏感值出现在进程参数里。 |
+| Headers | 支持重复 `--header 'Name: Value'` 参数，注入宿主提供的请求 metadata。 |
+| 平台后端 | 通过 `wry`/`tao` 支持 macOS WKWebView、Linux WebKitGTK、Windows WebView2。 |
+| 降级 | helper 不可用时，TUI 可以退回系统浏览器。 |
+
+## 安装
+
+```bash
+brew install a3s-lab/tap/a3s-webview
+cargo install --git https://github.com/A3S-Lab/WebView
+```
+
+macOS 上 Homebrew `a3s` formula 会依赖 `a3s-webview`。
+
+## 边界
+
+这个 helper 不是文档站 UI，也不是 agent runtime。它只服务于终端工作流旁边的固定尺寸
+原生弹窗视图。

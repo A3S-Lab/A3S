@@ -1,0 +1,25 @@
+---
+title: A3S Updater
+description: 基于 GitHub Releases 的 A3S CLI 二进制自更新库。
+---
+
+# A3S Updater
+
+`a3s-updater` 是 A3S 命令行工具使用的小型库：检查 GitHub Releases、下载匹配当前
+平台的 archive、提取目标二进制，并替换当前运行的二进制。
+
+## 能力地图
+
+| 领域 | 当前能力 |
+| --- | --- |
+| Release 查询 | 从配置的 owner/repository 获取 latest GitHub release。 |
+| 版本 | 解析带可选 `v` 前缀的 semver tag，并与当前二进制版本比较。 |
+| 平台匹配 | 将支持的目标规范化为 `darwin` 或 `linux`，以及 `arm64` 或 `x86_64`。 |
+| Asset 命名 | 查找 `<binary>-<version>-<os>-<arch>.tar.gz` 形态的 archive。 |
+| Archive 处理 | 下载 `.tar.gz`，只提取 regular file，并按文件名选择目标二进制。 |
+| 安装 | 当前 executable 先改名为 backup，再复制新 binary，设置 Unix executable 权限；复制失败会恢复 backup。 |
+
+## 边界
+
+该库当前面向 CLI 二进制替换和 GitHub Release assets。它不是包管理器；不支持的
+操作系统或架构会明确报错，而不是猜测。

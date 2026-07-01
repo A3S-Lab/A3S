@@ -1,0 +1,27 @@
+---
+title: A3S Updater
+description: Self-update library for A3S CLI binaries via GitHub Releases.
+---
+
+# A3S Updater
+
+`a3s-updater` is a small library used by A3S command-line tools to check GitHub
+Releases, download the matching platform archive, extract the target binary,
+and replace the currently running binary.
+
+## Capability Map
+
+| Area | Current capability |
+| --- | --- |
+| Release lookup | Fetches the latest GitHub release for a configured owner/repository. |
+| Versioning | Parses semver tags with an optional `v` prefix and compares against the current binary version. |
+| Platform match | Normalizes supported targets to `darwin` or `linux` and `arm64` or `x86_64`. |
+| Asset naming | Looks for archives named `<binary>-<version>-<os>-<arch>.tar.gz`. |
+| Archive handling | Downloads `.tar.gz`, extracts only regular files, and selects the requested binary by file name. |
+| Installation | Renames the current executable to a backup, copies the new binary into place, sets Unix executable permissions, and restores on copy failure. |
+
+## Boundary
+
+The library currently targets CLI-style binary replacement and GitHub Release
+assets. It is not a package manager, and unsupported operating systems or
+architectures are reported as unsupported rather than guessed.

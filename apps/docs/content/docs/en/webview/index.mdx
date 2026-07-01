@@ -1,0 +1,35 @@
+---
+title: A3S WebView
+description: Native popup helper for rendering A3S OS viewUrls from the a3s code TUI.
+---
+
+# A3S WebView
+
+`a3s-webview` is a small native WebView helper for the `a3s code` terminal UI.
+The terminal grid cannot embed a browser view, so the TUI can spawn this helper
+when A3S OS returns a partial `viewUrl` intended for a sized popup.
+
+## Capability Map
+
+| Area | Current capability |
+| --- | --- |
+| Window helper | Opens one native window at a requested logical size and title. |
+| URL policy | Accepts `http://` and `https://` URLs only. Plain links can still open in the system browser. |
+| Auth seeding | Reads an auth value from an environment variable and seeds browser storage before navigation, avoiding secrets in process arguments. |
+| Headers | Supports repeated `--header 'Name: Value'` arguments for host-provided request metadata. |
+| Platform backends | macOS WKWebView, Linux WebKitGTK, and Windows WebView2 through `wry`/`tao`. |
+| Degradation | If the helper is unavailable, the TUI can fall back to the system browser. |
+
+## Install
+
+```bash
+brew install a3s-lab/tap/a3s-webview
+cargo install --git https://github.com/A3S-Lab/WebView
+```
+
+The Homebrew `a3s` formula depends on `a3s-webview` on macOS.
+
+## Boundary
+
+This helper is not the document site UI and not the agent runtime. It exists for
+sized native popup views that accompany terminal workflows.

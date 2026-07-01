@@ -1,44 +1,52 @@
 ---
 title: A3S Documentation
-description: Documentation for the A3S ecosystem — secure AI infrastructure
+description: Documentation for the A3S ecosystem — agent runtime, isolation, routing, memory, observability, and runtime control
 ---
 
 # A3S Documentation
 
-Welcome to the A3S documentation. A3S is a secure AI infrastructure ecosystem built in Rust.
+A3S is infrastructure for running autonomous AI agents in production. The stack
+starts from the agent's real properties: it generates actions, acts on the real
+world, cannot be trusted to instrument itself honestly, and needs an external
+runtime veto when an action is unsafe.
 
 ## Projects
 
-- [A3S Code](/docs/code) — Harness-driven coding agent runtime with ACL config, selected tools, permissions, QuickJS programs, run replay, planning, delegation, and Rust/Node/Python SDKs
-- [A3S Box](/docs/box) — Docker-like MicroVM runtime for Linux OCI workloads, with explicit platform limits, experimental CRI, and hardware-dependent TEE paths
-- [A3S Gateway](/docs/gateway) — AI-native reverse proxy with multi-protocol support, 15 middlewares, and Knative-style autoscaling
-- [A3S Power](/docs/power) — Local LLM inference engine with TEE attestation, RA-TLS, and OpenAI-compatible API
-- [A3S Flow](/docs/flow) — Lightweight workflow engine with DAG execution, wave-based parallelism, and multi-language SDKs (Rust, Python, TypeScript)
-- [A3S Lane](/docs/lane) — Priority queue with 6 built-in lanes, retry/DLQ, rate limiting, and persistent storage
-- [A3S Search](/docs/search) — Meta search engine aggregating 9 engines with consensus ranking and proxy rotation
-- [A3S Memory](/docs/memory) — Pluggable memory storage for agents with episodic, semantic, procedural, and working memory types
+| Need | Project | Role |
+| --- | --- | --- |
+| Drive the agent loop | [A3S Code](/docs/code) | Harness-driven coding-agent runtime with tools, permissions, memory, planning, MCP, verification, TUI integration, and Rust/Node/Python SDKs. |
+| Package the stack | [A3S CLI](/docs/cli) | Umbrella CLI; `a3s code` launches the interactive terminal agent and `a3s box ...` delegates to Box. |
+| Isolate actions | [A3S Box](/docs/box) | Docker-like MicroVM runtime for Linux OCI workloads, with CRI, image, network, SDK, and TEE-oriented paths. |
+| Serve models | [A3S Power](/docs/power) | Local LLM inference with OpenAI-compatible API, tool/structured-output paths, observability, and TEE privacy work. |
+| Route traffic | [A3S Gateway](/docs/gateway) | AI-native reverse proxy with routing, services, middleware, streaming, and deployment docs. |
+| Schedule work | [A3S Lane](/docs/lane) | Priority queue with lanes, retries, dead-lettering, event stream, persistence, and observability. |
+| Remember and retrieve | [A3S Memory](/docs/memory) · [A3S Search](/docs/search) | Pluggable memory storage and an embeddable meta-search engine. |
+| Observe ground truth | [A3S Observer](/docs/observer) | Linux eBPF telemetry for agent tools, files, LLM calls, DNS, egress, and optional kernel guards. |
+| Stop unsafe actions | [A3S Sentry](/docs/sentry) | Tiered L1/L2/L3 runtime security control that judges Observer events and writes deny records for kernel enforcement. |
+| Render terminal UI | [A3S TUI](/docs/tui) | TEA terminal UI framework with Flexbox layout, incremental rendering, and reusable components. |
+| Render native UI | [A3S GUI](/docs/gui) · [A3S WebView](/docs/webview) | Native semantic UI renderer prototype and a WebView popup helper for A3S OS views. |
+| Share primitives | [A3S ACL](/docs/acl) · [A3S AHP](/docs/ahp) · [A3S Event](/docs/event) · [A3S Common](/docs/common) · [A3S Updater](/docs/updater) | Configuration language, supervision protocol, event bus, shared primitives, and self-update library. |
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────┐
-│              A3S Gateway                     │
-│    (traffic routing, TLS, auth, scaling)     │
-└──────────────────┬──────────────────────────┘
-                   │
-┌──────────────────▼──────────────────────────┐
-│              A3S Box VM                      │
-│  ┌──────────────────────────────────────┐   │
-│  │              A3S Code                 │   │
-│  │        (agent runtime)                │   │
-│  └──────────────────┬───────────────────┘   │
-│         TEE memory encryption  │             │
-└────────────────────────────────┼────────────┘
-                                 │
-              ┌──────────────────┼──────────────┐
-              │                  │              │
-     ┌────────▼──────┐  ┌───────▼──────┐  ┌───▼──────────┐
-     │   A3S Lane    │  │  A3S Memory  │  │  A3S Search  │
-     │ (task queue)  │  │  (storage)   │  │  (search)    │
-     └───────────────┘  └──────────────┘  └──────────────┘
+you -> a3s CLI / SDKs
+       |
+       v
+    A3S Code  -- tools, memory, planning, MCP, subagents, verification
+       |
+       +--> A3S Box      -- isolated Linux OCI execution
+       +--> A3S Power    -- model serving
+       +--> A3S Gateway  -- ingress, proxying, middleware
+       +--> Lane/Search/Memory/Event
+
+kernel/user boundary:
+    A3S Observer -> A3S Sentry -> Observer guards -> kernel denies
+
+shared contracts:
+    ACL config · AHP supervision · Common transport/privacy/tool types
 ```
+
+The spine is drive -> isolate -> serve/route -> observe -> govern. Observer and
+Sentry wrap the rest: whatever the agent does through Code, inside Box, or out
+through Gateway should be visible and answerable to an external control plane.

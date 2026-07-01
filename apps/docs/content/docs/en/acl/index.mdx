@@ -1,0 +1,46 @@
+---
+title: A3S ACL
+description: HCL-like Agent Configuration Language used across A3S components.
+---
+
+# A3S ACL
+
+`a3s-acl` is a lightweight typed configuration language for agent and component
+configuration. It provides a Rust crate and a Node.js/TypeScript SDK for parsing
+ACL text into an AST and generating ACL text back from structured values.
+
+## Capability Map
+
+| Area | Current capability |
+| --- | --- |
+| Syntax | HCL-like attributes, labeled blocks, nested blocks, lists, objects, strings, numbers, booleans, null, and function calls. |
+| Functions | Built-in representation for calls such as `env(...)`, `concat(...)`, and custom function names. |
+| AST | `Document`, `Block`, typed values, builders, and value constructors. |
+| Generation | Bidirectional parse/generate flow for config editing tools. |
+| SDKs | Rust crate `a3s-acl`; Node package `@a3s-lab/acl`. |
+
+## Example
+
+```hcl
+default_model = "provider/model-id"
+
+providers "provider" {
+  apiKey = env("PROVIDER_API_KEY")
+  baseUrl = env("PROVIDER_BASE_URL")
+
+  models "model-id" {
+    tool_call = true
+  }
+}
+```
+
+## Use In A3S
+
+ACL is the configuration format used by A3S Code sessions, Sentry policy files,
+and other components that need reviewable, typed product configuration without
+embedding private values in source control.
+
+## Boundaries
+
+ACL is a config language, not a policy engine by itself. Components decide how
+to evaluate values, what functions are allowed, and how secrets are resolved.

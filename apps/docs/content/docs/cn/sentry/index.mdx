@@ -1,0 +1,38 @@
+---
+title: A3S Sentry
+description: 基于 observer 事件和内核 guard 执行的分层 AI Agent 运行时安全控制。
+---
+
+# A3S Sentry
+
+`a3s-sentry` 是 A3S Observer 的策略大脑。Observer 发出 agent 实际做了什么；
+Sentry 通过逐级升级的 tier 判断这些事件，并写出 deny decision，交给 Observer
+内核 guard 执行。
+
+```text
+observer NDJSON -> L1 rules -> L2 LLM -> L3 A3S Code agent
+                 -> deny files -> observer guards -> kernel denies
+```
+
+## 能力地图
+
+| 领域 | 当前能力 |
+| --- | --- |
+| L1 rules | 确定性 regex rule engine，可用 ACL policy 配置，内置危险命令、凭据访问、SSRF、prompt injection marker 和类 secret 内容规则。 |
+| L2 judge | 面向 L1 escalation event 的快速 OpenAI-compatible LLM classifier。 |
+| L3 judge | 使用安全技能的深度 A3S Code agent investigation，用于需要上下文推理的事件。 |
+| SAE tier | 面向 A3S Power 发出的模型输出 activation 的 Sparse Autoencoder 信号路径。 |
+| Inline gate | `inspect_wire` 可以判断解码后的 LLM/MCP wire content，并在转发前 mask 具体 secret/PII span。 |
+| Enforcement | 写出 egress、exec 或 file deny record，供 Observer guard 消费。 |
+| 运行模式 | Rules-only、dry-run、fail-closed、policy hot reload、高风险事件 L2/L3 speculative parallel。 |
+| SDK | Python 与 TypeScript 原生 SDK，提供同一 Rust engine 的进程内 evaluation。 |
+
+## 与 Observer 的关系
+
+Observer 提供信号和内核 enforcement primitive。Sentry 负责策略判断。这样 observe 和
+intervene 保持分离：即使 enforcement policy 正在调试或关闭，遥测也能继续运行。
+
+## 边界
+
+Sentry 自己不做内核拦截。它发出 decision 和 deny record；真正的 kernel-level block 由
+Observer guard 执行。

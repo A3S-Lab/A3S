@@ -1,0 +1,44 @@
+---
+title: A3S ACL
+description: A3S 组件使用的类 HCL Agent Configuration Language。
+---
+
+# A3S ACL
+
+`a3s-acl` 是一个轻量的类型化配置语言，用于 agent 和组件配置。它提供
+Rust crate 与 Node.js/TypeScript SDK，可以把 ACL 文本解析成 AST，也可以从结构化
+值生成 ACL 文本。
+
+## 能力地图
+
+| 领域 | 当前能力 |
+| --- | --- |
+| 语法 | 类 HCL attribute、带 label 的 block、嵌套 block、list、object、string、number、boolean、null 和函数调用。 |
+| 函数 | 支持表达 `env(...)`、`concat(...)` 以及自定义函数名。 |
+| AST | `Document`、`Block`、类型化值、builder 和值构造函数。 |
+| 生成 | 支持 parse/generate 双向流程，适合配置编辑工具。 |
+| SDK | Rust crate `a3s-acl`；Node 包 `@a3s-lab/acl`。 |
+
+## 示例
+
+```hcl
+default_model = "provider/model-id"
+
+providers "provider" {
+  apiKey = env("PROVIDER_API_KEY")
+  baseUrl = env("PROVIDER_BASE_URL")
+
+  models "model-id" {
+    tool_call = true
+  }
+}
+```
+
+## 在 A3S 中的位置
+
+ACL 是 A3S Code session、Sentry policy 文件，以及其它需要可审阅、类型化产品配置的
+组件所使用的配置格式。真实私有值应留在环境变量或宿主密钥系统中。
+
+## 边界
+
+ACL 本身不是策略引擎。组件决定如何解释值、允许哪些函数，以及如何解析敏感值。

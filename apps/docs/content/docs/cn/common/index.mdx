@@ -1,0 +1,23 @@
+---
+title: A3S Common
+description: A3S crate 共享的 privacy、tool 和 transport 基础类型。
+---
+
+# A3S Common
+
+`a3s-common` 包含 A3S crate 共享的基础类型。它不是产品表面，而是用于隐私分类、
+工具结果类型、安全 workspace 路径解析和 framed transport 的小型库。
+
+## 能力地图
+
+| 领域 | 当前能力 |
+| --- | --- |
+| Privacy | 敏感级别、regex 分类规则、match metadata 和 redaction strategy。 |
+| Tool types | 共享的 `Tool` 与 `ToolResult` 结构。 |
+| Workspace path | 安全读写路径解析，拒绝逃逸 workspace 的路径。 |
+| Transport | codec、frame、Unix transport、TEE transport 等 framed transport 模块。 |
+
+## 边界
+
+Common 不拥有产品策略。组件可以复用 privacy classifier 或 path resolver，但最终授权
+decision 仍属于组件或宿主 runtime。

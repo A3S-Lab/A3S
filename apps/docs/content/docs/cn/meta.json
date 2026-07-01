@@ -4,15 +4,25 @@
   "pages": [
     "---框架---",
     "code",
+    "cli",
     "---应用---",
     "box",
     "power",
     "gateway",
+    "webview",
+    "gui",
     "---库---",
+    "acl",
+    "ahp",
+    "event",
     "lane",
     "search",
     "memory",
+    "tui",
+    "common",
+    "updater",
     "---可观测性---",
-    "observer"
+    "observer",
+    "sentry"
   ]
 }

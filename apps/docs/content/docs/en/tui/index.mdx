@@ -1,0 +1,35 @@
+---
+title: A3S TUI
+description: Rust TEA framework for terminal applications with Flexbox layout, incremental rendering, and reusable components.
+---
+
+# A3S TUI
+
+`a3s-tui` is a Rust terminal UI framework built around The Elm Architecture:
+model, update, view. It is the UI framework used by the `a3s code` terminal
+agent, but it is a reusable library rather than the agent runtime.
+
+## Capability Map
+
+| Area | Current capability |
+| --- | --- |
+| Architecture | TEA model-update-view loop with async Tokio runtime. |
+| Rendering | Declarative element tree, Taffy Flexbox layout, and incremental line-diff rendering. |
+| Terminal input | Keyboard, resize, mouse support, focus management, and Vim-like keymap helpers. |
+| Styling | ANSI/RGB colors, borders, spacing, dimensions, text styles, wrapping, and CJK-aware width handling. |
+| Markdown | CommonMark rendering with syntax highlighting through `syntect`. |
+| Components | Rich component set including tables, tabs, modals, diff views, git panels, task queues, text editors, logs, timelines, split panes, and status bars. |
+| Validation | Headless terminal integration tests and rendering benchmarks. |
+
+## Relationship To `a3s code`
+
+`a3s code` embeds A3S Code for the agent loop and uses A3S TUI to render the
+terminal surface. The runtime API and the UI framework are intentionally split:
+product teams can build a different UI over the same A3S Code event stream.
+
+## Install
+
+```toml
+[dependencies]
+a3s-tui = "0.1"
+```
