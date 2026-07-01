@@ -1,0 +1,37 @@
+---
+title: Formulae
+description: Current Homebrew tap entries, versions, installed binaries, platform coverage, and readiness caveats.
+---
+
+# Homebrew Formulae
+
+This page reflects the current files under `homebrew-tap/`.
+
+## Release-Backed Formulae
+
+| Entry | Version in tap | Installs | Release source | Platform branches |
+| --- | --- | --- | --- | --- |
+| `a3s` | `0.5.12` | `a3s` | `A3S-Lab/Cli` release archives | macOS arm64/x86_64, Linux arm64/x86_64 |
+| `a3s-box` | `2.6.0` | `a3s-box`, `a3s-box-shim`, `a3s-box-guest-init`, optional `a3s-box-cri`, bundled `lib/` | `AI45Lab/Box` release archives | macOS arm64, Linux arm64/x86_64 |
+| `a3s-code` | `0.6.0` | `a3s-code` | `A3S-Lab/Code` release archives | macOS arm64/x86_64, Linux arm64/x86_64 |
+| `a3s-power` | `0.4.2` | `a3s-power`, `a3s-power-verify` | `A3S-Lab/Power` release archives | macOS arm64/x86_64, Linux arm64/x86_64 |
+| `a3s-search` | `1.3.0` | `a3s-search` | `A3S-Lab/Search` release archives | macOS arm64/x86_64, Linux arm64/x86_64 |
+
+## Entries Requiring Attention
+
+| Entry | Current state |
+| --- | --- |
+| `a3s-gateway` | Formula exists at `1.0.11`, but the current file has empty `sha256` fields for all release assets. Homebrew will not accept those as final checksums. |
+| `safeclaw` formula | Formula exists with `sha256 "TODO"` and builds from source with Rust and protobuf build dependencies. Treat it as incomplete until the checksum is replaced. |
+| `safeclaw` cask | Cask exists at `0.1.0`, uses a universal macOS DMG asset, and declares macOS Ventura or newer. |
+
+## Tests
+
+The CLI formulae use Homebrew `test do` blocks that run the installed binary
+with `--version` and assert the expected command name appears in output.
+
+## Notes
+
+The tap state can lag component crate versions. For example, the current `a3s`
+formula pins a release version from the formula file, while the CLI crate may
+already have moved ahead in source.

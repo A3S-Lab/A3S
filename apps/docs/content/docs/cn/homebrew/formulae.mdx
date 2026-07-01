@@ -1,0 +1,35 @@
+---
+title: Formulae
+description: 当前 Homebrew tap entries、versions、installed binaries、platform coverage 和 readiness caveats。
+---
+
+# Homebrew Formulae
+
+本页反映 `homebrew-tap/` 下当前文件状态。
+
+## Release-Backed Formulae
+
+| Entry | Version in tap | Installs | Release source | Platform branches |
+| --- | --- | --- | --- | --- |
+| `a3s` | `0.5.12` | `a3s` | `A3S-Lab/Cli` release archives | macOS arm64/x86_64、Linux arm64/x86_64 |
+| `a3s-box` | `2.6.0` | `a3s-box`、`a3s-box-shim`、`a3s-box-guest-init`、optional `a3s-box-cri`、bundled `lib/` | `AI45Lab/Box` release archives | macOS arm64、Linux arm64/x86_64 |
+| `a3s-code` | `0.6.0` | `a3s-code` | `A3S-Lab/Code` release archives | macOS arm64/x86_64、Linux arm64/x86_64 |
+| `a3s-power` | `0.4.2` | `a3s-power`、`a3s-power-verify` | `A3S-Lab/Power` release archives | macOS arm64/x86_64、Linux arm64/x86_64 |
+| `a3s-search` | `1.3.0` | `a3s-search` | `A3S-Lab/Search` release archives | macOS arm64/x86_64、Linux arm64/x86_64 |
+
+## Entries Requiring Attention
+
+| Entry | Current state |
+| --- | --- |
+| `a3s-gateway` | Formula 存在，version 为 `1.0.11`，但当前文件里所有 release assets 的 `sha256` 都是空值。Homebrew 不会把这些当作最终 checksum。 |
+| `safeclaw` formula | Formula 存在，包含 `sha256 "TODO"`，并用 Rust 和 protobuf build dependencies 从源码构建。替换 checksum 前应视为 incomplete。 |
+| `safeclaw` cask | Cask 存在，version 为 `0.1.0`，使用 universal macOS DMG asset，并声明 macOS Ventura 或更新版本。 |
+
+## Tests
+
+CLI formulae 使用 Homebrew `test do` blocks，运行安装后的 binary `--version`，并断言输出中包含预期 command name。
+
+## Notes
+
+Tap state 可能落后于 component crate versions。例如当前 `a3s` formula 使用 formula 文件里的 release
+version，而 CLI crate 源码可能已经继续向前。

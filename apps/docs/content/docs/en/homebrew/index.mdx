@@ -1,0 +1,50 @@
+---
+title: A3S Homebrew Tap
+description: Homebrew formulae and cask entries for installing A3S command-line tools and app bundles.
+---
+
+# A3S Homebrew Tap
+
+`homebrew-tap/` is the Homebrew distribution project for A3S release builds. It
+contains formulae for command-line tools and a cask entry for an app bundle.
+
+## Install
+
+```bash
+brew tap a3s-lab/tap https://github.com/A3S-Lab/homebrew-tap
+brew install a3s
+```
+
+Install individual tools when you do not want the umbrella CLI:
+
+```bash
+brew install a3s-box
+brew install a3s-code
+brew install a3s-gateway
+brew install a3s-power
+brew install a3s-search
+```
+
+## Capability Map
+
+| Area | Current capability |
+| --- | --- |
+| Formulae | Formula files for `a3s`, `a3s-box`, `a3s-code`, `a3s-gateway`, `a3s-power`, `a3s-search`, and `safeclaw`. |
+| Casks | A `safeclaw` cask for a macOS app bundle. |
+| Platforms | Formulae use Homebrew `on_macos` / `on_linux` and architecture branches where release assets exist. |
+| Release assets | Most formulae install prebuilt `.tar.gz` release archives and verify them with SHA-256 hashes. |
+| Tests | CLI formulae run a version command in `test do` blocks. |
+| Templates | `a3s-search.rb.template` captures the release-template shape for search formula updates. |
+
+## Start Here
+
+- [Formulae](/docs/homebrew/formulae) lists the current tap entries, versions,
+  installed binaries, platform coverage, and readiness caveats.
+- [Maintenance](/docs/homebrew/maintenance) documents update flow, checksums,
+  tests, and boundaries.
+
+## Boundary
+
+The tap does not implement A3S runtime behavior. It packages release artifacts
+from the component repositories and gives Homebrew a way to install, upgrade,
+test, and uninstall them.

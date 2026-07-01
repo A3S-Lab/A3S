@@ -16,6 +16,7 @@ runtime veto when an action is unsafe.
 | --- | --- | --- |
 | Drive the agent loop | [A3S Code](/docs/code) | Harness-driven coding-agent runtime with tools, permissions, memory, planning, MCP, verification, TUI integration, and Rust/Node/Python SDKs. |
 | Package the stack | [A3S CLI](/docs/cli) | Umbrella CLI; `a3s code` launches the interactive terminal agent and `a3s box ...` delegates to Box. |
+| Install release builds | [A3S Homebrew Tap](/docs/homebrew) | Homebrew formulae and cask entries for A3S command-line tools and app bundles. |
 | Isolate actions | [A3S Box](/docs/box) | Docker-like MicroVM runtime for Linux OCI workloads, with CRI, image, network, SDK, and TEE-oriented paths. |
 | Serve models | [A3S Power](/docs/power) | Local LLM inference with OpenAI-compatible API, tool/structured-output paths, observability, and TEE privacy work. |
 | Route traffic | [A3S Gateway](/docs/gateway) | AI-native reverse proxy with routing, services, middleware, streaming, and deployment docs. |
@@ -45,6 +46,9 @@ kernel/user boundary:
 
 shared contracts:
     ACL config · AHP supervision · Common transport/privacy/tool types
+
+distribution:
+    Homebrew tap · release archives · formula checks · cask app bundles
 ```
 
 The spine is drive -> isolate -> serve/route -> observe -> govern. Observer and

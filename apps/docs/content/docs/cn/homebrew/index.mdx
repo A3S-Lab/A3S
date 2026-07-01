@@ -1,0 +1,48 @@
+---
+title: A3S Homebrew Tap
+description: 用于安装 A3S command-line tools 和 app bundles 的 Homebrew formulae 与 cask entries。
+---
+
+# A3S Homebrew Tap
+
+`homebrew-tap/` 是 A3S release builds 的 Homebrew distribution project。它包含
+command-line tools 的 formulae，以及 app bundle 的 cask entry。
+
+## Install
+
+```bash
+brew tap a3s-lab/tap https://github.com/A3S-Lab/homebrew-tap
+brew install a3s
+```
+
+不需要 umbrella CLI 时，可以安装单个 tool：
+
+```bash
+brew install a3s-box
+brew install a3s-code
+brew install a3s-gateway
+brew install a3s-power
+brew install a3s-search
+```
+
+## Capability Map
+
+| Area | Current capability |
+| --- | --- |
+| Formulae | `a3s`、`a3s-box`、`a3s-code`、`a3s-gateway`、`a3s-power`、`a3s-search`、`safeclaw` 的 formula files。 |
+| Casks | 面向 macOS app bundle 的 `safeclaw` cask。 |
+| Platforms | Formulae 在 release assets 存在时使用 Homebrew `on_macos` / `on_linux` 和 architecture branches。 |
+| Release assets | 大多数 formulae 安装预构建 `.tar.gz` release archives，并通过 SHA-256 hashes 验证。 |
+| Tests | CLI formulae 在 `test do` blocks 中运行 version command。 |
+| Templates | `a3s-search.rb.template` 记录 search formula update 的 release-template shape。 |
+
+## 从这里开始
+
+- [Formulae](/cn/docs/homebrew/formulae) 列出当前 tap entries、versions、installed binaries、
+  platform coverage 和 readiness caveats。
+- [Maintenance](/cn/docs/homebrew/maintenance) 说明 update flow、checksums、tests 和 boundaries。
+
+## 边界
+
+Tap 不实现 A3S runtime behavior。它打包来自各组件 repository 的 release artifacts，并让 Homebrew
+能够 install、upgrade、test、uninstall。

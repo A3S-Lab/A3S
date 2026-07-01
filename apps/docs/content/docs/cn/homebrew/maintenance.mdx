@@ -1,0 +1,48 @@
+---
+title: Maintenance
+description: 更新 Homebrew formula versions、checksums、tests、templates、casks 和 distribution boundaries。
+---
+
+# Tap Maintenance
+
+Tap 是 release-distribution layer。更新它意味着让 formula 或 cask 文件与组件 repository 中已经存在的
+release artifacts 对齐。
+
+## Formula Update Flow
+
+1. 在组件自己的 repository 中发布 release。
+2. 确认每个 supported platform 的 expected release archives 存在。
+3. 更新 formula `version`。
+4. 更新每个 platform `url`。
+5. 用对应 archive 的 checksum 替换每个 `sha256`。
+6. 验证 `def install` 安装 archive 中实际存在的每个 binary 和 bundled library。
+7. 可行时本地运行 formula 的 Homebrew test。
+
+对 release-backed CLI tools，formula test 应继续断言 install 后 `<binary> --version` 可用。
+
+## Search Template
+
+`Formula/a3s-search.rb.template` 使用 version 和 platform hashes placeholders。Search release
+之后，可以用它重新生成具体的 `a3s-search.rb` formula。
+
+## Cask Maintenance
+
+`safeclaw` cask 从 DMG release asset 安装 macOS `.app`，并声明 application support、caches、
+preferences、logs 的 zap paths。更新 cask 时应验证 DMG asset name、minimum macOS version、
+app bundle name 和 zap paths。
+
+## Readiness Checks
+
+把 tap entry 视为 ready 前，应检查：
+
+- empty checksum fields
+- placeholder checksum values
+- stale formula versions
+- 指向缺失 release artifacts 的 URLs
+- archives 不包含 `def install` 中列出的 binary names
+- tests 调用了 formula 未安装的 binary
+
+## 边界
+
+Tap 不应 patch product behavior。Product fixes 属于组件 repository 和 release artifact。Tap 只应描述
+Homebrew 如何 download、verify、install、test 这个 artifact。

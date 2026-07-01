@@ -1,0 +1,54 @@
+---
+title: Maintenance
+description: Updating Homebrew formula versions, checksums, tests, templates, casks, and distribution boundaries.
+---
+
+# Tap Maintenance
+
+The tap is a release-distribution layer. Updating it means aligning a formula or
+cask file with the release artifacts that already exist in a component
+repository.
+
+## Formula Update Flow
+
+1. Release the component in its own repository.
+2. Confirm the expected release archives exist for each supported platform.
+3. Update the formula `version`.
+4. Update every platform `url`.
+5. Replace every `sha256` with the checksum for that exact archive.
+6. Verify `def install` installs every binary and bundled library the archive
+   actually contains.
+7. Run the formula's Homebrew test locally when possible.
+
+For release-backed CLI tools, the formula test should continue to assert that
+`<binary> --version` works after install.
+
+## Search Template
+
+`Formula/a3s-search.rb.template` uses placeholders for version and platform
+hashes. It is useful for regenerating the concrete `a3s-search.rb` formula
+after a Search release.
+
+## Cask Maintenance
+
+The `safeclaw` cask installs a macOS `.app` from a DMG release asset and declares
+zap paths for application support, caches, preferences, and logs. Cask updates
+should verify the DMG asset name, minimum macOS version, app bundle name, and zap
+paths.
+
+## Readiness Checks
+
+Before treating a tap entry as ready, check for:
+
+- empty checksum fields
+- placeholder checksum values
+- stale formula versions
+- URLs that point to missing release artifacts
+- archives that do not contain the binary names listed in `def install`
+- tests that call a binary not installed by the formula
+
+## Boundary
+
+The tap should not patch product behavior. Product fixes belong in the component
+repository and release artifact. The tap should only describe how Homebrew
+downloads, verifies, installs, and tests that artifact.
