@@ -1,0 +1,71 @@
+---
+title: Node SDK
+description: JavaScript and TypeScript parsing, generation, builders, lexer/parser classes, and HCL output in @a3s-lab/acl.
+---
+
+# Node SDK
+
+Install the Node package:
+
+```bash
+npm install @a3s-lab/acl
+```
+
+The current package version in this repository is `0.2.1`.
+
+## Parse And Generate
+
+```typescript
+import {
+  BlockBuilder,
+  DocumentBuilder,
+  call,
+  generate,
+  parse,
+  string,
+} from '@a3s-lab/acl';
+
+const doc = parse(`
+providers "provider" {
+  api_key = env("PROVIDER_API_KEY")
+}
+`);
+
+const provider = new BlockBuilder('providers')
+  .label('provider')
+  .attr('api_key', call('env', [string('PROVIDER_API_KEY')]))
+  .build();
+
+const generated = generate(new DocumentBuilder().block(provider).build());
+```
+
+## Public API
+
+| API | Role |
+| --- | --- |
+| `parse(input)` | Parse ACL text into a `Document`. |
+| `generate(doc)` | Generate ACL-style text. |
+| `generateHCL(doc)` | Generate label-as-attribute HCL-shaped text. |
+| `string`, `number`, `boolean`, `bool`, `nullValue`, `list`, `call` | Value constructors. |
+| `BlockBuilder`, `DocumentBuilder` | Structured document builders. |
+| `Lexer`, `Parser` | Advanced tokenization/parsing classes. |
+
+The package ships TypeScript definitions in `src/index.d.ts`.
+
+## HCL Output Mode
+
+The Node generator has a `generateHCL` helper. It writes labels as attributes
+inside the generated block. For `models` blocks, the label attribute is named
+`id`; for other blocks it is named `name`.
+
+```typescript
+import {generateHCL} from '@a3s-lab/acl';
+
+const hcl = generateHCL(doc);
+```
+
+## Boundary
+
+The SDK is a parser/generator and AST builder. It does not load environment
+variables, fetch remote configuration, validate provider credentials, or execute
+functions such as `env(...)`.

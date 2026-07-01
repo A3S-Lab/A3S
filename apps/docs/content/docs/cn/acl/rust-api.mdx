@@ -1,0 +1,87 @@
+---
+title: Rust API
+description: a3s-acl 的 Rust parser、generator、AST、builders、value helpers 和 generator configuration。
+---
+
+# Rust API
+
+安装 Rust crate：
+
+```toml
+[dependencies]
+a3s-acl = "0.2.1"
+```
+
+## Parse And Generate
+
+```rust
+use a3s_acl::{generate, parse};
+
+let doc = parse(r#"
+default_model = "provider/model-id"
+
+providers "provider" {
+  api_key = env("PROVIDER_API_KEY")
+}
+"#)?;
+
+let text = generate(&doc);
+# Ok::<(), a3s_acl::ParseError>(())
+```
+
+Public crate exports：
+
+| API | 作用 |
+| --- | --- |
+| `parse` / `parse_acl` | 把 ACL text 解析成 `Document`。 |
+| `generate` / `generate_acl` | 从 `Document` 生成 ACL text。 |
+| `generate_from_map` | 从 `HashMap<String, Value>` 生成 ACL text。 |
+| `Lexer` / `Parser` | 高级 tokenization 和 parsing entry points。 |
+| `ParseError` | 带 message、line、column 的错误。 |
+
+## AST
+
+| Type | Fields |
+| --- | --- |
+| `Document` | `blocks: Vec<Block>` |
+| `Block` | `name`、`labels`、`blocks`、`attributes` |
+| `Value` | `String`、`Number`、`Bool`、`List`、`Object`、`Null`、`Call` |
+
+`Value` 还暴露 `as_str`、`as_number`、`as_bool`、`is_null`、`is_string` 等 helpers。
+
+## Builders
+
+```rust
+use a3s_acl::builder::{boolean, call, string, BlockBuilder, DocumentBuilder};
+
+let provider = BlockBuilder::new("providers")
+    .label("provider")
+    .attr("api_key", call("env", vec![string("PROVIDER_API_KEY")]))
+    .attr("enabled", boolean(true))
+    .build();
+
+let doc = DocumentBuilder::new().block(provider).build();
+```
+
+Builder helpers 包括 `string`、`number`、`integer`、`boolean`、`null`、`list`、`call`。
+
+## GeneratorConfig
+
+```rust
+use a3s_acl::{Generator, GeneratorConfig};
+
+let generator = Generator::with_config(GeneratorConfig {
+    indent: "  ",
+    comments: false,
+    labels_as_attrs: true,
+});
+```
+
+`labels_as_attrs` 会把 block labels 写成 block 内部 attributes，而不是写在 block header 中。
+当 integration 更偏向 attribute-oriented HCL shape 时可以使用。
+
+## Notes
+
+- Generated attributes 会按 key 排序，方便稳定输出。
+- Strings 会 escape quotes、backslashes、newlines、carriage returns 和 tabs。
+- ACL parse/generation 不解析 secrets，也不执行 function calls。

@@ -1,0 +1,61 @@
+---
+title: Generation And Boundaries
+description: Stable ACL output, label handling, function-call placeholders, secret hygiene, and ownership boundaries.
+---
+
+# Generation And Boundaries
+
+ACL is useful for product configuration because it keeps configuration readable
+and structured while leaving sensitive value resolution to the host component.
+
+## Generation Behavior
+
+| Behavior | Current implementation |
+| --- | --- |
+| Attribute order | Attributes are sorted by key during generation. |
+| String escaping | Quotes, backslashes, newline, carriage return, and tab are escaped. |
+| Lists and objects | Values are generated inline. |
+| Function calls | Calls are preserved as syntax, for example `env("PROVIDER_API_KEY")`. |
+| Labels | Default output writes labels in block headers. |
+| Label-as-attribute mode | Rust exposes `GeneratorConfig.labels_as_attrs`; Node exposes `generateHCL`. |
+
+## Secret Hygiene
+
+Store references, not secrets:
+
+```hcl
+providers "provider" {
+  api_key = env("PROVIDER_API_KEY")
+  base_url = env("PROVIDER_BASE_URL")
+}
+```
+
+Do not commit concrete API keys, bearer credentials, or private endpoints into
+ACL examples or product configuration. The ACL crate preserves `env(...)` as a
+function call; the component that loads the configuration decides how to resolve
+it.
+
+## Ownership Boundary
+
+ACL owns:
+
+- parsing text into AST
+- generating text from AST
+- value constructors and document builders
+- parser diagnostics
+- language-neutral config shape
+
+The host component owns:
+
+- validating whether a block or attribute is allowed
+- evaluating function calls
+- resolving environment variables or secret-store references
+- applying defaults
+- converting AST values into product-specific typed configuration
+- enforcing policy decisions
+
+## Relationship To A3S Components
+
+A3S Code, A3S Sentry, and other A3S components can use ACL as a reviewable
+configuration format. Each component should keep its schema and evaluator local
+to that component instead of making ACL a global policy engine.

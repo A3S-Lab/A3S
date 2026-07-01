@@ -1,0 +1,65 @@
+---
+title: Syntax
+description: Blocks, labels, attributes, values, calls, comments, and parser boundaries in A3S ACL.
+---
+
+# ACL Syntax
+
+ACL is intentionally close to HCL: a document is parsed into a list of named
+blocks. Top-level bare attributes are represented as single-attribute blocks so
+editing tools can keep one uniform AST shape.
+
+## Blocks And Attributes
+
+```hcl
+default_model = "provider/model-id"
+
+providers "provider" {
+  api_key = env("PROVIDER_API_KEY")
+  base_url = env("PROVIDER_BASE_URL")
+
+  models "model-id" {
+    tool_call = true
+    max_tokens = 4096
+  }
+}
+```
+
+| Construct | Current support |
+| --- | --- |
+| Bare attribute | `name = value` or `name : value` at the top level. |
+| Labeled block | `providers "provider" { ... }`, with one or more string labels. |
+| Nested block | Blocks inside block bodies. |
+| Object value | `{key = value}` pairs inside a value position. |
+| List value | `[value, value]`, including values split across lines. |
+| Function call | `name(arg, arg)`, stored as `Value::Call` / `{kind: 'Call'}`. |
+| Comments | Comment tokens are skipped by the parser. |
+
+The lexer has a `+=` token, but the parser currently accepts `=` and `:` for
+attributes. Do not model append semantics with `+=`.
+
+## Value Types
+
+| ACL value | AST representation |
+| --- | --- |
+| `"text"` or `'text'` | `String` |
+| `42`, `3.14`, `-1`, `1e10` | `Number` |
+| `true` / `false` | `Bool` |
+| `null` | `Null` |
+| `[1, "two"]` | `List` |
+| `{key = "value"}` | `Object` |
+| `env("PROVIDER_API_KEY")` | `Call` |
+
+Double-quoted strings support common escapes such as newline, carriage return,
+tab, backslash, and escaped quote. Single-quoted strings are also tokenized.
+
+## Parse Errors
+
+`ParseError` carries a message plus line and column. The lexer tracks spans for
+tokens, which lets editor integrations point users at the failing location.
+
+## Evaluation Boundary
+
+ACL parses function calls but does not evaluate them. A component that accepts
+ACL decides whether `env(...)`, `concat(...)`, or any custom call name is
+allowed and how it should resolve.

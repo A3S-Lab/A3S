@@ -1,0 +1,69 @@
+---
+title: Node SDK
+description: @a3s-lab/acl 的 JavaScript/TypeScript parsing、generation、builders、lexer/parser classes 和 HCL output。
+---
+
+# Node SDK
+
+安装 Node package：
+
+```bash
+npm install @a3s-lab/acl
+```
+
+当前仓库中的 package version 是 `0.2.1`。
+
+## Parse And Generate
+
+```typescript
+import {
+  BlockBuilder,
+  DocumentBuilder,
+  call,
+  generate,
+  parse,
+  string,
+} from '@a3s-lab/acl';
+
+const doc = parse(`
+providers "provider" {
+  api_key = env("PROVIDER_API_KEY")
+}
+`);
+
+const provider = new BlockBuilder('providers')
+  .label('provider')
+  .attr('api_key', call('env', [string('PROVIDER_API_KEY')]))
+  .build();
+
+const generated = generate(new DocumentBuilder().block(provider).build());
+```
+
+## Public API
+
+| API | 作用 |
+| --- | --- |
+| `parse(input)` | 把 ACL text 解析成 `Document`。 |
+| `generate(doc)` | 生成 ACL-style text。 |
+| `generateHCL(doc)` | 生成 label-as-attribute HCL-shaped text。 |
+| `string`、`number`、`boolean`、`bool`、`nullValue`、`list`、`call` | Value constructors。 |
+| `BlockBuilder`、`DocumentBuilder` | Structured document builders。 |
+| `Lexer`、`Parser` | Advanced tokenization/parsing classes。 |
+
+Package 在 `src/index.d.ts` 中提供 TypeScript definitions。
+
+## HCL Output Mode
+
+Node generator 有 `generateHCL` helper。它会把 labels 写成 generated block 内部的 attributes。
+对 `models` blocks，label attribute 名为 `id`；其它 blocks 使用 `name`。
+
+```typescript
+import {generateHCL} from '@a3s-lab/acl';
+
+const hcl = generateHCL(doc);
+```
+
+## 边界
+
+SDK 是 parser/generator 和 AST builder。它不会加载环境变量、拉取远程配置、验证 provider
+credentials，也不会执行 `env(...)` 等函数。

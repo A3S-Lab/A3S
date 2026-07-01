@@ -1,0 +1,62 @@
+---
+title: Syntax
+description: A3S ACL 的 blocks、labels、attributes、values、calls、comments 和 parser boundaries。
+---
+
+# ACL Syntax
+
+ACL 刻意接近 HCL：document 会被解析成一组 named blocks。Top-level bare attributes 会表示成
+single-attribute blocks，因此编辑工具可以使用统一 AST 形态。
+
+## Blocks And Attributes
+
+```hcl
+default_model = "provider/model-id"
+
+providers "provider" {
+  api_key = env("PROVIDER_API_KEY")
+  base_url = env("PROVIDER_BASE_URL")
+
+  models "model-id" {
+    tool_call = true
+    max_tokens = 4096
+  }
+}
+```
+
+| Construct | 当前支持 |
+| --- | --- |
+| Bare attribute | top level 的 `name = value` 或 `name : value`。 |
+| Labeled block | `providers "provider" { ... }`，支持一个或多个 string labels。 |
+| Nested block | block body 内的 blocks。 |
+| Object value | value 位置的 `{key = value}` pairs。 |
+| List value | `[value, value]`，包括跨行 values。 |
+| Function call | `name(arg, arg)`，存为 `Value::Call` / `{kind: 'Call'}`。 |
+| Comments | parser 会跳过 comment tokens。 |
+
+Lexer 里有 `+=` token，但 parser 当前接受的是 `=` 和 `:` attributes。不要用 `+=` 表达 append 语义。
+
+## Value Types
+
+| ACL value | AST representation |
+| --- | --- |
+| `"text"` 或 `'text'` | `String` |
+| `42`、`3.14`、`-1`、`1e10` | `Number` |
+| `true` / `false` | `Bool` |
+| `null` | `Null` |
+| `[1, "two"]` | `List` |
+| `{key = "value"}` | `Object` |
+| `env("PROVIDER_API_KEY")` | `Call` |
+
+Double-quoted strings 支持 newline、carriage return、tab、backslash、escaped quote 等常见 escapes。
+Single-quoted strings 也会被 tokenized。
+
+## Parse Errors
+
+`ParseError` 包含 message、line 和 column。Lexer 为 tokens 跟踪 spans，方便 editor integrations
+定位失败位置。
+
+## Evaluation Boundary
+
+ACL 会解析 function calls，但不会执行它们。接收 ACL 的组件决定是否允许 `env(...)`、`concat(...)`
+或自定义 call name，以及如何解析。

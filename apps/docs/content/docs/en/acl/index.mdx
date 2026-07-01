@@ -9,15 +9,31 @@ description: HCL-like Agent Configuration Language used across A3S components.
 configuration. It provides a Rust crate and a Node.js/TypeScript SDK for parsing
 ACL text into an AST and generating ACL text back from structured values.
 
+The current Rust crate is `a3s-acl` `0.2.1`, and the current Node package is
+`@a3s-lab/acl` `0.2.1`. The crate repository metadata points to
+[`A3S-Lab/ACL`](https://github.com/A3S-Lab/ACL).
+
 ## Capability Map
 
 | Area | Current capability |
 | --- | --- |
-| Syntax | HCL-like attributes, labeled blocks, nested blocks, lists, objects, strings, numbers, booleans, null, and function calls. |
-| Functions | Built-in representation for calls such as `env(...)`, `concat(...)`, and custom function names. |
-| AST | `Document`, `Block`, typed values, builders, and value constructors. |
-| Generation | Bidirectional parse/generate flow for config editing tools. |
-| SDKs | Rust crate `a3s-acl`; Node package `@a3s-lab/acl`. |
+| Syntax | HCL-like attributes, labeled blocks, nested blocks, lists, objects, strings, numbers, booleans, null, function calls, comments, and `=` / `:` assignments. |
+| Lexer/parser | Source spans, line/column parse errors, comment skipping, string escapes, negative numbers, and scientific notation. |
+| Functions | First-class call values such as `env(...)`, `concat(...)`, and custom function names. |
+| AST | `Document`, `Block`, typed values, builders, value constructors, and `Value` accessors. |
+| Generation | Bidirectional parse/generate flow, sorted attributes, string escaping, map generation, and label-as-attribute output mode. |
+| SDKs | Rust crate `a3s-acl`; Node package `@a3s-lab/acl` with TypeScript definitions. |
+
+## Start Here
+
+- [Syntax](/docs/acl/syntax) documents blocks, attributes, values, calls,
+  comments, and parser boundaries.
+- [Rust API](/docs/acl/rust-api) covers `parse`, `generate`, builders,
+  `GeneratorConfig`, and AST value helpers.
+- [Node SDK](/docs/acl/node-sdk) covers the JavaScript/TypeScript parser,
+  generator, builders, and `generateHCL`.
+- [Generation And Boundaries](/docs/acl/generation-boundaries) explains output
+  modes, secret handling, and what ACL does not evaluate by itself.
 
 ## Example
 
@@ -25,8 +41,8 @@ ACL text into an AST and generating ACL text back from structured values.
 default_model = "provider/model-id"
 
 providers "provider" {
-  apiKey = env("PROVIDER_API_KEY")
-  baseUrl = env("PROVIDER_BASE_URL")
+  api_key = env("PROVIDER_API_KEY")
+  base_url = env("PROVIDER_BASE_URL")
 
   models "model-id" {
     tool_call = true

@@ -1,0 +1,57 @@
+---
+title: Generation And Boundaries
+description: Stable ACL output、label handling、function-call placeholders、secret hygiene 和 ownership boundaries。
+---
+
+# Generation And Boundaries
+
+ACL 适合产品配置，是因为它让配置保持可读、结构化，同时把敏感值解析留给宿主组件。
+
+## Generation Behavior
+
+| Behavior | 当前实现 |
+| --- | --- |
+| Attribute order | 生成时 attributes 会按 key 排序。 |
+| String escaping | Quotes、backslashes、newline、carriage return、tab 会被 escape。 |
+| Lists and objects | Values 会 inline 生成。 |
+| Function calls | Calls 会以语法形式保留，例如 `env("PROVIDER_API_KEY")`。 |
+| Labels | 默认输出把 labels 写在 block headers 中。 |
+| Label-as-attribute mode | Rust 暴露 `GeneratorConfig.labels_as_attrs`；Node 暴露 `generateHCL`。 |
+
+## Secret Hygiene
+
+存引用，不存秘密：
+
+```hcl
+providers "provider" {
+  api_key = env("PROVIDER_API_KEY")
+  base_url = env("PROVIDER_BASE_URL")
+}
+```
+
+不要把真实 API keys、bearer credentials 或 private endpoints 提交进 ACL examples 或产品配置。
+ACL crate 会把 `env(...)` 保留为 function call；加载配置的组件决定如何解析。
+
+## Ownership Boundary
+
+ACL 负责：
+
+- 把 text 解析成 AST
+- 从 AST 生成 text
+- value constructors 和 document builders
+- parser diagnostics
+- language-neutral config shape
+
+宿主组件负责：
+
+- 验证 block 或 attribute 是否允许
+- 执行 function calls
+- 解析 environment variables 或 secret-store references
+- 应用 defaults
+- 把 AST values 转成 product-specific typed configuration
+- 执行 policy decisions
+
+## Relationship To A3S Components
+
+A3S Code、A3S Sentry 和其它 A3S components 可以把 ACL 作为可审阅配置格式。每个组件应把自己的
+schema 和 evaluator 留在本组件内，而不是把 ACL 变成全局 policy engine。

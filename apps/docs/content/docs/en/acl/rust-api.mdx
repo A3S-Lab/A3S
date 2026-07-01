@@ -1,0 +1,91 @@
+---
+title: Rust API
+description: Rust parser, generator, AST, builders, value helpers, and generator configuration for a3s-acl.
+---
+
+# Rust API
+
+Install the Rust crate:
+
+```toml
+[dependencies]
+a3s-acl = "0.2.1"
+```
+
+## Parse And Generate
+
+```rust
+use a3s_acl::{generate, parse};
+
+let doc = parse(r#"
+default_model = "provider/model-id"
+
+providers "provider" {
+  api_key = env("PROVIDER_API_KEY")
+}
+"#)?;
+
+let text = generate(&doc);
+# Ok::<(), a3s_acl::ParseError>(())
+```
+
+The public crate exports:
+
+| API | Role |
+| --- | --- |
+| `parse` / `parse_acl` | Parse ACL text into a `Document`. |
+| `generate` / `generate_acl` | Generate ACL text from a `Document`. |
+| `generate_from_map` | Build ACL text from a `HashMap<String, Value>`. |
+| `Lexer` / `Parser` | Advanced tokenization and parsing entry points. |
+| `ParseError` | Error with message, line, and column. |
+
+## AST
+
+| Type | Fields |
+| --- | --- |
+| `Document` | `blocks: Vec<Block>` |
+| `Block` | `name`, `labels`, `blocks`, `attributes` |
+| `Value` | `String`, `Number`, `Bool`, `List`, `Object`, `Null`, `Call` |
+
+`Value` also exposes helpers such as `as_str`, `as_number`, `as_bool`,
+`is_null`, and `is_string`.
+
+## Builders
+
+```rust
+use a3s_acl::builder::{boolean, call, string, BlockBuilder, DocumentBuilder};
+
+let provider = BlockBuilder::new("providers")
+    .label("provider")
+    .attr("api_key", call("env", vec![string("PROVIDER_API_KEY")]))
+    .attr("enabled", boolean(true))
+    .build();
+
+let doc = DocumentBuilder::new().block(provider).build();
+```
+
+Builder helpers include `string`, `number`, `integer`, `boolean`, `null`,
+`list`, and `call`.
+
+## GeneratorConfig
+
+```rust
+use a3s_acl::{Generator, GeneratorConfig};
+
+let generator = Generator::with_config(GeneratorConfig {
+    indent: "  ",
+    comments: false,
+    labels_as_attrs: true,
+});
+```
+
+`labels_as_attrs` writes block labels as attributes inside the block instead of
+in the block header. This is useful when an integration prefers an
+attribute-oriented HCL shape.
+
+## Notes
+
+- Generated attributes are sorted by key for stable output.
+- Strings are escaped for quotes, backslashes, newlines, carriage returns, and
+  tabs.
+- ACL parsing/generation does not resolve secrets or evaluate function calls.
