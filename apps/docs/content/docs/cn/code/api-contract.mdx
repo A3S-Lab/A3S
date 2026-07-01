@@ -503,14 +503,14 @@ new UnixSocketTransport('/tmp/a3s.sock').kind; // 'unix_socket'
 
 ```ts
 const session = agent.session(workspace, {
-  tenantId: 'acme-prod',
-  principal: 'svc-deploy-bot',
-  agentTemplateId: 'ci-runner-v7',
-  correlationId: 'trace-1234abcd',
+  tenantId: 'tenant-example',
+  principal: 'principal-example',
+  agentTemplateId: 'agent-template-example',
+  correlationId: 'trace-example',
   sessionStore: new FileSessionStore('./sessions'),
 });
-session.tenantId;          // -> 'acme-prod'
-session.correlationId;     // -> 'trace-1234abcd'
+session.tenantId;          // -> 'tenant-example'
+session.correlationId;     // -> 'trace-example'
 ```
 
 resume 时 `apply_persisted_runtime_options` 会从持久化快照里还原标签;但**调用方在 resume_session 时传的 opts 优先**,可以借此 relabel。

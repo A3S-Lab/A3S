@@ -22,17 +22,17 @@ Pair identity labels with a `sessionStore` / `session_store` so the labels survi
 
 ```ts
 const session = agent.session('/path/to/project', {
-  tenantId: 'acme-corp',
-  principal: 'user:42',
-  agentTemplateId: 'reviewer-v3',
-  correlationId: 'req-9f2c',
+  tenantId: 'tenant-example',
+  principal: 'principal-example',
+  agentTemplateId: 'agent-template-example',
+  correlationId: 'trace-example',
 });
 
 // Getters return string | null
-console.log(session.tenantId);         // 'acme-corp'
-console.log(session.principal);        // 'user:42'
-console.log(session.agentTemplateId);  // 'reviewer-v3'
-console.log(session.correlationId);    // 'req-9f2c'
+console.log(session.tenantId);         // 'tenant-example'
+console.log(session.principal);        // 'principal-example'
+console.log(session.agentTemplateId);  // 'agent-template-example'
+console.log(session.correlationId);    // 'trace-example'
 ```
 
 </Tab>
@@ -40,17 +40,17 @@ console.log(session.correlationId);    // 'req-9f2c'
 
 ```python
 opts = SessionOptions()
-opts.tenant_id = 'acme-corp'
-opts.principal = 'user:42'
-opts.agent_template_id = 'reviewer-v3'
-opts.correlation_id = 'req-9f2c'
+opts.tenant_id = 'tenant-example'
+opts.principal = 'principal-example'
+opts.agent_template_id = 'agent-template-example'
+opts.correlation_id = 'trace-example'
 session = agent.session('/path/to/project', opts)
 
 # Getters are properties, return str | None
-print(session.tenant_id)          # 'acme-corp'
-print(session.principal)          # 'user:42'
-print(session.agent_template_id)  # 'reviewer-v3'
-print(session.correlation_id)     # 'req-9f2c'
+print(session.tenant_id)          # 'tenant-example'
+print(session.principal)          # 'principal-example'
+print(session.agent_template_id)  # 'agent-template-example'
+print(session.correlation_id)     # 'trace-example'
 ```
 
 </Tab>

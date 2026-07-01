@@ -526,14 +526,14 @@ traces, and `SessionData` but never interpreted by the framework:
 
 ```ts
 const session = agent.session(workspace, {
-  tenantId: 'acme-prod',
-  principal: 'svc-deploy-bot',
-  agentTemplateId: 'ci-runner-v7',
-  correlationId: 'trace-1234abcd',
+  tenantId: 'tenant-example',
+  principal: 'principal-example',
+  agentTemplateId: 'agent-template-example',
+  correlationId: 'trace-example',
   sessionStore: new FileSessionStore('./sessions'),
 });
-session.tenantId;          // -> 'acme-prod'
-session.correlationId;     // -> 'trace-1234abcd'
+session.tenantId;          // -> 'tenant-example'
+session.correlationId;     // -> 'trace-example'
 ```
 
 `apply_persisted_runtime_options` restores them on resume; caller-

@@ -18,14 +18,14 @@ Models are configured in your agent file. Each provider lists the models it
 exposes, and `default_model` is used when a session does not set `model`.
 
 ```text
-default_model = "openai/MiniMax-M2.7-highspeed"
+default_model = "provider/fast-model"
 
-providers "openai" {
-  apiKey = env("A3S_OPENAI_API_KEY")
-  baseUrl = env("A3S_OPENAI_BASE_URL")
+providers "provider" {
+  apiKey = env("PROVIDER_API_KEY")
+  baseUrl = env("PROVIDER_BASE_URL")
 
-  models "MiniMax-M2.7-highspeed" { tool_call = true }
-  models "gpt-4o" { tool_call = true }
+  models "fast-model" { tool_call = true }
+  models "review-model" { tool_call = true }
 }
 ```
 
@@ -44,13 +44,13 @@ import { Agent } from '@a3s-lab/code';
 const agent = await Agent.create('agent.acl');
 
 // A fast model for high-volume, low-stakes work.
-const fast = agent.session('/repo', { model: 'openai/MiniMax-M2.7-highspeed' });
+const fast = agent.session('/repo', { model: 'provider/fast-model' });
 const draft = await fast.run('Draft a short README intro for this project.');
 console.log('draft:', draft);
 await fast.close();
 
 // A stronger model for review / higher-stakes reasoning.
-const review = agent.session('/repo', { model: 'openai/gpt-4o' });
+const review = agent.session('/repo', { model: 'provider/review-model' });
 const critique = await review.run(`Critique this README intro:\n${draft}`);
 console.log('critique:', critique);
 await review.close();
@@ -66,7 +66,7 @@ agent = Agent.create(open('agent.acl').read())
 
 # A fast model for high-volume, low-stakes work.
 fast_opts = SessionOptions()
-fast_opts.model = 'openai/MiniMax-M2.7-highspeed'
+fast_opts.model = 'provider/fast-model'
 fast = agent.session('/repo', fast_opts)
 draft = fast.run('Draft a short README intro for this project.')
 print('draft:', draft)
@@ -74,7 +74,7 @@ fast.close()
 
 # A stronger model for review / higher-stakes reasoning.
 review_opts = SessionOptions()
-review_opts.model = 'openai/gpt-4o'
+review_opts.model = 'provider/review-model'
 review = agent.session('/repo', review_opts)
 critique = review.run(f'Critique this README intro:\n{draft}')
 print('critique:', critique)
@@ -101,13 +101,13 @@ const agent = await Agent.create('agent.acl');
 
 const session = agent.session('/repo', {
   // Orchestrator stays on the stronger model.
-  model: 'openai/gpt-4o',
+  model: 'provider/review-model',
   // High-volume exploration runs on the cheaper model.
   workerAgents: [
     {
       name: 'scout',
       description: 'Reads files and reports findings.',
-      model: 'openai/MiniMax-M2.7-highspeed',
+      model: 'provider/fast-model',
     },
   ],
 });
@@ -130,13 +130,13 @@ agent = Agent.create(open('agent.acl').read())
 
 opts = SessionOptions()
 # Orchestrator stays on the stronger model.
-opts.model = 'openai/gpt-4o'
+opts.model = 'provider/review-model'
 # High-volume exploration runs on the cheaper model.
 opts.worker_agents = [
     WorkerAgentSpec(
         name='scout',
         description='Reads files and reports findings.',
-        model='openai/MiniMax-M2.7-highspeed',
+        model='provider/fast-model',
     ),
 ]
 session = agent.session('/repo', opts)

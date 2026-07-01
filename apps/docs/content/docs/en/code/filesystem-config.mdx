@@ -12,17 +12,20 @@ A root `agent.acl` usually serves interactive sessions in a repository. An Agent
 ## Basic Config
 
 ```hcl
-default_model = "openai/MiniMax-M2.7-highspeed"
-max_parallel_tasks = 8
+default_model = "provider/model-id"
+max_parallel_tasks = 4
 auto_parallel = false
 
-providers "openai" {
-  apiKey = env("A3S_OPENAI_API_KEY")
-  baseUrl = env("A3S_OPENAI_BASE_URL")
+providers "provider" {
+  apiKey = env("PROVIDER_API_KEY")
+  baseUrl = env("PROVIDER_BASE_URL")
 
-  models "MiniMax-M2.7-highspeed" {
-    name = "MiniMax M2.7 Highspeed"
+  models "model-id" {
     tool_call = true
+    limit = {
+      context = 128000
+      output = 4096
+    }
   }
 }
 ```

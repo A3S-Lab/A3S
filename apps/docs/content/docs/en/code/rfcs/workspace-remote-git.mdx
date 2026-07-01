@@ -336,7 +336,7 @@ caps in the request where applicable (`max_log_entries`), and surfaces
 
 #[derive(Debug, Clone)]
 pub struct RemoteGitBackendConfig {
-    pub base_url:        String,           // https://gitserver.internal
+    pub base_url:        String,           // https://git.example.invalid
     pub repo_id:         String,           // path-segment safe
     pub bearer_token:    Option<String>,
     pub client_cert_pem: Option<PathBuf>,  // mTLS
@@ -410,7 +410,7 @@ shape `S3WorkspaceBackend` uses for its per-call metering (see
 | Field         | Example                       |
 | ------------- | ----------------------------- |
 | `op`          | `git.status`, `git.diff`, ... |
-| `repo_id`     | `users/u1/s1`                 |
+| `repo_id`     | `sessions/example`                 |
 | `outcome`     | `ok` \| `error`               |
 | `status`      | HTTP status code              |
 | `bytes`       | response body length          |
@@ -425,18 +425,18 @@ gitserver cost; no new dependency or hook surface is needed.
 
 ```rust
 let ws = WorkspaceServices::s3_with_remote_git(
-    S3BackendConfig::new("workspace", "users/u1/s1", access_key, secret_key)
-        .endpoint("https://minio.local:9000")
+    S3BackendConfig::new("workspace", "sessions/example", access_key, secret_key)
+        .endpoint("https://s3.example.invalid")
         .force_path_style(true)
         .enable_search(true),
     RemoteGitBackendConfig::new(
-        "https://gitserver.internal",
-        "users/u1/s1",
+        "https://git.example.invalid",
+        "sessions/example",
     )
     .bearer_token(token),
 );
 
-let session = agent.session("s3://workspace/users/u1/s1", Some(
+let session = agent.session("s3://workspace/sessions/example", Some(
     SessionOptions::new().with_workspace_backend(ws),
 ))?;
 ```

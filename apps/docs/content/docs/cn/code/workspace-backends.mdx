@@ -8,11 +8,11 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 # Workspace 后端
 
 Workspace backend 决定内置 workspace 工具从哪里读写文件。默认后端是以 session
-workspace 为根目录的本地文件系统。v4.1.0 也通过 SDK 暴露了显式本地后端、S3 兼容
-对象存储后端，以及可选的 HTTP/JSON remote git provider。
+workspace 为根目录的本地文件系统。SDK 也暴露了显式本地后端、S3 兼容对象存储后端，
+以及可选的 HTTP/JSON remote git provider。
 
 当宿主负责 workspace 放置时使用这组能力：本地开发、浏览器或容器 workspace、对象存储
-workspace、书安 OS 托管会话等。
+workspace、托管 session 等。
 
 ## 能力矩阵
 
@@ -69,18 +69,18 @@ RustFS、Cloudflare R2 和 Backblaze B2。
 import { Agent, S3WorkspaceBackend } from '@a3s-lab/code';
 
 const backend = new S3WorkspaceBackend({
-  endpoint: 'https://minio.local:9000',
-  region: 'us-east-1',
+  endpoint: process.env.WORKSPACE_S3_ENDPOINT,
+  region: process.env.WORKSPACE_S3_REGION ?? 'us-east-1',
   accessKeyId: process.env.S3_ACCESS_KEY_ID!,
   secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
-  bucket: 'workspace',
-  prefix: 'users/u1/sessions/s1',
+  bucket: process.env.WORKSPACE_S3_BUCKET!,
+  prefix: 'sessions/example',
   forcePathStyle: true,
   searchEnabled: false,
 });
 
 const agent = await Agent.create('agent.acl');
-const session = agent.session('s3://workspace/users/u1/sessions/s1', {
+const session = agent.session('s3://workspace-bucket/sessions/example', {
   workspaceBackend: backend,
 });
 ```
@@ -96,16 +96,16 @@ from a3s_code import Agent, S3WorkspaceBackend, SessionOptions
 agent = Agent.create(open("agent.acl").read())
 opts = SessionOptions()
 opts.workspace_backend = S3WorkspaceBackend(
-    bucket="workspace",
-    prefix="users/u1/sessions/s1",
+    bucket=os.environ["WORKSPACE_S3_BUCKET"],
+    prefix="sessions/example",
     access_key_id=os.environ["S3_ACCESS_KEY_ID"],
     secret_access_key=os.environ["S3_SECRET_ACCESS_KEY"],
-    endpoint="https://minio.local:9000",
-    region="us-east-1",
+    endpoint=os.environ.get("WORKSPACE_S3_ENDPOINT"),
+    region=os.environ.get("WORKSPACE_S3_REGION", "us-east-1"),
     force_path_style=True,
     search_enabled=False,
 )
-session = agent.session("s3://workspace/users/u1/sessions/s1", opts)
+session = agent.session("s3://workspace-bucket/sessions/example", opts)
 ```
 
 </Tab>
@@ -129,22 +129,22 @@ S3 搜索是显式 opt-in。启用后，`grep` / `glob` 会降级为对象列表
 import { Agent, S3WorkspaceBackend } from '@a3s-lab/code';
 
 const backend = new S3WorkspaceBackend({
-  endpoint: 'https://minio.local:9000',
-  region: 'us-east-1',
+  endpoint: process.env.WORKSPACE_S3_ENDPOINT,
+  region: process.env.WORKSPACE_S3_REGION ?? 'us-east-1',
   accessKeyId: process.env.S3_ACCESS_KEY_ID!,
   secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
-  bucket: 'workspace',
-  prefix: 'users/u1/sessions/s1',
+  bucket: process.env.WORKSPACE_S3_BUCKET!,
+  prefix: 'sessions/example',
   forcePathStyle: true,
 });
 
 const agent = await Agent.create('agent.acl');
-const session = agent.session('s3://workspace/users/u1/sessions/s1', {
+const session = agent.session('s3://workspace-bucket/sessions/example', {
   workspaceBackend: backend,
   remoteGit: {
-    baseUrl: 'https://gitserver.internal',
-    repoId: 'u1/s1',
-    bearerToken: process.env.GITSERVER_TOKEN,
+    baseUrl: process.env.REMOTE_GIT_BASE_URL!,
+    repoId: 'sessions/example',
+    bearerToken: process.env.REMOTE_GIT_TOKEN,
   },
 });
 ```
@@ -165,20 +165,20 @@ from a3s_code import (
 agent = Agent.create(open("agent.acl").read())
 opts = SessionOptions()
 opts.workspace_backend = S3WorkspaceBackend(
-    bucket="workspace",
-    prefix="users/u1/sessions/s1",
+    bucket=os.environ["WORKSPACE_S3_BUCKET"],
+    prefix="sessions/example",
     access_key_id=os.environ["S3_ACCESS_KEY_ID"],
     secret_access_key=os.environ["S3_SECRET_ACCESS_KEY"],
-    endpoint="https://minio.local:9000",
-    region="us-east-1",
+    endpoint=os.environ.get("WORKSPACE_S3_ENDPOINT"),
+    region=os.environ.get("WORKSPACE_S3_REGION", "us-east-1"),
     force_path_style=True,
 )
 opts.remote_git = RemoteGitBackendConfig(
-    base_url="https://gitserver.internal",
-    repo_id="u1/s1",
-    bearer_token=os.environ["GITSERVER_TOKEN"],
+    base_url=os.environ["REMOTE_GIT_BASE_URL"],
+    repo_id="sessions/example",
+    bearer_token=os.environ["REMOTE_GIT_TOKEN"],
 )
-session = agent.session("s3://workspace/users/u1/sessions/s1", opts)
+session = agent.session("s3://workspace-bucket/sessions/example", opts)
 ```
 
 </Tab>

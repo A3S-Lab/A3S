@@ -5,13 +5,15 @@ description: "ACL provider configuration and environment injection"
 
 # Providers
 
-A3S Code reads runtime configuration from ACL. A config source can be a path to an `.acl` file or an inline ACL string. JSON and legacy HCL configs are intentionally not supported.
+A3S Code reads runtime configuration from ACL. A config source can be an
+`.acl` file path or an inline ACL string. JSON and legacy HCL configs are not
+part of the current config surface.
 
 ## Basic Shape
 
 ```text
 default_model = "provider/model-id"
-max_parallel_tasks = 8
+max_parallel_tasks = 4
 auto_parallel = false
 
 providers "provider" {
@@ -21,13 +23,35 @@ providers "provider" {
   models "model-id" {
     name = "Human readable model name"
     tool_call = true
+    limit = {
+      context = 128000
+      output = 4096
+    }
   }
 }
 
 storage_backend = "file"
 ```
 
-`apiKey` and `api_key` are accepted aliases. `baseUrl` and `base_url` are accepted aliases. Prefer environment variables for secrets and commit only templates or non-secret defaults.
+`apiKey` and `api_key` are accepted aliases. `baseUrl` and `base_url` are
+accepted aliases. Commit templates and non-secret defaults only; keep real API
+keys, private endpoints, and account-specific model names in the environment or
+in a secret manager.
+
+## Provider Families
+
+The built-in factory covers three paths:
+
+| Provider name | Client path | Notes |
+| --- | --- | --- |
+| `anthropic` / `claude` | Anthropic client | Uses the configured model id and optional provider base URL. |
+| `openai` / `gpt` | OpenAI-compatible client | Use this for OpenAI-compatible Chat Completions endpoints. |
+| `glm` / `zhipu` / `bigmodel` | Zhipu-compatible client | Use environment variables for the key and base URL. |
+| Any other provider name | OpenAI-compatible fallback | Useful for private or self-hosted OpenAI-compatible services. |
+
+The runtime does not hard-code model names. `default_model` and per-session
+`model` values are identifiers in the `provider/model-id` form that must match
+the provider blocks you define.
 
 ## Delegation Controls
 
@@ -35,58 +59,19 @@ storage_backend = "file"
 agent_dirs = ["./.a3s/agents"]
 
 auto_delegation {
-  enabled        = true
-  auto_parallel  = false
-  min_confidence = 0.72
-  max_tasks      = 4
+  enabled                 = true
+  auto_parallel           = false
+  allow_manual_delegation = true
+  min_confidence          = 0.72
+  max_tasks               = 4
 }
 ```
 
 `max_parallel_tasks` limits bounded sibling fan-out. `auto_delegation.enabled`
 turns on automatic subagent delegation. The top-level `auto_parallel = false`
 overrides `auto_delegation.auto_parallel` and disables only automatic parallel
-child-agent fan-out; manual `parallel_task` remains available.
-
-## Anthropic
-
-```text
-default_model = "anthropic/claude-sonnet-4-20250514"
-
-providers "anthropic" {
-  apiKey = env("ANTHROPIC_API_KEY")
-}
-```
-
-## OpenAI-Compatible
-
-Any service compatible with OpenAI Chat Completions can be configured through the `openai` provider:
-
-```text
-default_model = "openai/gpt-4o"
-
-providers "openai" {
-  apiKey = env("A3S_OPENAI_API_KEY")
-  baseUrl = env("A3S_OPENAI_BASE_URL")
-}
-```
-
-For MiniMax, use the same provider block:
-
-```text
-default_model = "openai/MiniMax-M2.7-highspeed"
-
-providers "openai" {
-  apiKey = env("A3S_OPENAI_API_KEY")
-  baseUrl = env("A3S_OPENAI_BASE_URL")
-
-  models "MiniMax-M2.7-highspeed" {
-    name = "MiniMax M2.7 Highspeed"
-    tool_call = true
-  }
-}
-```
-
-Test scripts map `MINIMAX_API_KEY` and `MINIMAX_BASE_URL` to `A3S_OPENAI_API_KEY` and `A3S_OPENAI_BASE_URL` when the latter are not set.
+child-agent fan-out; manual `parallel_task` remains available unless
+`allow_manual_delegation` is set to `false`.
 
 ## Storage
 
@@ -102,25 +87,24 @@ metadata, but it does not create a file-backed session store by itself. SDK
 hosts can always pass `sessionStore: new FileSessionStore(...)` /
 `opts.session_store = FileSessionStore(...)` directly.
 
-## Private Provider Check
+## Private Provider Checks
 
-Use a temporary environment-injected ACL when validating a private provider. The release scripts are designed to avoid mutating the real `.a3s/config.acl`: they extract provider values, write a temporary ACL that uses `env(...)`, and inject those values into the process environment.
-
-Use this pattern for private provider checks:
+Real-provider smoke tests should point at a local, git-ignored ACL file through
+`A3S_CONFIG_FILE`. Do not copy provider values into commands, logs, docs, pull
+requests, or committed fixtures.
 
 ```bash
-A3S_CONFIG_FILE=/path/to/.a3s/config.acl \
-  A3S_OPENAI_API_KEY="$A3S_OPENAI_API_KEY" \
-  A3S_OPENAI_BASE_URL="$A3S_OPENAI_BASE_URL" \
+A3S_CONFIG_FILE=/path/to/local/config.acl \
   scripts/real_config_env_integration.sh
 ```
 
 SDK parity is covered by a separate real-provider check:
 
 ```bash
-A3S_CONFIG_FILE=/path/to/.a3s/config.acl \
+A3S_CONFIG_FILE=/path/to/local/config.acl \
   scripts/sdk_real_config_env_integration.sh
 ```
 
-Keep the resulting provider evidence with the release. For the complete local
-API surface, see [API Contract](/docs/code/api-contract).
+Keep the provider evidence with the release or CI artifact, not in the public
+documentation. For the complete local API surface, see
+[API Contract](/docs/code/api-contract).

@@ -12,7 +12,7 @@ import { Agent } from '@a3s-lab/code';
 
 const agent = await Agent.create('agent.acl');
 const session = agent.session('/repo', {
-  model: 'openai/MiniMax-M2.7-highspeed',
+  model: 'provider/model-id',
   builtinSkills: true,
   planningMode: 'enabled',
   goalTracking: true,
@@ -150,19 +150,19 @@ hooks 和 traces，并在 resume 时恢复，因此宿主可以据此驱动多�
 
 ```ts
 const session = agent.session('/repo', {
-  tenantId: 'acme-corp',
-  principal: 'user-42',
-  agentTemplateId: 'planner-v3',
-  correlationId: 'trace-deadbeef',
+  tenantId: 'tenant-example',
+  principal: 'principal-example',
+  agentTemplateId: 'agent-template-example',
+  correlationId: 'trace-example',
 });
 ```
 
 ```python
 opts = SessionOptions()
-opts.tenant_id = 'acme-corp'
-opts.principal = 'user-42'
-opts.agent_template_id = 'planner-v3'
-opts.correlation_id = 'trace-deadbeef'
+opts.tenant_id = 'tenant-example'
+opts.principal = 'principal-example'
+opts.agent_template_id = 'agent-template-example'
+opts.correlation_id = 'trace-example'
 session = agent.session('/repo', opts)
 print(session.tenant_id, session.principal)
 ```
