@@ -1,0 +1,96 @@
+---
+title: Redis Rate Limit
+description: 使用 Redis Lua 脚本实现跨网关副本共享的分布式令牌桶
+---
+
+# Redis Rate Limit
+
+`rate-limit-redis` 是分布式令牌桶。它用 Redis Lua 脚本原子更新令牌状态，让多个 A3S Gateway 副本共享同一套路由限流预算。
+
+## 适用场景
+
+- 网关水平扩缩容，多副本需要共享全局限流。
+- 公开 API、租户入口或高价值后端需要稳定保护。
+- 单实例内存限流会因为副本数变化而改变总体限流阈值。
+
+## 工作方式
+
+每个请求使用路由器名构造 Redis key：
+
+```text
+a3s:ratelimit:<router>
+```
+
+Lua 脚本根据当前时间、`rate` 和 `burst` 原子补充并消费令牌。超过限制时返回 `429`：
+
+```json
+{"error":"Rate limit exceeded (distributed)"}
+```
+
+并携带：
+
+```text
+Retry-After: 1
+```
+
+Redis 连接是惰性建立的。Redis 不可达或脚本执行失败时，当前实现会 **fail open**：记录警告日志并放行请求。
+
+## 配置
+
+```text
+middlewares "rate-limit-distributed" {
+  type      = "rate-limit-redis"
+  rate      = 200
+  burst     = 100
+  redis_url = "redis://127.0.0.1:6379"
+}
+```
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `type` | string | _必填_ | 固定为 `rate-limit-redis`。 |
+| `redis_url` | string | _必填_ | Redis 连接串，例如 `redis://127.0.0.1:6379`。 |
+| `rate` | u64 | _必填_ | 每秒补充令牌数。 |
+| `burst` | u64 | `rate` | 桶容量。 |
+
+## 构建要求
+
+该中间件需要网关二进制启用 `redis` cargo feature。未启用时，配置 `type = "rate-limit-redis"` 会直接返回配置错误：
+
+```text
+rate-limit-redis requires the 'redis' feature flag: cargo build --features redis
+```
+
+发布的 Linux 镜像自 v1.0.1 起已启用该 feature。
+
+## 示例
+
+```text
+middlewares "global-api-limit" {
+  type      = "rate-limit-redis"
+  redis_url = env("GATEWAY_REDIS_URL")
+  rate      = 1000
+  burst     = 2000
+}
+
+routers "tenant-api" {
+  rule        = "Host(`api.example.com`)"
+  service     = "tenant-api"
+  middlewares = ["auth-jwt", "global-api-limit"]
+}
+```
+
+## 注意事项
+
+- 限流 key 按路由器隔离；同一个中间件挂到不同路由器，会得到不同桶。
+- Redis 故障时放行请求。若业务要求“Redis 故障即拒绝”，需要在认证服务或上游做额外保护。
+- Redis 时延会进入请求关键路径，建议部署在网关近端网络。
+- `burst / rate` 会影响 Redis key TTL；保持合理比值可减少无用状态。
+
+## 推荐顺序
+
+通常放在认证之后，避免未认证请求占用全局配额：
+
+```text
+middlewares = ["auth-jwt", "rate-limit-redis", "body-limit"]
+```

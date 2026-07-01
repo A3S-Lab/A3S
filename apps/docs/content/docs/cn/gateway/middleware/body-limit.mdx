@@ -1,0 +1,73 @@
+---
+title: Body Limit
+description: 限制请求体大小，拒绝超大 Content-Length 并让代理层处理流式请求体上限
+---
+
+# Body Limit
+
+`body-limit` 用于限制请求体大小。它会直接检查 `Content-Length`，并向代理层注入内部上限头，让代理在流式或分块请求体场景中继续执行限制。
+
+## 适用场景
+
+- 上传接口需要明确大小上限。
+- JSON API 需要防止异常大请求占用网关和后端内存。
+- 开放入口需要在认证、业务解析前尽早拒绝明显不合理的请求体。
+
+## 工作方式
+
+如果请求包含 `Content-Length`，且值大于 `max_body_bytes`，网关返回 `413`：
+
+```json
+{"error":"Request body too large","max_bytes":1048576}
+```
+
+如果请求没有 `Content-Length`，中间件不会立即拒绝，而是注入：
+
+```text
+x-gateway-body-limit: <max_body_bytes>
+```
+
+代理层据此处理分块或流式请求体。
+
+## 配置
+
+```text
+middlewares "body-limit" {
+  type           = "body-limit"
+  max_body_bytes = 1048576
+}
+```
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `type` | string | _必填_ | 固定为 `body-limit`。 |
+| `max_body_bytes` | u64 | _必填，且 > 0_ | 最大请求体字节数；缺失或为 `0` 会导致配置加载失败。 |
+
+## 示例
+
+```text
+middlewares "json-body-limit" {
+  type           = "body-limit"
+  max_body_bytes = 262144
+}
+
+middlewares "upload-body-limit" {
+  type           = "body-limit"
+  max_body_bytes = 10485760
+}
+```
+
+## 注意事项
+
+- `Content-Length` 等于上限时会放行；只有大于上限才拒绝。
+- 无法解析的 `Content-Length` 不会在该中间件中直接拒绝，但仍会注入代理层限制头。
+- 对上传接口和普通 JSON API 建议使用不同路由和不同限制。
+- 如果上游也有限制，网关上限应不大于上游上限，以便更早失败。
+
+## 推荐顺序
+
+通常放在认证和限流之后：
+
+```text
+middlewares = ["auth-jwt", "rate-limit", "body-limit"]
+```

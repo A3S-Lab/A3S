@@ -1,0 +1,63 @@
+---
+title: API Key
+description: Protect routes with a header-based API key allowlist for service-to-service and internal integrations
+---
+
+# API Key
+
+`api-key` reads an exact string from a request header and compares it with an allowlist. It is the lightest authentication middleware and works well for internal APIs, webhooks, background jobs, and simple service-to-service calls.
+
+## When to Use
+
+- Internal service calls that only need a static credential.
+- Webhooks, cron jobs, or automation scripts that call gateway-managed endpoints.
+- A two-layer control with [IP Allow](/docs/gateway/middleware/ip-allow): source network plus shared key.
+
+## Behavior
+
+The gateway reads the header configured by `header`. The value must exactly match one entry from `keys`; missing, empty, or mismatched values short-circuit the request.
+
+Failures return `401`:
+
+```json
+{"error":"Invalid or missing API key"}
+```
+
+## Configuration
+
+```text
+middlewares "auth-apikey" {
+  type   = "api-key"
+  header = "X-API-Key"
+  keys   = ["key-1", "key-2", "key-3"]
+}
+```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `type` | string | _required_ | Must be `api-key`. |
+| `header` | string | `X-API-Key` | Request header to read. |
+| `keys` | array&lt;string&gt; | _required, at least 1_ | Exact-match allowlist; empty values fail config loading. |
+
+## Example
+
+```text
+middlewares "internal-key" {
+  type   = "api-key"
+  header = "X-Internal-Key"
+  keys   = [env("INTERNAL_API_KEY")]
+}
+```
+
+## Notes
+
+- Inject keys from environment variables or a secret system; do not commit them.
+- Matching is exact: no prefixes, wildcards, or hashes.
+- Configure old and new keys together during rotation, then remove the old key.
+- For user sessions, prefer [JWT](/docs/gateway/middleware/jwt) or [Forward Auth](/docs/gateway/middleware/forward-auth).
+
+## Recommended Order
+
+```text
+middlewares = ["ip-allow", "auth-apikey", "rate-limit", "headers"]
+```

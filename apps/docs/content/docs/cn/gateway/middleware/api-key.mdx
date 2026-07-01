@@ -1,0 +1,78 @@
+---
+title: API Key
+description: 使用请求头 API key 白名单保护路由，适合服务间调用、内部工具和低复杂度集成
+---
+
+# API Key
+
+`api-key` 从指定请求头读取一个精确字符串，并与白名单比对。它是最轻量的认证中间件，适合内部 API、Webhook 回调、后台任务和没有完整登录态的服务间调用。
+
+## 适用场景
+
+- 内部服务调用，只需要一个静态凭据保护入口。
+- Webhook、定时任务、自动化脚本访问 A3S Gateway 保护的管理端点。
+- 与 `ip-allow` 叠加，形成“来源网络 + 密钥”的双因子入口控制。
+
+## 工作方式
+
+请求进入时，网关读取 `header` 指定的请求头。值必须和 `keys` 中任意一项完全相等；缺失、空值或不匹配都会短路请求。
+
+失败时返回：
+
+```json
+{"error":"Invalid or missing API key"}
+```
+
+HTTP 状态码为 `401`。
+
+## 配置
+
+```text
+middlewares "auth-apikey" {
+  type   = "api-key"
+  header = "X-API-Key"
+  keys   = ["key-1", "key-2", "key-3"]
+}
+```
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `type` | string | _必填_ | 固定为 `api-key`。 |
+| `header` | string | `X-API-Key` | 读取 API key 的请求头名称。 |
+| `keys` | array&lt;string&gt; | _必填，至少 1 项_ | 精确匹配白名单；为空会导致配置加载失败。 |
+
+## 组合示例
+
+```text
+middlewares "internal-ips" {
+  type        = "ip-allow"
+  allowed_ips = ["10.0.0.0/8"]
+}
+
+middlewares "internal-key" {
+  type   = "api-key"
+  header = "X-Internal-Key"
+  keys   = [env("INTERNAL_API_KEY")]
+}
+
+routers "admin-api" {
+  rule        = "Host(`admin.example.com`)"
+  service     = "admin"
+  middlewares = ["internal-ips", "internal-key", "rate-limit"]
+}
+```
+
+## 注意事项
+
+- API key 是长期静态凭据，推荐通过环境变量或密钥系统注入，不要写进仓库。
+- `keys` 是精确匹配，不支持前缀、通配符或哈希校验。
+- 多个 key 可用于灰度轮换：先同时配置旧 key 与新 key，再移除旧 key。
+- 如果面向用户登录态，优先使用 [JWT](/cn/docs/gateway/middleware/jwt) 或 [Forward Auth](/cn/docs/gateway/middleware/forward-auth)。
+
+## 推荐顺序
+
+通常放在 `ip-allow` 之后、`rate-limit` 之前：
+
+```text
+middlewares = ["ip-allow", "auth-apikey", "rate-limit", "headers"]
+```

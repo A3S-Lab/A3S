@@ -1,0 +1,57 @@
+---
+title: TCP Filter
+description: Limit concurrent connections and apply IP filtering on TCP entrypoints
+---
+
+# TCP Filter
+
+`tcp-filter` is a connection-level filter for TCP entrypoints. It is not an HTTP pipeline middleware and cannot be configured as `middlewares "<name>" { type = "tcp-filter" }`. Use entrypoint fields instead: `max_connections` and `tcp_allowed_ips`.
+
+## Behavior
+
+When a TCP connection arrives, the filter checks:
+
+1. If `tcp_allowed_ips` is non-empty, the client IP must match one entry.
+2. If `max_connections` is set, active connections must be below the limit.
+3. Accepted connections hold an RAII permit that decrements the counter on disconnect.
+
+Connections denied by IP do not consume connection capacity.
+
+## Configuration
+
+```text
+entrypoints "tcp-db" {
+  address         = "0.0.0.0:5432"
+  protocol        = "tcp"
+  max_connections = 1000
+  tcp_allowed_ips = ["10.0.0.0/8", "192.168.1.0/24"]
+}
+```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `max_connections` | u32 | _unset means unlimited_ | Maximum concurrent TCP connections. |
+| `tcp_allowed_ips` | array&lt;string&gt; | `[]` | Empty means allow all IPs; supports individual IPs and CIDRs. |
+
+## Difference from HTTP Middleware
+
+| Item | HTTP Middleware | TCP Filter |
+|------|-----------------|------------|
+| Location | `middlewares "<name>"` | `entrypoints "<name>"` |
+| Reference | `routers.middlewares` | entrypoint fields |
+| Object | HTTP request/response | TCP connection |
+| Client effect | HTTP status | connection rejected/closed |
+
+## Notes
+
+- `tcp_allowed_ips = []` allows all IPs, unlike `ip-allow`.
+- Leaving `max_connections` unset means unlimited connections.
+- TCP entrypoints do not return HTTP status codes.
+- Check whether upstream L4 load balancers preserve the original client IP.
+
+## Recommended Baseline
+
+```text
+max_connections = 1000
+tcp_allowed_ips = ["10.0.0.0/8"]
+```

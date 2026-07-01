@@ -1,0 +1,52 @@
+---
+title: Basic Auth
+description: Protect simple admin endpoints and temporary diagnostics with HTTP Basic authentication
+---
+
+# Basic Auth
+
+`basic-auth` validates the standard `Authorization: Basic ...` header against one configured username/password pair.
+
+## When to Use
+
+- Small internal pages that benefit from the browser's native login prompt.
+- Low-frequency admin endpoints without IAM or SSO integration.
+- Temporary diagnostics protected together with [IP Allow](/docs/gateway/middleware/ip-allow).
+
+## Behavior
+
+The gateway expects `Authorization` to start with `Basic ` and decodes the Base64 value into `username:password`. The decoded value must exactly match the configured pair.
+
+Failures return `401`:
+
+- Missing header: `{"error":"Missing Authorization header"}`
+- Wrong credentials: `{"error":"Invalid credentials"}`
+
+## Configuration
+
+```text
+middlewares "auth-basic" {
+  type     = "basic-auth"
+  username = "admin"
+  password = env("ADMIN_PASSWORD")
+}
+```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `type` | string | _required_ | Must be `basic-auth`. |
+| `username` | string | _required_ | Missing value fails config loading. |
+| `password` | string | _required_ | Prefer environment injection. |
+
+## Notes
+
+- Use TLS; Basic credentials are replayable if transported over plain HTTP.
+- This is a single-user mechanism, not a multi-user audit or authorization system.
+- Prefer printable ASCII credentials.
+- For durable production access, prefer [JWT](/docs/gateway/middleware/jwt) or [Forward Auth](/docs/gateway/middleware/forward-auth).
+
+## Recommended Order
+
+```text
+middlewares = ["ip-allow", "auth-basic", "body-limit"]
+```

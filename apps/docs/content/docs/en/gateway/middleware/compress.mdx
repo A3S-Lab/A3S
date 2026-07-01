@@ -1,0 +1,52 @@
+---
+title: Compress
+description: Mark responses eligible for proxy-layer br/gzip/deflate compression
+---
+
+# Compress
+
+`compress` marks eligible responses for compression. The proxy layer performs negotiation based on the client's `Accept-Encoding`.
+
+## Behavior
+
+The request path passes through. On the response path, if `Content-Encoding` is not already set, the middleware inserts:
+
+```text
+x-gateway-compress: eligible
+```
+
+The proxy layer prefers:
+
+```text
+br > gzip > deflate > identity
+```
+
+## Configuration
+
+```text
+middlewares "compress" {
+  type = "compress"
+}
+```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `type` | string | _required_ | Must be `compress`. |
+
+## Current Limits
+
+ACL configuration for `compress` ignores extra keys. The code defaults are minimum size `1024` bytes and compression level `6`, but there are no ACL keys to change them.
+
+Already-encoded responses are not marked again.
+
+## Notes
+
+- Compression helps text, JSON, HTML, CSS, JavaScript, SVG, and XML.
+- Avoid recompressing images, videos, zip files, or already-compressed payloads.
+- Watch CPU and tail latency on high-throughput routes.
+
+## Recommended Order
+
+```text
+middlewares = ["cors", "auth-jwt", "headers", "compress"]
+```

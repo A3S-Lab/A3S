@@ -1,0 +1,79 @@
+---
+title: Strip Prefix
+description: 转发前剥离路径前缀，支持固定前缀和 /* 单段通配符
+---
+
+# Strip Prefix
+
+`strip-prefix` 在请求转发前改写路径，移除配置列表中第一个匹配的前缀。它适合把多个外部路径挂到同一个上游服务，或把 `/apps/<id>/...` 这样的动态路径映射回应用内部根路径。
+
+## 适用场景
+
+- 外部暴露 `/api/v1/users`，上游只接收 `/users`。
+- 多应用共享 `/apps/<id>/...` 前缀，上游应用只关心自己的根路径。
+- 在网关层统一处理路径兼容，不改动上游服务。
+
+## 工作方式
+
+中间件按 `prefixes` 列表顺序查找第一个匹配项：
+
+- 普通前缀：`/api/v1` 匹配所有以 `/api/v1` 开头的路径。
+- 单段通配符：`/apps/*` 会剥离 `/apps/` 加后面的一个动态段。
+
+剥离后如果路径为空，会改为 `/`。查询字符串会被保留。
+
+## 配置
+
+```text
+middlewares "strip-api" {
+  type     = "strip-prefix"
+  prefixes = ["/api/v1", "/api/v2"]
+}
+
+middlewares "strip-app" {
+  type     = "strip-prefix"
+  prefixes = ["/apps/*"]
+}
+```
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `type` | string | _必填_ | 固定为 `strip-prefix`。 |
+| `prefixes` | array&lt;string&gt; | `[]` | 按顺序匹配，首个命中生效；为空时直通。 |
+
+## 示例
+
+```text
+middlewares "strip-workload" {
+  type     = "strip-prefix"
+  prefixes = ["/apps/*"]
+}
+
+routers "workload" {
+  rule        = "Host(`apps.example.com`) && PathPrefix(`/apps/`)"
+  service     = "workload"
+  middlewares = ["auth-jwt", "strip-workload"]
+}
+```
+
+路径示例：
+
+| 原路径 | 配置 | 上游路径 |
+|--------|------|----------|
+| `/api/v1/users?page=1` | `/api/v1` | `/users?page=1` |
+| `/api/v1` | `/api/v1` | `/` |
+| `/apps/asset-123/api/meta` | `/apps/*` | `/api/meta` |
+| `/apps/asset-123` | `/apps/*` | `/` |
+
+## 注意事项
+
+- 列表顺序很重要，首个匹配生效。更具体的前缀应放在更前面。
+- `/*` 只匹配一个动态段，不是贪婪多段通配符。
+- `strip-prefix` 不短路请求，只修改 URI。
+- 如果 [Forward Auth](/cn/docs/gateway/middleware/forward-auth) 需要看到原始路径，把认证放在 `strip-prefix` 前。
+
+## 推荐顺序
+
+```text
+middlewares = ["auth-jwt", "rate-limit", "strip-prefix"]
+```

@@ -1,0 +1,66 @@
+---
+title: IP Allow
+description: 按客户端 IP 或 CIDR 白名单限制 HTTP 请求入口
+---
+
+# IP Allow
+
+`ip-allow` 根据网关上下文中的客户端 IP 做白名单校验。它支持单个 IPv4/IPv6 地址，也支持 CIDR 网段。
+
+## 适用场景
+
+- 管理端点只允许公司办公网、堡垒机或内网访问。
+- API key、JWT 之外再叠加网络来源限制。
+- 对高风险接口先做最便宜的 IP 过滤，减少后续认证和后端压力。
+
+## 工作方式
+
+中间件读取 `ctx.client_ip`，并与 `allowed_ips` 中的 IP/CIDR 规则匹配。匹配成功则放行；不匹配或客户端 IP 无法解析则返回 `403`：
+
+```json
+{"error":"Forbidden"}
+```
+
+配置中的无效 IP 或 CIDR 会导致中间件构造失败，进而中止配置加载。
+
+## 配置
+
+```text
+middlewares "corp-ip" {
+  type        = "ip-allow"
+  allowed_ips = ["192.168.1.0/24", "10.0.0.1", "fd00::/8"]
+}
+```
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `type` | string | _必填_ | 固定为 `ip-allow`。 |
+| `allowed_ips` | array&lt;string&gt; | _必填，至少 1 项_ | 单个 IP 或 CIDR；为空或包含非法条目都会报错。 |
+
+## 示例
+
+```text
+middlewares "admin-network" {
+  type        = "ip-allow"
+  allowed_ips = ["10.0.0.0/8", "192.168.10.25"]
+}
+
+routers "admin" {
+  rule        = "Host(`admin.example.com`)"
+  service     = "admin"
+  middlewares = ["admin-network", "auth-jwt"]
+}
+```
+
+## 注意事项
+
+- 该中间件信任网关解析出的客户端 IP。若网关前还有负载均衡器，需要确认真实客户端 IP 的传递和解析策略。
+- 白名单为空是配置错误，不代表允许所有请求。
+- IPv6 和 IPv4 都支持，但规则必须写成合法 IP 或 CIDR。
+- 对公网入口，建议把 `ip-allow` 放在认证前，尽早拒绝明显不允许的来源。
+
+## 推荐顺序
+
+```text
+middlewares = ["ip-allow", "auth-jwt", "rate-limit"]
+```

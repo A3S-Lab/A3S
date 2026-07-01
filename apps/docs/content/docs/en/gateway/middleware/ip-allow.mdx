@@ -1,0 +1,45 @@
+---
+title: IP Allow
+description: Restrict HTTP requests by client IP or CIDR allowlists
+---
+
+# IP Allow
+
+`ip-allow` checks the client IP from the gateway request context against an allowlist. It supports individual IPv4/IPv6 addresses and CIDR ranges.
+
+## Behavior
+
+If `ctx.client_ip` matches `allowed_ips`, the request continues. If it does not match, or the client IP cannot be parsed, the gateway returns `403`:
+
+```json
+{"error":"Forbidden"}
+```
+
+Invalid configured IPs or CIDRs fail middleware construction and abort config loading.
+
+## Configuration
+
+```text
+middlewares "corp-ip" {
+  type        = "ip-allow"
+  allowed_ips = ["192.168.1.0/24", "10.0.0.1", "fd00::/8"]
+}
+```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `type` | string | _required_ | Must be `ip-allow`. |
+| `allowed_ips` | array&lt;string&gt; | _required, at least 1_ | Individual IPs or CIDRs. Empty or invalid values fail loading. |
+
+## Notes
+
+- This middleware trusts the client IP resolved by the gateway. Check upstream load balancer behavior.
+- Empty allowlists are configuration errors.
+- IPv4 and IPv6 are both supported.
+- Put it early to reject disallowed sources before auth and backend work.
+
+## Recommended Order
+
+```text
+middlewares = ["ip-allow", "auth-jwt", "rate-limit"]
+```

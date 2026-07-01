@@ -1,0 +1,25 @@
+{
+  "title": "Middleware",
+  "pages": [
+    "index",
+    "---Authentication---",
+    "api-key",
+    "basic-auth",
+    "jwt",
+    "forward-auth",
+    "---Traffic Control---",
+    "rate-limit",
+    "rate-limit-redis",
+    "circuit-breaker",
+    "retry",
+    "body-limit",
+    "---Transform---",
+    "cors",
+    "headers",
+    "strip-prefix",
+    "compress",
+    "---Network---",
+    "ip-allow",
+    "tcp-filter"
+  ]
+}

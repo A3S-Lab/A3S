@@ -1,0 +1,45 @@
+---
+title: Headers
+description: Insert or overwrite HTTP headers on upstream requests and client responses
+---
+
+# Headers
+
+`headers` centralizes request and response header management.
+
+## Behavior
+
+On the request path, `request_headers` are inserted into the upstream request. On the response path, `response_headers` are inserted into the client response. Insertions overwrite existing headers with the same name.
+
+Invalid header names or values are skipped.
+
+## Configuration
+
+```text
+middlewares "custom-headers" {
+  type = "headers"
+  request_headers = [
+    { name = "X-Internal-Auth", value = env("INTERNAL_TOKEN") }
+  ]
+  response_headers = [
+    { name = "X-Frame-Options", value = "DENY" }
+  ]
+}
+```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `type` | string | _required_ | Must be `headers`. |
+| `request_headers` | array&lt;{name,value}&gt; | `[]` | Added to upstream requests. |
+| `response_headers` | array&lt;{name,value}&gt; | `[]` | Added to client responses. |
+
+## Notes
+
+- Do not use this middleware to forge user identity; use [JWT](/docs/gateway/middleware/jwt) or [Forward Auth](/docs/gateway/middleware/forward-auth).
+- Security headers such as CSP should be tuned to the frontend.
+
+## Recommended Order
+
+```text
+middlewares = ["auth-jwt", "headers", "compress"]
+```

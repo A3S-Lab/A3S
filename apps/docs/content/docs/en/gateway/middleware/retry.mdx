@@ -1,0 +1,47 @@
+---
+title: Retry
+description: Inject retry policy headers that the proxy layer uses during forwarding
+---
+
+# Retry
+
+`retry` does not perform retries itself. It writes internal request headers that the proxy layer reads while forwarding to backends.
+
+## Behavior
+
+The middleware injects:
+
+```text
+x-gateway-retry-max: <max_retries>
+x-gateway-retry-interval-ms: <retry_interval_ms>
+```
+
+It never short-circuits the request by itself.
+
+## Configuration
+
+```text
+middlewares "retry" {
+  type              = "retry"
+  max_retries       = 3
+  retry_interval_ms = 100
+}
+```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `type` | string | _required_ | Must be `retry`. |
+| `max_retries` | u32 | `3` | Retry attempts excluding the initial request; `0` is invalid. |
+| `retry_interval_ms` | u64 | `100` | Retry interval in milliseconds. |
+
+## Notes
+
+- Use mostly for idempotent requests.
+- Non-idempotent writes can be duplicated.
+- Pair with [Circuit Breaker](/docs/gateway/middleware/circuit-breaker) for failing backends.
+
+## Recommended Order
+
+```text
+middlewares = ["auth-jwt", "rate-limit", "circuit-breaker", "retry"]
+```

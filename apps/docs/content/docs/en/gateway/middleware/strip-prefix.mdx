@@ -1,0 +1,56 @@
+---
+title: Strip Prefix
+description: Remove path prefixes before forwarding, including a /* single-segment wildcard
+---
+
+# Strip Prefix
+
+`strip-prefix` rewrites the request path before forwarding by removing the first matching configured prefix.
+
+## Behavior
+
+Prefixes are checked in list order:
+
+- Normal prefix: `/api/v1` matches paths beginning with `/api/v1`.
+- Single-segment wildcard: `/apps/*` strips `/apps/` plus exactly one dynamic segment.
+
+If the remaining path is empty, it becomes `/`. Query strings are preserved.
+
+## Configuration
+
+```text
+middlewares "strip-api" {
+  type     = "strip-prefix"
+  prefixes = ["/api/v1", "/api/v2"]
+}
+
+middlewares "strip-app" {
+  type     = "strip-prefix"
+  prefixes = ["/apps/*"]
+}
+```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `type` | string | _required_ | Must be `strip-prefix`. |
+| `prefixes` | array&lt;string&gt; | `[]` | First match wins; empty means pass-through. |
+
+## Examples
+
+| Original path | Config | Upstream path |
+|---------------|--------|---------------|
+| `/api/v1/users?page=1` | `/api/v1` | `/users?page=1` |
+| `/api/v1` | `/api/v1` | `/` |
+| `/apps/asset-123/api/meta` | `/apps/*` | `/api/meta` |
+
+## Notes
+
+- Order matters; put more specific prefixes first.
+- `/*` is one dynamic segment, not a greedy wildcard.
+- If [Forward Auth](/docs/gateway/middleware/forward-auth) needs the original path, put auth before stripping.
+
+## Recommended Order
+
+```text
+middlewares = ["auth-jwt", "rate-limit", "strip-prefix"]
+```

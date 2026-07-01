@@ -1,0 +1,57 @@
+---
+title: JWT
+description: Validate HS256 HMAC JWTs and inject the sub claim into upstream requests
+---
+
+# JWT
+
+`jwt` validates HS256 HMAC JWTs. Tokens can use a `Bearer ` prefix or be sent raw in the configured header. On success, the gateway injects the `sub` claim upstream as `x-jwt-subject`.
+
+## When to Use
+
+- Gateway-level validation for internal applications.
+- Upstream services need a trusted user identifier without parsing JWTs again.
+- Integration with an identity service that issues HMAC-signed JWTs.
+
+## Behavior
+
+The gateway reads `header` and strips an optional `Bearer ` prefix. It validates the token with the HMAC secret in `value`. The `exp` claim is required; `aud` validation is disabled.
+
+Failures return `401` for missing headers, invalid header values, empty tokens, expired tokens, or signature/claim validation errors.
+
+## Configuration
+
+```text
+middlewares "auth-jwt" {
+  type   = "jwt"
+  value  = env("GATEWAY_JWT_SECRET")
+  header = "Authorization"
+}
+```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `type` | string | _required_ | Must be `jwt`. |
+| `value` | string | _required_ | HMAC secret; the key is `value`, not `secret`. |
+| `header` | string | `Authorization` | Header containing the token. |
+
+## Upstream Effect
+
+When `sub` is non-empty, the gateway injects:
+
+```text
+x-jwt-subject: <sub>
+```
+
+## Notes
+
+- This config path uses HS256. Do not feed RS256/ES256 public-key tokens to it.
+- `exp` is required.
+- `aud` is not validated by default. For issuer/audience checks, multi-algorithm support, or OIDC discovery, delegate to [Forward Auth](/docs/gateway/middleware/forward-auth).
+- Treat `x-jwt-subject` as trusted only from the gateway network.
+
+## Recommended Order
+
+```text
+middlewares = ["ip-allow", "auth-jwt", "rate-limit", "headers"]
+```

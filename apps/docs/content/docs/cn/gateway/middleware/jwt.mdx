@@ -1,0 +1,89 @@
+---
+title: JWT
+description: 校验 HS256 HMAC JWT，并把 sub claim 注入到上游请求头
+---
+
+# JWT
+
+`jwt` 用 HMAC 密钥校验 HS256 JWT。令牌可带 `Bearer ` 前缀，也可以直接放在配置的请求头里。校验成功后，网关会把 `sub` claim 注入为上游请求头 `x-jwt-subject`。
+
+## 适用场景
+
+- 内部应用统一使用网关做令牌校验。
+- 上游服务只需要可信用户标识，不想重复解析 JWT。
+- 与外部身份系统签发的 HMAC JWT 对接。
+
+## 工作方式
+
+网关从 `header` 指定的请求头读取令牌，若值以 `Bearer ` 开头会去掉前缀。随后使用 `value` 中的 HMAC 密钥按 HS256 校验签名。`exp` claim 是必需的，`aud` 校验默认关闭。
+
+失败时返回 `401`：
+
+- 请求头不存在：`{"error":"Missing authorization header"}`
+- 请求头无法解析：`{"error":"Invalid authorization header"}`
+- 令牌为空：`{"error":"Missing token"}`
+- 签名、过期时间或 claims 不合法：`{"error":"JWT validation failed: ..."}`
+
+## 配置
+
+```text
+middlewares "auth-jwt" {
+  type   = "jwt"
+  value  = env("GATEWAY_JWT_SECRET")
+  header = "Authorization"
+}
+```
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `type` | string | _必填_ | 固定为 `jwt`。 |
+| `value` | string | _必填_ | HMAC 密钥；注意键名是 `value`，不是 `secret`。 |
+| `header` | string | `Authorization` | 读取令牌的请求头。 |
+
+## 上游影响
+
+当令牌中存在非空 `sub` 时，网关会向上游请求注入：
+
+```text
+x-jwt-subject: <sub>
+```
+
+上游可以把它作为已经由网关校验过的用户标识，但仍应在服务内执行自己的业务授权。
+
+## 示例
+
+```text
+middlewares "tenant-jwt" {
+  type   = "jwt"
+  value  = env("GATEWAY_TENANT_JWT_SECRET")
+  header = "Authorization"
+}
+
+middlewares "secure-headers" {
+  type = "headers"
+  request_headers = [
+    { name = "X-Gateway-Verified", value = "true" }
+  ]
+}
+
+routers "tenant-api" {
+  rule        = "Host(`api.example.com`) && PathPrefix(`/tenant`)"
+  service     = "tenant-api"
+  middlewares = ["tenant-jwt", "secure-headers", "rate-limit"]
+}
+```
+
+## 注意事项
+
+- 当前配置路径只使用 HS256；不要把 RS256/ES256 公钥令牌直接接入此中间件。
+- `exp` 是必需 claim；没有过期时间的令牌会被拒绝。
+- `aud` 默认不校验。如果需要 issuer、audience、多算法或 OIDC 发现，请使用 [Forward Auth](/cn/docs/gateway/middleware/forward-auth) 委托给专门认证服务。
+- 不要在上游覆盖 `x-jwt-subject` 的安全语义；若外部请求可能带同名头，建议在上游只信任来自网关网络的请求。
+
+## 推荐顺序
+
+常见顺序是先网络访问控制，再身份校验，再限流：
+
+```text
+middlewares = ["ip-allow", "auth-jwt", "rate-limit", "headers"]
+```

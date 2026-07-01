@@ -1,0 +1,48 @@
+---
+title: Body Limit
+description: Cap request body size and propagate limits for streaming bodies
+---
+
+# Body Limit
+
+`body-limit` caps request body size. It checks `Content-Length` directly and injects an internal limit header so the proxy layer can enforce streaming or chunked body limits.
+
+## Behavior
+
+If `Content-Length` is greater than `max_body_bytes`, the gateway returns `413`:
+
+```json
+{"error":"Request body too large","max_bytes":1048576}
+```
+
+For requests without `Content-Length`, it injects:
+
+```text
+x-gateway-body-limit: <max_body_bytes>
+```
+
+## Configuration
+
+```text
+middlewares "body-limit" {
+  type           = "body-limit"
+  max_body_bytes = 1048576
+}
+```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `type` | string | _required_ | Must be `body-limit`. |
+| `max_body_bytes` | u64 | _required, > 0_ | Missing or `0` fails config loading. |
+
+## Notes
+
+- Values exactly at the limit pass.
+- Use different routers for JSON APIs and upload APIs when limits differ.
+- Set gateway limits no higher than upstream limits for earlier failure.
+
+## Recommended Order
+
+```text
+middlewares = ["auth-jwt", "rate-limit", "body-limit"]
+```

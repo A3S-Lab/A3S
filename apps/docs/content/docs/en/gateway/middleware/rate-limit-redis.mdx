@@ -1,0 +1,58 @@
+---
+title: Redis Rate Limit
+description: Share a distributed token bucket across gateway replicas with Redis Lua scripts
+---
+
+# Redis Rate Limit
+
+`rate-limit-redis` uses a Redis Lua script to atomically update token bucket state across A3S Gateway replicas.
+
+## Behavior
+
+The key is scoped by router:
+
+```text
+a3s:ratelimit:<router>
+```
+
+Over-limit requests return `429` with `Retry-After: 1` and:
+
+```json
+{"error":"Rate limit exceeded (distributed)"}
+```
+
+Redis connections are lazy. If Redis is unreachable or the script fails, this middleware **fails open**: it logs a warning and allows the request.
+
+## Configuration
+
+```text
+middlewares "rate-limit-distributed" {
+  type      = "rate-limit-redis"
+  rate      = 200
+  burst     = 100
+  redis_url = "redis://127.0.0.1:6379"
+}
+```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `type` | string | _required_ | Must be `rate-limit-redis`. |
+| `redis_url` | string | _required_ | Redis URL. |
+| `rate` | u64 | _required_ | Tokens per second. |
+| `burst` | u64 | `rate` | Bucket capacity. |
+
+## Build Requirement
+
+The gateway binary must be built with the `redis` cargo feature. Without it, this type returns a configuration error.
+
+## Notes
+
+- The limit is per router, even when the same middleware name is used by multiple routers.
+- Redis failures allow traffic rather than deny it.
+- Keep Redis close to the gateway; Redis latency is request-path latency.
+
+## Recommended Order
+
+```text
+middlewares = ["auth-jwt", "rate-limit-redis", "body-limit"]
+```

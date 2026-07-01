@@ -1,0 +1,74 @@
+---
+title: Headers
+description: 向上游请求和客户端响应插入或覆盖 HTTP 头
+---
+
+# Headers
+
+`headers` 用于集中管理请求头和响应头。它可以向上游请求插入内部标记、租户上下文或安全头，也可以向客户端响应添加浏览器安全相关头。
+
+## 适用场景
+
+- 给上游服务注入来自网关的可信标记，例如 `X-Gateway-Verified`。
+- 添加安全响应头，例如 `X-Frame-Options`、`Strict-Transport-Security`。
+- 对旧服务做轻量兼容，让其收到固定请求头。
+
+## 工作方式
+
+请求方向会遍历 `request_headers`，向上游请求插入头。响应方向会遍历 `response_headers`，向客户端响应插入头。插入采用覆盖语义；同名头已存在时会被新值替换。
+
+无效的头名或头值会被静默跳过，不会中止请求。
+
+## 配置
+
+```text
+middlewares "custom-headers" {
+  type = "headers"
+  request_headers = [
+    { name = "X-Internal-Auth", value = env("INTERNAL_TOKEN") }
+  ]
+  response_headers = [
+    { name = "X-Frame-Options",           value = "DENY" },
+    { name = "Strict-Transport-Security", value = "max-age=31536000" }
+  ]
+}
+```
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `type` | string | _必填_ | 固定为 `headers`。 |
+| `request_headers` | array&lt;{name,value}&gt; | `[]` | 添加到上游请求。 |
+| `response_headers` | array&lt;{name,value}&gt; | `[]` | 添加到客户端响应。 |
+
+## 示例
+
+```text
+middlewares "security-headers" {
+  type = "headers"
+  response_headers = [
+    { name = "X-Content-Type-Options", value = "nosniff" },
+    { name = "X-Frame-Options",        value = "DENY" },
+    { name = "Referrer-Policy",        value = "no-referrer" }
+  ]
+}
+
+routers "console" {
+  rule        = "Host(`console.example.com`)"
+  service     = "console"
+  middlewares = ["auth-jwt", "security-headers"]
+}
+```
+
+## 注意事项
+
+- 不要用 `headers` 伪造未经认证的用户身份头。用户身份应来自 [JWT](/cn/docs/gateway/middleware/jwt) 或 [Forward Auth](/cn/docs/gateway/middleware/forward-auth)。
+- 如果上游需要知道请求原始协议、来源地址等，优先使用网关/代理标准转发头。
+- 安全响应头应结合应用实际情况配置，例如 CSP 往往需要按前端资源策略细调。
+
+## 推荐顺序
+
+请求头注入通常放在认证之后；响应安全头可放在链路末尾：
+
+```text
+middlewares = ["auth-jwt", "headers", "compress"]
+```

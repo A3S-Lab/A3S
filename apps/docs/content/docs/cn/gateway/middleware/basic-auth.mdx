@@ -1,0 +1,70 @@
+---
+title: Basic Auth
+description: 使用 HTTP Basic 用户名密码保护简单管理端点和临时诊断入口
+---
+
+# Basic Auth
+
+`basic-auth` 校验标准 `Authorization: Basic ...` 请求头。它只支持一组用户名和密码，适合简单管理页、临时诊断入口或低频内部接口。
+
+## 适用场景
+
+- 内部临时页面，需要浏览器原生弹窗登录。
+- 小范围管理接口，没有完整 IAM 或 SSO 集成。
+- 与 `ip-allow`、`headers` 组合保护调试端点。
+
+## 工作方式
+
+网关读取 `Authorization` 请求头，要求它以 `Basic ` 开头，并将 Base64 内容解码为 `username:password`。解码结果必须与配置完全一致。
+
+失败时状态码为 `401`：
+
+- 缺少 `Authorization`：`{"error":"Missing Authorization header"}`
+- 用户名或密码错误：`{"error":"Invalid credentials"}`
+
+## 配置
+
+```text
+middlewares "auth-basic" {
+  type     = "basic-auth"
+  username = "admin"
+  password = env("ADMIN_PASSWORD")
+}
+```
+
+| 键 | 类型 | 默认值 | 说明 |
+|-----|------|---------|-------|
+| `type` | string | _必填_ | 固定为 `basic-auth`。 |
+| `username` | string | _必填_ | Basic 凭据用户名；缺失会导致配置加载失败。 |
+| `password` | string | _必填_ | Basic 凭据密码；建议使用环境变量注入。 |
+
+## 示例
+
+```text
+middlewares "ops-basic" {
+  type     = "basic-auth"
+  username = "ops"
+  password = env("OPS_BASIC_PASSWORD")
+}
+
+routers "ops-console" {
+  rule        = "Host(`ops.example.com`)"
+  service     = "ops-console"
+  middlewares = ["corp-ip", "ops-basic"]
+}
+```
+
+## 注意事项
+
+- Basic Auth 需要 TLS；明文 HTTP 会暴露凭据。
+- 当前实现是单用户密码，不适合多用户审计或细粒度权限。
+- Base64 解码器面向 ASCII 凭据；建议用户名和密码使用可打印 ASCII。
+- 长期生产入口推荐迁移到 [JWT](/cn/docs/gateway/middleware/jwt) 或 [Forward Auth](/cn/docs/gateway/middleware/forward-auth)。
+
+## 推荐顺序
+
+建议先做来源限制，再做 Basic 校验：
+
+```text
+middlewares = ["ip-allow", "auth-basic", "body-limit"]
+```

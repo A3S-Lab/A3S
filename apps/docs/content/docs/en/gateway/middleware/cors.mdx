@@ -1,0 +1,49 @@
+---
+title: CORS
+description: Handle browser preflight requests and add Access-Control-Allow-Origin to responses
+---
+
+# CORS
+
+`cors` centralizes browser cross-origin behavior at the gateway. It answers `OPTIONS` preflight requests and adds CORS response headers.
+
+## Behavior
+
+For `OPTIONS`, the middleware reads `Origin`:
+
+- Allowed origin: returns `204` with `Access-Control-Allow-*` headers.
+- Disallowed origin: returns `403` with `Origin not allowed`.
+
+For non-preflight responses, it adds `Access-Control-Allow-Origin`. If `allowed_origins` includes `*`, the value is `*`; otherwise the first configured origin is used.
+
+## Configuration
+
+```text
+middlewares "cors" {
+  type            = "cors"
+  allowed_origins = ["https://console.example.com"]
+  allowed_methods = ["GET", "POST", "PATCH", "DELETE"]
+  allowed_headers = ["Content-Type", "Authorization"]
+  max_age         = 3600
+}
+```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `type` | string | _required_ | Must be `cors`. |
+| `allowed_origins` | array&lt;string&gt; | `["*"]` | `*` or exact origins. |
+| `allowed_methods` | array&lt;string&gt; | `["GET","POST","PUT","DELETE","OPTIONS"]` | Sent as `Access-Control-Allow-Methods`. |
+| `allowed_headers` | array&lt;string&gt; | `["Content-Type","Authorization"]` | Sent as `Access-Control-Allow-Headers`. |
+| `max_age` | u64 | `86400` | Preflight cache seconds. |
+
+## Notes
+
+- CORS is not authentication; still use auth middleware.
+- Avoid the default wildcard for private APIs.
+- Put `cors` before auth when browsers need unauthenticated preflight responses.
+
+## Recommended Order
+
+```text
+middlewares = ["cors", "auth-jwt", "rate-limit", "headers"]
+```

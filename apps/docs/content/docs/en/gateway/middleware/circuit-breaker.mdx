@@ -1,0 +1,53 @@
+---
+title: Circuit Breaker
+description: Stop calls to failing backends with a Closed / Open / HalfOpen state machine
+---
+
+# Circuit Breaker
+
+`circuit-breaker` tracks backend response status and temporarily rejects requests when the backend keeps returning `5xx`.
+
+## Behavior
+
+States:
+
+- `Closed`: requests pass.
+- `Open`: requests are rejected with `503`.
+- `HalfOpen`: after cooldown, probe requests are allowed to test recovery.
+
+Responses with status `>= 500` count as failures; `2xx/3xx/4xx` count as successes. When Open, the gateway returns:
+
+```json
+{"error":"Service unavailable (circuit breaker open)"}
+```
+
+## Configuration
+
+```text
+middlewares "circuit-breaker" {
+  type              = "circuit-breaker"
+  failure_threshold = 5
+  cooldown_secs     = 30
+  success_threshold = 1
+}
+```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `type` | string | _required_ | Must be `circuit-breaker`. |
+| `failure_threshold` | u32 | `5` | Consecutive `5xx` responses before Open. |
+| `cooldown_secs` | u64 | `30` | Seconds before HalfOpen. |
+| `success_threshold` | u32 | `1` | HalfOpen successes required to Close. |
+
+## Notes
+
+- `4xx` counts as success because it usually reflects client behavior.
+- State is in-process and not shared across gateway replicas.
+- Avoid sharing one breaker name across unrelated backends.
+- Pair carefully with [Retry](/docs/gateway/middleware/retry) to avoid amplifying failures.
+
+## Recommended Order
+
+```text
+middlewares = ["auth-jwt", "rate-limit", "circuit-breaker", "retry"]
+```

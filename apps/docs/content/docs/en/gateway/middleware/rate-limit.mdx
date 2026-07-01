@@ -1,0 +1,46 @@
+---
+title: Rate Limit
+description: Protect backends from bursts with an in-process token bucket
+---
+
+# Rate Limit
+
+`rate-limit` is an in-process token bucket. It has no external dependency and is best for single-instance gateways or cases where per-replica limiting is acceptable.
+
+## Behavior
+
+Tokens refill at `rate` per second and the bucket holds up to `burst` tokens. Every request consumes one token. If the bucket is empty, the request returns `429` with `Retry-After: 1` and:
+
+```json
+{"error":"Rate limit exceeded"}
+```
+
+The bucket is shared by the middleware instance; it is not per IP, user, or tenant.
+
+## Configuration
+
+```text
+middlewares "rate-limit" {
+  type  = "rate-limit"
+  rate  = 100
+  burst = 50
+}
+```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `type` | string | _required_ | Must be `rate-limit`. |
+| `rate` | u64 | _required_ | Tokens refilled per second. |
+| `burst` | u64 | `rate` | Bucket capacity and initial tokens. |
+
+## Tuning
+
+- `rate` controls sustained throughput.
+- `burst` controls short spikes.
+- For a global multi-replica limit, use [Redis Rate Limit](/docs/gateway/middleware/rate-limit-redis).
+
+## Recommended Order
+
+```text
+middlewares = ["ip-allow", "auth-jwt", "rate-limit", "body-limit"]
+```

@@ -1,0 +1,139 @@
+---
+title: Middleware Overview
+description: The 15 built-in A3S Gateway middleware modules, execution model, configuration shape, and composition order
+---
+
+import { TypeTable } from 'fumadocs-ui/components/type-table';
+
+# Middleware Overview
+
+A3S Gateway middleware puts authentication, rate limiting, circuit breaking, retries, request rewriting, response rewriting, and network access control into a declarative request path.
+
+A3S Gateway ships **15 built-in middleware capabilities**:
+
+- 14 HTTP pipeline middlewares, defined as `middlewares "<name>" { type = "..." }` and referenced from a router's `middlewares = [...]` list.
+- 1 TCP connection filter, `tcp-filter`, configured directly on TCP entrypoints. It is not a valid HTTP middleware `type`.
+
+## Execution Model
+
+HTTP middlewares run in router-list order before the backend request and in reverse order before the response returns to the client. Any middleware can short-circuit the chain, for example with `401`, `429`, or `503`.
+
+```text
+routers "api" {
+  rule        = "Host(`api.example.com`) && PathPrefix(`/v1`)"
+  service     = "api-backend"
+  middlewares = ["ip-allow", "auth-jwt", "rate-limit", "strip-api"]
+}
+```
+
+That request runs as `ip-allow -> auth-jwt -> rate-limit -> strip-api`; response hooks run in the opposite order.
+
+## Configuration Blocks
+
+Each HTTP pipeline middleware is a named block. The name is referenced by routers; `type` selects the implementation.
+
+```text
+middlewares "<name>" {
+  type = "<middleware-type>"
+  # ...type-specific keys...
+}
+```
+
+Configuration files must use the `.acl` extension. Every block requires `type`; unknown types fail loading with `Unknown middleware type`. Required-key validation is strict: missing or invalid values abort loading rather than being silently skipped.
+
+## Chapter Map
+
+### Authentication
+
+- [API Key](/docs/gateway/middleware/api-key): header-based API key allowlist.
+- [Basic Auth](/docs/gateway/middleware/basic-auth): HTTP Basic username/password.
+- [JWT](/docs/gateway/middleware/jwt): HS256 HMAC JWT validation and `x-jwt-subject` injection.
+- [Forward Auth](/docs/gateway/middleware/forward-auth): delegate auth to an external service.
+
+### Traffic Control
+
+- [Rate Limit](/docs/gateway/middleware/rate-limit): in-process token bucket.
+- [Redis Rate Limit](/docs/gateway/middleware/rate-limit-redis): distributed token bucket across gateway replicas.
+- [Circuit Breaker](/docs/gateway/middleware/circuit-breaker): Closed / Open / HalfOpen state machine.
+- [Retry](/docs/gateway/middleware/retry): inject retry policy headers for the proxy layer.
+- [Body Limit](/docs/gateway/middleware/body-limit): cap request body size.
+
+### Transform
+
+- [CORS](/docs/gateway/middleware/cors): preflight handling and CORS response headers.
+- [Headers](/docs/gateway/middleware/headers): request/response header insertion and overwrite.
+- [Strip Prefix](/docs/gateway/middleware/strip-prefix): path prefix stripping with a single-segment wildcard.
+- [Compress](/docs/gateway/middleware/compress): mark responses eligible for proxy-layer compression.
+
+### Network
+
+- [IP Allow](/docs/gateway/middleware/ip-allow): client IP / CIDR allowlist.
+- [TCP Filter](/docs/gateway/middleware/tcp-filter): TCP entrypoint connection limit and IP filtering.
+
+## Supported `type` Values
+
+`type` can be `api-key`, `basic-auth`, `jwt`, `forward-auth`, `rate-limit`, `rate-limit-redis`, `circuit-breaker`, `retry`, `body-limit`, `cors`, `headers`, `strip-prefix`, `compress`, or `ip-allow`.
+
+`tcp-filter` is not a valid HTTP `type`; configure it on TCP entrypoints with `max_connections` and `tcp_allowed_ips`.
+
+## Quick Reference
+
+<TypeTable
+  type={{
+    "api-key": {
+      type: "401",
+      description: "auth: header-based API key allowlist",
+    },
+    "basic-auth": {
+      type: "401",
+      description: "auth: HTTP Basic username/password",
+    },
+    "jwt": {
+      type: "401",
+      description: "auth: HS256 Bearer or raw JWT",
+    },
+    "forward-auth": {
+      type: "401/502",
+      description: "auth: external auth delegation",
+    },
+    "rate-limit": {
+      type: "429",
+      description: "traffic: in-memory token bucket",
+    },
+    "rate-limit-redis": {
+      type: "429",
+      description: "traffic: Redis token bucket, fails open",
+    },
+    "circuit-breaker": {
+      type: "503",
+      description: "traffic: backend-5xx-driven circuit breaker",
+    },
+    "retry": {
+      description: "traffic: injects x-gateway-retry-* headers for the proxy",
+    },
+    "body-limit": {
+      type: "413",
+      description: "traffic: Content-Length and streaming body cap",
+    },
+    "cors": {
+      type: "204/403",
+      description: "transform: CORS preflight and response headers",
+    },
+    "headers": {
+      description: "transform: request/response header insertion",
+    },
+    "strip-prefix": {
+      description: "transform: path prefix removal with /* wildcard",
+    },
+    "compress": {
+      description: "transform: marks compressible responses for br/gzip/deflate",
+    },
+    "ip-allow": {
+      type: "403",
+      description: "network: client IP/CIDR allowlist",
+    },
+    "tcp-filter": {
+      description: "network: TCP connection limit + IP filter, not an HTTP type",
+    },
+  }}
+/>

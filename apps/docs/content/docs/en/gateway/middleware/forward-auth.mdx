@@ -1,0 +1,59 @@
+---
+title: Forward Auth
+description: Delegate authentication and authorization to an external service and copy approved identity headers upstream
+---
+
+# Forward Auth
+
+`forward-auth` delegates the authentication decision to an external HTTP service. Before forwarding the business request, the gateway sends a `GET` verification request; a `2xx` response allows the request, while a non-`2xx` response is returned to the client.
+
+## When to Use
+
+- OIDC, OAuth2, SSO, RBAC, or enterprise IAM integration.
+- Complex auth logic should live outside the gateway.
+- The auth service needs to pass user context such as `X-User-Id`, `X-User-Role`, or `X-Tenant-Id` upstream.
+
+## Behavior
+
+The gateway calls `forward_auth_url`, copies original request headers, and adds:
+
+- `X-Forwarded-Method`: original request method.
+- `X-Forwarded-Uri`: original request URI.
+
+On `2xx`, the request continues and configured `forward_auth_response_headers` are copied to the upstream request. On non-`2xx`, the auth service status and body are returned. If the auth service is unreachable, the gateway returns `502` with `{"error":"Auth service unavailable"}`.
+
+## Configuration
+
+```text
+middlewares "ext-auth" {
+  type                          = "forward-auth"
+  forward_auth_url              = "https://auth.example.com/verify"
+  forward_auth_response_headers = ["X-User-Id", "X-User-Role"]
+}
+```
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `type` | string | _required_ | Must be `forward-auth`. |
+| `forward_auth_url` | string | _required_ | External auth endpoint; empty values fail loading. |
+| `forward_auth_response_headers` | array&lt;string&gt; | `[]` | Headers copied from a successful auth response into the upstream request. |
+
+## Auth Service Contract
+
+- `2xx`: allow the request; optional identity headers can be returned.
+- `401`: unauthenticated or invalid token.
+- `403`: authenticated but unauthorized.
+- `5xx`: auth service failure. The gateway does not fail open.
+
+## Notes
+
+- Every request adds an external HTTP call; deploy the auth service close to the gateway.
+- Unreachable auth services return `502`.
+- Only listed response headers are copied upstream.
+- Split public/static paths into separate routers instead of adding many exceptions inside the auth service.
+
+## Recommended Order
+
+```text
+middlewares = ["ip-allow", "sso-auth", "rate-limit", "strip-prefix"]
+```

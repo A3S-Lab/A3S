@@ -1,0 +1,139 @@
+---
+title: 中间件总览
+description: A3S Gateway 的 15 个内置中间件模块、执行模型、配置方式和组合顺序
+---
+
+import { TypeTable } from 'fumadocs-ui/components/type-table';
+
+# 中间件总览
+
+A3S Gateway 中间件负责把认证、限流、熔断、重试、请求改写、响应改写和网络访问控制放进同一条可声明的链路里。
+
+A3S Gateway 目前内置 **15 个中间件能力**：
+
+- 14 个 HTTP 管道中间件：通过 `middlewares "<name>" { type = "..." }` 定义，再由路由器的 `middlewares = [...]` 按名称引用。
+- 1 个 TCP 连接过滤器：`tcp-filter` 直接配置在 TCP 入口点上，不是合法的 HTTP `type`。
+
+## 执行模型
+
+HTTP 中间件在请求进入后端前按路由器列表顺序执行，在响应返回客户端前按逆序执行。任一中间件都可以短路请求，例如认证失败返回 `401`、限流返回 `429`、熔断打开返回 `503`。
+
+```text
+routers "api" {
+  rule        = "Host(`api.example.com`) && PathPrefix(`/v1`)"
+  service     = "api-backend"
+  middlewares = ["ip-allow", "auth-jwt", "rate-limit", "strip-api"]
+}
+```
+
+上面的请求顺序是 `ip-allow -> auth-jwt -> rate-limit -> strip-api`，响应方向则反过来。
+
+## 配置块
+
+每个 HTTP 管道中间件都是一个具名块。名称由路由器引用，`type` 决定构造哪一种中间件。
+
+```text
+middlewares "<name>" {
+  type = "<middleware-type>"
+  # ...type-specific keys...
+}
+```
+
+配置文件必须使用 `.acl` 扩展名。每个块都必须有 `type` 键；未知类型会导致配置加载失败并报错 `Unknown middleware type`。必填键校验是严格的：缺失或无效的配置会中止加载，而不是静默跳过。
+
+## 章节地图
+
+### 认证
+
+- [API Key](/cn/docs/gateway/middleware/api-key)：请求头 API key 白名单。
+- [Basic Auth](/cn/docs/gateway/middleware/basic-auth)：HTTP Basic 用户名/密码。
+- [JWT](/cn/docs/gateway/middleware/jwt)：HS256 HMAC JWT 校验，并向上游注入 `x-jwt-subject`。
+- [Forward Auth](/cn/docs/gateway/middleware/forward-auth)：把认证委托给外部服务。
+
+### 流量治理
+
+- [Rate Limit](/cn/docs/gateway/middleware/rate-limit)：进程内令牌桶。
+- [Redis Rate Limit](/cn/docs/gateway/middleware/rate-limit-redis)：跨实例分布式令牌桶。
+- [Circuit Breaker](/cn/docs/gateway/middleware/circuit-breaker)：Closed / Open / HalfOpen 熔断状态机。
+- [Retry](/cn/docs/gateway/middleware/retry)：向代理层注入重试策略头。
+- [Body Limit](/cn/docs/gateway/middleware/body-limit)：限制请求体大小。
+
+### 转换
+
+- [CORS](/cn/docs/gateway/middleware/cors)：预检请求与跨域响应头。
+- [Headers](/cn/docs/gateway/middleware/headers)：请求头、响应头插入与覆盖。
+- [Strip Prefix](/cn/docs/gateway/middleware/strip-prefix)：路径前缀剥离，支持单段通配符。
+- [Compress](/cn/docs/gateway/middleware/compress)：响应压缩资格标记与代理层压缩。
+
+### 网络
+
+- [IP Allow](/cn/docs/gateway/middleware/ip-allow)：客户端 IP / CIDR 白名单。
+- [TCP Filter](/cn/docs/gateway/middleware/tcp-filter)：TCP 入口点连接数限制和 IP 过滤。
+
+## 支持的 `type`
+
+`type` 可取值为：`api-key`、`basic-auth`、`jwt`、`forward-auth`、`rate-limit`、`rate-limit-redis`、`circuit-breaker`、`retry`、`body-limit`、`cors`、`headers`、`strip-prefix`、`compress`、`ip-allow`。
+
+`tcp-filter` 不是合法 `type`，请在 TCP 入口点上使用 `max_connections` 和 `tcp_allowed_ips`。
+
+## 速查表
+
+<TypeTable
+  type={{
+    "api-key": {
+      type: "401",
+      description: "认证：请求头 API key 白名单",
+    },
+    "basic-auth": {
+      type: "401",
+      description: "认证：HTTP Basic 用户名/密码",
+    },
+    "jwt": {
+      type: "401",
+      description: "认证：HS256 Bearer 或裸 JWT",
+    },
+    "forward-auth": {
+      type: "401/502",
+      description: "认证：外部认证服务委托",
+    },
+    "rate-limit": {
+      type: "429",
+      description: "流量：进程内令牌桶",
+    },
+    "rate-limit-redis": {
+      type: "429",
+      description: "流量：Redis 分布式令牌桶，Redis 故障时放行",
+    },
+    "circuit-breaker": {
+      type: "503",
+      description: "流量：后端 5xx 驱动的熔断状态机",
+    },
+    "retry": {
+      description: "流量：注入 x-gateway-retry-* 头，由代理层执行",
+    },
+    "body-limit": {
+      type: "413",
+      description: "流量：Content-Length 与流式请求体上限",
+    },
+    "cors": {
+      type: "204/403",
+      description: "转换：预检请求和 CORS 响应头",
+    },
+    "headers": {
+      description: "转换：请求/响应头插入",
+    },
+    "strip-prefix": {
+      description: "转换：路径前缀剥离，支持 /* 单段通配符",
+    },
+    "compress": {
+      description: "转换：标记可压缩响应，由代理层处理 br/gzip/deflate",
+    },
+    "ip-allow": {
+      type: "403",
+      description: "网络：客户端 IP/CIDR 白名单",
+    },
+    "tcp-filter": {
+      description: "网络：TCP 入口点连接数和 IP 过滤，不是 HTTP type",
+    },
+  }}
+/>
