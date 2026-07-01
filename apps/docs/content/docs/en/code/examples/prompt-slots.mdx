@@ -33,7 +33,7 @@ session.
 import { Agent } from '@a3s-lab/code';
 
 async function main() {
-  // Node: create() takes a PATH to the ACL agent file.
+  // create() accepts an .acl file path or inline ACL string.
   const agent = await Agent.create('agent.acl');
 
   const session = agent.session('/repo', {
@@ -61,8 +61,8 @@ main().catch((err) => {
 from a3s_code import Agent, SessionOptions
 
 def main():
-    # Python: create() takes the ACL SOURCE TEXT.
-    agent = Agent.create(open('agent.acl').read())
+    # create() accepts an .acl file path or inline ACL string.
+    agent = Agent.create('agent.acl')
 
     opts = SessionOptions()
     opts.role = 'release-readiness reviewer'

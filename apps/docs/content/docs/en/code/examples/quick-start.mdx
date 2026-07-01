@@ -17,7 +17,7 @@ verification summary the runtime produced for that turn.
 ```ts
 import { Agent } from '@a3s-lab/code';
 
-// Agent.create takes a PATH to the ACL file.
+// Agent.create accepts an .acl file path or inline ACL string.
 const agent = await Agent.create('agent.acl');
 const session = agent.session('.');
 
@@ -36,8 +36,8 @@ await session.close();
 ```python
 from a3s_code import Agent
 
-# Agent.create takes the ACL SOURCE TEXT, not a path.
-agent = Agent.create(open('agent.acl').read())
+# Agent.create accepts an .acl file path or inline ACL string.
+agent = Agent.create('agent.acl')
 session = agent.session('.')
 
 result = session.send('List the files in this directory.')
@@ -52,10 +52,9 @@ session.close()
 </Tab>
 </Tabs>
 
-Note the asymmetry between the SDKs: in Node.js `Agent.create` takes a **path** to the
-ACL file, while in Python it takes the **ACL source text** (read the file yourself).
-Always `close()` the session when you are done so the runtime can flush state and
-release resources.
+`Agent.create()` accepts either an `.acl` file path or inline ACL source text in both
+SDKs. Always `close()` the session when you are done so the runtime can flush state
+and release resources.
 
 ## Next steps
 
