@@ -7,7 +7,12 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 # AHP Transport & Safety
 
-A3S Code sessions can attach to an external host over a pluggable transport (AHP — the Agent Host Protocol). Whatever transport carries the messages, the safety layer is independent: a **security provider** vets tool calls and a **permission policy** decides what runs without a human in the loop. Use this page when you need a remote/host-driven session while keeping tool policy explicit in the A3S Code harness.
+A3S Code sessions can attach to an external harness over a pluggable transport
+(AHP — Agent Harness Protocol). Whatever transport carries the messages, the
+safety layer is independent: a **security provider** vets tool calls and a
+**permission policy** decides what runs without a human in the loop. Use this
+page when you need a remote or host-driven session while keeping tool policy
+explicit in the A3S Code harness.
 
 The transport and the safety layer are orthogonal. You can swap `HttpTransport` for a WebSocket or Unix-socket transport without touching the permission rules, and vice versa.
 Set `AHP_ENDPOINT` to your deployed host endpoint before running the example;
@@ -38,7 +43,11 @@ console.log(result.text);
 session.close();
 ```
 
-Other transports follow the same shape — `WebSocketTransport`, `UnixSocketTransport`, and the in-process `StdioTransport` are all interchangeable here. Set `defaultDecision` to `'deny'` when unattended work should fail closed unless an allow rule matches, or `'allow'` only in trusted, sandboxed environments.
+Other transports follow the same shape — `WebSocketTransport`,
+`UnixSocketTransport`, and child-process `StdioTransport` are all
+interchangeable here. Set `defaultDecision` to `'deny'` when unattended work
+should fail closed unless an allow rule matches, or `'allow'` only in trusted,
+sandboxed environments.
 
 </Tab>
 <Tab value="Python">
