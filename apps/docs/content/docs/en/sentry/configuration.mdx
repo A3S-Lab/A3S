@@ -1,0 +1,148 @@
+---
+title: Configuration
+description: Daemon environment variables, unified SDK ACL config, site rules, fail posture, deny sinks, and metrics.
+---
+
+# Sentry Configuration
+
+Sentry has two configuration surfaces:
+
+- The daemon is configured with environment variables plus an optional rules ACL.
+- The embedded SDKs read one ACL document that carries rules, optional backends, deny sinks, fail mode, and SAE settings.
+
+Keep production provider credentials in deployment secrets or the process environment. Committed examples should use placeholders such as `PROVIDER_BASE_URL`, `provider/model-id`, and `PROVIDER_API_KEY`.
+
+## Daemon Environment
+
+| Variable | Purpose |
+| --- | --- |
+| `A3S_SENTRY_POLICY` | Extra L1 rule policy file. Built-ins still apply, and the file is hot-reloaded. |
+| `A3S_SENTRY_LLM_URL` | Enables L2 with an OpenAI-compatible chat base URL. |
+| `A3S_SENTRY_LLM_MODEL` | L2 model identifier. |
+| `A3S_SENTRY_LLM_KEY` | L2 bearer credential, normally injected from a deployment secret. |
+| `A3S_SENTRY_AGENT_BIN` | Enables L3 by pointing at the agent bridge command. |
+| `A3S_SENTRY_SKILLS` | Security skill directory used by the L3 A3S Code agent. |
+| `A3S_SENTRY_L3_URL` | Optional L3-specific OpenAI-compatible chat base URL. Falls back to the L2 URL when omitted. |
+| `A3S_SENTRY_L3_MODEL` | Optional L3-specific model identifier. |
+| `A3S_SENTRY_L3_KEY` | Optional L3-specific bearer credential. |
+| `A3S_SENTRY_EGRESS_DENY` | Egress deny file consumed by Observer guards. |
+| `A3S_SENTRY_FILE_DENY` | File deny file consumed by Observer file guards. |
+| `A3S_SENTRY_EXEC_DENY` | Exec deny file consumed by Observer file guards. |
+| `A3S_SENTRY_FAIL_CLOSED` | Blocks unresolved escalations and overload degradation instead of allowing them. |
+| `A3S_SENTRY_SPECULATE` | Starts L2 and L3 in parallel when L1 escalates at or above the configured severity, for example `high`. |
+| `A3S_SENTRY_LLM_TIMEOUT` | L2 timeout in seconds. Defaults to 30. |
+| `A3S_SENTRY_AGENT_TIMEOUT` | L3 investigation timeout in seconds. Defaults to 120. |
+| `A3S_SENTRY_WORKERS` | L2/L3 worker count. Defaults to 4. |
+| `A3S_SENTRY_QUEUE` | Escalation queue depth. Defaults to 256. |
+| `A3S_SENTRY_DRY_RUN` | Judges and audits without writing deny files. |
+| `A3S_SENTRY_METRICS_ADDR` | Enables Prometheus `/metrics` and `/healthz` on the configured `ip:port`. |
+
+## Minimal Daemon Shape
+
+```bash
+A3S_OBSERVER_JSON=1 A3S_OBSERVER_SSL=1 a3s-observer-collector \
+  | A3S_SENTRY_POLICY=policy/rules.acl \
+    A3S_SENTRY_EGRESS_DENY=/run/a3s/egress.txt \
+    A3S_SENTRY_FILE_DENY=/run/a3s/file.txt \
+    A3S_SENTRY_EXEC_DENY=/run/a3s/exec.txt \
+    A3S_SENTRY_LLM_URL="${PROVIDER_BASE_URL}" \
+    A3S_SENTRY_LLM_MODEL="provider/model-id" \
+    A3S_SENTRY_LLM_KEY="${PROVIDER_API_KEY}" \
+    A3S_SENTRY_DRY_RUN=1 \
+    a3s-sentry
+```
+
+Start with `A3S_SENTRY_DRY_RUN=1`, inspect the audit stream and metrics, then remove dry-run only after policy tuning.
+
+## Rules ACL
+
+The daemon's policy file is rules-only. Site rules run before the built-in defaults, and the first match wins.
+
+```hcl
+rules = [
+  {
+    name     = "no-netcat"
+    on       = "ToolExec"
+    match    = "(?i)\\b(ncat|netcat)\\b"
+    verdict  = "block"
+    severity = "medium"
+    reason   = "netcat invocation"
+    action   = "deny-exec"
+  },
+  {
+    name     = "admin-subnet-egress"
+    on       = "Egress"
+    match    = "^10\\.0\\.99\\."
+    verdict  = "escalate"
+    severity = "medium"
+    reason   = "connection into a restricted subnet"
+  },
+]
+```
+
+Supported event selectors include `ToolExec`, `SslContent`, `SecurityAction`, `Egress`, `Dns`, `FileAccess`, and `*`. Supported verdicts are `allow`, `block`, and `escalate`. Supported actions are `deny-egress`, `deny-file`, and `deny-exec`.
+
+The policy file is watched. A valid rewrite applies live; a parse error keeps the current rules rather than disarming the engine.
+
+## Unified SDK ACL
+
+Python and TypeScript SDKs use a single ACL document. It can describe everything the embedded engine needs.
+
+```hcl
+fail_closed = false
+dry_run     = false
+speculate   = "high"
+
+llm {
+  url       = "${PROVIDER_BASE_URL}"
+  model     = "provider/model-id"
+  key       = "${PROVIDER_API_KEY}"
+  timeout_s = 30
+}
+
+agent {
+  bin       = "a3s-code"
+  skills    = "./skills"
+  timeout_s = 120
+}
+
+sae {
+  dict        = "features.json"
+  escalate_at = 0.3
+  block_at    = 0.6
+}
+
+deny {
+  egress = "egress-deny.txt"
+  file   = "file-deny.txt"
+  exec   = "exec-deny.txt"
+}
+
+rules = [
+  { name = "no-netcat", on = "ToolExec", match = "(?i)\\bnetcat\\b",
+    verdict = "block", severity = "medium", reason = "netcat", action = "deny-exec" },
+]
+```
+
+For committed samples, prefer environment substitution in the host application or deployment manifest. Do not commit real provider URLs, credentials, local usernames, or organization-only paths.
+
+## Fail Mode
+
+Sentry defaults to fail-open. If L1 escalates and no deeper tier resolves the event, the event is allowed. The same posture applies when a slow tier overloads the queue.
+
+Fail-closed changes unresolved escalation and overload degradation into blocks. Use it for safety-first workloads only when L2/L3 capacity and the operational blast radius are understood.
+
+## Deny Sinks
+
+Deny files are append-only operational state. Sentry writes egress, file, and exec targets; Observer guards enforce them. Missing deny sinks are valid when the process is used only for judgment or dry-run analysis.
+
+Exec deny is path-oriented. A deny action on a bare binary name may not map to a kernel guard match, so site rules should prefer absolute paths when the goal is enforcement.
+
+## Metrics
+
+`A3S_SENTRY_METRICS_ADDR` enables:
+
+- `GET /metrics` with counters for judged events, blocks, overload degradation, and enforce failures.
+- `GET /healthz` with `200 ok` while the daemon is alive.
+
+Alert on `sentry_overload_degraded_total` and `sentry_enforce_failed_total`; both indicate that an intended block may not have landed.

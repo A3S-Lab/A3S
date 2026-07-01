@@ -1,0 +1,101 @@
+---
+title: Deployment Runbook
+description: Install surfaces, Kubernetes DaemonSet wiring, rollout procedure, alerting, restart behavior, and outage handling.
+---
+
+# Sentry Deployment Runbook
+
+Sentry is a policy brain. It reads Observer events, decides, and writes deny files. Observer guards remain the kernel enforcement point.
+
+## Install Surfaces
+
+| Surface | Use when |
+| --- | --- |
+| Daemon image | You want to run `observer-collector | a3s-sentry` as node infrastructure. |
+| Release binary | You want a standalone daemon without building from source. |
+| Source checkout | You are developing Sentry itself or validating a patch. |
+| Python SDK | A Python service wants in-process judgment over Observer-shaped events. |
+| TypeScript SDK | A Node service wants in-process judgment over Observer-shaped events. |
+
+L1 and L2 work in the published daemon image. L3 needs an A3S Code agent bridge and its security skills available in the runtime image or host filesystem.
+
+## Reference Kubernetes Shape
+
+`crates/sentry/deploy/daemonset.yaml` wires Sentry after Observer on each node:
+
+```text
+observer-collector -> a3s-sentry -> deny files -> observer guards -> kernel denies
+```
+
+The reference manifest uses:
+
+| Part | Role |
+| --- | --- |
+| `observe-judge` container | Runs the Observer collector and pipes NDJSON into Sentry. |
+| `deny` `emptyDir` | Shared node-local directory for egress, file, and exec deny files. |
+| `policy` ConfigMap | Rules ACL mounted into the Sentry container. |
+| `enforce-egress` container | Runs Observer egress enforcement against the egress deny file. |
+| `fileguard` container | Runs Observer file and exec guards against their deny files. |
+| Metrics port | Exposes Sentry `/metrics` and `/healthz`. |
+
+The manifest ships with dry-run enabled so the first rollout shadows policy decisions before enforcement.
+
+## Rollout
+
+1. Deploy with `A3S_SENTRY_DRY_RUN=1`.
+2. Inspect the non-allow NDJSON audit stream and Prometheus counters.
+3. Tune site rules and L2/L3 capacity until the false-positive rate is acceptable.
+4. Remove dry-run node by node.
+5. Keep deny files node-local unless a separate controller owns global policy distribution.
+
+This order matters because Sentry is reactive on Observer events. A bad deny can affect every matching process on the node.
+
+## Alerts
+
+Page on rising values for:
+
+| Metric | Why it matters | First response |
+| --- | --- | --- |
+| `sentry_overload_degraded_total` | Escalations fell through to the fail mode because the worker queue was full. | Increase workers or queue, reduce escalation volume, tune the slow tier, or choose fail-closed deliberately. |
+| `sentry_enforce_failed_total` | A block wanted to write a deny file and failed. | Check volume space, mount mode, file permissions, and configured paths. |
+
+Use `sentry_events_total` and `sentry_blocked_total` for traffic and block-ratio trends. `/healthz` only says the daemon is alive; it does not prove that every deny landed.
+
+## Queue And Timeout Tuning
+
+L1 runs on every event and stays cheap. Escalations go to a bounded worker pool.
+
+Tune:
+
+- `A3S_SENTRY_WORKERS` for concurrent L2/L3 investigations.
+- `A3S_SENTRY_QUEUE` for burst absorption.
+- `A3S_SENTRY_LLM_TIMEOUT` for the real L2 latency.
+- `A3S_SENTRY_AGENT_TIMEOUT` for the L3 A3S Code investigation.
+- `A3S_SENTRY_SPECULATE` for high-severity events where parallel L2/L3 is worth the extra cost.
+
+If overload rises, the deployment is under-provisioned for the current event mix or the deeper tier is too slow for the escalation rate.
+
+## L2 Or L3 Outage
+
+When L2 times out or errors, the event escalates onward if L3 exists; otherwise it resolves through the fail mode. When L3 hangs, Sentry times out and kills the agent process group before resolving through the fail mode.
+
+For availability-first deployments, fail-open avoids broad blocking but can miss a threat during outage. For safety-first deployments, fail-closed blocks unresolved cases but can become node-wide blast radius during an escalation flood.
+
+## Deny-File Durability
+
+Sentry appends a deny and closes the file for each target. It also deduplicates in memory so repeated attacks do not grow the file without bound.
+
+Deny files are node-local operational state. They are durable against daemon process death, but not a source-of-truth database. On restart, Sentry reseeds its dedup set from existing files. If a long-lived node accumulates a very large deny set, recreate the pod and let observation regenerate active denies.
+
+## Restart And Termination
+
+An abrupt process stop can lose the in-flight event being judged, not a deny already written. During normal termination, the upstream pipe closes, stdin reaches EOF, queued work drains, and final stats print before exit.
+
+Observer guards can continue enforcing existing deny files while Sentry restarts.
+
+## Operational Boundaries
+
+- Observer-event Sentry is reactive. It can block the next matching action, not necessarily the action that produced the event.
+- Inline Gateway inspection is the pre-forward path for LLM/MCP traffic that is routed through the proxy.
+- Denies are coarse and node-local: an IP or executable-path block can affect other workloads on the same node.
+- L2 and L3 process attacker-influenced content. Keep deterministic L1 and kernel guard enforcement as the floor.

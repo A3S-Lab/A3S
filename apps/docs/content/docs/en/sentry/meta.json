@@ -4,7 +4,10 @@
     "index",
     "pipeline",
     "inline-gate",
+    "configuration",
     "operations",
+    "deployment-runbook",
+    "sae-evaluation",
     "sdk"
   ]
 }

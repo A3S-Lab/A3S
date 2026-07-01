@@ -1,0 +1,148 @@
+---
+title: Configuration
+description: Daemon environment variables、统一 SDK ACL config、站点规则、fail posture、deny sinks 与 metrics。
+---
+
+# Sentry Configuration
+
+Sentry 有两类配置入口：
+
+- Daemon 使用 environment variables，再加一个可选 rules ACL。
+- Embedded SDK 使用一个 ACL 文档，集中描述 rules、可选 backend、deny sinks、fail mode 和 SAE 设置。
+
+生产 provider credential 应放在部署 secret 或进程环境里。提交到仓库的示例应使用 `PROVIDER_BASE_URL`、`provider/model-id`、`PROVIDER_API_KEY` 这类占位符。
+
+## Daemon Environment
+
+| Variable | 用途 |
+| --- | --- |
+| `A3S_SENTRY_POLICY` | 额外 L1 rule policy file。内置规则仍会应用，并支持热加载。 |
+| `A3S_SENTRY_LLM_URL` | 用 OpenAI-compatible chat base URL 启用 L2。 |
+| `A3S_SENTRY_LLM_MODEL` | L2 model identifier。 |
+| `A3S_SENTRY_LLM_KEY` | L2 bearer credential，通常从部署 secret 注入。 |
+| `A3S_SENTRY_AGENT_BIN` | 指向 agent bridge command，用于启用 L3。 |
+| `A3S_SENTRY_SKILLS` | L3 A3S Code agent 使用的 security skill directory。 |
+| `A3S_SENTRY_L3_URL` | 可选 L3 专用 OpenAI-compatible chat base URL；省略时回退到 L2 URL。 |
+| `A3S_SENTRY_L3_MODEL` | 可选 L3 专用 model identifier。 |
+| `A3S_SENTRY_L3_KEY` | 可选 L3 专用 bearer credential。 |
+| `A3S_SENTRY_EGRESS_DENY` | Observer guard 消费的 egress deny file。 |
+| `A3S_SENTRY_FILE_DENY` | Observer file guard 消费的 file deny file。 |
+| `A3S_SENTRY_EXEC_DENY` | Observer file guard 消费的 exec deny file。 |
+| `A3S_SENTRY_FAIL_CLOSED` | 将 unresolved escalation 和 overload degradation 从 allow 改为 block。 |
+| `A3S_SENTRY_SPECULATE` | 当 L1 escalation 达到配置 severity 时并行启动 L2 和 L3，例如 `high`。 |
+| `A3S_SENTRY_LLM_TIMEOUT` | L2 timeout，单位秒，默认 30。 |
+| `A3S_SENTRY_AGENT_TIMEOUT` | L3 investigation timeout，单位秒，默认 120。 |
+| `A3S_SENTRY_WORKERS` | L2/L3 worker 数，默认 4。 |
+| `A3S_SENTRY_QUEUE` | Escalation queue depth，默认 256。 |
+| `A3S_SENTRY_DRY_RUN` | 只 judge 和 audit，不写 deny file。 |
+| `A3S_SENTRY_METRICS_ADDR` | 在配置的 `ip:port` 上启用 Prometheus `/metrics` 和 `/healthz`。 |
+
+## Minimal Daemon Shape
+
+```bash
+A3S_OBSERVER_JSON=1 A3S_OBSERVER_SSL=1 a3s-observer-collector \
+  | A3S_SENTRY_POLICY=policy/rules.acl \
+    A3S_SENTRY_EGRESS_DENY=/run/a3s/egress.txt \
+    A3S_SENTRY_FILE_DENY=/run/a3s/file.txt \
+    A3S_SENTRY_EXEC_DENY=/run/a3s/exec.txt \
+    A3S_SENTRY_LLM_URL="${PROVIDER_BASE_URL}" \
+    A3S_SENTRY_LLM_MODEL="provider/model-id" \
+    A3S_SENTRY_LLM_KEY="${PROVIDER_API_KEY}" \
+    A3S_SENTRY_DRY_RUN=1 \
+    a3s-sentry
+```
+
+先用 `A3S_SENTRY_DRY_RUN=1` 启动，检查 audit stream 和 metrics；等策略调好后再移除 dry-run。
+
+## Rules ACL
+
+Daemon 的 policy file 只描述 rules。站点规则先于内置默认规则运行，first match wins。
+
+```hcl
+rules = [
+  {
+    name     = "no-netcat"
+    on       = "ToolExec"
+    match    = "(?i)\\b(ncat|netcat)\\b"
+    verdict  = "block"
+    severity = "medium"
+    reason   = "netcat invocation"
+    action   = "deny-exec"
+  },
+  {
+    name     = "admin-subnet-egress"
+    on       = "Egress"
+    match    = "^10\\.0\\.99\\."
+    verdict  = "escalate"
+    severity = "medium"
+    reason   = "connection into a restricted subnet"
+  },
+]
+```
+
+支持的 event selector 包括 `ToolExec`、`SslContent`、`SecurityAction`、`Egress`、`Dns`、`FileAccess` 和 `*`。支持的 verdict 是 `allow`、`block`、`escalate`。支持的 action 是 `deny-egress`、`deny-file`、`deny-exec`。
+
+Policy file 会被监听。有效 rewrite 会 live apply；parse error 会保留当前规则，而不是让 engine 失效。
+
+## Unified SDK ACL
+
+Python 和 TypeScript SDK 使用单个 ACL 文档，描述 embedded engine 所需的全部配置。
+
+```hcl
+fail_closed = false
+dry_run     = false
+speculate   = "high"
+
+llm {
+  url       = "${PROVIDER_BASE_URL}"
+  model     = "provider/model-id"
+  key       = "${PROVIDER_API_KEY}"
+  timeout_s = 30
+}
+
+agent {
+  bin       = "a3s-code"
+  skills    = "./skills"
+  timeout_s = 120
+}
+
+sae {
+  dict        = "features.json"
+  escalate_at = 0.3
+  block_at    = 0.6
+}
+
+deny {
+  egress = "egress-deny.txt"
+  file   = "file-deny.txt"
+  exec   = "exec-deny.txt"
+}
+
+rules = [
+  { name = "no-netcat", on = "ToolExec", match = "(?i)\\bnetcat\\b",
+    verdict = "block", severity = "medium", reason = "netcat", action = "deny-exec" },
+]
+```
+
+提交示例时，优先在宿主应用或部署 manifest 中做 environment substitution。不要提交真实 provider URL、credential、本地用户名或组织内部路径。
+
+## Fail Mode
+
+Sentry 默认 fail-open。L1 escalate 后如果没有更深 tier 给出结论，该事件会 allow。慢 tier 导致 queue overload 时也遵循同样姿态。
+
+Fail-closed 会把 unresolved escalation 和 overload degradation 变成 block。只有在 L2/L3 容量和 operational blast radius 都明确时，才适合安全优先 workload。
+
+## Deny Sinks
+
+Deny file 是 append-only operational state。Sentry 写入 egress、file、exec target；Observer guard 执行。缺少 deny sink 也是合法的，此时进程只用于 judgment 或 dry-run analysis。
+
+Exec deny 以路径为中心。对裸 binary name 的 deny action 可能无法匹配 kernel guard，因此以 enforcement 为目标的站点规则应优先使用 absolute path。
+
+## Metrics
+
+`A3S_SENTRY_METRICS_ADDR` 启用：
+
+- `GET /metrics`，包含 judged events、blocks、overload degradation、enforce failures 等 counters。
+- `GET /healthz`，daemon 存活时返回 `200 ok`。
+
+应重点告警 `sentry_overload_degraded_total` 和 `sentry_enforce_failed_total`；它们都表示预期 block 可能没有落地。

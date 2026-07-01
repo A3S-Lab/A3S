@@ -1,0 +1,116 @@
+---
+title: SAE And Evaluation
+description: Sparse-autoencoder activation judgment、explainability payload、tests、soak coverage 与 accuracy corpus results。
+---
+
+# SAE And Evaluation
+
+Sentry 有两类安全信号：
+
+- Observer-event tiers 判断 agent 做了什么。
+- SAE tier 判断 A3S Power 发出的模型输出 activations。
+
+第二条路径适合处理 harmful intent 被隐藏在输出文本里的场景。该 tier 评分 sparse model features，而不是依赖表面字符串。
+
+## SAE Signal Path
+
+```text
+A3S Power model runtime -> LlmActivations event -> Sentry SaeJudge -> Decision.explain
+```
+
+A3S Power 在 model runtime 内部 tap residual stream，用 Sparse Autoencoder 编码，然后发出 sparse `(feature_id, activation)` pairs。Sentry 这个 tier 不需要 prompt 或 completion text。
+
+`SaeJudge` 加载 feature dictionary：
+
+```json
+{
+  "8801": {
+    "concept": "exploit-code-synthesis",
+    "category": "cyber_offense",
+    "weight": 0.9,
+    "severity": "high"
+  }
+}
+```
+
+Dictionary 将 feature ID 映射到命名 safety concept、calibrated weight、category 和可选 severity。Dictionary 中不存在的 feature 不贡献分数。
+
+## Scoring
+
+对每个 activation，Sentry 用 activation 乘以 feature weight，并 clamp contribution。Category score 会累积且上限为 `1.0`。最终 harmful score 取最坏 category，因此一个严重 category 不会被其它 benign feature 稀释。
+
+默认 thresholds：
+
+| Threshold | Verdict |
+| --- | --- |
+| Harmful score 低于 `0.30` | `allow` |
+| Harmful score 大于等于 `0.30` | `escalate` |
+| Harmful score 大于等于 `0.60` | `block` |
+
+SDK ACL 可覆盖 thresholds：
+
+```hcl
+sae {
+  dict        = "features.json"
+  escalate_at = 0.3
+  block_at    = 0.6
+}
+```
+
+## Explainability Payload
+
+SAE decision 携带 `Decision.explain`：
+
+| Field | 含义 |
+| --- | --- |
+| `harmful` | 最坏 category score。 |
+| `safety` | `1.0 - harmful`。 |
+| `per_category` | Category-level scores。 |
+| `drivers` | Ranked feature drivers，包含 concept、category、source、activation 和 contribution。 |
+| `channel` | `activation`。 |
+
+结果可审计，因为 score 对命名 feature 是线性的，而不是第二个 black-box classifier。
+
+## Enforcement Boundary
+
+模型输出文本没有天然 kernel deny target。SAE 可以 block 或 escalate output risk，但 kernel action 通常需要落在相关的 `ToolExec`、`Egress` 或其它 Observer action event 上。
+
+当前 tier 依赖 labeled feature dictionary。Dictionary 的训练、探测、标注和因果验证仍是 model-specific work。
+
+## Test Coverage
+
+Sentry 仓库包含：
+
+| Layer | Coverage |
+| --- | --- |
+| Unit tests | Rules、escalation、enforcement、parsing、speculative execution、hot reload、metrics endpoint、SAE scoring 和 SDK config wiring。 |
+| Integration tests | Real binary end-to-end behavior、block to deny-file、dry-run、fail-open/fail-closed、malformed input、live hot reload、version output、mock L2 round trip、mock L3 block path、overload degradation 和 metrics endpoint。 |
+| SDK tests | Python 与 TypeScript bindings 通过 embedded Rust engine 判断真实 Observer-shaped events。 |
+| Soak scripts | Sustained mixed load、policy rewrite under load、slow L2 worker-pool behavior、flat memory、clean overload degradation 和 clean exit。 |
+| Evaluation harness | `examples/eval.rs` 用 `eval/corpus.ndjson` labeled corpus 跑 pipeline。 |
+
+## Accuracy Corpus
+
+仓库 README 记录了 checked-in 69-event labeled corpus 上的 measured results：
+
+| Mode | Recall | Precision | False-positive rate |
+| --- | --- | --- | --- |
+| L1 rules only | 47.8% | 100% | 0% |
+| L1 plus live OpenAI-compatible L2 | 95.7% | 100% | 0% |
+
+这些数字应被看作 corpus results，不是普遍 guarantee。它们仍然有价值，因为 harness 和 corpus 都在仓库中，且此前 evaluation 找到并修复了具体 rule gaps。
+
+## Running Evaluation Locally
+
+在 `crates/sentry` 下，corpus runner 可以以 rules-only 模式运行，也可以接外部 L2 endpoint：
+
+```bash
+cargo run --example eval -- eval/corpus.ndjson
+
+A3S_SENTRY_LLM_URL="${PROVIDER_BASE_URL}" \
+A3S_SENTRY_LLM_MODEL="provider/model-id" \
+A3S_SENTRY_LLM_KEY="${PROVIDER_API_KEY}" \
+cargo run --example eval -- eval/corpus.ndjson
+```
+
+提交到 docs 的示例只使用占位符；真实 credential 只应通过本地 shell 或 deployment secret manager 注入。

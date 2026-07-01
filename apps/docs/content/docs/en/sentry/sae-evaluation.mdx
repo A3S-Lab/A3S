@@ -1,0 +1,116 @@
+---
+title: SAE And Evaluation
+description: Sparse-autoencoder activation judgment, explainability payloads, tests, soak coverage, and accuracy corpus results.
+---
+
+# SAE And Evaluation
+
+Sentry has two security signals:
+
+- Observer-event tiers judge what the agent did.
+- The SAE tier judges model-output activations emitted by A3S Power.
+
+The second path is useful when harmful intent is hidden in output text. The tier scores sparse model features rather than relying on surface strings.
+
+## SAE Signal Path
+
+```text
+A3S Power model runtime -> LlmActivations event -> Sentry SaeJudge -> Decision.explain
+```
+
+A3S Power taps a residual stream inside the model runtime, encodes it with a Sparse Autoencoder, and emits sparse `(feature_id, activation)` pairs. Sentry does not need the prompt or completion text for this tier.
+
+`SaeJudge` loads a feature dictionary:
+
+```json
+{
+  "8801": {
+    "concept": "exploit-code-synthesis",
+    "category": "cyber_offense",
+    "weight": 0.9,
+    "severity": "high"
+  }
+}
+```
+
+The dictionary maps feature IDs to named safety concepts, calibrated weights, categories, and optional severities. Features absent from the dictionary contribute nothing.
+
+## Scoring
+
+For each activation, Sentry multiplies activation by the feature weight and clamps the contribution. Category scores are accumulated and capped at `1.0`. The final harmful score is the worst category, so one severe category is not diluted by benign features elsewhere.
+
+Default thresholds:
+
+| Threshold | Verdict |
+| --- | --- |
+| Harmful score below `0.30` | `allow` |
+| Harmful score at or above `0.30` | `escalate` |
+| Harmful score at or above `0.60` | `block` |
+
+SDK ACL can override thresholds with:
+
+```hcl
+sae {
+  dict        = "features.json"
+  escalate_at = 0.3
+  block_at    = 0.6
+}
+```
+
+## Explainability Payload
+
+SAE decisions carry `Decision.explain` with:
+
+| Field | Meaning |
+| --- | --- |
+| `harmful` | Worst category score. |
+| `safety` | `1.0 - harmful`. |
+| `per_category` | Category-level scores. |
+| `drivers` | Ranked feature drivers with concept, category, source, activation, and contribution. |
+| `channel` | `activation`. |
+
+The result is auditable because the score is linear in named features rather than a second black-box classifier.
+
+## Enforcement Boundary
+
+Model-output text has no natural kernel deny target. SAE can block or escalate the output risk, but a kernel action normally rides a related `ToolExec`, `Egress`, or other Observer action event.
+
+The current tier depends on a labeled feature dictionary. Training, probing, labeling, and causal validation of the dictionary remain model-specific work.
+
+## Test Coverage
+
+The Sentry repository includes:
+
+| Layer | Coverage |
+| --- | --- |
+| Unit tests | Rules, escalation, enforcement, parsing, speculative execution, hot reload, metrics endpoint, SAE scoring, and SDK config wiring. |
+| Integration tests | Real binary end-to-end behavior, block to deny-file, dry-run, fail-open and fail-closed, malformed input, live hot reload, version output, mock L2 round trip, mock L3 block path, overload degradation, and metrics endpoint. |
+| SDK tests | Python and TypeScript bindings judge real Observer-shaped events through the embedded Rust engine. |
+| Soak scripts | Sustained mixed load, policy rewrite under load, slow L2 worker-pool behavior, flat memory, clean overload degradation, and clean exit. |
+| Evaluation harness | `examples/eval.rs` runs the labeled NDJSON corpus in `eval/corpus.ndjson` through the pipeline. |
+
+## Accuracy Corpus
+
+The repository README reports the following measured results on the checked-in 69-event labeled corpus:
+
+| Mode | Recall | Precision | False-positive rate |
+| --- | --- | --- | --- |
+| L1 rules only | 47.8% | 100% | 0% |
+| L1 plus live OpenAI-compatible L2 | 95.7% | 100% | 0% |
+
+These numbers should be treated as corpus results, not universal guarantees. They are still useful because the harness and corpus live in the repository, and earlier evaluation found concrete rule gaps that were fixed.
+
+## Running Evaluation Locally
+
+From `crates/sentry`, the corpus runner can be used in rules-only mode or with an external L2 endpoint:
+
+```bash
+cargo run --example eval -- eval/corpus.ndjson
+
+A3S_SENTRY_LLM_URL="${PROVIDER_BASE_URL}" \
+A3S_SENTRY_LLM_MODEL="provider/model-id" \
+A3S_SENTRY_LLM_KEY="${PROVIDER_API_KEY}" \
+cargo run --example eval -- eval/corpus.ndjson
+```
+
+Use placeholders in committed docs and inject real credentials only through the local shell or deployment secret manager.

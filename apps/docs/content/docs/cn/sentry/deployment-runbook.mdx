@@ -1,0 +1,101 @@
+---
+title: Deployment Runbook
+description: Install surfaces、Kubernetes DaemonSet wiring、rollout procedure、alerting、restart behavior 与 outage handling。
+---
+
+# Sentry Deployment Runbook
+
+Sentry 是策略大脑。它读取 Observer events、做 decision、写 deny files。Observer guards 仍然是 kernel enforcement point。
+
+## Install Surfaces
+
+| Surface | 适用场景 |
+| --- | --- |
+| Daemon image | 希望以 node infrastructure 运行 `observer-collector | a3s-sentry`。 |
+| Release binary | 希望使用独立 daemon，而不从源码构建。 |
+| Source checkout | 正在开发 Sentry 本身或验证 patch。 |
+| Python SDK | Python service 希望对 Observer-shaped events 做进程内 judgment。 |
+| TypeScript SDK | Node service 希望对 Observer-shaped events 做进程内 judgment。 |
+
+发布的 daemon image 可运行 L1 和 L2。L3 需要 runtime image 或 host filesystem 中存在 A3S Code agent bridge 和 security skills。
+
+## Reference Kubernetes Shape
+
+`crates/sentry/deploy/daemonset.yaml` 在每个 node 上把 Sentry 接在 Observer 后面：
+
+```text
+observer-collector -> a3s-sentry -> deny files -> observer guards -> kernel denies
+```
+
+Reference manifest 使用：
+
+| Part | 作用 |
+| --- | --- |
+| `observe-judge` container | 运行 Observer collector，并把 NDJSON pipe 到 Sentry。 |
+| `deny` `emptyDir` | 共享 node-local directory，存放 egress、file、exec deny files。 |
+| `policy` ConfigMap | 挂载到 Sentry container 的 rules ACL。 |
+| `enforce-egress` container | 用 egress deny file 运行 Observer egress enforcement。 |
+| `fileguard` container | 用 file 和 exec deny files 运行 Observer file/exec guards。 |
+| Metrics port | 暴露 Sentry `/metrics` 和 `/healthz`。 |
+
+Manifest 默认启用 dry-run，让首次 rollout 先 shadow policy decisions，再进入 enforcement。
+
+## Rollout
+
+1. 使用 `A3S_SENTRY_DRY_RUN=1` 部署。
+2. 检查 non-allow NDJSON audit stream 和 Prometheus counters。
+3. 调整站点规则和 L2/L3 容量，直到 false-positive rate 可接受。
+4. 按 node 移除 dry-run。
+5. 除非有单独 controller 负责全局策略分发，否则保持 deny files node-local。
+
+这个顺序很重要，因为基于 Observer event 的 Sentry 是 reactive。错误 deny 可能影响同一 node 上所有匹配进程。
+
+## Alerts
+
+重点告警持续上升的：
+
+| Metric | 为什么重要 | 第一反应 |
+| --- | --- | --- |
+| `sentry_overload_degraded_total` | Worker queue 满了，escalation 只能落到 fail mode。 | 增加 workers 或 queue，减少 escalation volume，调慢 tier，或有意识地选择 fail-closed。 |
+| `sentry_enforce_failed_total` | 某个 block 需要写 deny file，但写入失败。 | 检查 volume space、mount mode、file permissions 和 configured paths。 |
+
+`sentry_events_total` 和 `sentry_blocked_total` 用于观察流量与 block ratio trend。`/healthz` 只说明 daemon 存活，不证明每个 deny 都已落地。
+
+## Queue And Timeout Tuning
+
+L1 在每个 event 上运行并保持低成本。Escalation 进入 bounded worker pool。
+
+可调项：
+
+- `A3S_SENTRY_WORKERS`：并发 L2/L3 investigations。
+- `A3S_SENTRY_QUEUE`：吸收 burst。
+- `A3S_SENTRY_LLM_TIMEOUT`：真实 L2 latency。
+- `A3S_SENTRY_AGENT_TIMEOUT`：L3 A3S Code investigation timeout。
+- `A3S_SENTRY_SPECULATE`：高 severity event 值得并行 L2/L3 时启用。
+
+如果 overload 上升，说明当前部署对 event mix 来说资源不足，或 deeper tier 对 escalation rate 来说太慢。
+
+## L2 Or L3 Outage
+
+L2 timeout 或 error 时，如果配置了 L3，event 会继续 escalate；否则按 fail mode 解决。L3 hang 时，Sentry 会 timeout 并 kill agent process group，再按 fail mode 解决。
+
+Availability-first 部署中，fail-open 可以避免大范围误阻断，但 outage 期间可能漏掉 threat。Safety-first 部署中，fail-closed 会阻断 unresolved cases，但在 escalation flood 下可能放大为 node-wide blast radius。
+
+## Deny-File Durability
+
+Sentry 对每个 target append deny 后关闭文件。它也会在内存中 dedup，避免重复攻击无限增长 deny file。
+
+Deny file 是 node-local operational state，不是 source-of-truth database。它能抵抗 daemon process death，但不是主机崩溃级持久化。Restart 时，Sentry 会从现有文件重建 dedup set。长时间运行的 node 如果积累了很大的 deny set，可以 recreate pod，让观察重新生成仍活跃的 denies。
+
+## Restart And Termination
+
+Abrupt process stop 可能丢失正在 judgment 的 in-flight event，但不会丢失已经写入的 deny。正常 termination 时，上游 pipe 关闭，stdin 到 EOF，queued work drain，并打印 final stats 后退出。
+
+Sentry restart 期间，Observer guards 仍可继续执行已有 deny files。
+
+## Operational Boundaries
+
+- Observer-event Sentry 是 reactive。它能 block 下一次匹配动作，不一定能 block 产生 event 的那一次动作。
+- Inline Gateway inspection 是路由到 proxy 的 LLM/MCP traffic 的 pre-forward path。
+- Deny 是 coarse 且 node-local 的：IP 或 executable-path block 可能影响同 node 上其它 workload。
+- L2 和 L3 会处理 attacker-influenced content。确定性的 L1 和 kernel guard enforcement 仍应作为底线。
