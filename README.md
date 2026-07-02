@@ -105,6 +105,7 @@ cargo add a3s-code-core          # Rust
 ```text
 a3s/                            # monorepo root (NOT a Rust workspace)
 ├── apps/
+│   ├── desktop/                # 书小安 desktop app (Pake shell, submodule)
 │   └── docs/                   # documentation site
 ├── crates/                     # components, each its own git submodule
 │   ├── cli/                    # a3s interactive coding-agent TUI
