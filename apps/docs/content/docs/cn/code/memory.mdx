@@ -7,6 +7,61 @@ description: "Session memory store 与显式 recall"
 
 Memory 记录可复用事实，帮助驾驭层复用经验。
 
+## 默认 Store
+
+每个 session 默认都有 memory store。普通 SDK session 若不传入自定义 store，会使用
+`<workspace>/.a3s/memory` 下的文件存储。`a3s code` TUI 使用和 `/memory` 面板相同的
+`memory_dir`；默认是 `~/.a3s/memory`，所以不同项目会共享这份长期记忆，除非你配置
+项目本地路径。可以通过 config 的 `memory_dir` 移动默认位置，也可以给单个 session
+传入 typed store object 覆盖默认后端。若文件 store 初始化失败，session 会降级到
+in-memory store，并通过 init warning 暴露该问题。
+
+## LLM 抽取
+
+当 memory 可用时，LLM memory extraction 默认开启。agent 不会在每次用户输入或每次
+工具调用后机械抽取；它只在一个 turn 完成后，根据显著性门控触发：例如使用过工具、
+turn 足够长，或请求/回答里出现记忆、偏好、workflow、decision、fix、failure、
+project、config、migration 等可复用信号。
+触发抽取时，prompt 会带入少量相关旧记忆；如果旧记忆已有 `supersedes` /
+`conflicts_with` 关系 metadata，也会一起带入，帮助模型避免重复并整理成更完整的
+standalone facts。如果模型声明新记忆 supersede 了这些相关旧项，runtime 只接受本次
+prompt 中实际提供过的 id，先写入 consolidated item，再从 session memory tiers 和
+long-term store 中移除被 supersede 的旧项。相互矛盾但不应删除的旧记忆可以标记为
+`conflicts_with`；旧项会保留，新项会带上 `conflict` tag，后续 recall 可以看到这组
+分歧。召回出的 memory context 会在存在 `supersedes` 或 `conflicts_with` 时带上简短
+关系注释和结构化 metadata，方便后续模型继续理解整理关系。
+
+开启 LLM 抽取时，成功工具输出不会再被机械写入 memory；失败仍会立即写入，帮助
+agent 避免重复危险或已知错误的路径。对于 TUI 这类 streaming session，通过显著性
+门控的抽取会在 final response event 后进入后台运行，不会为了这次维护型 LLM 调用卡住
+UI 收尾。
+
+抽取结果仍会经过运行时过滤：明显的 API key、token、password assignment 和
+private key 不会写入，memory metadata 中的敏感值也会被脱敏。
+
+## Store 清理
+
+默认 memory store 会返回代表某个事实的 canonical item。完全重复和保守近重复记忆
+会合并进已有 item，提升 importance，并保留有用的 tag、provenance 和关系 metadata。
+带冲突意味的近似记忆，例如新增 `Do not` 约束的内容，会作为独立 memory 保留，而不是
+被错误折叠。
+
+配置自动 pruning 后，系统会删除陈旧且低重要度的 memory；但 curated memory 会被硬保护：
+pinned/protected item、频繁召回 item、consolidated memory，以及带 `supersedes` 或
+`conflicts_with` 关系 metadata 的 item 都不会因为容量上限被直接裁掉。
+
+可以在 `config.acl` 中调整抽取上限：
+
+```hcl
+memory {
+  llmExtraction = true
+  llmExtractionMaxItems = 5
+  llmExtractionMaxInputChars = 8000
+}
+```
+
+## 手动写入与召回
+
 ```ts
 import { FileMemoryStore } from '@a3s-lab/code';
 

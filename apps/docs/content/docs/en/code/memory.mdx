@@ -7,7 +7,18 @@ description: "Session memory stores and explicit recall"
 
 Memory records reusable facts about previous work. It should help the harness recall patterns without flooding every prompt.
 
-## Configure Stores
+## Default Store
+
+Every session gets a memory store by default. Plain SDK sessions use a
+file-backed store at `<workspace>/.a3s/memory` if you do not pass one. The
+`a3s code` TUI uses the same `memory_dir` setting that its `/memory` panel
+browses; by default that is `~/.a3s/memory`, so memories carry across projects
+unless you configure a project-local path. Set `memory_dir` in config or pass a
+typed store object to override the backend for one session. If the file store
+cannot be created, the session falls back to an in-memory store and exposes an
+init warning.
+
+## Override Stores
 
 ```ts
 import { FileMemoryStore } from '@a3s-lab/code';
@@ -17,7 +28,57 @@ const session = agent.session('/repo', {
 });
 ```
 
-Use memory storage in short-lived tests and file storage for durable local sessions.
+## LLM Extraction
+
+LLM memory extraction is enabled by default when memory is available. The agent
+does not call the extractor after every input or tool result. It runs after a
+completed turn only when the turn looks durable: tools were used, the turn is
+long enough, or the request/answer contains memory, preference, workflow,
+decision, fix, failure, project, config, migration, or similar signals.
+When extraction runs, the prompt includes a small set of related existing
+memories, including existing `supersedes` / `conflicts_with` relation metadata
+when present, so the model can avoid duplicates and write consolidated
+standalone facts. If the model marks a new memory as superseding one of those
+related items, the runtime only accepts ids it actually supplied in that prompt,
+stores the consolidated item, and removes the superseded item from the session
+memory tiers and long-term store. Contradictory memories can instead be marked
+as `conflicts_with`; those older items are kept, while the new memory is tagged
+as `conflict` so future recall can surface the disagreement. Recalled memory
+context includes concise relation annotations and structured metadata for
+`supersedes` and `conflicts_with` when those fields are present.
+
+Successful tool output is not mechanically written when LLM extraction is on.
+Failures are still stored immediately so the agent can avoid repeating unsafe or
+broken patterns. For streaming sessions such as the TUI, gated extraction is
+scheduled after the final response event and runs in the background so memory
+maintenance does not hold the UI open.
+
+Extractor output is still filtered by the runtime: obvious API keys, tokens,
+password assignments, and private keys are not written, and sensitive values in
+memory metadata are redacted.
+
+## Store Hygiene
+
+Default memory stores return the canonical item that represents a fact. Exact
+duplicates and conservative near-duplicates are merged into the existing item,
+raising importance and preserving useful tags, provenance, and relation
+metadata. Conflict-like near matches, such as a memory that adds a `Do not`
+constraint, are kept as separate memories instead of being collapsed.
+
+Automatic pruning removes stale, low-importance memories when configured, but it
+hard-protects curated memories: pinned/protected items, frequently recalled
+items, consolidated memories, and memories carrying `supersedes` or
+`conflicts_with` relation metadata.
+
+You can tune extraction limits in `config.acl`:
+
+```hcl
+memory {
+  llmExtraction = true
+  llmExtractionMaxItems = 5
+  llmExtractionMaxInputChars = 8000
+}
+```
 
 ## Write Memory
 

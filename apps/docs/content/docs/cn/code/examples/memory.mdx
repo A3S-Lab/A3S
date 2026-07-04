@@ -8,9 +8,16 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 # 记忆
 
 持久化记忆让会话能够记录哪些做法成功（以及哪些失败），并在之后取回这些事实。
-挂载一个 `FileMemoryStore`，让记录在多次运行间保留；用 `rememberSuccess` /
-`rememberFailure` 写入结果，再用 `recallSimilar`、`recallByTags` 或
+SDK session 默认在 `<workspace>/.a3s/memory` 使用文件存储；TUI 默认使用
+`~/.a3s/memory`，让 `/memory` 面板和实时 session 浏览同一份长期记忆。只有当你想
+覆盖路径或后端时，才需要传入 `memoryStore`。你仍然可以用 `rememberSuccess` /
+`rememberFailure` 显式写入结果，再用 `recallSimilar`、`recallByTags` 或
 `memoryRecent` 取回它们。
+
+LLM 抽取也默认开启。它会在重要 turn 完成后整理可复用的偏好、workflow、decision
+和失败教训，普通寒暄或短 turn 会被跳过。
+默认 store 会把完全重复和保守近重复 memory 合并到 canonical item；带冲突意味的
+memory 会保留为独立项，方便后续 recall。
 
 <Tabs groupId="lang" items={['Node.js', 'Python']}>
 <Tab value="Node.js">
@@ -81,4 +88,4 @@ print(len(recent), len(by_tags), len(similar))
 （这些工具同时充当可检索的标签），以及结果文本。三个召回方法相互补充：
 `memoryRecent(limit)` 返回最新的记录，`recallByTags(tags, limit)` 按你记录的
 工具标签过滤，`recallSimilar(query, limit)` 则按与查询的语义相关度对记录排序。
-若不设置 `memoryStore`，记忆仅存在于进程内，会话关闭时即被丢弃。
+若默认文件 store 初始化失败，session 会降级到进程内 memory，并暴露 init warning。

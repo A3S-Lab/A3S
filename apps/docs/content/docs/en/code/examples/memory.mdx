@@ -8,9 +8,18 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 # Memory
 
 Persistent memory lets a session record what worked (and what didn't) and pull
-those facts back later. Attach a `FileMemoryStore` so entries survive across
-runs, write outcomes with `rememberSuccess` / `rememberFailure`, then retrieve
-them with `recallSimilar`, `recallByTags`, or `memoryRecent`.
+those facts back later. SDK sessions have a default file-backed store at
+`<workspace>/.a3s/memory`; the TUI defaults to `~/.a3s/memory` so its `/memory`
+panel and live session browse the same durable store. Pass a `memoryStore` only
+when you want to override the path or backend. You can write outcomes explicitly
+with `rememberSuccess` / `rememberFailure`, then retrieve them with
+`recallSimilar`, `recallByTags`, or `memoryRecent`.
+
+LLM extraction is also enabled by default. It runs after significant completed
+turns to distill durable preferences, workflows, decisions, and failure lessons,
+while trivial turns are skipped.
+Default stores consolidate exact and conservative near-duplicate memories into a
+canonical item, while conflict-like memories remain separate for future recall.
 
 <Tabs groupId="lang" items={['Node.js', 'Python']}>
 <Tab value="Node.js">
@@ -82,5 +91,5 @@ list of tools involved (which double as searchable tags), and the outcome text.
 The three recall methods are complementary: `memoryRecent(limit)` returns the
 newest entries, `recallByTags(tags, limit)` filters by the tool tags you
 recorded, and `recallSimilar(query, limit)` ranks entries by semantic relevance
-to a query. Without a `memoryStore`, memory is in-process only and is discarded
-when the session closes.
+to a query. If the default file store cannot be created, the session falls back
+to in-process memory and exposes an init warning.
