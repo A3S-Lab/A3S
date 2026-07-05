@@ -84,7 +84,7 @@ so each crate can be built, tested, versioned, and released independently.
 
 | Project | Version | Role |
 |---|---|---|
-| [a3s](crates/cli/) | 0.5.11 | Interactive terminal coding agent; `a3s code` launches the TUI. Prebuilt binaries for macOS, Linux, Windows |
+| [a3s](crates/cli/) | 0.6.0 | Interactive terminal coding agent; `a3s code` launches the TUI. Prebuilt binaries for macOS, Linux, Windows |
 | [a3s-code](crates/code/) | 4.1.0 | Harness-driven agent runtime: ACL config, tools, hooks, security policy, memory, MCP, structured output, planning, subagents, and pluggable workspaces. Rust core with Node/Python SDKs |
 | [a3s-flow](crates/flow/) | 0.1.0 | Rust SDK and durable workflow engine core: event-sourced runs, replay, steps, waits, hooks, retries, and pluggable runtime backends |
 | [a3s-box](crates/box/) | 2.6.0 | Docker-like MicroVM runtime for Linux OCI workloads |
@@ -198,6 +198,18 @@ experience. It includes:
   text input, text areas, timelines, and status surfaces
 - regression coverage for narrow terminals, CJK text, ANSI styling,
   zero-width marks, stale selection state, and empty viewport behavior
+
+During monorepo development, `crates/cli/Cargo.toml` patches `a3s-tui` to the
+local `crates/tui` submodule. That means `a3s code` and `a3s top` exercise the
+same local TUI framework changes before they are published to crates.io. To
+verify the wiring:
+
+```bash
+cd crates/cli
+cargo tree -i a3s-tui --locked --offline
+# a3s-tui v0.1.4 (.../crates/tui)
+# └── a3s v0.6.0 (.../crates/cli)
+```
 
 ## Documentation
 
