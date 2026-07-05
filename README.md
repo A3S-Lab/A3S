@@ -220,17 +220,17 @@ the command palette and asset selectors use `MenuPanel`; `/model` uses
 `ToolStatusLine`; transcript gutters and user input bubbles use `GutterBlock`;
 input prompt chrome uses `InputBorder` and `PromptLine`; live and completed tool
 output tail previews use `OutputBlock`; live reasoning uses `WrappedPrefixBlock`;
-task summaries use `ConnectorBlock`; `/compact` progress uses `Progress`;
-file-edit diffs use `DiffView`; the live activity indicator and `/effort` title
-use `ShimmerText`; `/effort` controls use `LevelSlider`; SPF and `/ide` chrome
-uses `PanelFrame`; SPF and `/ide` file metadata use `Breadcrumb`; and the main
-footer uses `SessionStatus` plus `ModeLine`. Menu bounds, selection windows,
-tool status truncation, transcript gutters and input bubbles, prompt
-continuation alignment, input border labels, live reasoning wrapping, completed
-output tail previews, compaction progress bars, connector rows, diff wrapping,
-framed panels, breadcrumbs, activity shimmer, detail rows, and footer width
-handling therefore exercise the shared TUI library directly inside the
-interactive CLI.
+task summaries use `Checklist`; live output rows use `ConnectorBlock`;
+`/compact` progress uses `Progress`; file-edit diffs use `DiffView`; the live
+activity indicator and `/effort` title use `ShimmerText`; `/effort` controls use
+`LevelSlider`; SPF and `/ide` chrome uses `PanelFrame`; SPF and `/ide` file
+metadata use `Breadcrumb`; and the main footer uses `SessionStatus` plus
+`ModeLine`. Menu bounds, selection windows, tool status truncation, transcript
+gutters and input bubbles, prompt continuation alignment, input border labels,
+live reasoning wrapping, completed output tail previews, task status summaries,
+compaction progress bars, connector rows, diff wrapping, framed panels,
+breadcrumbs, activity shimmer, detail rows, and footer width handling therefore
+exercise the shared TUI library directly inside the interactive CLI.
 
 ## Documentation
 
