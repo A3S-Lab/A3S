@@ -215,9 +215,10 @@ cargo tree -i a3s-tui --locked --offline
 
 Recent `a3s code` surfaces are wired through shared components from `a3s-tui`:
 the command palette and asset selectors use `MenuPanel`; the tool approval
-overlay uses `ChoicePrompt`; `/model` uses `TabbedMenuPanel`; `/memory`, `/ctx`,
-`/kb`, resource, and `/loop` details use `DetailPanel`, `Timeline`, and
-`SectionHeader`; `/memory` type labels use `Badge`; tool status lines use
+overlay uses `ChoicePrompt`; `/model` uses `TabbedMenuPanel`; `/plugin` skill
+toggles use `MenuPanel`; `/memory`, `/ctx`, `/kb`, resource, and `/loop`
+details use `DetailPanel`, `Timeline`, and `SectionHeader`; `/memory` type
+labels use `Badge`; tool status lines use
 `ToolStatusLine`; RemoteUI view links use `InlineAction`; transcript gutters and
 user input bubbles use `GutterBlock`; input prompt chrome uses `InputBorder` and
 `PromptLine`; live and completed tool output tail previews use `OutputBlock`;
@@ -238,19 +239,20 @@ and the main footer uses `SessionStatus` plus `ModeLine`, with context fill
 rendered through the shared `Meter`. The main transcript viewport appends its
 right gutter through `Scrollbar`. Menu bounds, selection windows, approval
 choices, `/model` account tab mouse switching, `/theme` wheel preview and
-click-to-apply, `@` file picker wheel browsing and click-to-insert, RemoteUI
-action links, tool status truncation, shared alert rows, overlay composition,
-toast rows, live activity blocks, top process trends, loop key-value summaries,
-KB delete confirmations, transcript gutters and input bubbles, prompt
-continuation alignment, input border labels, shared
+click-to-apply, `@` file picker wheel browsing and click-to-insert, `/plugin`
+wheel browsing and click-to-toggle, RemoteUI action links, tool status
+truncation, shared alert rows, overlay composition, toast rows, live activity
+blocks, top process trends, loop key-value summaries, KB delete confirmations,
+transcript gutters and input bubbles, prompt continuation alignment, input border
+labels, shared
 display-width wrapping for live reasoning and detail text, completed output tail
 previews, pinned plan checklists, task status summaries, compaction progress
 bars, pinned memory importance bars, transcript scrollbars, IDE cursor rows,
 top status actions, panel dividers, connector rows, diff wrapping, framed
 panels, breadcrumbs, activity shimmer, detail rows, `/model` tab hit-testing,
-`/theme` preview hit-testing, `@` file picker hit-testing, footer context
-meters, and footer width handling therefore exercise the shared TUI library
-directly inside the interactive CLI.
+`/theme` preview hit-testing, `@` file picker hit-testing, `/plugin` overlay
+hit-testing, footer context meters, and footer width handling therefore exercise
+the shared TUI library directly inside the interactive CLI.
 
 ## Documentation
 
