@@ -229,25 +229,26 @@ messages use `Toast`; `/compact` progress uses `Progress`; `/memory` importance
 bars also use `Progress`; memory, knowledge, and resource panel separators use
 `Divider`; file-edit diffs use `DiffView`; the live activity indicator and
 `/effort` title use `ShimmerText`; `/effort` controls use `LevelSlider`; detail
-text wrapping uses `Paragraph`; SPF and `/ide` chrome uses `PanelFrame`; SPF and
-`/ide` file metadata use `Breadcrumb`; `/ide` active editor rows use
-`CursorLine`; the `/top` header uses `StatusBar`; the `/top` process table uses
-`DataTable` and `Sparkline` for CPU/MEM trends; `/loop` details use `KeyValue`;
-and the main footer uses `SessionStatus` plus `ModeLine`, with context fill
-rendered through the shared `Meter`. The main transcript viewport appends its
-right gutter through `Scrollbar`. Menu bounds, selection windows, approval
-choices, `/model` account tab mouse switching, RemoteUI action links, tool
-status truncation, shared alert rows, overlay composition, toast rows, live
-activity blocks, top process trends, loop key-value summaries, KB delete
-confirmations, transcript gutters and input bubbles, prompt continuation
-alignment, input border labels, shared
+text wrapping uses `Paragraph`; `/theme` uses `PreviewPanel`; SPF and `/ide`
+chrome uses `PanelFrame`; SPF and `/ide` file metadata use `Breadcrumb`; `/ide`
+active editor rows use `CursorLine`; the `/top` header uses `StatusBar`; the
+`/top` process table uses `DataTable` and `Sparkline` for CPU/MEM trends;
+`/loop` details use `KeyValue`; and the main footer uses `SessionStatus` plus
+`ModeLine`, with context fill rendered through the shared `Meter`. The main
+transcript viewport appends its right gutter through `Scrollbar`. Menu bounds,
+selection windows, approval choices, `/model` account tab mouse switching,
+`/theme` wheel preview and click-to-apply, RemoteUI action links, tool status
+truncation, shared alert rows, overlay composition, toast rows, live activity
+blocks, top process trends, loop key-value summaries, KB delete confirmations,
+transcript gutters and input bubbles, prompt continuation alignment, input
+border labels, shared
 display-width wrapping for live reasoning and detail text, completed output tail
 previews, pinned plan checklists, task status summaries, compaction progress
 bars, pinned memory importance bars, transcript scrollbars, IDE cursor rows,
 top status actions, panel dividers, connector rows, diff wrapping, framed
 panels, breadcrumbs, activity shimmer, detail rows, `/model` tab hit-testing,
-footer context meters, and footer width handling therefore exercise the shared
-TUI library directly inside the interactive CLI.
+`/theme` preview hit-testing, footer context meters, and footer width handling
+therefore exercise the shared TUI library directly inside the interactive CLI.
 
 ## Documentation
 
