@@ -216,13 +216,13 @@ cargo tree -i a3s-tui --locked --offline
 Recent `a3s code` surfaces are wired through shared components from `a3s-tui`:
 the command palette and asset selectors use `MenuPanel`; `/model` uses
 `TabbedMenuPanel`; `/memory`, `/ctx`, `/kb`, resource, and `/loop` details use
-`DetailPanel`, `Timeline`, and `SectionHeader`; completed task summaries use
-`ConnectorBlock`; `/effort` uses `LevelSlider` and `ShimmerText`; SPF and `/ide`
-chrome uses `PanelFrame`; SPF and `/ide` file metadata use `Breadcrumb`; and the
-main footer uses `SessionStatus` plus `ModeLine`. Menu bounds, selection
-windows, connector rows, framed panels, breadcrumbs, shimmer, detail rows, and
-footer width handling therefore exercise the shared TUI library directly inside
-the interactive CLI.
+`DetailPanel`, `Timeline`, and `SectionHeader`; completed tool output and task
+summaries use `ConnectorBlock`; `/effort` uses `LevelSlider` and `ShimmerText`;
+SPF and `/ide` chrome uses `PanelFrame`; SPF and `/ide` file metadata use
+`Breadcrumb`; and the main footer uses `SessionStatus` plus `ModeLine`. Menu
+bounds, selection windows, connector rows, framed panels, breadcrumbs, shimmer,
+detail rows, and footer width handling therefore exercise the shared TUI library
+directly inside the interactive CLI.
 
 ## Documentation
 
