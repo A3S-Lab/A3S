@@ -245,11 +245,12 @@ account tab mouse switching, `/theme` wheel preview and click-to-apply,
 browsing and click-to-develop, `/mcp` picker wheel browsing and
 click-to-develop, `/skill` picker wheel browsing and click-to-develop,
 `/okf` picker wheel browsing and click-to-develop, `/flow` picker wheel browsing
-and click-to-open, `/plugin` wheel browsing and click-to-toggle, RemoteUI action
-links, tool status truncation, shared alert rows, overlay composition, toast
-rows, live activity blocks, top process trends, loop key-value summaries, KB
-delete confirmations, transcript gutters and input bubbles, prompt continuation
-alignment, input border labels, shared
+and click-to-open, `/plugin` wheel browsing and click-to-toggle, `/top` process
+table wheel browsing and click row selection, RemoteUI action links, tool status
+truncation, shared alert rows, overlay composition, toast rows, live activity
+blocks, top process trends, loop key-value summaries, KB delete confirmations,
+transcript gutters and input bubbles, prompt continuation alignment, input border
+labels, shared
 display-width wrapping for live reasoning and detail text, completed output tail
 previews, pinned plan checklists, task status summaries, compaction progress
 bars, pinned memory importance bars, transcript scrollbars, IDE cursor rows,
@@ -259,8 +260,9 @@ panels, breadcrumbs, activity shimmer, detail rows, `/model` tab hit-testing,
 overlay hit-testing, `/theme` preview hit-testing, `@` file picker hit-testing,
 `/agent` picker hit-testing, `/mcp` picker hit-testing, `/skill` picker
 hit-testing, `/okf` picker hit-testing, `/flow` picker hit-testing, `/plugin`
-overlay hit-testing, footer context meters, and footer width handling therefore
-exercise the shared TUI library directly inside the interactive CLI.
+overlay hit-testing, `/top` process table hit-testing, footer context meters, and
+footer width handling therefore exercise the shared TUI library directly inside
+the interactive CLI.
 
 ## Documentation
 
