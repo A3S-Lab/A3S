@@ -242,11 +242,12 @@ choices, approval overlay wheel browsing and click-to-approve or deny, `/model`
 account tab mouse switching, `/theme` wheel preview and click-to-apply,
 `/effort` wheel/click adjustment, slash command wheel browsing and click-to-run,
 `@` file picker wheel browsing and click-to-insert, `/agent` picker wheel
-browsing and click-to-develop, `/plugin` wheel browsing and click-to-toggle,
-RemoteUI action links, tool status truncation, shared alert rows, overlay
-composition, toast rows, live activity blocks, top process trends, loop
-key-value summaries, KB delete confirmations, transcript gutters and input
-bubbles, prompt continuation alignment, input border labels, shared
+browsing and click-to-develop, `/mcp` picker wheel browsing and
+click-to-develop, `/plugin` wheel browsing and click-to-toggle, RemoteUI action
+links, tool status truncation, shared alert rows, overlay composition, toast
+rows, live activity blocks, top process trends, loop key-value summaries, KB
+delete confirmations, transcript gutters and input bubbles, prompt continuation
+alignment, input border labels, shared
 display-width wrapping for live reasoning and detail text, completed output tail
 previews, pinned plan checklists, task status summaries, compaction progress
 bars, pinned memory importance bars, transcript scrollbars, IDE cursor rows,
@@ -254,9 +255,9 @@ top status actions, panel dividers, connector rows, diff wrapping, framed
 panels, breadcrumbs, activity shimmer, detail rows, `/model` tab hit-testing,
 `/effort` slider hit-testing, slash command palette hit-testing, approval
 overlay hit-testing, `/theme` preview hit-testing, `@` file picker hit-testing,
-`/agent` picker hit-testing, `/plugin` overlay hit-testing, footer context
-meters, and footer width handling therefore exercise the shared TUI library
-directly inside the interactive CLI.
+`/agent` picker hit-testing, `/mcp` picker hit-testing, `/plugin` overlay
+hit-testing, footer context meters, and footer width handling therefore exercise
+the shared TUI library directly inside the interactive CLI.
 
 ## Documentation
 
