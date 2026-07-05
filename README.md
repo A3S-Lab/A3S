@@ -216,16 +216,17 @@ cargo tree -i a3s-tui --locked --offline
 Recent `a3s code` surfaces are wired through shared components from `a3s-tui`:
 the command palette and asset selectors use `MenuPanel`; `/model` uses
 `TabbedMenuPanel`; `/memory`, `/ctx`, `/kb`, resource, and `/loop` details use
-`DetailPanel`, `Timeline`, and `SectionHeader`; tool status lines use
-`ToolStatusLine`; transcript gutters and user input bubbles use `GutterBlock`;
-input prompt chrome uses `InputBorder` and `PromptLine`; live and completed tool
-output tail previews use `OutputBlock`; live reasoning uses `WrappedPrefixBlock`;
-pinned plan rows and task summaries use `Checklist`; live output rows use
-`ConnectorBlock`; `/compact` progress uses `Progress`; file-edit diffs use
-`DiffView`; the live activity indicator and `/effort` title use `ShimmerText`;
-`/effort` controls use `LevelSlider`; detail text wrapping uses `Paragraph`; SPF
-and `/ide` chrome uses `PanelFrame`; SPF and `/ide` file metadata use
-`Breadcrumb`; and the main footer uses `SessionStatus` plus `ModeLine`. Menu
+`DetailPanel`, `Timeline`, and `SectionHeader`; `/memory` type labels use
+`Badge`; tool status lines use `ToolStatusLine`; transcript gutters and user
+input bubbles use `GutterBlock`; input prompt chrome uses `InputBorder` and
+`PromptLine`; live and completed tool output tail previews use `OutputBlock`;
+live reasoning uses `WrappedPrefixBlock`; pinned plan rows and task summaries
+use `Checklist`; live output rows use `ConnectorBlock`; `/compact` progress uses
+`Progress`; file-edit diffs use `DiffView`; the live activity indicator and
+`/effort` title use `ShimmerText`; `/effort` controls use `LevelSlider`; detail
+text wrapping uses `Paragraph`; SPF and `/ide` chrome uses `PanelFrame`; SPF and
+`/ide` file metadata use `Breadcrumb`; and the main footer uses `SessionStatus`
+plus `ModeLine`. Menu
 bounds, selection windows, tool status truncation, transcript gutters and input
 bubbles, prompt continuation alignment, input border labels, shared
 display-width wrapping for live reasoning and detail text, completed output tail
