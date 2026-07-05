@@ -228,14 +228,16 @@ also use `Progress`; file-edit diffs use `DiffView`; the live activity indicator
 and `/effort` title use `ShimmerText`; `/effort` controls use `LevelSlider`;
 detail text wrapping uses `Paragraph`; SPF and `/ide` chrome uses `PanelFrame`;
 SPF and `/ide` file metadata use `Breadcrumb`; and the main footer uses
-`SessionStatus` plus `ModeLine`. Menu bounds, selection windows, approval
-choices, RemoteUI action links, tool status truncation, transcript gutters and
-input bubbles, prompt continuation alignment, input border labels, shared
+`SessionStatus` plus `ModeLine`. The main transcript viewport appends its right
+gutter through `Scrollbar`. Menu bounds, selection windows, approval choices,
+RemoteUI action links, tool status truncation, transcript gutters and input
+bubbles, prompt continuation alignment, input border labels, shared
 display-width wrapping for live reasoning and detail text, completed output tail
 previews, pinned plan checklists, task status summaries, compaction progress
-bars, pinned memory importance bars, connector rows, diff wrapping, framed
-panels, breadcrumbs, activity shimmer, detail rows, and footer width handling
-therefore exercise the shared TUI library directly inside the interactive CLI.
+bars, pinned memory importance bars, transcript scrollbars, connector rows,
+diff wrapping, framed panels, breadcrumbs, activity shimmer, detail rows, and
+footer width handling therefore exercise the shared TUI library directly inside
+the interactive CLI.
 
 ## Documentation
 
