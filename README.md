@@ -221,25 +221,28 @@ overlay uses `ChoicePrompt`; `/model` uses `TabbedMenuPanel`; `/memory`, `/ctx`,
 `ToolStatusLine`; RemoteUI view links use `InlineAction`; transcript gutters and
 user input bubbles use `GutterBlock`; input prompt chrome uses `InputBorder` and
 `PromptLine`; live and completed tool output tail previews use `OutputBlock`;
-live reasoning uses `WrappedPrefixBlock`;
-pinned plan rows and task summaries use `Checklist`; live output rows use
-`ConnectorBlock`; `/compact` progress uses `Progress`; `/memory` importance bars
-also use `Progress`; memory, knowledge, and resource panel separators use
+live reasoning uses `WrappedPrefixBlock`; pinned plan rows and task summaries
+use `Checklist`; live output rows use `ConnectorBlock`; live tool activity and
+stdout tail previews use `ActivityBlock`; OS login/configuration warnings use
+`Alert`; overlay menus and prompts are composed with `TextOverlay`; `/ide` flash
+messages use `Toast`; `/compact` progress uses `Progress`; `/memory` importance
+bars also use `Progress`; memory, knowledge, and resource panel separators use
 `Divider`; file-edit diffs use `DiffView`; the live activity indicator and
 `/effort` title use `ShimmerText`; `/effort` controls use `LevelSlider`; detail
 text wrapping uses `Paragraph`; SPF and `/ide` chrome uses `PanelFrame`; SPF and
 `/ide` file metadata use `Breadcrumb`; `/ide` active editor rows use
-`CursorLine`; and the main footer uses `SessionStatus` plus `ModeLine`. The main
-transcript viewport appends its right gutter through `Scrollbar`. Menu bounds,
-selection windows, approval choices, RemoteUI action links, tool status
-truncation, transcript gutters and input bubbles, prompt continuation alignment,
-input border labels, shared
+`CursorLine`; the `/top` header uses `StatusBar`; and the main footer uses
+`SessionStatus` plus `ModeLine`. The main transcript viewport appends its right
+gutter through `Scrollbar`. Menu bounds, selection windows, approval choices,
+RemoteUI action links, tool status truncation, shared alert rows, overlay
+composition, toast rows, live activity blocks, transcript gutters and input
+bubbles, prompt continuation alignment, input border labels, shared
 display-width wrapping for live reasoning and detail text, completed output tail
 previews, pinned plan checklists, task status summaries, compaction progress
 bars, pinned memory importance bars, transcript scrollbars, IDE cursor rows,
-panel dividers, connector rows, diff wrapping, framed panels, breadcrumbs,
-activity shimmer, detail rows, and footer width handling therefore exercise the
-shared TUI library directly inside the interactive CLI.
+top status actions, panel dividers, connector rows, diff wrapping, framed
+panels, breadcrumbs, activity shimmer, detail rows, and footer width handling
+therefore exercise the shared TUI library directly inside the interactive CLI.
 
 ## Documentation
 
