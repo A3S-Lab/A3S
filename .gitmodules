@@ -55,3 +55,6 @@
 [submodule "apps/desktop"]
 	path = apps/desktop
 	url = git@github.com:A3S-Lab/Desktop.git
+[submodule "crates/flow"]
+	path = crates/flow
+	url = git@github.com:A3S-Lab/Flow.git

@@ -22,7 +22,7 @@ The project is organized around these component groups:
 
 | Area | Components |
 |---|---|
-| Agent runtime and SDKs | `a3s-code`, `a3s-ahp`, `a3s-common` |
+| Agent runtime and SDKs | `a3s-code`, `a3s-flow`, `a3s-ahp`, `a3s-common` |
 | Workload isolation | `a3s-box` |
 | Model serving and ingress | `a3s-power`, `a3s-gateway` |
 | State, retrieval, and scheduling | `a3s-memory`, `a3s-search`, `a3s-lane`, `a3s-event` |
@@ -56,7 +56,7 @@ application. `a3s code` launches an interactive terminal coding agent built on
    eBPF telemetry        runtime control policy
 
    supporting libraries:
-   a3s-acl, a3s-ahp, a3s-event, a3s-memory, a3s-search,
+   a3s-flow, a3s-acl, a3s-ahp, a3s-event, a3s-memory, a3s-search,
    a3s-lane, a3s-common, a3s-tui, a3s-gui
 ```
 
@@ -70,6 +70,7 @@ so each crate can be built, tested, versioned, and released independently.
 |---|---|---|
 | [a3s](crates/cli/) | 0.5.11 | Interactive terminal coding agent; `a3s code` launches the TUI. Prebuilt binaries for macOS, Linux, Windows |
 | [a3s-code](crates/code/) | 4.1.0 | Harness-driven agent runtime: ACL config, tools, hooks, security policy, memory, MCP, structured output, planning, subagents, and pluggable workspaces. Rust core with Node/Python SDKs |
+| [a3s-flow](crates/flow/) | 0.1.0 | Rust SDK and durable workflow engine core: event-sourced runs, replay, steps, waits, hooks, retries, and a Perry-style native TypeScript runtime boundary |
 | [a3s-box](crates/box/) | 2.6.0 | Docker-like MicroVM runtime for Linux OCI workloads |
 | [a3s-gateway](crates/gateway/) | 1.0.11 | Reverse proxy for routing, middleware, SSE streaming, scale-to-zero, and agent orchestration |
 | [a3s-power](crates/power/) | 0.4.2 | Privacy-preserving LLM inference for TEE environments (OpenAI-compatible) |
@@ -105,11 +106,12 @@ cargo add a3s-code-core          # Rust
 ```text
 a3s/                            # monorepo root (NOT a Rust workspace)
 ├── apps/
-│   ├── desktop/                # 书小安 desktop app (Pake shell, submodule)
+│   ├── desktop/                # A3S Code desktop app (A3S GUI native shell, submodule)
 │   └── docs/                   # documentation site
 ├── crates/                     # components, each its own git submodule
 │   ├── cli/                    # a3s interactive coding-agent TUI
 │   ├── code/                   # a3s-code agent runtime + SDKs
+│   ├── flow/                   # a3s-flow Rust SDK and durable workflow engine
 │   ├── box/                    # a3s-box MicroVM runtime
 │   ├── power/                  # a3s-power LLM serving
 │   ├── gateway/                # a3s-gateway reverse proxy / ingress
