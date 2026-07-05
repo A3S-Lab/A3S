@@ -232,12 +232,13 @@ bars also use `Progress`; memory, knowledge, and resource panel separators use
 text wrapping uses `Paragraph`; SPF and `/ide` chrome uses `PanelFrame`; SPF and
 `/ide` file metadata use `Breadcrumb`; `/ide` active editor rows use
 `CursorLine`; the `/top` header uses `StatusBar`; the `/top` process table uses
-`DataTable` and `Sparkline` for CPU/MEM trends; and the main footer uses
-`SessionStatus` plus `ModeLine`. The main transcript viewport appends its right
-gutter through `Scrollbar`. Menu bounds, selection windows, approval choices,
-RemoteUI action links, tool status truncation, shared alert rows, overlay
-composition, toast rows, live activity blocks, top process trends, transcript
-gutters and input bubbles, prompt continuation alignment, input border labels, shared
+`DataTable` and `Sparkline` for CPU/MEM trends; `/loop` details use `KeyValue`;
+and the main footer uses `SessionStatus` plus `ModeLine`. The main transcript
+viewport appends its right gutter through `Scrollbar`. Menu bounds, selection
+windows, approval choices, RemoteUI action links, tool status truncation, shared
+alert rows, overlay composition, toast rows, live activity blocks, top process
+trends, loop key-value summaries, transcript gutters and input bubbles, prompt
+continuation alignment, input border labels, shared
 display-width wrapping for live reasoning and detail text, completed output tail
 previews, pinned plan checklists, task status summaries, compaction progress
 bars, pinned memory importance bars, transcript scrollbars, IDE cursor rows,
