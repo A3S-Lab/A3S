@@ -16,6 +16,7 @@ import {
   Lock,
   RefreshCw,
   ShieldCheck,
+  SlidersHorizontal,
   Terminal,
   Workflow,
   Zap,
@@ -62,6 +63,8 @@ const t = {
     frameworkHeading: 'Build agents, not boilerplate',
     appsLabel: 'Applications',
     appsHeading: 'Infrastructure that runs agents safely',
+    middlewareLabel: 'Middleware',
+    middlewareHeading: 'Request policy at the gateway edge',
     libsLabel: 'Libraries',
     libsHeading: 'Composable primitives',
     obsLabel: 'Observability And Control',
@@ -109,6 +112,8 @@ const t = {
     frameworkHeading: '构建 Agent，而非样板代码',
     appsLabel: '应用',
     appsHeading: '安全运行 Agent 的基础设施',
+    middlewareLabel: '中间件',
+    middlewareHeading: '网关边缘的请求策略',
     libsLabel: '库',
     libsHeading: '可组合的基础原语',
     obsLabel: '可观测性与控制',
@@ -233,6 +238,21 @@ function getModules(lang: Lang) {
     },
   ];
 
+  const middleware = [
+    {
+      name: 'Gateway Middleware',
+      tag: lang === 'cn' ? '请求管道' : 'Request Pipeline',
+      description:
+        lang === 'cn'
+          ? '15 个内置中间件能力：认证、限流、熔断、重试、CORS、headers、路径改写、压缩、IP/TCP 过滤。'
+          : '15 built-in middleware capabilities: auth, rate limiting, circuit breaking, retry, CORS, headers, path rewrite, compression, IP/TCP filtering.',
+      href: `${base}/docs/gateway/middleware`,
+      icon: SlidersHorizontal,
+      lightColor: 'bg-cyan-50 text-cyan-700',
+      darkColor: 'dark:bg-cyan-900/40 dark:text-cyan-400',
+    },
+  ];
+
   const libraries = [
     {
       name: 'Lane',
@@ -323,7 +343,7 @@ function getModules(lang: Lang) {
     },
   ];
 
-  return { frameworks, applications, libraries, observability };
+  return { frameworks, applications, middleware, libraries, observability };
 }
 
 const installSnippets = [
@@ -372,7 +392,7 @@ function ModuleCard({
 
 export default function HomePage({ lang = 'en' }: { lang?: Lang }) {
   const tr = t[lang];
-  const { frameworks, applications, libraries, observability } = getModules(lang);
+  const { frameworks, applications, middleware, libraries, observability } = getModules(lang);
   const docsHref = lang === 'cn' ? '/cn/docs/code' : '/docs/code';
 
   return (
@@ -452,6 +472,19 @@ export default function HomePage({ lang = 'en' }: { lang?: Lang }) {
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {applications.map((m) => <ModuleCard key={m.name} {...m} />)}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Middleware ── */}
+      <section className="px-4 py-16 sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-8">
+            <span className="text-xs font-semibold uppercase tracking-widest text-cyan-600 dark:text-cyan-400">{tr.middlewareLabel}</span>
+            <h2 className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{tr.middlewareHeading}</h2>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {middleware.map((m) => <ModuleCard key={m.name} {...m} />)}
           </div>
         </div>
       </section>

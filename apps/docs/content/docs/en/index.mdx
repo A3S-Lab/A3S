@@ -21,6 +21,7 @@ runtime veto when an action is unsafe.
 | Isolate actions | [A3S Box](/docs/box) | Docker-like MicroVM runtime for Linux OCI workloads, with CRI, image, network, SDK, and TEE-oriented paths. |
 | Serve models | [A3S Power](/docs/power) | Local LLM inference with OpenAI-compatible API, tool/structured-output paths, observability, and TEE privacy work. |
 | Route traffic | [A3S Gateway](/docs/gateway) | AI-native reverse proxy with routing, services, middleware, streaming, and deployment docs. |
+| Shape request policy | [A3S Gateway Middleware](/docs/gateway/middleware) | 15 built-in edge controls for auth, rate limits, circuit breaking, retries, request/response transforms, compression, IP allowlists, and TCP filtering. |
 | Schedule work | [A3S Lane](/docs/lane) | Priority queue with lanes, retries, dead-lettering, event stream, persistence, and observability. |
 | Remember and retrieve | [A3S Memory](/docs/memory) · [A3S Search](/docs/search) | Pluggable memory storage and an embeddable meta-search engine. |
 | Observe ground truth | [A3S Observer](/docs/observer) | Linux eBPF telemetry for agent tools, files, LLM calls, DNS, egress, and optional kernel guards. |
@@ -41,6 +42,7 @@ you -> a3s CLI / SDKs
        +--> A3S Box      -- isolated Linux OCI execution
        +--> A3S Power    -- model serving
        +--> A3S Gateway  -- ingress, proxying, middleware
+              +--> Gateway Middleware -- auth, rate-limit, transform, network policy
        +--> Lane/Search/Memory/Event
 
 kernel/user boundary:
