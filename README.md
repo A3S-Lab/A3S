@@ -22,7 +22,7 @@ The project focuses on production agent systems rather than a single runtime:
 
 - agent runtimes and SDKs for local and hosted coding assistants
 - terminal, native, and WebView UI surfaces for interactive agent workflows
-- MicroVM workload isolation, policy enforcement, and runtime supervision
+- modular web services, MicroVM workload isolation, policy enforcement, and runtime supervision
 - durable workflows, eventing, retrieval, memory, and scheduling primitives
 - ingress, model-serving, update, and distribution tooling
 
@@ -32,7 +32,7 @@ The project is organized around these component groups:
 |---|---|
 | Agent runtime and SDKs | `a3s-code`, `a3s-flow`, `a3s-ahp`, `a3s-common` |
 | Workload isolation | `a3s-box` |
-| Model serving and ingress | `a3s-power`, `a3s-gateway` |
+| Service framework, model serving, and ingress | `a3s-boot`, `a3s-power`, `a3s-gateway` |
 | State, retrieval, and scheduling | `a3s-memory`, `a3s-search`, `a3s-lane`, `a3s-event` |
 | Observability and control | `a3s-observer`, `a3s-sentry`, `a3s-acl` |
 | User interfaces | `a3s-tui`, `a3s-gui`, `a3s-webview` |
@@ -52,8 +52,12 @@ application. `a3s code` launches an interactive terminal coding agent built on
    interactive coding-agent UI
               |
               v
-        a3s-code                 a3s-gateway
-   agent runtime and SDKs   ingress, routing, streaming
+        a3s-code                 a3s-boot
+   agent runtime and SDKs   modular web services
+              |                         |
+              |                         v
+              |                  a3s-gateway
+              |             ingress, routing, streaming
               |                         |
               |                         v
               |                  a3s-power
@@ -72,7 +76,7 @@ application. `a3s code` launches an interactive terminal coding agent built on
    eBPF telemetry        runtime control policy
 
    supporting libraries:
-   a3s-flow, a3s-acl, a3s-ahp, a3s-event, a3s-memory, a3s-search,
+   a3s-boot, a3s-flow, a3s-acl, a3s-ahp, a3s-event, a3s-memory, a3s-search,
    a3s-lane, a3s-common, a3s-tui, a3s-gui
 ```
 
@@ -86,6 +90,7 @@ so each crate can be built, tested, versioned, and released independently.
 |---|---|---|
 | [a3s](crates/cli/) | 0.6.0 | Interactive terminal coding agent; `a3s code` launches the TUI. Prebuilt binaries for macOS, Linux, Windows |
 | [a3s-code](crates/code/) | 4.1.0 | Harness-driven agent runtime: ACL config, tools, hooks, security policy, memory, MCP, structured output, planning, subagents, and pluggable workspaces. Rust core with Node/Python SDKs |
+| [a3s-boot](crates/boot/) | 0.1.0 | Modular Rust web framework inspired by Nest.js: framework-neutral modules and routes with replaceable HTTP adapters |
 | [a3s-flow](crates/flow/) | 0.1.0 | Rust SDK and durable workflow engine core: event-sourced runs, replay, steps, waits, hooks, retries, and pluggable runtime backends |
 | [a3s-box](crates/box/) | 2.6.0 | Docker-like MicroVM runtime for Linux OCI workloads |
 | [a3s-gateway](crates/gateway/) | 1.0.11 | Reverse proxy for routing, middleware, SSE streaming, scale-to-zero, and agent orchestration |
@@ -138,6 +143,7 @@ a3s/                            # monorepo root (NOT a Rust workspace)
 ├── crates/                     # components, each its own git submodule
 │   ├── cli/                    # a3s interactive coding-agent TUI
 │   ├── code/                   # a3s-code agent runtime + SDKs
+│   ├── boot/                   # a3s-boot modular Rust web framework
 │   ├── flow/                   # a3s-flow Rust SDK and durable workflow engine
 │   ├── box/                    # a3s-box MicroVM runtime
 │   ├── power/                  # a3s-power LLM serving
