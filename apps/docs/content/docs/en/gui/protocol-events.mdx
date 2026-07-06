@@ -5,32 +5,33 @@ description: UiFrame, NativeProtocolSession, command responses, HostEvent, Inter
 
 # Protocol And Events
 
-A3S GUI keeps the JavaScript/Rust and native-host boundaries explicit. Compiled
-React output crosses into Rust as a `UiFrame`; native input returns as
+A3S GUI keeps the RSX/Rust and native-host boundaries explicit. Compiled RSX
+output crosses the host boundary as a `UiFrame`; native input returns as
 `HostEvent` and resolves to validated action invocations.
 
 ## Host Protocol Types
 
 | Type | Purpose |
 | --- | --- |
-| `UiFrame` | A compiled React tree plus stable action ids. |
+| `UiFrame` | A compiled RSX tree plus stable action ids. |
 | `WindowOptions` | Optional native window title, dimensions, and resizable flag for a frame. |
 | `RenderedFrame` | The native root produced by rendering a frame. |
 | `NativeRenderResponse` | The native root plus incremental platform commands emitted by a render pass. |
 | `HostEvent` | Native event emitted by a platform backend. |
-| `HostEventResponse` | Validated Web action invocation for a host event. |
+| `HostEventResponse` | Validated RSX action invocation for a host event. |
 
-The protocol keeps React authoring and platform backends decoupled. JavaScript
-does not see native widget handles. Native backends do not see JSX.
+The protocol keeps RSX authoring and platform backends decoupled. RSX components
+do not see native widget handles. Native backends receive native command
+records, not source-level RSX.
 
 ## Frame Boundary
 
 `NativeProtocolSession` is the intended host boundary for a native platform
 process. It owns a `GuiRuntime<PlatformPlanningHost<_>>`, accepts `UiFrame`
 values, returns only the new `PlatformCommand` records for a render pass, and
-dispatches `HostEvent` values back to registered Web action ids.
+dispatches `HostEvent` values back to registered RSX action ids.
 
-When `UiFrame.window` is present, the Rust core wraps the compiled React root in
+When `UiFrame.window` is present, the Rust core wraps the compiled RSX root in
 a native window role. The same command stream then creates `NSWindow`,
 `Microsoft.UI.Xaml.Window`, or `gtk::ApplicationWindow` before inserting the
 frame content as its child.
@@ -48,7 +49,7 @@ The renderer emits a small command vocabulary:
 | `SetRoot` | Set the surface or window root. |
 
 `NativeWidgetBlueprint` carries the platform family, widget class, native role,
-accessibility role, labels, values, React Aria control state, Web metadata,
+accessibility role, labels, values, semantic control state, Web metadata,
 event bindings, and parsed portable style. Platform bindings can derive
 `NativeWidgetSetter` operations such as `SetLabel`, `SetEnabled`,
 `SetPlaceholder`, `SetMinimum`, `SetMaximum`, `SetCurrent`, `SetEvents`, and
@@ -56,10 +57,10 @@ event bindings, and parsed portable style. Platform bindings can derive
 
 ## Event Flow
 
-React callbacks are compiled to stable action identifiers. Native adapters emit
+RSX event props are compiled to stable action identifiers. Native adapters emit
 typed events. `GuiRuntime` first updates portable focus, value, selection,
 checked, and expanded state in `InteractionState`; then `EventRouter` maps the
-native event back to the Web-authored action id and `ActionRegistry` validates
+native event back to the registered action id and `ActionRegistry` validates
 that the action exists.
 
 ```text
@@ -74,11 +75,11 @@ onPress={saveProfile}
 Native paths enqueue press, change, focus, blur, toggle, selection-change, and
 ranged-value events depending on the platform control. Programmatic setter
 updates are kept separate from native user input so render diffs do not trigger
-Web-authored actions.
+RSX actions.
 
 ## Native Host Responsibility
 
 A native host can keep one session per window or embedded surface, apply
 returned commands on its UI thread, and send host events back through the same
-session. The host does not need to understand React component instances; it only
+session. The host does not need to understand RSX component instances; it only
 needs the serializable protocol records and platform command stream.

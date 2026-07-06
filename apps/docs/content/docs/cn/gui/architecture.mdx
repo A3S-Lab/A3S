@@ -1,20 +1,21 @@
 ---
 title: Architecture
-description: A3S GUI 的 structured input、native IR、renderer、command stream、host boundary 和 style contract。
+description: A3S GUI 的 RSX authoring、native IR、renderer、command stream、host boundary 和 style contract。
 ---
 
 # GUI Architecture
 
-A3S GUI 接受结构化 JSX/protocol element records，并输出 native platform
-commands。React Aria component names、HTML/SVG intrinsic names、DOM-style props
+A3S GUI 接受 Rust-style `.rsx` function components，并输出 native platform
+commands。Semantic component names、HTML/SVG intrinsic names、DOM-style props
 和 style input 会在 Rust core 中映射到 native IR。
 
 ```text
-JSX / TSX element records
-        -> @a3s-lab/gui JSX runtime
-        -> React Compiler output
+RSX function component source
+        -> parse_rsx / ComponentCx hooks
+        -> RsxComponent template
+        -> CompiledRsxNode
         -> UiFrame protocol
-        -> ReactCompilerBridge
+        -> RsxCompilerBridge
         -> semantic UI tree
         -> A3S Native UI IR
         -> keyed renderer diff engine
@@ -31,11 +32,11 @@ JSX / TSX element records
 
 | Layer | 职责 |
 | --- | --- |
-| Structured input | 接受 JSX/protocol element records，包含 semantic component names、DOM-style props、inline styles、`aria-*`、`data-*` 和命名事件回调。 |
+| RSX authoring | 接受 Rust-style `.rsx` function components，包含 semantic component names、DOM-style props、inline styles、`aria-*`、`data-*` 和命名事件 actions。 |
 | Native UI IR | 保留 roles、labels、values、state、events、metadata、children、accessibility roles 和 portable style tokens。 |
 | Renderer | 对 keyed tree 做 reconciliation，并输出 create、update、insert child、remove、set-root commands。 |
 | Native host | 把 commands 应用到 AppKit、WinUI、GTK 或 headless recording backend。 |
-| Event bridge | 把 native input 转成 `HostEvent`，更新 portable interaction state，再路由到已注册的 action ids。 |
+| Event bridge | 把 native input 转成 `HostEvent`，更新 portable interaction state，再路由到已注册的 RSX action ids。 |
 
 ## NativeHost Boundary
 
@@ -70,7 +71,7 @@ events 和 metadata。
 
 ## Style Contract
 
-`WebProps` 保留原始 Web props。`PortableStyle` 解析 native adapter 能确定性应用的子集：
+`WebProps` 保留 portable DOM-style props。`PortableStyle` 解析 native adapter 能确定性应用的子集：
 
 - display 和 flex direction
 - alignment 和 justification

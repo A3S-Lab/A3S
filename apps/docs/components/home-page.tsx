@@ -217,8 +217,8 @@ function getModules(lang: Lang) {
       tag: lang === 'cn' ? '原生 UI' : 'Native UI',
       description:
         lang === 'cn'
-          ? 'React Aria 语义树到 native IR 的原生 UI renderer 原型，覆盖 AppKit、WinUI、GTK 规划路径。'
-          : 'Native UI renderer prototype that lowers React Aria semantic trees into native IR for AppKit, WinUI, and GTK planning paths.',
+          ? 'Rust RSX 与 semantic_ui 到 native IR 的原生 UI renderer 原型，覆盖 AppKit、WinUI、GTK 规划路径。'
+          : 'Native UI renderer prototype that lowers Rust RSX and semantic_ui trees into native IR for AppKit, WinUI, and GTK planning paths.',
       href: `${base}/docs/gui`,
       icon: Monitor,
       lightColor: 'bg-fuchsia-50 text-fuchsia-600',
