@@ -63,6 +63,8 @@ const t = {
     frameworkHeading: 'Build agents, not boilerplate',
     appsLabel: 'Applications',
     appsHeading: 'Infrastructure that runs agents safely',
+    distributionLabel: 'Distribution',
+    distributionHeading: 'Install, package, and update the stack',
     middlewareLabel: 'Middleware',
     middlewareHeading: 'Request policy at the gateway edge',
     libsLabel: 'Libraries',
@@ -112,6 +114,8 @@ const t = {
     frameworkHeading: '构建 Agent，而非样板代码',
     appsLabel: '应用',
     appsHeading: '安全运行 Agent 的基础设施',
+    distributionLabel: '分发',
+    distributionHeading: '安装、打包和更新整套技术栈',
     middlewareLabel: '中间件',
     middlewareHeading: '网关边缘的请求策略',
     libsLabel: '库',
@@ -238,6 +242,33 @@ function getModules(lang: Lang) {
     },
   ];
 
+  const distribution = [
+    {
+      name: 'Homebrew',
+      tag: lang === 'cn' ? '安装渠道' : 'Install Channel',
+      description:
+        lang === 'cn'
+          ? 'A3S Homebrew tap：formulae、cask、release archive、checksum、platform branch 和维护流程。'
+          : 'A3S Homebrew tap for formulae, casks, release archives, checksums, platform branches, and maintenance flow.',
+      href: `${base}/docs/homebrew`,
+      icon: Package,
+      lightColor: 'bg-orange-50 text-orange-600',
+      darkColor: 'dark:bg-orange-900/40 dark:text-orange-400',
+    },
+    {
+      name: 'Updater',
+      tag: lang === 'cn' ? '自更新' : 'Self Update',
+      description:
+        lang === 'cn'
+          ? 'CLI release 自更新库，覆盖 GitHub Releases、资产选择、安装安全和验证流程。'
+          : 'CLI self-update library for GitHub Releases, asset selection, installation safety, and verification flow.',
+      href: `${base}/docs/updater`,
+      icon: RefreshCw,
+      lightColor: 'bg-rose-50 text-rose-600',
+      darkColor: 'dark:bg-rose-900/40 dark:text-rose-400',
+    },
+  ];
+
   const middleware = [
     {
       name: 'Gateway Middleware',
@@ -254,6 +285,42 @@ function getModules(lang: Lang) {
   ];
 
   const libraries = [
+    {
+      name: 'ACL',
+      tag: lang === 'cn' ? '配置语言' : 'Config Language',
+      description:
+        lang === 'cn'
+          ? '类 HCL Agent Configuration Language：parser、AST、generator、Rust API 和 Node SDK。'
+          : 'HCL-like Agent Configuration Language with parser, AST, generator, Rust API, and Node SDK.',
+      href: `${base}/docs/acl`,
+      icon: Lock,
+      lightColor: 'bg-zinc-100 text-zinc-700',
+      darkColor: 'dark:bg-zinc-800 dark:text-zinc-300',
+    },
+    {
+      name: 'AHP',
+      tag: lang === 'cn' ? 'Agent 协议' : 'Agent Protocol',
+      description:
+        lang === 'cn'
+          ? '传输无关 JSON-RPC harness protocol，支持事件、typed decisions、批处理和多种 transport。'
+          : 'Transport-agnostic JSON-RPC harness protocol for events, typed decisions, batching, and multiple transports.',
+      href: `${base}/docs/ahp`,
+      icon: Workflow,
+      lightColor: 'bg-blue-50 text-blue-700',
+      darkColor: 'dark:bg-blue-900/40 dark:text-blue-400',
+    },
+    {
+      name: 'Event',
+      tag: lang === 'cn' ? '事件总线' : 'Event Bus',
+      description:
+        lang === 'cn'
+          ? 'Provider 无关 event bus：publish、subscribe、history、schema、routing、NATS 和 payload security。'
+          : 'Provider-agnostic event bus for publish, subscribe, history, schema, routing, NATS, and payload security.',
+      href: `${base}/docs/event`,
+      icon: Zap,
+      lightColor: 'bg-yellow-50 text-yellow-700',
+      darkColor: 'dark:bg-yellow-900/40 dark:text-yellow-400',
+    },
     {
       name: 'Lane',
       tag: lang === 'cn' ? '优先级队列' : 'Priority Queue',
@@ -303,16 +370,16 @@ function getModules(lang: Lang) {
       darkColor: 'dark:bg-purple-900/40 dark:text-purple-400',
     },
     {
-      name: 'Updater',
-      tag: lang === 'cn' ? '自更新' : 'Self Update',
+      name: 'Common',
+      tag: lang === 'cn' ? '共享原语' : 'Shared Primitives',
       description:
         lang === 'cn'
-          ? 'CLI release 自更新库，覆盖 GitHub Releases、资产选择、安装安全和验证流程。'
-          : 'CLI self-update library for GitHub Releases, asset selection, installation safety, and verification flow.',
-      href: `${base}/docs/updater`,
-      icon: RefreshCw,
-      lightColor: 'bg-rose-50 text-rose-600',
-      darkColor: 'dark:bg-rose-900/40 dark:text-rose-400',
+          ? '共享 privacy、tool、workspace path 和 framed transport 类型，供 A3S crates 复用。'
+          : 'Shared privacy, tool, workspace path, and framed transport primitives reused across A3S crates.',
+      href: `${base}/docs/common`,
+      icon: Puzzle,
+      lightColor: 'bg-stone-100 text-stone-700',
+      darkColor: 'dark:bg-stone-800 dark:text-stone-300',
     },
   ];
 
@@ -343,7 +410,7 @@ function getModules(lang: Lang) {
     },
   ];
 
-  return { frameworks, applications, middleware, libraries, observability };
+  return { frameworks, applications, distribution, middleware, libraries, observability };
 }
 
 const installSnippets = [
@@ -392,7 +459,7 @@ function ModuleCard({
 
 export default function HomePage({ lang = 'en' }: { lang?: Lang }) {
   const tr = t[lang];
-  const { frameworks, applications, middleware, libraries, observability } = getModules(lang);
+  const { frameworks, applications, distribution, middleware, libraries, observability } = getModules(lang);
   const docsHref = lang === 'cn' ? '/cn/docs/code' : '/docs/code';
 
   return (
@@ -472,6 +539,19 @@ export default function HomePage({ lang = 'en' }: { lang?: Lang }) {
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {applications.map((m) => <ModuleCard key={m.name} {...m} />)}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Distribution ── */}
+      <section className="px-4 py-16 sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-8">
+            <span className="text-xs font-semibold uppercase tracking-widest text-orange-500">{tr.distributionLabel}</span>
+            <h2 className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{tr.distributionHeading}</h2>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {distribution.map((m) => <ModuleCard key={m.name} {...m} />)}
           </div>
         </div>
       </section>
