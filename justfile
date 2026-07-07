@@ -23,6 +23,18 @@ docs-build:
     cd apps/docs && bun run build
 
 # ============================================================================
+# A3S GUI
+# ============================================================================
+
+# Start the A3S GUI native calculator example for this operating system
+calculator:
+    cd crates/gui && just calculator
+
+# Start the A3S GUI semantic component playground for this operating system
+playground:
+    cd crates/gui && just playground
+
+# ============================================================================
 # A3S Code CLI
 # ============================================================================
 
