@@ -1,0 +1,62 @@
+---
+title: GitHub Packages
+description: How A3S treats GitHub Packages, GHCR images, and the boundary with Homebrew release archives.
+---
+
+# GitHub Packages
+
+GitHub Packages is the registry layer for package artifacts such as OCI images,
+private packages, and language package registries. It is separate from the A3S
+Homebrew tap.
+
+## Current Role
+
+The Homebrew tap currently installs release archives from GitHub Releases. Those
+formula URLs point at `.tar.gz` or app bundle assets and verify them with
+SHA-256 checksums.
+
+GitHub Packages and GHCR are used when a component publishes registry artifacts.
+For example, A3S documentation and source reference GHCR for container images
+such as Gateway deployments and Box OCI workloads.
+
+| Channel | Role |
+| --- | --- |
+| GitHub Releases | Versioned binary archives consumed by Homebrew formulae. |
+| Homebrew Tap | Installer metadata, platform branches, checksums, and smoke tests. |
+| GitHub Packages / GHCR | Registry artifacts such as OCI images or private packages. |
+
+## Authentication
+
+Public GHCR images can be pulled without credentials. Private packages require a
+token with package read access.
+
+```bash
+echo "$GITHUB_TOKEN" | docker login ghcr.io -u USERNAME --password-stdin
+```
+
+GitHub Actions can usually use the repository `GITHUB_TOKEN` when the workflow
+has the required package permissions:
+
+```yaml
+permissions:
+  contents: read
+  packages: read
+```
+
+## Homebrew Boundary
+
+Do not replace Homebrew formula release archive URLs with GHCR image references.
+Homebrew formulae should continue to use direct downloadable archives and fixed
+checksums.
+
+Use GitHub Packages when the artifact is a registry package, such as:
+
+- OCI images used by Docker, Kubernetes, or A3S Box.
+- Private package artifacts consumed by CI.
+- Registry-hosted SDK packages when a component explicitly publishes them.
+
+Use GitHub Releases when the artifact is:
+
+- A CLI binary archive installed by Homebrew.
+- A macOS app bundle or DMG consumed by a cask.
+- A release asset downloaded by the updater.
