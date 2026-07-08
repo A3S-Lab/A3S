@@ -45,7 +45,7 @@ is Rust.
 | [A3S Code Desktop](apps/desktop/) | 0.1.0 | Native shell for A3S Code. |
 | [A3S Box Desktop](apps/box/) | 0.1.0 | Native A3S Box management client. |
 | [a3s](crates/cli/) | 0.7.5 | End-user CLI; `a3s code` launches the TUI coding agent. |
-| [a3s-code](crates/code/) | core 4.3.1, SDKs 4.3.0 | Rust agent runtime plus Node and Python SDK bindings. |
+| [a3s-code](crates/code/) | core 4.3.2, SDKs 4.3.0 | Rust agent runtime plus Node and Python SDK bindings. |
 | [a3s-gui](crates/gui/) | 0.1.0 | Native GUI runtime with hooks, RSX templates, semantic UI, and platform hosts. |
 | [a3s-tui](crates/tui/) | 0.1.6 | Terminal UI framework used by `a3s code`. |
 | [a3s-flow](crates/flow/) | 0.4.1 | Durable workflow engine with event-sourced runs and replay. |
@@ -53,7 +53,7 @@ is Rust.
 | [a3s-event](crates/event/) | 0.3.0 | Event subscription, dispatch, and persistence. |
 | [a3s-lane](crates/lane/) | 0.4.0 | Priority queues with concurrency, retry, and dead-letter support. |
 | [a3s-search](crates/search/) | 1.3.0 | Embeddable meta-search engine with consensus ranking. |
-| [a3s-box](crates/box/) | 3.0.4 | Docker-like MicroVM runtime for Linux OCI workloads. |
+| [a3s-box](crates/box/) | 3.0.5 | Docker-like MicroVM runtime for Linux OCI workloads. |
 | [a3s-observer](crates/observer/) | 0.11.0 | eBPF observability for LLM calls, tools, files, and egress. |
 | [a3s-sentry](crates/sentry/) | 0.6.0 | Tiered runtime security control. |
 | [a3s-boot](crates/boot/) | 0.1.0 | Nest-inspired modular service framework for Rust APIs. |
