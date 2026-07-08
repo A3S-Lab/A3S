@@ -130,13 +130,6 @@ Applications under `apps/` use app-local workflows. The root `justfile` only
 orchestrates common entry points such as `just code`, `just dev`, and
 `just desktop-check`.
 
-## Current Focus
-
-- Keep `a3s code` reliable as the production terminal surface.
-- Build native desktop clients on `a3s-gui`, Rust hooks, and RSX templates.
-- Keep runtime, memory, eventing, workflow, isolation, and safety crates aligned
-  with A3S Code instead of drifting into unrelated product surfaces.
-
 ## Documentation
 
 Full reference and tutorials: [a3s-lab.github.io/a3s](https://a3s-lab.github.io/a3s/).
