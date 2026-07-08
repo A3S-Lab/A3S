@@ -31,12 +31,12 @@ core product path is Rust.
 
 | Area | Paths | Purpose |
 | --- | --- | --- |
-| Product surfaces | `crates/cli`, `apps/desktop`, `apps/docs` | CLI, native desktop app, and documentation site. |
+| Product surfaces | `crates/cli`, `apps/desktop`, `apps/box`, `apps/docs` | CLI, native desktop apps, and documentation site. |
 | Agent runtime | `crates/code`, `crates/ahp`, `crates/acl`, `crates/common` | Sessions, tools, policy, protocol, config, and shared types. |
 | UI systems | `crates/tui`, `crates/gui`, `crates/webview` | Terminal UI, native RSX UI, and trusted WebView helpers. |
 | State and coordination | `crates/memory`, `crates/event`, `crates/flow`, `crates/lane`, `crates/search` | Memory, events, workflows, queues, and retrieval. |
 | Runtime safety and operations | `crates/box`, `crates/observer`, `crates/sentry` | Isolation, observability, and runtime control. |
-| Services | `crates/boot`, `crates/gateway`, `crates/power` | Optional service framework, ingress, and model serving. |
+| Services | `crates/boot`, `crates/gateway`, `crates/power` | Nest-style service framework, ingress, and model serving. |
 | Distribution | `crates/updater`, `homebrew-tap` | CLI self-update support and Homebrew formulae. |
 
 ## Projects
@@ -44,6 +44,7 @@ core product path is Rust.
 | Project | Version | Role |
 | --- | --- | --- |
 | [A3S Code Desktop](apps/desktop/) | 0.1.0 | Native desktop shell for A3S Code. |
+| [A3S Box Desktop](apps/box/) | 0.1.0 | Native A3S Box management client built with `a3s-gui`. |
 | [a3s](crates/cli/) | 0.7.5 | End-user CLI; `a3s code` launches the TUI coding agent. |
 | [a3s-code](crates/code/) | core 4.3.1, SDKs 4.3.0 | Rust agent runtime plus Node and Python SDK bindings. |
 | [a3s-gui](crates/gui/) | 0.1.0 | Native GUI runtime with `ComponentCx` hooks, RSX templates, semantic UI, and AppKit/GTK/WinUI hosts. |
@@ -56,7 +57,7 @@ core product path is Rust.
 | [a3s-box](crates/box/) | 3.0.4 | Docker-like MicroVM runtime for Linux OCI workloads. |
 | [a3s-observer](crates/observer/) | 0.11.0 | eBPF observability for LLM calls, tools, files, and egress. |
 | [a3s-sentry](crates/sentry/) | 0.6.0 | Tiered runtime security control. |
-| [a3s-boot](crates/boot/) | 0.1.0 | Modular Rust web framework inspired by Nest.js. |
+| [a3s-boot](crates/boot/) | 0.1.0 | Modular Rust web framework with Nest-style controllers, providers, route macros, SSE, events, scheduling, WebSockets, and transports. |
 | [a3s-gateway](crates/gateway/) | 1.0.11 | Reverse proxy, routing, middleware, streaming, and scale-to-zero. |
 | [a3s-power](crates/power/) | 0.4.2 | Privacy-preserving LLM inference for TEE environments. |
 | [a3s-ahp](crates/ahp/) | 2.4.0 | Agent Harness Protocol supervision primitives. |
@@ -88,6 +89,9 @@ just dev
 
 # Check the desktop app.
 just desktop-check
+
+# Run the A3S Box desktop client.
+just box
 
 # Test the GUI runtime and RSX support.
 cd crates/gui
@@ -131,6 +135,8 @@ orchestrates common entry points such as `just code`, `just dev`, and
 
 - Keep `a3s code` reliable as the production terminal surface.
 - Build the native desktop shell on `a3s-gui`, Rust hooks, and RSX templates.
+- Keep `a3s-boot` moving toward Nest.js-style framework ergonomics for Rust
+  services while staying GraphQL-free.
 - Keep runtime, memory, eventing, workflow, isolation, and safety crates aligned
   with A3S Code instead of drifting into unrelated product surfaces.
 
