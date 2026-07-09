@@ -51,7 +51,7 @@ is Rust.
 | [a3s-flow](crates/flow/) | 0.4.1 | Durable workflow engine with event-sourced runs and replay. |
 | [a3s-memory](crates/memory/) | 0.1.2 | Pluggable long-term memory storage for agents. |
 | [a3s-event](crates/event/) | 0.3.0 | Event subscription, dispatch, and persistence. |
-| [a3s-lane](crates/lane/) | 0.4.0 | Rust-only priority and job queue with Redis, flows, repeat jobs, worker leases, retry, and DLQ. |
+| [a3s-lane](crates/lane/) | 0.4.1 | Rust-only priority and job queue with Redis, flows, repeat jobs, worker leases, retry, and DLQ. |
 | [a3s-search](crates/search/) | 1.3.0 | Embeddable meta-search engine with consensus ranking. |
 | [a3s-box](crates/box/) | 3.0.5 | Docker-like MicroVM runtime for Linux OCI workloads. |
 | [a3s-observer](crates/observer/) | 0.11.0 | eBPF observability for LLM calls, tools, files, and egress. |
