@@ -61,3 +61,6 @@
 [submodule "crates/boot"]
 	path = crates/boot
 	url = git@github.com:A3S-Lab/Boot.git
+[submodule "crates/use"]
+	path = crates/use
+	url = git@github.com:A3S-Lab/Use.git

@@ -10,7 +10,7 @@ a3s/                            ← MONOREPO ROOT (NOT a Rust workspace)
 │   └── docs/                   # Documentation site (Next.js/Fumadocs-style app)
 ├── crates/                     # Rust crates (submodules)
 │   ├── acl/ ahp/ box/ code/ event/ gateway/
-│   ├── lane/ memory/ power/ search/ updater/
+│   ├── lane/ memory/ power/ search/ updater/ use/
 │   └── common/                 # Shared types (local crate)
 └── homebrew-tap/              # Homebrew tap
 ```
@@ -63,7 +63,9 @@ Key rules:
 
 **Python SDK:** Async/await, `async with` for cleanup, type hints.
 
-**Config:** Prefer HCL over TOML. Use `.hcl` extension by default.
+**Config:** Prefer ACL over TOML. Use `.acl` by default. ACL means the A3S
+Agent Configuration Language and must be parsed and generated with `a3s-acl`;
+do not treat ACL as HCL or use an HCL parser for ACL files.
 
 ---
 

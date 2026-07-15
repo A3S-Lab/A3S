@@ -12,7 +12,7 @@ a3s/
 │   └── docs/         # Documentation site
 ├── crates/           # Rust crates as submodules
 │   ├── acl/ ahp/ box/ code/ event/ gateway/
-│   ├── lane/ memory/ power/ search/ updater/
+│   ├── lane/ memory/ power/ search/ updater/ use/
 │   └── common/       # Shared types (local crate)
 └── homebrew-tap/     # Homebrew tap
 ```
@@ -82,8 +82,10 @@ Conventions:
 
 ## Configuration
 
-- Prefer HCL over TOML for product configuration.
-- Use `.hcl` by default for new config files unless an existing local convention says otherwise.
+- Prefer ACL over TOML for product configuration.
+- Use `.acl` by default for new config files unless an existing local convention says otherwise.
+- ACL means the A3S Agent Configuration Language. Parse and generate it with
+  `a3s-acl`; do not treat ACL as HCL or use an HCL parser for ACL files.
 
 ## NestJS And DDD Rules
 

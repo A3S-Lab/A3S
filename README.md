@@ -19,10 +19,12 @@ Rust-first platform components. Crates under `crates/` are independent git
 submodules, and applications live under `apps/`.
 
 The `a3s` command is the unified product entrypoint: `a3s code` launches the
-interactive coding agent, `a3s box` manages isolated runtimes, and `a3s bench`
-runs reproducible evaluations of coding agents and automated systems. Local
-Code, Runtime, provider/model, and Bench workflows do not require an A3S OS
-login unless the selected remote capability requires one.
+interactive coding agent, `a3s box` manages isolated runtimes, `a3s bench` runs
+reproducible evaluations, and `a3s use` exposes Browser, Office, and installed
+Use extensions. `a3s list`, `a3s install`, `a3s upgrade`, and `a3s uninstall`
+provide one typed component lifecycle. Local Code, Runtime, provider/model, and
+Bench workflows do not require an A3S OS login unless the selected remote
+capability requires one.
 
 The stack is intentionally not a root Rust workspace and not a JavaScript UI
 runtime. Web and WebView packages are auxiliary surfaces; the core product path
@@ -35,7 +37,8 @@ is Rust.
 | Product surfaces | `crates/cli`, `crates/bench`, `apps/web`, `apps/box`, `apps/docs` | CLI, browser workspace, benchmark control component, native app, and documentation site. |
 | Agent runtime | `crates/code`, `crates/ahp`, `crates/acl`, `crates/common` | Sessions, tools, policy, protocol, config, and shared types. |
 | UI systems | `crates/tui`, `crates/gui`, `crates/webview` | Terminal UI, native RSX UI, and trusted WebView helpers. |
-| State and coordination | `crates/memory`, `crates/event`, `crates/flow`, `crates/lane`, `crates/search` | Memory, events, workflows, queues, and retrieval. |
+| Use and retrieval | `crates/use`, `crates/search` | Browser and Office capability surfaces, external Use extensions, and search through the shared Browser runtime. |
+| State and coordination | `crates/memory`, `crates/event`, `crates/flow`, `crates/lane` | Memory, events, workflows, and queues. |
 | Runtime safety and operations | `crates/runtime`, `crates/box`, `crates/observer`, `crates/sentry` | Provider-neutral execution, isolation, observability, and runtime control. |
 | Services | `crates/boot`, `crates/gateway`, `crates/power` | Service framework, ingress, and model serving. |
 | Distribution | `crates/updater`, `homebrew-tap` | CLI self-update support and Homebrew formulae. |
@@ -46,15 +49,16 @@ is Rust.
 | --- | --- | --- |
 | [A3S Web](apps/web/) | 0.1.0 | Browser workspace for the A3S Code product, served by the local CLI. |
 | [A3S Box Desktop](apps/box/) | 0.1.0 | Native A3S Box management client. |
-| [a3s](crates/cli/) | 0.7.7 | End-user CLI; `a3s code` launches the TUI coding agent. |
-| [a3s-code](crates/code/) | core and SDKs 4.3.3 | Rust agent runtime plus Node and Python SDK bindings. |
+| [a3s](crates/cli/) | 0.9.0 | End-user CLI and typed component-management entrypoint. |
+| [a3s-code](crates/code/) | core and SDKs 5.2.8 | Rust agent runtime plus Node and Python SDK bindings. |
 | [a3s-gui](crates/gui/) | 0.1.0 | Native GUI runtime with hooks, RSX templates, semantic UI, and platform hosts. |
 | [a3s-tui](crates/tui/) | 0.1.6 | Terminal UI framework used by `a3s code`. |
 | [a3s-flow](crates/flow/) | 0.4.1 | Durable workflow engine with event-sourced runs and replay. |
 | [a3s-memory](crates/memory/) | 0.1.2 | Pluggable long-term memory storage for agents. |
 | [a3s-event](crates/event/) | 0.3.0 | Event subscription, dispatch, and persistence. |
 | [a3s-lane](crates/lane/) | 0.5.0 | Rust-only priority and job queue with Redis, flows, repeat jobs, worker leases, retry, and DLQ. |
-| [a3s-search](crates/search/) | 1.3.0 | Embeddable meta-search engine with consensus ranking. |
+| [a3s-use](crates/use/) | 0.1.1 | Typed Browser and Office capability layer plus native CLI, standard MCP, and Skill extension surfaces. |
+| [a3s-search](crates/search/) | 1.4.3 | Embeddable meta-search engine using `a3s-use-browser` for headless browsing. |
 | [a3s-bench](crates/bench/) | 0.1.0 | Reproducible evaluation of coding agents, automated systems, and deterministic tools. |
 | [a3s-runtime](crates/runtime/) | 0.1.0 | Provider-neutral execution contract and Runtime client. |
 | [a3s-box](crates/box/) | 3.0.5 | Docker-like MicroVM runtime for Linux OCI workloads. |
@@ -67,7 +71,7 @@ is Rust.
 | [a3s-acl](crates/acl/) | 0.2.1 | Agent Configuration Language parser. |
 | [a3s-webview](crates/webview/) | 0.1.1 | Native trusted WebView popup helper. |
 | [a3s-common](crates/common/) | 0.1.1 | Shared primitives and transport types. |
-| [a3s-updater](crates/updater/) | 0.2.0 | Self-update support for CLI binaries. |
+| [a3s-updater](crates/updater/) | 0.3.0 | Verified component transactions and self-update support for CLI binaries. |
 
 ## Quick Start
 
@@ -81,19 +85,33 @@ a3s code
 # Run the browser Code workspace.
 a3s web
 
-# Code is included with a3s. Box and Bench install on first real use.
+# Inspect the trusted component catalog and local installation state.
 a3s list
-a3s box ps
 
-# Optional components can also be prepared explicitly.
-a3s install code   # verify/repair the included Code installation
-a3s install box
-a3s install bench
+# Use the built-in Browser and Office domains.
+a3s use browser render https://example.com
+a3s use office doctor --json
+
+# Manage catalog components explicitly.
+a3s install use
+a3s upgrade use
+a3s uninstall use/office
 ```
 
-`a3s update` remains the Code self-update alias. Use
-`a3s update code|box|bench` to update one component explicitly; updating a
-missing optional component tells you to install it first.
+`a3s list` is read-only. The mutation commands resolve typed component IDs from
+trusted catalogs, verify provenance, and modify only component-owned files;
+they are not general package managers for arbitrary macOS, Linux, or Windows
+ecosystems. Use `a3s self update` for the umbrella CLI itself.
+
+Managed component installation and runtime support currently target macOS and
+Linux. Windows remains a compile/package preview on the roadmap until its
+managed lifecycle, file-locking, and persistent Browser session gates pass.
+
+Browser and Office are built-in A3S Use domains. External domains remain
+independently implementable through ACL-declared native CLI, standard MCP,
+and/or `SKILL.md` surfaces; A3S Use does not introduce a custom JSON-RPC
+extension protocol. A3S Search depends directly on the typed
+`a3s-use-browser` library rather than owning a second browser runtime.
 
 Manage account-owned and configured model routes without copying Claude Code,
 Codex, or A3S OS credentials into `config.acl`:
