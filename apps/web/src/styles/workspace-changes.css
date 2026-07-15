@@ -1,0 +1,262 @@
+.changes-inspector > header {
+  display: flex;
+  height: 40px;
+  flex: 0 0 40px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px 0 11px;
+  border-bottom: 1px solid var(--a3s-line);
+}
+
+.changes-inspector > header > div:first-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0;
+}
+
+.changes-inspector > header .eyebrow {
+  color: var(--a3s-faint);
+  font-size: 8px;
+}
+
+.changes-inspector > header strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.changes-header-actions {
+  display: flex;
+  align-items: center;
+}
+
+.changes-header-actions .ds-icon-button {
+  width: 27px;
+  height: 27px;
+  border-radius: 5px;
+}
+
+.changes-busy {
+  color: var(--a3s-muted);
+  font-size: 9px;
+}
+
+.changes-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+.change-group {
+  border-bottom: 1px solid var(--a3s-line);
+}
+
+.change-group > header {
+  display: flex;
+  height: 29px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  color: var(--a3s-muted);
+}
+
+.change-group > header strong,
+.change-group > header span {
+  font-size: 10px;
+}
+
+.change-group > header strong {
+  font-weight: 650;
+  letter-spacing: 0.03em;
+}
+
+.change-group > div {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  padding: 0 3px 0 8px;
+}
+
+.change-group > div:hover {
+  background: color-mix(in srgb, var(--a3s-panel-strong) 60%, transparent);
+}
+
+.change-group > div > button:first-child {
+  display: flex;
+  min-width: 0;
+  min-height: 32px;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--a3s-muted);
+  cursor: default;
+  text-align: left;
+}
+
+.change-file-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: baseline;
+  gap: 5px;
+  overflow: hidden;
+}
+
+.change-file-copy strong,
+.change-file-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.change-file-copy strong {
+  color: var(--a3s-ink);
+  font-size: 10px;
+  font-weight: 520;
+}
+
+.change-file-copy small {
+  color: var(--a3s-faint);
+  font-size: 8px;
+}
+
+.change-file-status {
+  flex: 0 0 auto;
+  color: var(--a3s-warning);
+  font: 650 10px/1 "SFMono-Regular", Consolas, monospace;
+}
+
+.change-group > div > .ds-icon-button {
+  width: 25px;
+  height: 25px;
+  border-radius: 4px;
+}
+
+.changes-inspector > footer {
+  margin-top: auto;
+  padding: 8px;
+  border-top: 1px solid var(--a3s-line);
+}
+
+.changes-inspector > footer .ds-button {
+  width: 100%;
+  min-height: 32px;
+  font-size: 11px;
+}
+
+.changes-empty {
+  display: flex;
+  min-height: 120px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 18px;
+  flex-direction: column;
+  color: var(--a3s-faint);
+  font-size: 10px;
+  text-align: center;
+}
+
+.changes-error strong {
+  color: var(--a3s-ink);
+  font-size: 11px;
+}
+
+.changes-error span {
+  max-width: 240px;
+  line-height: 1.5;
+}
+
+.changes-inline-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 7px 9px;
+  border-bottom: 1px solid color-mix(in srgb, var(--a3s-red) 20%, var(--a3s-line));
+  background: color-mix(in srgb, var(--a3s-red) 5%, var(--a3s-panel));
+  color: var(--a3s-red);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.changes-inline-error span {
+  min-width: 0;
+  flex: 1;
+}
+
+.changes-inline-error button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.commit-receipt {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px;
+  padding: 9px;
+  border: 1px solid color-mix(in srgb, var(--a3s-green) 30%, var(--a3s-line));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--a3s-green) 6%, var(--a3s-panel));
+  color: var(--a3s-green);
+}
+
+.commit-receipt > div {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.commit-receipt strong,
+.commit-receipt span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-receipt strong {
+  color: var(--a3s-ink);
+  font-size: 10px;
+}
+
+.commit-receipt span,
+.commit-receipt small {
+  color: var(--a3s-muted);
+  font-size: 9px;
+}
+
+.changes-compact-close {
+  display: none;
+}
+
+@media (max-width: 1200px) {
+  .changes-inspector {
+    display: none;
+  }
+
+  .changes-inspector.compact-open {
+    position: absolute;
+    z-index: 30;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    width: 310px;
+    box-shadow: -18px 0 36px rgb(18 24 45 / 12%);
+  }
+
+  .changes-inspector.compact-open .changes-compact-close {
+    display: inline-flex;
+  }
+}

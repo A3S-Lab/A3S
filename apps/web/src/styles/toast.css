@@ -1,0 +1,53 @@
+/* Toast */
+
+.toast-region {
+  position: fixed;
+  z-index: 120;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  width: min(370px, calc(100vw - 36px));
+  flex-direction: column;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 9px 9px 13px;
+  border: 1px solid var(--a3s-line);
+  border-radius: 11px;
+  background: var(--a3s-panel);
+  box-shadow: var(--a3s-shadow-soft);
+  pointer-events: auto;
+  animation: toast-in 180ms ease-out;
+}
+
+.toast > svg {
+  color: var(--a3s-blue);
+}
+
+.toast.success > svg {
+  color: var(--a3s-green);
+}
+
+.toast.error > svg {
+  color: var(--a3s-red);
+}
+
+.toast > span {
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.toast .ds-icon-button {
+  width: 27px;
+  height: 27px;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+}

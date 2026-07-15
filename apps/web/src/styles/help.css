@@ -1,0 +1,99 @@
+.help-settings {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+}
+
+.help-search {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px;
+  border: 1px solid var(--a3s-line);
+  border-radius: 9px;
+  color: var(--a3s-muted);
+  background: var(--a3s-panel-soft);
+}
+
+.help-search:focus-within {
+  border-color: var(--a3s-line-strong);
+  background: var(--a3s-panel);
+}
+
+.help-search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--a3s-ink);
+}
+
+.help-content {
+  min-height: 0;
+  flex: 1;
+  padding: 8px 0 16px;
+}
+
+.help-content section {
+  margin-top: 18px;
+}
+
+.help-content h3 {
+  margin: 0 0 5px;
+  color: var(--a3s-faint);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.help-content article {
+  display: flex;
+  min-height: 62px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 6px;
+  border-bottom: 1px solid var(--a3s-line);
+}
+
+.help-content article > div {
+  min-width: 0;
+}
+
+.help-content strong {
+  font-size: 13px;
+}
+
+.help-content p {
+  margin: 4px 0 0;
+  color: var(--a3s-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.help-content article > span {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.help-settings kbd {
+  display: inline-grid;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  place-items: center;
+  border: 1px solid var(--a3s-line-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-muted);
+  font: 11px ui-monospace, SFMono-Regular, monospace;
+}
+
+.help-empty {
+  padding: 50px;
+  color: var(--a3s-muted);
+  text-align: center;
+}

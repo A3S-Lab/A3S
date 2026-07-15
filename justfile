@@ -42,6 +42,10 @@ playground:
 code:
     cargo --config 'patch.crates-io.a3s-code-core.path="crates/code/core"' --config 'patch.crates-io.a3s-memory.path="crates/memory"' --config 'patch.crates-io.a3s-tui.path="crates/tui"' run --manifest-path crates/cli/Cargo.toml -- code
 
+# Build and start the A3S Web application
+web:
+    cd apps/web && just web
+
 # ============================================================================
 # A3S Desktop
 # ============================================================================

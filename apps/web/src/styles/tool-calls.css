@@ -1,0 +1,592 @@
+.tool-call-timeline {
+  display: flex;
+  margin: 4px 0 18px;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tool-call-timeline-header {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 2px;
+  color: var(--a3s-muted);
+}
+
+.tool-call-timeline-icon {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-muted);
+}
+
+.tool-call-timeline-header > strong {
+  color: var(--a3s-ink);
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.tool-call-timeline-summary {
+  display: inline-flex;
+  min-height: 22px;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  color: var(--a3s-faint);
+  font-size: 10px;
+}
+
+.tool-call-timeline.running .tool-call-timeline-summary,
+.tool-call-timeline.running .tool-call-timeline-icon {
+  color: var(--a3s-blue);
+}
+
+.tool-call-timeline.attention .tool-call-timeline-summary,
+.tool-call-timeline.attention .tool-call-timeline-icon {
+  color: var(--a3s-warning);
+}
+
+.tool-call-timeline.problem .tool-call-timeline-summary,
+.tool-call-timeline.problem .tool-call-timeline-icon {
+  color: var(--a3s-red);
+}
+
+.tool-call-timeline.complete .tool-call-timeline-summary {
+  color: var(--a3s-muted);
+}
+
+.tool-call-list {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--a3s-line);
+  border-radius: 10px;
+  background: var(--a3s-panel);
+  flex-direction: column;
+}
+
+.tool-call-timeline.attention .tool-call-list {
+  border-color: color-mix(in srgb, var(--a3s-warning) 32%, var(--a3s-line));
+}
+
+.tool-call-timeline.problem .tool-call-list {
+  border-color: color-mix(in srgb, var(--a3s-red) 25%, var(--a3s-line));
+}
+
+.tool-call-item {
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.tool-call-item + .tool-call-item,
+.tool-call-history-toggle + .tool-call-item {
+  border-top: 1px solid var(--a3s-line);
+}
+
+.tool-call-item.open {
+  background: var(--a3s-panel-soft);
+}
+
+.tool-call-item.awaiting.open {
+  background: color-mix(in srgb, var(--a3s-warning) 4%, var(--a3s-panel));
+}
+
+.tool-call-item.failed.open,
+.tool-call-item.denied.open,
+.tool-call-item.timed-out.open,
+.tool-call-item.interrupted.open {
+  background: color-mix(in srgb, var(--a3s-red) 3%, var(--a3s-panel));
+}
+
+.tool-call-summary {
+  display: grid;
+  width: 100%;
+  min-height: 40px;
+  grid-template-columns: 26px minmax(0, 1fr) auto 14px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 9px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--a3s-ink);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.tool-call-summary:hover {
+  background: color-mix(in srgb, var(--a3s-panel-soft) 78%, transparent);
+}
+
+.tool-call-summary:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--a3s-blue) 72%, white);
+  outline-offset: -2px;
+}
+
+.tool-call-icon {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-muted);
+}
+
+.tool-call-item.open .tool-call-icon {
+  background: var(--a3s-panel);
+}
+
+.tool-call-item.running .tool-call-icon,
+.tool-call-item.preparing .tool-call-icon {
+  color: var(--a3s-blue);
+}
+
+.tool-call-item.awaiting .tool-call-icon {
+  color: var(--a3s-warning);
+}
+
+.tool-call-item.succeeded .tool-call-icon {
+  color: var(--a3s-green);
+}
+
+.tool-call-item.failed .tool-call-icon,
+.tool-call-item.denied .tool-call-icon,
+.tool-call-item.timed-out .tool-call-icon,
+.tool-call-item.interrupted .tool-call-icon {
+  color: var(--a3s-red);
+}
+
+.tool-call-title {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.tool-call-title strong,
+.tool-call-title small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-call-title strong {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 580;
+}
+
+.tool-call-title small {
+  color: var(--a3s-muted);
+  font: 11px/1.4 inherit;
+}
+
+.tool-call-state {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--a3s-faint);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.tool-call-item.running .tool-call-state,
+.tool-call-item.preparing .tool-call-state {
+  color: var(--a3s-blue);
+}
+
+.tool-call-item.awaiting .tool-call-state {
+  color: var(--a3s-warning);
+}
+
+.tool-call-item.failed .tool-call-state,
+.tool-call-item.denied .tool-call-state,
+.tool-call-item.timed-out .tool-call-state,
+.tool-call-item.interrupted .tool-call-state {
+  color: var(--a3s-red);
+}
+
+.tool-call-chevron {
+  color: var(--a3s-faint);
+  transition: transform 140ms ease;
+}
+
+.tool-call-item.open > .tool-call-summary .tool-call-chevron {
+  transform: rotate(180deg);
+}
+
+.tool-call-body {
+  display: flex;
+  gap: 8px;
+  padding: 5px 10px 12px 43px;
+  flex-direction: column;
+}
+
+.tool-call-body[hidden] {
+  display: none;
+}
+
+.tool-call-history-toggle {
+  display: flex;
+  width: 100%;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border: 0;
+  outline: 0;
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.tool-call-history-toggle:hover,
+.tool-call-history-toggle:focus-visible {
+  background: var(--a3s-panel-strong);
+  color: var(--a3s-ink);
+}
+
+.tool-call-history-toggle:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--a3s-blue) 72%, white);
+  outline-offset: -2px;
+}
+
+.tool-call-history-toggle svg {
+  transition: transform 140ms ease;
+}
+
+.tool-call-history-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.tool-call-metadata {
+  display: flex;
+  min-height: 22px;
+  align-items: center;
+  gap: 5px;
+  color: var(--a3s-faint);
+  flex-wrap: wrap;
+}
+
+.tool-call-metadata > span {
+  display: inline-flex;
+  min-height: 22px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: var(--a3s-panel);
+  font-size: 10px;
+}
+
+.tool-call-metadata code {
+  color: var(--a3s-muted);
+  font: inherit;
+}
+
+.tool-call-output,
+.tool-call-arguments pre,
+.tool-call-raw-output pre {
+  max-height: 320px;
+  margin: 0;
+  padding: 9px 10px;
+  overflow: auto;
+  border: 1px solid var(--a3s-line);
+  border-radius: 7px;
+  background: var(--a3s-panel);
+  color: var(--a3s-ink);
+  font: 11px/1.6 "SFMono-Regular", Consolas, monospace;
+  tab-size: 2;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tool-call-output.error {
+  border-color: color-mix(in srgb, var(--a3s-red) 22%, var(--a3s-line));
+  color: var(--a3s-red);
+}
+
+.tool-call-arguments,
+.tool-call-raw-output {
+  color: var(--a3s-muted);
+  font-size: 10px;
+}
+
+.tool-call-arguments > button,
+.tool-call-raw-output > button {
+  display: flex;
+  width: fit-content;
+  min-height: 24px;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 5px;
+  border: 0;
+  border-radius: 5px;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.tool-call-arguments > button:hover,
+.tool-call-arguments > button:focus-visible,
+.tool-call-raw-output > button:hover,
+.tool-call-raw-output > button:focus-visible {
+  background: var(--a3s-panel-strong);
+  color: var(--a3s-ink);
+}
+
+.tool-call-arguments > button:focus-visible,
+.tool-call-raw-output > button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--a3s-blue) 60%, white);
+  outline-offset: 1px;
+}
+
+.tool-call-arguments > button svg:last-child,
+.tool-call-raw-output > button svg:last-child {
+  color: var(--a3s-faint);
+  transition: transform 140ms ease;
+}
+
+.tool-call-arguments.open > button svg:last-child,
+.tool-call-raw-output.open > button svg:last-child {
+  transform: rotate(180deg);
+}
+
+.tool-call-arguments pre,
+.tool-call-raw-output pre {
+  margin-top: 7px;
+}
+
+.tool-call-inline-content[hidden] {
+  display: none;
+}
+
+.tool-call-review {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 9px;
+  border: 1px solid var(--a3s-line);
+  border-radius: 9px;
+  background: var(--a3s-panel);
+}
+
+.tool-call-review > span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  color: var(--a3s-muted);
+}
+
+.tool-call-review > span > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.tool-call-review strong,
+.tool-call-review small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-call-review strong {
+  color: var(--a3s-ink);
+  font-size: 11px;
+}
+
+.tool-call-review small {
+  color: var(--a3s-faint);
+  font-size: 10px;
+}
+
+.tool-call-permission {
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--a3s-warning) 25%, var(--a3s-line));
+  border-radius: 9px;
+  background: var(--a3s-panel);
+}
+
+.tool-call-permission > header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--a3s-warning);
+}
+
+.tool-call-permission-icon {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  place-items: center;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--a3s-warning) 9%, var(--a3s-panel));
+}
+
+.tool-call-permission > header > span {
+  display: flex;
+  flex-direction: column;
+}
+
+.tool-call-permission > header strong {
+  color: var(--a3s-ink);
+  font-size: 11px;
+}
+
+.tool-call-permission > header small {
+  color: var(--a3s-muted);
+  font-size: 10px;
+}
+
+.tool-call-permission dl {
+  display: grid;
+  margin: 10px 0;
+  gap: 6px;
+}
+
+.tool-call-permission dl > div {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.tool-call-permission dt {
+  color: var(--a3s-faint);
+  font-size: 10px;
+}
+
+.tool-call-permission dd {
+  margin: 0;
+  color: var(--a3s-ink);
+  font-size: 11px;
+}
+
+.tool-call-permission > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.tool-call-decision,
+.tool-call-message {
+  margin: 0;
+  color: var(--a3s-muted);
+  font-size: 10px;
+}
+
+.tool-call-decision {
+  display: block;
+  padding: 8px 9px;
+  border-radius: 7px;
+  background: var(--a3s-panel-soft);
+}
+
+.tool-call-decision.approved {
+  color: var(--a3s-green);
+}
+
+.tool-call-decision.denied,
+.tool-call-message.denied,
+.tool-call-message.timed-out,
+.tool-call-message.interrupted {
+  color: var(--a3s-red);
+}
+
+.tool-call-decision-error {
+  margin: 0 0 8px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--a3s-red) 6%, var(--a3s-panel));
+  color: var(--a3s-red);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.tool-call-result {
+  display: flex;
+  min-width: 0;
+  gap: 5px;
+  flex-direction: column;
+}
+
+.tool-call-result > header {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tool-call-result > header > span:first-child {
+  color: var(--a3s-faint);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.tool-call-result-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tool-call-result-actions button {
+  width: auto;
+  background: var(--a3s-panel);
+}
+
+.tool-call-recovery {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 7px 6px 9px;
+  border: 1px solid color-mix(in srgb, var(--a3s-red) 18%, var(--a3s-line));
+  border-radius: 8px;
+  background: var(--a3s-panel);
+  color: var(--a3s-muted);
+  font-size: 10px;
+}
+
+.tool-call-recovery.permission {
+  border-color: color-mix(in srgb, var(--a3s-warning) 22%, var(--a3s-line));
+}
+
+.tool-call-recovery .ds-button {
+  min-height: 28px;
+  padding: 0 8px;
+  flex: 0 0 auto;
+  font-size: 10px;
+}
+
+.tool-call-message.failed {
+  color: var(--a3s-red);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-call-chevron,
+  .tool-call-history-toggle svg,
+  .tool-call-arguments > button svg:last-child,
+  .tool-call-raw-output > button svg:last-child {
+    transition: none;
+  }
+}

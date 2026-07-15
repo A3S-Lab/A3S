@@ -1,0 +1,264 @@
+.active-task-product {
+  position: relative;
+  background: var(--a3s-panel);
+}
+
+.active-task-layout {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.task-conversation-pane {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  background: var(--a3s-panel);
+}
+
+.task-context-panel {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  width: var(--task-context-width);
+  min-width: 600px;
+  min-height: 0;
+  flex: 0 0 var(--task-context-width);
+  flex-direction: column;
+  border-left: 1px solid var(--a3s-line);
+  background: var(--a3s-panel);
+}
+
+.task-context-resizer {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  width: 6px;
+  height: auto;
+  margin: 0;
+  border: 0;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.task-context-resizer::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 1px;
+  background: transparent;
+  content: "";
+  transition: background-color 140ms ease;
+}
+
+.task-context-resizer:hover::after,
+.task-context-resizer:focus-visible::after,
+.resizing-task-context .task-context-resizer::after {
+  background: var(--a3s-blue);
+}
+
+.resizing-task-context,
+.resizing-task-context * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+.task-context-header {
+  display: flex;
+  height: 44px;
+  flex: 0 0 44px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 0 10px;
+  border-bottom: 1px solid var(--a3s-line);
+  background: var(--a3s-panel);
+}
+
+.task-context-header nav {
+  display: flex;
+  height: 100%;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.task-context-header nav button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 11px;
+  border: 0;
+  background: transparent;
+  color: var(--a3s-muted);
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.task-context-header nav button:hover,
+.task-context-header nav button.active {
+  color: var(--a3s-ink);
+}
+
+.task-context-header nav button.active::after {
+  position: absolute;
+  right: 9px;
+  bottom: -1px;
+  left: 9px;
+  height: 2px;
+  border-radius: 999px 999px 0 0;
+  background: var(--a3s-blue);
+  content: "";
+}
+
+.task-context-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.task-context-changes {
+  min-height: 32px;
+}
+
+.task-context-body {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.task-context-body > .workspace-page,
+.task-context-body > .runs-page {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+}
+
+.task-context-body > .workspace-page {
+  position: relative;
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+}
+
+.task-context-body .workspace-explorer > header {
+  height: 40px;
+}
+
+.task-context-body .workspace-explorer > header {
+  padding-left: 11px;
+}
+
+.task-context-body .workspace-explorer > header .eyebrow {
+  display: none;
+}
+
+.task-context-body .explorer-row {
+  height: 25px;
+}
+
+.task-context-body .changes-inspector {
+  display: none;
+}
+
+.task-context-body .changes-inspector.compact-open {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: auto;
+  border-right: 1px solid var(--a3s-line);
+  border-left: 0;
+  box-shadow: none;
+}
+
+.task-context-body .changes-inspector.compact-open .changes-compact-close {
+  display: inline-flex;
+}
+
+.task-context-body > .workspace-page.changes-open {
+  grid-template-columns: 260px minmax(0, 1fr);
+}
+
+.task-context-body .workspace-page.changes-open .workspace-explorer {
+  display: none;
+}
+
+.task-context-body .workspace-page.changes-open .changes-inspector {
+  grid-row: 1;
+  grid-column: 1;
+}
+
+.task-context-body .workspace-page.changes-open .workspace-editor {
+  grid-row: 1;
+  grid-column: 2;
+}
+
+.task-context-body .workspace-search-panel {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+}
+
+.task-context-body .output-panel {
+  width: 100%;
+}
+
+.task-context-body .output-panel > header {
+  min-height: 74px;
+  padding: 12px 14px;
+}
+
+.task-context-body .output-panel > header .eyebrow {
+  display: none;
+}
+
+.task-context-body .output-panel > header h2 {
+  font-size: 15px;
+}
+
+.task-context-body .output-toolbar {
+  padding: 9px 10px;
+}
+
+.task-context-body .output-layout.with-detail {
+  grid-template-columns: minmax(190px, 0.9fr) minmax(230px, 1.1fr);
+}
+
+@media (max-width: 1320px) {
+  .task-context-panel {
+    position: absolute;
+    z-index: 45;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(var(--task-context-width), calc(100% - 44px));
+    min-width: 0;
+    flex-basis: auto;
+    box-shadow: -18px 0 42px rgb(20 24 40 / 14%);
+  }
+
+  .task-context-resizer {
+    display: none;
+  }
+}
+
+@media (max-width: 1100px) {
+  .task-context-panel {
+    width: 100%;
+    box-shadow: none;
+  }
+}

@@ -1,0 +1,207 @@
+@import "tailwindcss";
+@import "basecoat-css/maia";
+@import "streamdown/styles.css";
+@source "../../node_modules/streamdown/dist/*.js";
+@source "../../node_modules/@streamdown/code/dist/*.js";
+
+:root {
+  color-scheme: light;
+  --a3s-bg: #f7f7f8;
+  --a3s-panel: #ffffff;
+  --a3s-panel-soft: #f2f3f5;
+  --a3s-panel-strong: #e9ebef;
+  --a3s-ink: #17181a;
+  --a3s-muted: #71757d;
+  --a3s-faint: #a1a5ad;
+  --a3s-line: #e2e4e8;
+  --a3s-line-strong: #d3d6dc;
+  --a3s-action: #242424;
+  --a3s-action-hover: #111111;
+  --a3s-action-ink: #ffffff;
+  --a3s-blue: #2864e8;
+  --a3s-indigo: #4034cc;
+  --a3s-purple: #5420bd;
+  --a3s-green: #14a675;
+  --a3s-red: #d84b4f;
+  --a3s-warning: #c97816;
+  --a3s-file-folder: #d8a43a;
+  --a3s-file-typescript: #3178c6;
+  --a3s-file-javascript: #c89b18;
+  --a3s-file-json: #b7791f;
+  --a3s-file-document: #477bb3;
+  --a3s-file-style: #c6538c;
+  --a3s-file-markup: #d4673f;
+  --a3s-file-image: #8d63b8;
+  --a3s-file-config: #718096;
+  --a3s-gradient: linear-gradient(135deg, #2587f5 0%, #3b53dc 47%, #5221bd 100%);
+  --a3s-shadow: 0 24px 64px rgb(20 24 40 / 18%);
+  --a3s-shadow-soft: 0 14px 36px rgb(20 24 40 / 12%);
+  --a3s-shadow-composer: 0 8px 28px rgb(20 24 40 / 6%);
+  --a3s-tooltip-bg: #24262d;
+  --a3s-tooltip-ink: #ffffff;
+  --a3s-radius: 16px;
+  --a3s-radius-sm: 9px;
+  font-family:
+    ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+:root.dark {
+  color-scheme: dark;
+  --a3s-bg: #101118;
+  --a3s-panel: #171820;
+  --a3s-panel-soft: #1e2028;
+  --a3s-panel-strong: #282b35;
+  --a3s-ink: #f2f3f5;
+  --a3s-muted: #a4a8b2;
+  --a3s-faint: #727783;
+  --a3s-line: #2a2d35;
+  --a3s-line-strong: #3a3d48;
+  --a3s-action: #f2f3f5;
+  --a3s-action-hover: #ffffff;
+  --a3s-action-ink: #17181a;
+  --a3s-blue: #6ca3ff;
+  --a3s-green: #3ccf91;
+  --a3s-red: #f27777;
+  --a3s-warning: #eda94c;
+  --a3s-file-folder: #e2b653;
+  --a3s-file-typescript: #63a8e8;
+  --a3s-file-javascript: #e0bc47;
+  --a3s-file-json: #d49a46;
+  --a3s-file-document: #79a9d8;
+  --a3s-file-style: #df7db0;
+  --a3s-file-markup: #e98b68;
+  --a3s-file-image: #b28ad4;
+  --a3s-file-config: #9ca8b8;
+  --a3s-shadow: 0 22px 70px rgb(0 0 0 / 35%);
+  --a3s-shadow-soft: 0 9px 30px rgb(0 0 0 / 24%);
+  --a3s-shadow-composer: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 320px;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--a3s-bg);
+  color: var(--a3s-ink);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--a3s-blue) 75%, white);
+  outline-offset: 2px;
+}
+
+.card {
+  border-color: var(--a3s-line);
+  background: var(--a3s-panel);
+  color: var(--a3s-ink);
+}
+
+.btn,
+.btn-outline,
+.btn-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: 160ms ease;
+}
+
+.btn {
+  background: var(--a3s-ink);
+  color: var(--a3s-panel);
+}
+
+.btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.btn-outline {
+  border-color: var(--a3s-line-strong);
+  background: var(--a3s-panel);
+}
+
+.btn-outline:hover:not(:disabled),
+.btn-sm:hover:not(:disabled) {
+  border-color: var(--a3s-blue);
+  background: color-mix(in srgb, var(--a3s-blue) 6%, var(--a3s-panel));
+}
+
+.btn:disabled,
+.btn-outline:disabled,
+.btn-sm:disabled,
+.send-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+}
+
+.danger,
+.danger-btn {
+  color: var(--a3s-red) !important;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--a3s-blue);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.status-dot,
+.connection-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: var(--a3s-green);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--a3s-green) 13%, transparent);
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

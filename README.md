@@ -32,7 +32,7 @@ is Rust.
 
 | Area | Paths | Purpose |
 | --- | --- | --- |
-| Product surfaces | `crates/cli`, `crates/bench`, `apps/box`, `apps/docs` | CLI, benchmark control component, native app, and documentation site. |
+| Product surfaces | `crates/cli`, `crates/bench`, `apps/web`, `apps/box`, `apps/docs` | CLI, browser workspace, benchmark control component, native app, and documentation site. |
 | Agent runtime | `crates/code`, `crates/ahp`, `crates/acl`, `crates/common` | Sessions, tools, policy, protocol, config, and shared types. |
 | UI systems | `crates/tui`, `crates/gui`, `crates/webview` | Terminal UI, native RSX UI, and trusted WebView helpers. |
 | State and coordination | `crates/memory`, `crates/event`, `crates/flow`, `crates/lane`, `crates/search` | Memory, events, workflows, queues, and retrieval. |
@@ -44,6 +44,7 @@ is Rust.
 
 | Project | Version | Role |
 | --- | --- | --- |
+| [A3S Web](apps/web/) | 0.1.0 | Browser workspace for the A3S Code product, served by the local CLI. |
 | [A3S Box Desktop](apps/box/) | 0.1.0 | Native A3S Box management client. |
 | [a3s](crates/cli/) | 0.7.7 | End-user CLI; `a3s code` launches the TUI coding agent. |
 | [a3s-code](crates/code/) | core and SDKs 4.3.3 | Rust agent runtime plus Node and Python SDK bindings. |
@@ -76,6 +77,9 @@ brew install a3s-lab/tap/a3s
 
 # Run the terminal coding agent.
 a3s code
+
+# Run the browser Code workspace.
+a3s web
 
 # Code is included with a3s. Box and Bench install on first real use.
 a3s list
@@ -125,6 +129,9 @@ just code
 
 # Run the default development surface.
 just dev
+
+# Build and run the browser Code workspace.
+just web
 
 # Run the A3S Box desktop client.
 just box

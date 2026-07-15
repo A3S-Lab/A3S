@@ -1,0 +1,531 @@
+.review-context {
+  display: flex;
+  min-height: 40px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px 5px 10px;
+  border-bottom: 1px solid var(--a3s-line);
+  background: color-mix(in srgb, var(--a3s-blue) 5%, var(--a3s-panel));
+  color: var(--a3s-blue);
+}
+
+.review-context.context-selection {
+  background: color-mix(in srgb, var(--a3s-blue) 8%, var(--a3s-panel));
+}
+
+.review-context > span {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.review-context small {
+  color: var(--a3s-muted);
+  font-size: 9px;
+  line-height: 1.25;
+}
+
+.review-context strong {
+  overflow: hidden;
+  color: var(--a3s-ink);
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-context .ds-button {
+  min-height: 28px;
+  padding: 0 9px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.workspace-editor-tabs {
+  display: flex;
+  height: 35px;
+  min-height: 35px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-bottom: 1px solid var(--a3s-line);
+  background: color-mix(in srgb, var(--a3s-panel-soft) 62%, var(--a3s-panel));
+  scrollbar-width: none;
+}
+
+.workspace-editor-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.workspace-editor-tab {
+  position: relative;
+  display: flex;
+  min-width: 96px;
+  max-width: 190px;
+  height: 35px;
+  flex: 0 1 150px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px 0 9px;
+  border-right: 1px solid var(--a3s-line);
+  background: transparent;
+  color: var(--a3s-muted);
+  cursor: default;
+  user-select: none;
+}
+
+.workspace-editor-tab::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: transparent;
+  content: "";
+}
+
+.workspace-editor-tab:hover {
+  background: color-mix(in srgb, var(--a3s-panel) 72%, var(--a3s-panel-soft));
+  color: var(--a3s-ink);
+}
+
+.workspace-editor-tab.active {
+  background: var(--a3s-panel);
+  color: var(--a3s-ink);
+}
+
+.workspace-editor-tab.active::before {
+  background: var(--a3s-blue);
+}
+
+.workspace-editor-tab > span:not(.workspace-tab-loading) {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1;
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-tab-icon {
+  flex: 0 0 auto;
+  color: var(--a3s-warning);
+}
+
+.workspace-tab-icon.staged {
+  color: var(--a3s-green);
+}
+
+.workspace-tab-close {
+  position: relative;
+  display: grid;
+  width: 19px;
+  height: 19px;
+  flex: 0 0 19px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--a3s-muted);
+  cursor: default;
+}
+
+.workspace-tab-close:hover {
+  background: var(--a3s-panel-strong);
+  color: var(--a3s-ink);
+}
+
+.workspace-tab-close-icon {
+  display: none;
+}
+
+.workspace-editor-tab.active .workspace-tab-close-icon,
+.workspace-editor-tab:hover .workspace-tab-close-icon,
+.workspace-tab-close:focus-visible .workspace-tab-close-icon {
+  display: block;
+}
+
+.workspace-tab-dirty-dot {
+  display: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--a3s-muted);
+}
+
+.workspace-editor-tab.dirty .workspace-tab-dirty-dot {
+  display: block;
+}
+
+.workspace-editor-tab.dirty.active .workspace-tab-dirty-dot,
+.workspace-editor-tab.dirty:hover .workspace-tab-dirty-dot,
+.workspace-editor-tab.dirty .workspace-tab-close:focus-visible .workspace-tab-dirty-dot {
+  display: none;
+}
+
+.workspace-tab-loading {
+  flex: 0 0 auto;
+  color: var(--a3s-blue);
+}
+
+.workspace-editor-panel {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.workspace-editor-toolbar {
+  display: flex;
+  height: 31px;
+  min-height: 31px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 0 10px;
+  border-bottom: 1px solid var(--a3s-line);
+  background: var(--a3s-panel);
+}
+
+.workspace-breadcrumbs {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  color: var(--a3s-muted);
+}
+
+.workspace-breadcrumbs > span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 3px;
+}
+
+.workspace-breadcrumbs > span > span {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-breadcrumbs em {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-muted);
+  font-size: 9px;
+  font-style: normal;
+}
+
+.workspace-breadcrumbs em.workspace-unsaved-label {
+  background: color-mix(in srgb, var(--a3s-warning) 10%, var(--a3s-panel));
+  color: var(--a3s-warning);
+}
+
+.workspace-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.workspace-editor-actions .ds-icon-button {
+  width: 25px;
+  height: 25px;
+  border-radius: 4px;
+}
+
+.workspace-editor-content {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  background: var(--a3s-panel);
+}
+
+.monaco-editor-surface {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  background: var(--a3s-panel);
+}
+
+.code-navigation-picker {
+  position: absolute;
+  z-index: 5;
+  top: 12px;
+  right: 12px;
+  width: min(430px, calc(100% - 24px));
+  max-height: min(420px, calc(100% - 24px));
+  flex: none !important;
+  overflow: hidden;
+  border: 1px solid var(--a3s-line-strong);
+  border-radius: 8px;
+  background: var(--a3s-panel);
+  box-shadow: 0 16px 44px color-mix(in srgb, black 25%, transparent);
+}
+
+.code-navigation-picker > header {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 12px;
+  border-bottom: 1px solid var(--a3s-line);
+  background: var(--a3s-panel-soft);
+}
+
+.code-navigation-picker > header strong {
+  flex: 1;
+  color: var(--a3s-ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.code-navigation-picker > header span,
+.code-navigation-picker small {
+  color: var(--a3s-muted);
+  font-size: 9px;
+}
+
+.code-navigation-picker > header button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--a3s-muted);
+  cursor: pointer;
+}
+
+.code-navigation-picker > header button:hover,
+.code-navigation-picker > header button:focus-visible {
+  background: var(--a3s-panel-strong);
+  color: var(--a3s-ink);
+}
+
+.code-navigation-picker ol {
+  max-height: 374px;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.code-navigation-picker li > button {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--a3s-ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.code-navigation-picker li > button:hover,
+.code-navigation-picker li > button:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--a3s-blue) 10%, var(--a3s-panel));
+}
+
+.code-navigation-picker li span {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1;
+  font: 10px/1.4 "SFMono-Regular", Consolas, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.code-navigation-picker li small {
+  flex: 0 0 auto;
+}
+
+.monaco-editor-surface > section,
+.monaco-editor-surface > div {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+}
+
+.monaco-editor-surface > textarea {
+  width: 100%;
+  min-height: 0;
+  padding: 14px;
+  flex: 1;
+  resize: none;
+  border: 0;
+  outline: 0;
+  background: var(--a3s-panel);
+  color: var(--a3s-ink);
+  font: 12px/1.65 "SFMono-Regular", Consolas, monospace;
+}
+
+.monaco-loading {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: var(--a3s-faint);
+  font-size: 11px;
+}
+
+.workspace-editor-statusbar {
+  display: flex;
+  height: 23px;
+  min-height: 23px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 0 10px;
+  border-top: 1px solid var(--a3s-line);
+  background: color-mix(in srgb, var(--a3s-panel-soft) 58%, var(--a3s-panel));
+  color: var(--a3s-muted);
+  font-size: 9px;
+}
+
+.workspace-editor-statusbar > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.workspace-editor-empty {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+}
+
+.workspace-editor-empty-content,
+.workspace-editor-state {
+  display: flex;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  flex-direction: column;
+  padding: 24px;
+  color: var(--a3s-faint);
+  text-align: center;
+}
+
+.workspace-editor-empty-content strong,
+.workspace-editor-state strong {
+  margin-top: 11px;
+  color: var(--a3s-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.workspace-editor-empty-content p,
+.workspace-editor-state span {
+  max-width: 380px;
+  margin: 5px 0 0;
+  color: var(--a3s-faint);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.workspace-editor-state.error {
+  color: var(--a3s-red);
+}
+
+.workspace-editor-state .ds-button {
+  min-height: 30px;
+  margin-top: 13px;
+  font-size: 11px;
+}
+
+.workspace-editor-shortcuts {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+  color: var(--a3s-faint);
+  font-size: 9px;
+}
+
+.workspace-editor-shortcuts span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.workspace-editor-shortcuts kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--a3s-line);
+  border-bottom-color: var(--a3s-line-strong);
+  border-radius: 4px;
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-muted);
+  font: 9px/1.6 inherit;
+}
+
+.config-validation {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--a3s-line);
+  background: var(--a3s-panel-soft);
+}
+
+.config-validation > header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.config-validation.valid > header {
+  color: var(--a3s-green);
+}
+
+.config-validation.invalid > header {
+  color: var(--a3s-red);
+}
+
+.config-validation header strong {
+  font-size: 11px;
+}
+
+.config-validation header span {
+  margin-left: auto;
+  color: var(--a3s-muted);
+  font-size: 9px;
+}
+
+.config-validation ul {
+  margin: 7px 0 0;
+  padding-left: 20px;
+  color: var(--a3s-red);
+  font-size: 10px;
+}
+
+.config-validation-return {
+  min-height: 28px;
+  margin-left: auto;
+  font-size: 10px;
+}
+
+.config-validation-save-hint {
+  margin: 7px 0 0;
+  color: var(--a3s-warning);
+  font-size: 10px;
+}

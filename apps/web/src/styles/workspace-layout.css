@@ -1,0 +1,51 @@
+.workspace-page {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: 230px minmax(0, 1fr) 300px;
+  overflow: hidden;
+  background: var(--a3s-panel);
+}
+
+.workspace-explorer,
+.changes-inspector,
+.workspace-editor {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.workspace-explorer {
+  border-right: 1px solid var(--a3s-line);
+  background: color-mix(in srgb, var(--a3s-panel-soft) 55%, var(--a3s-panel));
+}
+
+.changes-inspector {
+  border-left: 1px solid var(--a3s-line);
+  background: color-mix(in srgb, var(--a3s-panel-soft) 42%, var(--a3s-panel));
+}
+
+.workspace-editor {
+  overflow: hidden;
+  background: var(--a3s-panel);
+}
+
+.workspace-page > .review-compact-changes-button {
+  display: none;
+}
+
+@media (max-width: 1200px) {
+  .workspace-page {
+    grid-template-columns: 210px minmax(0, 1fr);
+  }
+
+  .workspace-page > .review-compact-changes-button {
+    position: absolute;
+    z-index: 15;
+    top: 8px;
+    right: 8px;
+    display: inline-flex;
+  }
+}

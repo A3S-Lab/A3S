@@ -1,0 +1,54 @@
+{
+  "name": "@a3s/code-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "rsbuild dev",
+    "build": "rsbuild build",
+    "preview": "rsbuild preview",
+    "typecheck": "tsc --noEmit",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint --write .",
+    "lint:check": "biome lint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "@streamdown/code": "^1.1.1",
+    "@tiptap/core": "^3.27.3",
+    "@tiptap/extension-placeholder": "^3.27.3",
+    "@tiptap/markdown": "^3.27.3",
+    "@tiptap/pm": "^3.27.3",
+    "@tiptap/react": "^3.27.3",
+    "@tiptap/starter-kit": "^3.27.3",
+    "ahooks": "^3.9.7",
+    "basecoat-css": "^1.0.2",
+    "lucide-react": "^0.544.0",
+    "monaco-editor": "^0.55.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "streamdown": "^2.5.0",
+    "valtio": "^2.3.2"
+  },
+  "devDependencies": {
+    "@rsbuild/core": "^2.1.5",
+    "@rsbuild/plugin-react": "^2.1.0",
+    "@tailwindcss/postcss": "^4.3.2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^24.3.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^28.1.0",
+    "@biomejs/biome": "2.3.14",
+    "tailwindcss": "^4.3.2",
+    "typescript": "7.0.2",
+    "vitest": "^4.0.18"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

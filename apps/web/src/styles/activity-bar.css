@@ -1,0 +1,136 @@
+.activity-bar {
+  z-index: 70;
+  display: flex;
+  width: 52px;
+  height: 100%;
+  flex: 0 0 52px;
+  flex-direction: column;
+  align-items: center;
+  border-right: 1px solid var(--a3s-line);
+  background: var(--a3s-panel);
+  color: var(--a3s-muted);
+}
+
+.activity-brand {
+  display: flex;
+  width: 52px;
+  height: 64px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--a3s-line);
+  background: transparent;
+  cursor: default;
+}
+
+.activity-brand img {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  box-shadow: 0 6px 18px rgb(48 69 194 / 16%);
+}
+
+.activity-products,
+.activity-system {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+}
+
+.activity-products {
+  flex: 1;
+}
+
+.activity-system {
+  border-top: 1px solid var(--a3s-line);
+}
+
+.activity-button {
+  position: relative;
+  display: flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--a3s-muted);
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.activity-button:hover,
+.activity-button:focus-visible {
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-ink);
+}
+
+.activity-button.active {
+  background: color-mix(in srgb, var(--a3s-blue) 8%, var(--a3s-panel));
+  color: var(--a3s-blue);
+}
+
+.activity-button.active::before {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: -5px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--a3s-blue);
+  content: "";
+}
+
+.activity-button::after {
+  position: absolute;
+  z-index: 100;
+  top: 50%;
+  left: calc(100% + 10px);
+  padding: 6px 9px;
+  transform: translate(-4px, -50%);
+  visibility: hidden;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 7px;
+  background: var(--a3s-tooltip-bg);
+  box-shadow: 0 8px 24px rgb(20 24 40 / 16%);
+  color: var(--a3s-tooltip-ink);
+  content: attr(data-activity-tooltip);
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease,
+    visibility 0s linear 120ms;
+}
+
+.activity-button:hover::after,
+.activity-button:focus-visible::after {
+  transform: translate(0, -50%);
+  visibility: visible;
+  opacity: 1;
+  transition-delay: 220ms;
+}
+
+.coming-dot {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  width: 6px;
+  height: 6px;
+  border: 1px solid var(--a3s-panel);
+  border-radius: 50%;
+  background: var(--a3s-faint);
+  opacity: 0.55;
+}

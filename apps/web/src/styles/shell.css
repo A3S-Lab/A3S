@@ -1,0 +1,194 @@
+.app-shell{position:relative;display:flex;width:100%;height:100%;overflow:hidden;background:var(--a3s-bg)}
+.service-connection-banner{position:absolute;z-index:70;right:18px;bottom:18px;display:flex;width:min(560px,calc(100% - 88px));align-items:center;gap:10px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--a3s-warning,#d97706) 35%,var(--a3s-line));border-radius:11px;background:var(--a3s-panel);box-shadow:var(--a3s-shadow-soft);color:var(--a3s-warning,#d97706)}.service-connection-banner>div{display:flex;min-width:0;flex:1;flex-direction:column;gap:2px}.service-connection-banner strong{color:var(--a3s-ink);font-size:11px}.service-connection-banner span{color:var(--a3s-muted);font-size:9px;line-height:1.45}
+.service-connection-banner strong{font-size:12px}.service-connection-banner span{font-size:11px}
+
+.code-boot-screen {
+  display: grid;
+  width: 100%;
+  min-width: 960px;
+  height: 100%;
+  place-content: center;
+  justify-items: center;
+  gap: 18px;
+  padding: 48px;
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--a3s-blue) 4%, transparent), transparent 34%),
+    var(--a3s-bg);
+}
+
+.code-boot-card {
+  width: 390px;
+  padding: 22px;
+  border: 1px solid var(--a3s-line);
+  border-radius: 16px;
+  background: var(--a3s-panel);
+  box-shadow: 0 16px 44px rgb(20 24 40 / 8%);
+}
+
+.code-boot-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--a3s-line);
+}
+
+.code-boot-brand > span {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--a3s-line);
+  border-radius: 10px;
+  background: var(--a3s-panel-soft);
+}
+
+.code-boot-brand img {
+  display: block;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+}
+
+.code-boot-brand > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.code-boot-brand strong {
+  color: var(--a3s-ink);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.code-boot-brand small {
+  color: var(--a3s-faint);
+  font-size: 10px;
+}
+
+.code-boot-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 22px 0 18px;
+}
+
+.code-boot-state > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-ink);
+}
+
+.code-boot-state > span.error {
+  background: color-mix(in srgb, var(--a3s-warning) 9%, var(--a3s-panel));
+  color: var(--a3s-warning);
+}
+
+.code-boot-state h1 {
+  margin: 1px 0 4px;
+  color: var(--a3s-ink);
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.code-boot-state p {
+  margin: 0;
+  color: var(--a3s-muted);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.code-boot-progress {
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--a3s-panel-strong);
+}
+
+.code-boot-progress > span {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--a3s-action);
+  animation: code-boot-progress 1.35s ease-in-out infinite;
+}
+
+.code-boot-recovery {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-direction: column;
+}
+
+.code-boot-recovery .ds-button {
+  width: 100%;
+}
+
+.code-boot-recovery > p {
+  margin: 0;
+  color: var(--a3s-faint);
+  font-size: 10px;
+}
+
+.code-boot-recovery code {
+  color: var(--a3s-muted);
+  font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.code-boot-recovery details {
+  width: 100%;
+  color: var(--a3s-faint);
+  font-size: 10px;
+}
+
+.code-boot-recovery summary {
+  width: fit-content;
+  cursor: pointer;
+}
+
+.code-boot-recovery pre {
+  max-height: 96px;
+  margin: 8px 0 0;
+  padding: 8px;
+  overflow: auto;
+  border-radius: 7px;
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-muted);
+  font: 10px/1.5 "SFMono-Regular", Consolas, monospace;
+  white-space: pre-wrap;
+}
+
+.code-boot-assurance {
+  color: var(--a3s-faint);
+  font-size: 10px;
+}
+
+@keyframes code-boot-progress {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  50% {
+    transform: translateX(70%);
+  }
+
+  100% {
+    transform: translateX(240%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .code-boot-progress > span {
+    width: 100%;
+    animation: none;
+  }
+}

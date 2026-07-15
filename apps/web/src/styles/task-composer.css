@@ -1,0 +1,875 @@
+.task-composer {
+  position: relative;
+  overflow: visible;
+  container-type: inline-size;
+}
+
+.composer-model-change-notice {
+  display: flex;
+  width: min(520px, calc(100% - 32px));
+  align-items: center;
+  gap: 12px;
+  margin: 0 auto 10px;
+  color: var(--a3s-faint);
+  font-size: 11px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.composer-model-change-notice::before,
+.composer-model-change-notice::after {
+  height: 1px;
+  flex: 1;
+  background: var(--a3s-line);
+  content: "";
+}
+
+.composer-model-change-notice > span {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-model-change-notice strong {
+  color: var(--a3s-muted);
+  font-weight: 500;
+}
+
+.composer-model-change-notice svg {
+  flex: 0 0 auto;
+  margin-left: 1px;
+}
+
+.execution-column {
+  padding-bottom: 220px;
+}
+
+.task-prompt-editor {
+  position: relative;
+}
+
+.task-composer-input {
+  position: relative;
+}
+
+.composer-drop-overlay {
+  position: absolute;
+  z-index: 95;
+  inset: 6px 8px 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  border: 1px dashed color-mix(in srgb, var(--a3s-blue) 55%, var(--a3s-line));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--a3s-blue) 5%, var(--a3s-panel));
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--a3s-blue) 4%, transparent);
+  pointer-events: none;
+}
+
+.composer-drop-overlay > span {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 5px;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--a3s-action);
+  color: var(--a3s-action-ink);
+}
+
+.composer-drop-overlay strong {
+  font-size: 12px;
+}
+
+.composer-drop-overlay small {
+  color: var(--a3s-muted);
+  font-size: 10px;
+}
+
+.task-composer-input.drop-active .task-prompt-editor,
+.task-composer-input.drop-importing .task-prompt-editor {
+  opacity: 0.24;
+}
+
+.task-prompt-editor-content {
+  min-height: 72px;
+  max-height: 190px;
+  padding: 14px 16px 8px;
+  overflow: auto;
+  outline: 0;
+  color: var(--a3s-ink);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.task-prompt-editor-content p {
+  margin: 0 0 6px;
+}
+
+.task-prompt-editor-content p:last-child {
+  margin-bottom: 0;
+}
+
+.task-prompt-editor-content ul,
+.task-prompt-editor-content ol {
+  margin: 4px 0;
+  padding-left: 22px;
+}
+
+.task-prompt-editor-content code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--a3s-panel-soft);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.task-prompt-editor-content .composer-slash-command {
+  color: var(--a3s-blue);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.task-prompt-editor-content p.is-editor-empty:first-child::before {
+  height: 0;
+  float: left;
+  color: var(--a3s-faint);
+  content: attr(data-placeholder);
+  pointer-events: none;
+}
+
+.task-prompt-editor-content[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.task-prompt-editor-loading {
+  min-height: 104px;
+}
+
+.composer-controls {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+}
+
+.composer-quick-trigger {
+  position: relative;
+  display: flex;
+  height: 34px;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--a3s-muted);
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.composer-quick-trigger:hover,
+.composer-quick-trigger.active {
+  border-color: var(--a3s-line);
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-ink);
+}
+
+.composer-quick-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.composer-popover-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.composer-quick-trigger {
+  cursor: pointer;
+}
+
+.composer-control-popover {
+  position: absolute;
+  z-index: 85;
+  top: auto;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 350px;
+  max-height: min(360px, calc(100vh - 190px));
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid var(--a3s-line);
+  border-radius: 12px;
+  background: var(--a3s-panel);
+  box-shadow: var(--a3s-shadow-soft);
+}
+
+.composer-mode-control .composer-quick-trigger {
+  min-width: 106px;
+  justify-content: flex-start;
+  padding: 0 8px;
+  border-radius: 9px;
+}
+
+.composer-mode-control .composer-mode-chevron {
+  margin-left: auto;
+  transition: transform 150ms ease;
+}
+
+.composer-mode-control .composer-quick-trigger.active .composer-mode-chevron {
+  transform: rotate(180deg);
+}
+
+.composer-mode-selected-icon {
+  color: var(--a3s-ink);
+}
+
+.composer-mode-control .composer-control-popover {
+  width: 310px;
+  max-height: none;
+  padding: 10px;
+  overflow: hidden;
+  border-radius: 15px;
+}
+
+.composer-mode-control .composer-control-popover-header {
+  margin: 2px 4px 9px;
+  padding: 2px 2px 10px;
+  border-bottom: 1px solid var(--a3s-line);
+}
+
+.composer-mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.composer-mode-options > button {
+  display: grid;
+  width: 100%;
+  min-height: 52px;
+  grid-template-columns: 30px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--a3s-ink);
+  text-align: left;
+}
+
+.composer-mode-options > button:hover,
+.composer-mode-options > button[aria-selected="true"] {
+  background: var(--a3s-panel-soft);
+}
+
+.composer-mode-options > button > span:first-child {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--a3s-line);
+  border-radius: 8px;
+  background: var(--a3s-panel);
+  color: var(--a3s-muted);
+}
+
+.composer-mode-options > button > span:nth-child(2) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.composer-mode-options strong {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.composer-mode-options small {
+  overflow: hidden;
+  color: var(--a3s-faint);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-mode-options > button > svg {
+  color: var(--a3s-ink);
+}
+
+.composer-control-popover-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.composer-control-popover-header > svg {
+  color: var(--a3s-ink);
+}
+
+.composer-control-popover-header > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.composer-control-popover-header strong {
+  font-size: 12px;
+}
+
+.composer-control-popover-header small {
+  color: var(--a3s-muted);
+  font-size: 10px;
+}
+
+.composer-control-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--a3s-red) 25%, var(--a3s-line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--a3s-red) 5%, var(--a3s-panel));
+  color: var(--a3s-red);
+  font-size: 11px;
+}
+
+.composer-control-error > span {
+  min-width: 0;
+  flex: 1;
+}
+
+.composer-control-error .ds-button {
+  min-height: 28px;
+  padding: 0 8px;
+}
+
+.composer-model-control .ds-combobox-trigger {
+  width: auto;
+  min-width: 0;
+  max-width: 184px;
+  height: 34px;
+  gap: 5px;
+  padding: 0 7px 0 5px;
+  border-color: transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--a3s-ink);
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.composer-model-control .ds-combobox-trigger:hover,
+.composer-model-control .ds-combobox-trigger[aria-expanded="true"] {
+  border-color: var(--a3s-line);
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-ink);
+}
+
+.composer-model-control .ds-combobox-trigger:disabled {
+  border-color: transparent;
+  background: transparent;
+}
+
+.composer-model-control .ds-combobox-trigger > svg:last-child {
+  color: var(--a3s-faint);
+}
+
+.composer-model-control .ds-combobox-trigger strong {
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.composer-model-control .ds-combobox-trigger small {
+  display: none;
+}
+
+.composer-model-control .ds-combobox-model-mark {
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  color: var(--a3s-blue);
+}
+
+.composer-model-control .ds-combobox-popover {
+  width: min(380px, calc(100vw - 32px));
+  padding: 10px;
+  border-radius: 16px;
+}
+
+.composer-model-control .ds-combobox-popover [role="listbox"] {
+  max-height: 190px;
+}
+
+.composer-effort-control .composer-control-popover {
+  right: 0;
+  left: auto;
+  width: 360px;
+  overflow: hidden;
+}
+
+.composer-effort-control .composer-quick-trigger {
+  background: transparent;
+}
+
+.composer-effort-slider > div:first-child {
+  display: flex;
+  min-height: 38px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.composer-effort-slider > div:first-child strong {
+  font-size: 16px;
+  letter-spacing: -0.02em;
+}
+
+.composer-effort-slider > div:first-child small {
+  overflow: hidden;
+  color: var(--a3s-muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-effort-slider input[type="range"] {
+  width: 100%;
+  height: 24px;
+  margin: 8px 0 2px;
+  accent-color: var(--a3s-action);
+  cursor: grab;
+}
+
+.composer-effort-slider input[type="range"]:active {
+  cursor: grabbing;
+}
+
+.composer-effort-slider input[type="range"]:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--a3s-blue) 13%, transparent);
+  outline-offset: 2px;
+}
+
+.composer-effort-ticks {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--a3s-faint);
+  font-size: 9px;
+}
+
+.composer-effort-ticks span.active {
+  color: var(--a3s-ink);
+  font-weight: 700;
+}
+
+.composer-context-control .composer-control-popover {
+  right: 0;
+  left: auto;
+  width: 300px;
+}
+
+.composer-context-status {
+  display: flex;
+  height: 34px;
+  align-items: center;
+  border-radius: 9px;
+}
+
+.composer-context-status .composer-context-control .composer-quick-trigger {
+  padding-right: 6px;
+}
+
+.composer-context-status.warning .composer-quick-trigger {
+  color: var(--a3s-warning);
+}
+
+.composer-context-compact {
+  display: flex;
+  height: 28px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  border: 0;
+  border-left: 1px solid var(--a3s-line);
+  background: transparent;
+  color: var(--a3s-muted);
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.composer-context-compact:hover:not(:disabled) {
+  color: var(--a3s-ink);
+}
+
+.composer-context-compact:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.composer-context-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.composer-context-summary strong {
+  font-size: 24px;
+  letter-spacing: -0.04em;
+}
+
+.composer-context-summary span,
+.composer-context-control .composer-control-popover > p {
+  color: var(--a3s-muted);
+  font-size: 10px;
+}
+
+.composer-context-meter {
+  height: 5px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--a3s-panel-strong);
+}
+
+.composer-context-meter > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--a3s-blue);
+}
+
+.composer-context-control .composer-control-popover > p {
+  margin: 8px 0 0;
+}
+
+.composer-goal-timing {
+  display: inline-flex;
+  height: 32px;
+  max-width: 180px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px;
+  border-radius: 7px;
+  color: var(--a3s-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.composer-goal-timing svg {
+  color: var(--a3s-blue);
+}
+
+.composer-goal-timing time {
+  color: var(--a3s-ink);
+  font: 10px/1 "SFMono-Regular", Consolas, monospace;
+}
+
+.composer-goal-timing.completed svg,
+.composer-goal-timing.completed time {
+  color: var(--a3s-green);
+}
+
+.composer-suggestion-menu {
+  position: absolute;
+  z-index: 90;
+  right: 12px;
+  bottom: calc(100% + 10px);
+  left: 12px;
+  max-height: min(380px, calc(100vh - 190px));
+  padding: 10px;
+  overflow: hidden;
+  border: 1px solid var(--a3s-line);
+  border-radius: 15px;
+  background: var(--a3s-panel);
+  box-shadow: var(--a3s-shadow-soft);
+}
+
+.composer-suggestion-menu > header {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 5px 7px;
+}
+
+.composer-suggestion-menu > header > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+}
+
+.composer-suggestion-menu > header kbd {
+  display: grid;
+  min-width: 24px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid var(--a3s-line);
+  border-radius: 6px;
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-muted);
+  font: 10px/1 inherit;
+}
+
+.composer-suggestion-query {
+  margin: 0 5px 6px;
+  color: var(--a3s-faint);
+  font-size: 10px;
+}
+
+.composer-suggestion-menu [role="listbox"] {
+  max-height: 270px;
+  overflow: auto;
+}
+
+.composer-workspace-tree-menu [role="tree"] {
+  max-height: 270px;
+  overflow: auto;
+}
+
+.task-composer.preparation .composer-workspace-tree-menu [role="tree"] {
+  max-height: 190px;
+}
+
+.composer-workspace-tree-menu [role="treeitem"] {
+  display: grid;
+  width: 100%;
+  min-height: 40px;
+  grid-template-columns: 14px 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+  padding-top: 4px;
+  padding-right: 8px;
+  padding-bottom: 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--a3s-ink);
+  text-align: left;
+}
+
+.composer-workspace-tree-menu [role="treeitem"]:hover,
+.composer-workspace-tree-menu [role="treeitem"].active {
+  background: var(--a3s-panel-soft);
+}
+
+.composer-tree-chevron {
+  display: grid;
+  place-items: center;
+  color: var(--a3s-faint);
+}
+
+.composer-tree-chevron.file {
+  visibility: hidden;
+}
+
+.composer-tree-chevron svg {
+  transition: transform 120ms ease;
+}
+
+.composer-tree-chevron svg.expanded {
+  transform: rotate(90deg);
+}
+
+.workspace-entry-icon {
+  color: var(--a3s-muted);
+}
+
+.workspace-entry-icon.folder {
+  color: var(--a3s-file-folder);
+}
+
+.workspace-entry-icon.typescript {
+  color: var(--a3s-file-typescript);
+}
+
+.workspace-entry-icon.javascript,
+.workspace-entry-icon.lock {
+  color: var(--a3s-file-javascript);
+}
+
+.workspace-entry-icon.json {
+  color: var(--a3s-file-json);
+}
+
+.workspace-entry-icon.document,
+.workspace-entry-icon.python {
+  color: var(--a3s-file-document);
+}
+
+.workspace-entry-icon.style {
+  color: var(--a3s-file-style);
+}
+
+.workspace-entry-icon.markup,
+.workspace-entry-icon.rust {
+  color: var(--a3s-file-markup);
+}
+
+.workspace-entry-icon.image {
+  color: var(--a3s-file-image);
+}
+
+.workspace-entry-icon.config {
+  color: var(--a3s-file-config);
+}
+
+.composer-workspace-tree-menu [role="treeitem"] > .spin {
+  color: var(--a3s-muted);
+}
+
+.task-composer.preparation .composer-suggestion-menu [role="listbox"] {
+  max-height: 190px;
+}
+
+.composer-suggestion-menu [role="option"] {
+  display: grid;
+  width: 100%;
+  min-height: 44px;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--a3s-ink);
+  text-align: left;
+}
+
+.composer-suggestion-menu [role="option"]:hover,
+.composer-suggestion-menu [role="option"].active,
+.composer-suggestion-menu [role="option"][aria-selected="true"] {
+  background: var(--a3s-panel-soft);
+}
+
+.composer-suggestion-icon {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border: 1px solid var(--a3s-line);
+  border-radius: 8px;
+  background: var(--a3s-panel);
+  color: var(--a3s-muted);
+}
+
+.composer-suggestion-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.composer-suggestion-copy strong,
+.composer-suggestion-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-suggestion-copy strong {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.composer-suggestion-copy small,
+.composer-suggestion-menu [role="option"] > em {
+  color: var(--a3s-faint);
+  font-size: 9px;
+  font-style: normal;
+}
+
+.composer-suggestion-copy mark {
+  padding: 0 1px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--a3s-blue) 14%, transparent);
+  color: var(--a3s-ink);
+  font-weight: 700;
+}
+
+.composer-suggestion-state {
+  display: flex;
+  min-height: 66px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--a3s-muted);
+  font-size: 10px;
+}
+
+.composer-suggestion-state.error {
+  color: var(--a3s-red);
+}
+
+.composer-suggestion-menu > footer {
+  display: flex;
+  gap: 14px;
+  margin: 7px -2px -2px;
+  padding: 8px 7px 1px;
+  border-top: 1px solid var(--a3s-line);
+  color: var(--a3s-faint);
+  font-size: 9px;
+}
+
+.composer-resource-chips > span > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-resource-chips > span.skill > svg {
+  color: var(--a3s-ink);
+}
+
+.composer-preparation-meta {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 10px;
+  border-top: 1px solid var(--a3s-line);
+  border-radius: 0 0 15px 15px;
+  background: var(--a3s-panel-soft);
+}
+
+.composer-preparation-meta .composer-quick-trigger {
+  height: 32px;
+}
+
+@container (max-width: 650px) {
+  .composer-leading-controls,
+  .composer-trailing-controls,
+  .task-composer > footer > div {
+    gap: 3px;
+  }
+
+  .composer-model-control .ds-combobox-trigger {
+    max-width: 142px;
+  }
+
+  .composer-run-state {
+    gap: 0;
+    padding: 0;
+    font-size: 0;
+  }
+}

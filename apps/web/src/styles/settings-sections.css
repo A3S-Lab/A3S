@@ -1,0 +1,272 @@
+/* Settings content shared by account, appearance, and model sections */
+
+.settings-section {
+  width: 100%;
+  max-width: 760px;
+}
+
+.setting-heading h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.setting-heading p {
+  margin: 6px 0 0;
+  color: var(--a3s-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.theme-grid {
+  display: grid;
+  margin: 15px 0 24px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 9px;
+}
+
+.theme-card {
+  position: relative;
+  display: flex;
+  min-height: 120px;
+  align-items: flex-start;
+  padding: 13px;
+  flex-direction: column;
+  border: 1px solid var(--a3s-line);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--a3s-panel-soft) 55%, var(--a3s-panel));
+  cursor: pointer;
+  text-align: left;
+}
+
+.theme-card:hover,
+.theme-card.active {
+  border-color: color-mix(in srgb, var(--a3s-blue) 55%, var(--a3s-line));
+}
+
+.theme-card > span {
+  display: flex;
+  width: 31px;
+  height: 31px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-blue);
+}
+
+.theme-card strong {
+  font-size: 12px;
+}
+
+.theme-card small {
+  margin-top: 4px;
+  color: var(--a3s-muted);
+  font-size: 11px;
+}
+
+.theme-card i {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  display: flex;
+  width: 19px;
+  height: 19px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--a3s-blue);
+  color: white;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  padding: 14px;
+  border: 1px solid var(--a3s-line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--a3s-panel-soft) 52%, var(--a3s-panel));
+}
+
+.setting-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setting-row strong {
+  font-size: 11px;
+}
+
+.setting-row span {
+  color: var(--a3s-muted);
+  font-size: 11px;
+}
+
+.setting-row code {
+  max-width: 300px;
+  overflow: hidden;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.default-model-card,
+.os-account-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin: 17px 0;
+  padding: 15px;
+  border: 1px solid var(--a3s-line);
+  border-radius: 11px;
+  background: var(--a3s-panel-soft);
+}
+
+.default-model-card > div,
+.os-account-card > div {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.default-model-card strong,
+.os-account-card strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.default-model-card span,
+.os-account-card span {
+  color: var(--a3s-muted);
+  font-size: 11px;
+}
+
+.settings-model-select {
+  max-width: 260px;
+  height: 34px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--a3s-line-strong);
+  border-radius: 8px;
+  background: var(--a3s-panel);
+  color: var(--a3s-ink);
+  font-size: 12px;
+}
+
+.provider-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.provider-list section {
+  padding: 14px;
+  border: 1px solid var(--a3s-line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--a3s-panel-soft) 42%, var(--a3s-panel));
+}
+
+.provider-list section header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+}
+
+.provider-list section header strong {
+  font-size: 12px;
+}
+
+.provider-list section > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.provider-list section > div span {
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-muted);
+  font-size: 10px;
+}
+
+.os-account-card img {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+}
+
+.connection-badge {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: var(--a3s-panel-strong);
+  color: var(--a3s-muted) !important;
+}
+
+.connection-badge.online {
+  background: color-mix(in srgb, var(--a3s-green) 11%, var(--a3s-panel));
+  color: var(--a3s-green) !important;
+}
+
+.account-capabilities {
+  display: grid;
+  margin: 0 0 18px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.account-capabilities > div {
+  display: flex;
+  padding: 12px;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--a3s-line);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--a3s-panel-soft) 42%, var(--a3s-panel));
+}
+
+.account-capabilities span {
+  color: var(--a3s-muted);
+  font-size: 11px;
+}
+
+.account-capabilities strong {
+  font-size: 12px;
+}
+
+.settings-section > .btn,
+.settings-section > .btn-outline {
+  min-height: 37px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.settings-saving,
+.account-config-hint {
+  display: block;
+  margin: -9px 0 14px;
+  color: var(--a3s-muted);
+  font-size: 11px;
+}
+
+.settings-warning {
+  margin: 8px 0;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--a3s-warning, #d97706) 25%, var(--a3s-line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--a3s-warning, #d97706) 5%, var(--a3s-panel));
+  color: var(--a3s-warning, #d97706);
+  font-size: 11px;
+}

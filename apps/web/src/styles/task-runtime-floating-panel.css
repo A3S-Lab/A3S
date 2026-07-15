@@ -1,0 +1,568 @@
+.task-conversation-pane {
+  position: relative;
+}
+
+.task-conversation-pane[data-task-runtime-layout="wide"] .execution-column {
+  width: min(780px, calc(100% - 424px));
+  margin-right: auto;
+  margin-left: max(32px, calc((100% - 1172px) / 2));
+}
+
+.task-runtime-floating-panel {
+  position: absolute;
+  z-index: 36;
+  top: var(--task-runtime-panel-top, 54px);
+  right: 16px;
+  width: min(360px, calc(100% - 32px));
+  overflow: hidden;
+  border: 1px solid var(--a3s-line-strong);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--a3s-panel) 96%, transparent);
+  box-shadow: 0 14px 36px rgb(0 0 0 / 14%);
+  backdrop-filter: blur(14px);
+  animation: task-runtime-enter 160ms ease-out;
+}
+
+.task-runtime-floating-panel.collapsed {
+  width: min(320px, calc(100% - 32px));
+}
+
+.task-runtime-floating-panel.compact {
+  position: relative;
+  top: auto;
+  right: auto;
+  width: min(360px, calc(100% - 32px));
+  margin: 8px 16px 0;
+  align-self: flex-end;
+}
+
+.task-runtime-floating-panel.compact.collapsed {
+  width: min(320px, calc(100% - 32px));
+}
+
+.task-runtime-floating-panel.compact .task-runtime-floating-trigger {
+  min-height: 48px;
+}
+
+.task-runtime-floating-trigger {
+  display: grid;
+  width: 100%;
+  min-height: 54px;
+  grid-template-columns: 28px minmax(0, 1fr) auto 16px;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 11px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--a3s-ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.task-runtime-floating-trigger:hover,
+.task-runtime-floating-trigger:focus-visible {
+  background: var(--a3s-panel-soft);
+}
+
+.task-runtime-floating-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--a3s-panel-strong);
+  color: var(--a3s-muted);
+}
+
+.task-runtime-floating-icon.running {
+  background: color-mix(in srgb, var(--a3s-blue) 9%, var(--a3s-panel));
+  color: var(--a3s-blue);
+}
+
+.task-runtime-floating-icon.failed {
+  background: color-mix(in srgb, var(--a3s-red) 9%, var(--a3s-panel));
+  color: var(--a3s-red);
+}
+
+.task-runtime-floating-icon.interrupted {
+  background: color-mix(in srgb, var(--a3s-warning) 9%, var(--a3s-panel));
+  color: var(--a3s-warning);
+}
+
+.task-runtime-floating-panel.failed {
+  border-color: color-mix(in srgb, var(--a3s-red) 24%, var(--a3s-line-strong));
+}
+
+.task-runtime-floating-panel.interrupted {
+  border-color: color-mix(in srgb, var(--a3s-warning) 24%, var(--a3s-line-strong));
+}
+
+.task-runtime-floating-title {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.task-runtime-floating-title strong {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.task-runtime-floating-title small {
+  overflow: hidden;
+  color: var(--a3s-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-runtime-floating-summary {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.task-runtime-floating-summary strong {
+  font: 600 11px/1.2 "SFMono-Regular", Consolas, monospace;
+}
+
+.task-runtime-floating-summary time {
+  color: var(--a3s-faint);
+  font: 10px/1.2 "SFMono-Regular", Consolas, monospace;
+}
+
+.task-runtime-floating-content {
+  box-sizing: border-box;
+  max-height: min(430px, var(--task-runtime-content-max-height, calc(100vh - 150px)));
+  padding: 0 11px 11px;
+  overflow-y: auto;
+  border-top: 1px solid var(--a3s-line);
+}
+
+.task-runtime-floating-panel.agent-only .task-runtime-floating-content {
+  padding-top: 10px;
+}
+
+.task-runtime-progress {
+  height: 2px;
+  margin: 0 -11px 10px;
+  overflow: hidden;
+  background: var(--a3s-panel-strong);
+}
+
+.task-runtime-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: 0 999px 999px 0;
+  background: var(--a3s-line-strong);
+  transition: width 180ms ease;
+}
+
+.task-runtime-floating-panel.running .task-runtime-progress > span {
+  background: var(--a3s-blue);
+}
+
+.task-runtime-floating-panel.completed .task-runtime-progress > span {
+  background: var(--a3s-green);
+}
+
+.task-runtime-floating-panel.failed .task-runtime-progress > span {
+  background: var(--a3s-red);
+}
+
+.task-runtime-floating-panel.interrupted .task-runtime-progress > span {
+  background: var(--a3s-warning);
+}
+
+.task-runtime-section + .task-runtime-section {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--a3s-line);
+}
+
+.task-runtime-section > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 7px;
+  padding-inline: 3px;
+}
+
+.task-runtime-section > header strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.task-runtime-section > header span {
+  color: var(--a3s-faint);
+  font-size: 10px;
+}
+
+.task-runtime-section ol,
+.task-runtime-section ul {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
+  gap: 3px;
+  list-style: none;
+}
+
+.task-runtime-plan li {
+  display: grid;
+  min-height: 30px;
+  grid-template-columns: 17px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 4px 7px;
+  border-radius: 7px;
+  color: var(--a3s-faint);
+  font-size: 11px;
+}
+
+.task-runtime-plan li > span {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--a3s-muted);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.task-runtime-plan li.in_progress {
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-blue);
+}
+
+.task-runtime-plan li.in_progress > span {
+  display: block;
+  overflow: visible;
+  color: var(--a3s-ink);
+  font-weight: 550;
+  -webkit-line-clamp: unset;
+}
+
+.task-runtime-plan li.completed {
+  color: var(--a3s-green);
+}
+
+.task-runtime-plan li.failed {
+  color: var(--a3s-red);
+}
+
+.task-runtime-plan li.failed > span {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
+
+.task-runtime-plan li.skipped {
+  color: var(--a3s-faint);
+}
+
+.task-runtime-agents > ul {
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--a3s-line);
+  border-radius: 8px;
+  background: var(--a3s-panel-soft);
+}
+
+.task-runtime-agents > ul > .task-runtime-agent-row {
+  min-height: 42px;
+  overflow: hidden;
+  background: transparent;
+}
+
+.task-runtime-agents > ul > .task-runtime-agent-row + .task-runtime-agent-row {
+  border-top: 1px solid var(--a3s-line);
+}
+
+.task-runtime-agent-evidence,
+.task-runtime-agent-static {
+  display: block;
+  width: 100%;
+}
+
+.task-runtime-agent-trigger,
+.task-runtime-agent-static {
+  display: grid;
+  width: 100%;
+  min-height: 42px;
+  grid-template-columns: 20px minmax(0, 1fr) auto 13px;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 7px;
+}
+
+.task-runtime-agent-static {
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+}
+
+.task-runtime-agent-trigger {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--a3s-ink);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.task-runtime-agent-trigger:hover,
+.task-runtime-agent-trigger:focus-visible {
+  background: color-mix(in srgb, var(--a3s-ink) 3%, transparent);
+}
+
+.task-runtime-agent-trigger:focus-visible {
+  outline: 1px solid color-mix(in srgb, var(--a3s-blue) 50%, transparent);
+  outline-offset: -1px;
+}
+
+.task-runtime-agent-state {
+  display: grid;
+  place-items: center;
+  color: var(--a3s-muted);
+}
+
+.task-runtime-agent-state.running {
+  color: var(--a3s-blue);
+}
+
+.task-runtime-agent-state.completed {
+  color: var(--a3s-green);
+}
+
+.task-runtime-agent-state.failed {
+  color: var(--a3s-red);
+}
+
+.task-runtime-agent-state.interrupted {
+  color: var(--a3s-warning);
+}
+
+.task-runtime-agent-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.task-runtime-agent-copy > strong,
+.task-runtime-agent-copy > small,
+.task-runtime-agent-copy > small > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-runtime-agent-copy > strong {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.task-runtime-agent-copy > small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--a3s-faint);
+  font-size: 10px;
+}
+
+.task-runtime-agent-disclosure {
+  color: var(--a3s-muted);
+}
+
+.task-runtime-agent-trigger:hover .task-runtime-agent-disclosure {
+  color: var(--a3s-ink);
+}
+
+.task-runtime-agent-metrics {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.task-runtime-agent-metrics time,
+.task-runtime-agent-metrics small {
+  color: var(--a3s-faint);
+  font: 10px/1 "SFMono-Regular", Consolas, monospace;
+  white-space: nowrap;
+}
+
+.task-runtime-agent-metrics small {
+  font-size: 9px;
+}
+
+.task-runtime-agent-chevron {
+  color: var(--a3s-faint);
+  transition: transform 140ms ease;
+}
+
+.task-runtime-agent-evidence.open .task-runtime-agent-chevron {
+  transform: rotate(90deg);
+}
+
+.task-runtime-agent-evidence-content {
+  display: flex;
+  padding: 8px 10px 10px 34px;
+  flex-direction: column;
+  gap: 9px;
+  border-top: 1px solid var(--a3s-line);
+}
+
+.task-runtime-agent-evidence-content > section {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.task-runtime-agent-evidence-content > section > strong {
+  color: var(--a3s-muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.task-runtime-agent-evidence-content ol {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+}
+
+.task-runtime-agent-evidence-content li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--a3s-muted);
+  font-size: 10px;
+}
+
+.task-runtime-agent-evidence-content li::before {
+  width: 4px;
+  height: 4px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--a3s-line-strong);
+  content: '';
+}
+
+.task-runtime-agent-evidence-content li > span {
+  min-width: 0;
+  margin-right: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-runtime-agent-evidence-content li > small {
+  color: var(--a3s-faint);
+  font: 9px/1 "SFMono-Regular", Consolas, monospace;
+  white-space: nowrap;
+}
+
+.task-runtime-agent-output,
+.task-runtime-agent-output-fallback {
+  max-height: 156px;
+  margin: 0;
+  overflow: auto;
+  color: var(--a3s-muted);
+  font-size: 10px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.task-runtime-agent-output-fallback {
+  padding: 7px 8px;
+  border: 1px solid var(--a3s-line);
+  border-radius: 6px;
+  background: var(--a3s-panel);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  white-space: pre-wrap;
+}
+
+.task-runtime-agent-output.execution-markdown .streaming-markdown :where(p, ul, ol, blockquote, table) {
+  margin-block: 0.45em;
+}
+
+.task-runtime-agent-output.execution-markdown [data-streamdown="code-block"],
+.task-runtime-agent-output.execution-markdown [data-streamdown="table-wrapper"] {
+  margin: 0 !important;
+  border-radius: 6px !important;
+}
+
+.task-runtime-agent-output.execution-markdown [data-streamdown="code-block-header"] {
+  height: 28px !important;
+}
+
+.task-runtime-agent-output.execution-markdown [data-streamdown="code-block-body"],
+.task-runtime-agent-output.execution-markdown [data-streamdown="table-wrapper"] > div:last-child {
+  max-height: 118px;
+}
+
+.task-runtime-agent-output.execution-markdown [data-streamdown="code-block-body"] {
+  padding: 8px 9px !important;
+}
+
+.task-runtime-agents-more {
+  display: flex;
+  width: 100%;
+  min-height: 27px;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--a3s-muted);
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.task-runtime-agents-more:hover,
+.task-runtime-agents-more:focus-visible {
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-ink);
+}
+
+.task-runtime-agents-more svg {
+  transition: transform 140ms ease;
+}
+
+.task-runtime-agents-more[aria-label^='收起'] svg {
+  transform: rotate(90deg);
+}
+
+@keyframes task-runtime-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.99);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-runtime-floating-panel {
+    animation: none;
+  }
+}

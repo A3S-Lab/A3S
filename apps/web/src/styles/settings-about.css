@@ -1,0 +1,178 @@
+/* About and update settings */
+
+.about-settings {
+  text-align: center;
+}
+
+.about-settings > img {
+  display: block;
+  width: 68px;
+  height: 68px;
+  margin: 0 auto;
+  border-radius: 18px;
+  box-shadow: 0 12px 30px rgb(49 70 194 / 17%);
+}
+
+.about-settings h3 {
+  margin: 14px 0 6px;
+  font-size: 18px;
+}
+
+.about-settings > p {
+  margin: 0 0 26px;
+  color: var(--a3s-muted);
+  font-size: 12px;
+}
+
+.about-settings dl {
+  margin: 0;
+  text-align: left;
+}
+
+.about-settings dl div {
+  display: grid;
+  padding: 11px 0;
+  grid-template-columns: 110px minmax(0, 1fr);
+  border-top: 1px solid var(--a3s-line);
+  font-size: 11px;
+}
+
+.about-settings dt {
+  color: var(--a3s-muted);
+}
+
+.about-settings dd {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.about-settings dd .status-dot {
+  width: 5px;
+  height: 5px;
+  flex-basis: 5px;
+}
+
+.about-settings dd .status-dot.checking {
+  background: var(--a3s-warning, #d97706);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--a3s-warning, #d97706) 13%, transparent);
+}
+
+.about-settings dd .status-dot.disconnected {
+  background: var(--a3s-red);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--a3s-red) 13%, transparent);
+}
+
+.about-settings a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 20px;
+  color: var(--a3s-blue);
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.update-card {
+  width: 100%;
+  margin-top: 18px;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--card);
+  text-align: left;
+}
+
+.update-card > header,
+.update-card > header > div,
+.update-versions > div {
+  display: flex;
+}
+
+.update-card > header {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.update-card > header > div,
+.update-versions > div {
+  flex-direction: column;
+}
+
+.update-card > header span,
+.update-versions span {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+.update-card .btn-outline,
+.update-card .btn {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.update-versions {
+  display: grid;
+  grid-template-columns: 1fr 24px 1fr;
+  align-items: center;
+  margin-top: 13px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--muted);
+}
+
+.update-versions i::after {
+  content: "→";
+  color: var(--muted-foreground);
+  font-style: normal;
+}
+
+.update-action {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.update-action p {
+  margin: 0 0 10px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.update-action > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.update-error,
+.update-success {
+  display: block;
+  margin: 12px 0 0;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.update-error {
+  border: 1px solid color-mix(in srgb, var(--a3s-red) 25%, var(--a3s-line));
+  background: color-mix(in srgb, var(--a3s-red) 5%, var(--a3s-panel));
+  color: var(--a3s-red);
+}
+
+.update-success {
+  border: 1px solid color-mix(in srgb, var(--a3s-green) 25%, var(--a3s-line));
+  background: color-mix(in srgb, var(--a3s-green) 6%, var(--a3s-panel));
+  color: var(--a3s-green);
+}
