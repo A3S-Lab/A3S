@@ -14,7 +14,10 @@ pub use component::{
     uninstall_owned_files, ComponentReceipt, DirectoryActivation, InstallProvenance, ReceiptStore,
     RECEIPT_SCHEMA_VERSION,
 };
-pub use download::{download_asset, extract_tar_gz_archive, sha256_hex, verify_sha256};
+pub use download::{
+    download_asset, extract_release_archive, extract_tar_gz_archive, extract_zip_archive,
+    sha256_hex, verify_sha256,
+};
 pub use github::{
     fetch_latest_release, fetch_release, find_matching_asset, parse_version, Asset, Release,
 };

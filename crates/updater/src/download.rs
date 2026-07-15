@@ -2,6 +2,7 @@
 
 use anyhow::{bail, Context};
 use sha2::{Digest, Sha256};
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -120,6 +121,69 @@ pub fn extract_tar_gz_archive(data: &[u8], dest_dir: &Path) -> anyhow::Result<Ve
         }
     }
     Ok(extracted)
+}
+
+/// Safely extract a complete ZIP archive.
+///
+/// Directory entries and regular files are accepted. Symbolic links and paths
+/// outside the destination are rejected.
+pub fn extract_zip_archive(data: &[u8], dest_dir: &Path) -> anyhow::Result<Vec<PathBuf>> {
+    std::fs::create_dir_all(dest_dir)
+        .with_context(|| format!("failed to create extraction root {}", dest_dir.display()))?;
+    let mut archive = zip::ZipArchive::new(Cursor::new(data)).context("failed to read ZIP")?;
+    let mut extracted = Vec::new();
+
+    for index in 0..archive.len() {
+        let mut entry = archive
+            .by_index(index)
+            .with_context(|| format!("failed to read ZIP entry {index}"))?;
+        if entry.is_symlink() {
+            bail!(
+                "ZIP entry uses an unsupported symbolic link: {}",
+                entry.name()
+            );
+        }
+        let relative = entry
+            .enclosed_name()
+            .with_context(|| format!("ZIP entry escapes extraction root: {}", entry.name()))?;
+        let output = dest_dir.join(&relative);
+        if !output.starts_with(dest_dir) {
+            bail!("ZIP entry escapes extraction root: {}", relative.display());
+        }
+
+        if entry.is_dir() {
+            std::fs::create_dir_all(&output)
+                .with_context(|| format!("failed to create {}", output.display()))?;
+        } else if entry.is_file() {
+            if let Some(parent) = output.parent() {
+                std::fs::create_dir_all(parent)
+                    .with_context(|| format!("failed to create {}", parent.display()))?;
+            }
+            let mut file = std::fs::File::create(&output)
+                .with_context(|| format!("failed to create {}", output.display()))?;
+            std::io::copy(&mut entry, &mut file)
+                .with_context(|| format!("failed to extract {}", output.display()))?;
+            extracted.push(output);
+        } else {
+            bail!("ZIP entry uses an unsupported type: {}", entry.name());
+        }
+    }
+    Ok(extracted)
+}
+
+/// Extract a supported release archive according to its published file name.
+pub fn extract_release_archive(
+    data: &[u8],
+    dest_dir: &Path,
+    archive_name: &str,
+) -> anyhow::Result<Vec<PathBuf>> {
+    if archive_name.ends_with(".tar.gz") {
+        extract_tar_gz_archive(data, dest_dir)
+    } else if archive_name.ends_with(".zip") {
+        extract_zip_archive(data, dest_dir)
+    } else {
+        bail!("unsupported release archive format: {archive_name}")
+    }
 }
 
 /// Download a `.tar.gz` asset and extract the binary from it.
@@ -265,5 +329,44 @@ mod tests {
             builder.finish().unwrap();
         }
         assert!(extract_tar_gz_archive(&linked_archive, temp.path()).is_err());
+    }
+
+    #[test]
+    fn zip_archive_extraction_accepts_files_and_rejects_traversal() {
+        use std::io::Write;
+        use zip::write::SimpleFileOptions;
+
+        let mut bytes = Vec::new();
+        {
+            let cursor = Cursor::new(&mut bytes);
+            let mut writer = zip::ZipWriter::new(cursor);
+            writer
+                .start_file("package/a3s-use.exe", SimpleFileOptions::default())
+                .unwrap();
+            writer.write_all(b"fixture").unwrap();
+            writer.finish().unwrap();
+        }
+        let temp = tempfile::tempdir().unwrap();
+        let files = extract_zip_archive(&bytes, temp.path()).unwrap();
+        assert_eq!(files, [temp.path().join("package/a3s-use.exe")]);
+        assert_eq!(std::fs::read(&files[0]).unwrap(), b"fixture");
+
+        let mut traversal = Vec::new();
+        {
+            let cursor = Cursor::new(&mut traversal);
+            let mut writer = zip::ZipWriter::new(cursor);
+            writer
+                .start_file("../escape", SimpleFileOptions::default())
+                .unwrap();
+            writer.write_all(b"escape").unwrap();
+            writer.finish().unwrap();
+        }
+        assert!(extract_zip_archive(&traversal, temp.path()).is_err());
+    }
+
+    #[test]
+    fn release_archive_dispatch_rejects_unknown_formats() {
+        let temp = tempfile::tempdir().unwrap();
+        assert!(extract_release_archive(b"fixture", temp.path(), "release.rar").is_err());
     }
 }
