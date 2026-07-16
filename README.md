@@ -49,10 +49,10 @@ is Rust.
 | --- | --- | --- |
 | [A3S Web](apps/web/) | 0.1.0 | Browser workspace for the A3S Code product, served by the local CLI. |
 | [A3S Box Desktop](apps/box/) | 0.1.0 | Native A3S Box management client. |
-| [a3s](crates/cli/) | 0.9.0 | End-user CLI and typed component-management entrypoint. |
-| [a3s-code](crates/code/) | core and SDKs 5.2.8 | Rust agent runtime plus Node and Python SDK bindings. |
+| [a3s](crates/cli/) | 0.9.1 | End-user CLI and typed component-management entrypoint. |
+| [a3s-code](crates/code/) | core and SDKs 5.3.1 | Rust agent runtime plus Node and Python SDK bindings. |
 | [a3s-gui](crates/gui/) | 0.1.0 | Native GUI runtime with hooks, RSX templates, semantic UI, and platform hosts. |
-| [a3s-tui](crates/tui/) | 0.1.6 | Terminal UI framework used by `a3s code`. |
+| [a3s-tui](crates/tui/) | 0.1.10 | Terminal UI framework used by `a3s code`. |
 | [a3s-flow](crates/flow/) | 0.4.1 | Durable workflow engine with event-sourced runs and replay. |
 | [a3s-memory](crates/memory/) | 0.1.2 | Pluggable long-term memory storage for agents. |
 | [a3s-event](crates/event/) | 0.3.0 | Event subscription, dispatch, and persistence. |
@@ -112,6 +112,13 @@ independently implementable through ACL-declared native CLI, standard MCP,
 and/or `SKILL.md` surfaces; A3S Use does not introduce a custom JSON-RPC
 extension protocol. A3S Search depends directly on the typed
 `a3s-use-browser` library rather than owning a second browser runtime.
+
+When Code delegates to the restricted `use` worker, TUI and Web project the
+standard child-tool metadata into a first-class capability identity. A Browser
+route appears as `Using Browser` / `Used Browser` in the terminal and
+`Use · Browser` in Web; multiple routes remain ordered and deduplicated, and
+restored task snapshots preserve the same identity. This is presentation over
+the existing subagent event stream, not another transport.
 
 Manage account-owned and configured model routes without copying Claude Code,
 Codex, or A3S OS credentials into `config.acl`:

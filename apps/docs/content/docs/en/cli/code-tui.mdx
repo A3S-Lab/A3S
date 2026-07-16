@@ -81,6 +81,25 @@ After `/login`, the session also registers the OS `runtime` tool and unlocks
 RemoteUI ViewLinks, OS asset publishing, Function as a Service, Workflow as a
 Service, Knowledge service deployment, and asset activity panels.
 
+## Use Workers
+
+When the explicitly installed Use component is ready, Code registers one
+restricted `use` worker in the live `task` and `parallel_task` agent catalogs.
+It can call only `mcp__use_*` tools: it cannot use the workspace, shell,
+unrelated MCP servers, or recursive delegation, and starting Code never
+installs Use as a side effect.
+
+The TUI projects standard child progress into a capability-oriented lifecycle.
+For example, `mcp__use_browser__browser_open` appears as `Using Browser` while
+live and `Used Browser` after success; a failed Office run appears as
+`Use · Office failed`. Multiple capability routes are deduplicated, and a
+restored tracker snapshot reconstructs the same identity. This presentation
+uses the existing subagent events and does not add a private RPC protocol.
+
+The current runtime and managed-component targets are macOS and Linux. Native
+Windows lifecycle support remains on the roadmap; WSL follows the Linux
+contract.
+
 ## Slash Command Families
 
 The CLI command palette delegates to the A3S Code TUI command registry:
@@ -115,7 +134,9 @@ host then runs the native local fan-out implementation outside QuickJS.
 
 ## Updates
 
-`/update`, `a3s update`, and `a3s code update` use the same update machinery.
+`/update`, `a3s code update`, and `a3s self update` use the same self-update
+machinery. The hidden legacy `a3s update` route exists only for transition
+compatibility; optional components use `a3s upgrade`.
 Homebrew installs refresh the tap and upgrade the formula. Standalone installs
 download the matching release asset, swap the `a3s` binary, and verify the
 target version before treating the update as successful. If restart fails after

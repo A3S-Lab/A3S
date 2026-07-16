@@ -5,37 +5,76 @@ description: Public command surface, dispatch behavior, and boundaries for the a
 
 # CLI Commands
 
-`a3s` is intentionally small: it routes users to the right A3S surface and keeps
-the heavier product behavior in the component crates.
+`a3s` is the stable product entrypoint. It owns a typed root grammar, common
+output and error behavior, and registered component lifecycle; product-specific
+behavior remains in the component that implements it.
 
 ## Public Commands
 
 | Command | Behavior |
 | --- | --- |
-| `a3s code` | Launch the interactive coding-agent terminal UI. |
-| `a3s code resume <id>` | Resume a saved session by id. |
-| `a3s code resume` | Resume the newest saved session in the current workspace. |
-| `a3s code update` | Alias for the CLI self-update path. |
-| `a3s box <args...>` | Run `a3s-box <args...>`, bootstrapping Box when missing. |
-| `a3s list` | Print installed `a3s-*` tools found on `PATH`. |
-| `a3s top` | Open the live monitor for boxes, coding agents, sessions, events, and processes. |
-| `a3s update` | Check the latest release and upgrade when possible. |
-| `a3s --version` | Print the CLI version. |
-| `a3s --help` | Print the built-in usage text. |
+| `a3s code [command]` | Launch or automate A3S Code, including session resume and update compatibility paths. |
+| `a3s web [command]` | Run the local A3S Web application and API. |
+| `a3s top` | Monitor agents, containers, sessions, events, and processes. |
+| `a3s box <args...>` | Run the registered A3S Box product. |
+| `a3s bench <args...>` | Run the registered A3S Bench product. |
+| `a3s search <args...>` | Run the registered A3S Search product. |
+| `a3s use <domain> <args...>` | Use Browser, Office, or an installed external Use domain. |
+| `a3s auth ...` | Manage account authentication. |
+| `a3s model ...` | Discover and select runtime models. |
+| `a3s config ...` | Inspect and edit A3S ACL configuration. |
+| `a3s list` | List registered component state and separately discovered external tools. |
+| `a3s info <component>` | Explain component state, sources, provenance, and available versions. |
+| `a3s install <component>...` | Install or repair registered components. With no IDs, list installable components without mutation. |
+| `a3s upgrade [<component>...]` | List upgrades or upgrade selected installed components. |
+| `a3s uninstall <component>...` | Remove only files proven to be owned by the selected component. |
+| `a3s doctor [component]` | Run read-only installation and health diagnostics. |
+| `a3s registry ...` | Manage trusted component registries. |
+| `a3s cache ...` | Inspect or remove recreatable cache data. |
+| `a3s self ...` | Manage the umbrella executable itself. |
+| `a3s version` / `a3s --version` | Print version information. |
+| `a3s completion <shell>` | Generate shell completion source. |
+| `a3s help [path]` / `a3s --help` | Show help for the root or one command path. |
 
 Unknown top-level commands exit with an error instead of guessing another
 binary name.
 
-## Dispatch Model
+Common root flags include `-C/--directory`, `--config`,
+`--output human|json|jsonl`, `--json`, `--offline`, `--non-interactive`,
+`--no-progress`, color control, and quiet/verbose diagnostics. Machine output is
+selected at the root rather than redefined independently by each root-owned
+command.
 
-`a3s code` stays in-process and calls the TUI module. `a3s box ...` shells out to
-the `a3s-box` binary after discovery/bootstrap. Other product helpers remain
-separate binaries rather than being linked into the umbrella CLI.
+## Dispatch And Installation
+
+`a3s code` and the local Web backend run through the integrated Code runtime.
+Product proxies resolve a typed component ID from the trusted catalog and then
+execute the recorded absolute path. Components that explicitly opt in may use
+a visible first-use installation; `--offline` or `--non-interactive` prevents
+surprise downloads. Read-only help, version, listing, and status paths do not
+trigger delayed installation.
+
+`a3s install` is not a universal frontend for Homebrew, APT, DNF, Pacman,
+Winget, npm, pip, Cargo, or arbitrary package names. It manages registered A3S
+components and uses only a source declared for that component. Native package
+manager adapters preserve the native manager's ownership instead of copying
+its files into A3S receipts.
+
+macOS and Linux are the current runtime, release, and managed-install targets.
+Windows CLI/MCP/Skill and manifest types remain a compile/package preview on
+the roadmap; native Windows installation, recovery, locking, and persistent
+Browser sessions are not part of the current support claim. WSL follows the
+Linux contract.
 
 ## Runtime Boundaries
 
-- The CLI owns command selection, packaging, first-use glue, and self-update UX.
+- The CLI owns command selection, trusted catalog policy, receipts, lifecycle
+  orchestration, first-use policy, common output, and self-update UX.
 - A3S Code owns the agent session, model/tool execution, workspace services, and
   persistence.
 - A3S TUI owns terminal rendering and input handling.
 - A3S Box owns sandbox/container runtime behavior.
+- A3S Use owns Browser, Office, and external domain routing; it exposes native
+  CLI, standard MCP, and `SKILL.md` surfaces without a private JSON-RPC layer.
+- A3S Updater owns verified download, staging, activation, rollback, receipts,
+  and ownership-safe removal primitives; it does not define the product catalog.

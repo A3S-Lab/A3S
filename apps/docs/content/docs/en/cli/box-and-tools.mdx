@@ -1,6 +1,6 @@
 ---
 title: Box And Tools
-description: a3s box proxying, Box bootstrap, install locations, tool discovery, and helper binary boundaries.
+description: Registered Box proxying, component installation, discovery, inventory, and helper binary boundaries.
 ---
 
 # Box And Tools
@@ -12,12 +12,13 @@ simple while leaving sandbox/runtime behavior in the `a3s-box` binary.
 
 When you run `a3s box <args...>`, the CLI:
 
-1. Looks for an executable `a3s-box`.
-2. Checks `A3S_BOX_INSTALL_DIR` first when it is set.
-3. Checks next to the current `a3s` executable.
-4. Checks `PATH`.
-5. Checks a user-local fallback location.
-6. Installs Box when missing, then re-runs the requested command.
+1. Resolves the registered `box` component from the trusted catalog.
+2. Reconciles its receipt with an allowed existing installation, including the
+   configured install directory, a CLI sibling, `PATH`, or the user component
+   root.
+3. Performs a visible first-use installation only when Box is missing and the
+   invocation permits network and interaction.
+4. Executes the absolute resolved `a3s-box` path with the original arguments.
 
 The proxy exits with the same status code as `a3s-box` when the child command
 fails.
@@ -28,7 +29,7 @@ fails.
 | --- | --- |
 | Homebrew | Tries the `a3s-lab/tap/a3s-box` formula when `brew` is available. |
 | Standalone release | Downloads a platform release archive, extracts Box binaries, installs them into the chosen bin directory, and copies bundled libraries. |
-| Existing install | Reuses an existing executable from the configured install dir, CLI sibling dir, `PATH`, or user-local fallback. |
+| Existing install | Reconciles a compatible executable from an allowed discovery location without claiming files owned by another package manager. |
 
 Standalone Box bootstrap currently has release targets for macOS arm64, Linux
 arm64, and Linux x86_64. Unsupported OS/arch pairs should install Box manually
@@ -43,13 +44,17 @@ When present in the release archive, bootstrap installs:
 - `a3s-box-guest-init`
 - `a3s-box-cri`
 
-## Tool Listing
+## Component And Tool Listing
 
-`a3s list` scans visible `a3s-*` executables so users can see which A3S product
-tools are available on their machine.
+`a3s list` reports every registered component and its bundled, managed,
+delegated, external, missing, or unsupported state. Additional `a3s-*`
+executables discovered on `PATH` are listed separately as unregistered external
+tools; their presence does not activate them as trusted components.
 
 ## Boundaries
 
-The CLI does not implement container isolation itself. It discovers, installs,
-and launches Box; the Box repository owns runtime, CRI, networking, image, and
-TEE behavior.
+The CLI does not implement container isolation itself. It owns Box catalog and
+lifecycle policy, while verified transaction primitives stage and activate the
+artifact. The Box repository owns runtime, CRI, networking, image, and TEE
+behavior. Current managed delivery targets macOS and Linux; Windows remains on
+the roadmap.
