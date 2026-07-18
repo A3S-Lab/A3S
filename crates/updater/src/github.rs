@@ -112,3 +112,22 @@ pub fn find_matching_asset<'a>(
     let expected = asset_name(binary_name, &version.to_string(), os, arch);
     release.assets.iter().find(|a| a.name == expected)
 }
+
+/// Return a validated GitHub-provided SHA-256 digest for a release asset.
+///
+/// A missing digest is a hard failure: callers must never silently downgrade
+/// a self-update to an unverified download.
+pub fn asset_sha256(asset: &Asset) -> anyhow::Result<String> {
+    let digest = asset
+        .digest
+        .as_deref()
+        .ok_or_else(|| anyhow::anyhow!("release asset '{}' has no SHA-256 digest", asset.name))?;
+    let digest = digest.strip_prefix("sha256:").unwrap_or(digest);
+    if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(anyhow::anyhow!(
+            "release asset '{}' has an invalid SHA-256 digest",
+            asset.name
+        ));
+    }
+    Ok(digest.to_ascii_lowercase())
+}

@@ -19,7 +19,8 @@ pub use download::{
     sha256_hex, verify_sha256,
 };
 pub use github::{
-    fetch_latest_release, fetch_release, find_matching_asset, parse_version, Asset, Release,
+    asset_sha256, fetch_latest_release, fetch_release, find_matching_asset, parse_version, Asset,
+    Release,
 };
 
 /// Configuration for the update check — each binary provides its own.
@@ -73,8 +74,12 @@ pub async fn run_update(config: &UpdateConfig) -> anyhow::Result<()> {
         config.binary_name, latest_version, os, arch
     );
 
+    let checksum = github::asset_sha256(asset)?;
+    let archive = download::download_asset(&asset.browser_download_url).await?;
+    download::verify_sha256(&archive, &checksum)?;
     let (new_binary, _temp_dir) =
-        download::download_and_extract(&asset.browser_download_url, config.binary_name).await?;
+        download::extract_release_binary(&archive, &asset.name, config.binary_name)?;
+    verify_downloaded_version(&new_binary, &latest_version)?;
     install::replace_binary(&new_binary)?;
     // _temp_dir is dropped here, automatically cleaning up the temp directory
 
@@ -83,6 +88,57 @@ pub async fn run_update(config: &UpdateConfig) -> anyhow::Result<()> {
         config.binary_name, current_version, latest_version
     );
 
+    Ok(())
+}
+
+fn verify_downloaded_version(
+    binary: &std::path::Path,
+    expected: &semver::Version,
+) -> anyhow::Result<()> {
+    let output = std::process::Command::new(binary)
+        .arg("--version")
+        .output()
+        .map_err(|error| {
+            anyhow::anyhow!(
+                "failed to probe downloaded binary '{}': {error}",
+                binary.display()
+            )
+        })?;
+    if !output.status.success() {
+        return Err(anyhow::anyhow!(
+            "downloaded binary '{}' failed its version probe",
+            binary.display()
+        ));
+    }
+    let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
+    text.push_str(&String::from_utf8_lossy(&output.stderr));
+    let actual = text
+        .split(|character: char| {
+            !(character.is_ascii_alphanumeric()
+                || character == '.'
+                || character == '-'
+                || character == '+'
+                || character == 'v')
+        })
+        .filter_map(|token| {
+            let token = token.trim_start_matches('v');
+            semver::Version::parse(token).ok()
+        })
+        .next()
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "downloaded binary '{}' did not report a semantic version",
+                binary.display()
+            )
+        })?;
+    if &actual != expected {
+        return Err(anyhow::anyhow!(
+            "downloaded binary '{}' reported version {}, expected {}",
+            binary.display(),
+            actual,
+            expected
+        ));
+    }
     Ok(())
 }
 
@@ -204,5 +260,36 @@ mod tests {
 
         let v2 = github::parse_version("0.2.0").unwrap();
         assert_eq!(v2, semver::Version::parse("0.2.0").unwrap());
+    }
+
+    #[test]
+    fn release_asset_requires_a_valid_sha256_digest() {
+        let mut asset = Asset {
+            name: "a3s-search-1.0.0-linux-x86_64.tar.gz".to_string(),
+            browser_download_url: "https://example.invalid/release.tar.gz".to_string(),
+            digest: Some(format!("sha256:{}", "a".repeat(64))),
+        };
+        assert_eq!(asset_sha256(&asset).unwrap(), "a".repeat(64));
+
+        asset.digest = None;
+        assert!(asset_sha256(&asset).is_err());
+        asset.digest = Some("sha256:not-a-digest".to_string());
+        assert!(asset_sha256(&asset).is_err());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn downloaded_binary_version_must_match_the_release() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp = tempfile::tempdir().unwrap();
+        let binary = temp.path().join("a3s-test");
+        std::fs::write(&binary, "#!/bin/sh\nprintf 'a3s-test 1.2.3\\n'\n").unwrap();
+        std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        verify_downloaded_version(&binary, &semver::Version::parse("1.2.3").unwrap()).unwrap();
+        assert!(
+            verify_downloaded_version(&binary, &semver::Version::parse("1.2.4").unwrap()).is_err()
+        );
     }
 }
