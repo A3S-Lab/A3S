@@ -43,10 +43,11 @@ a3s code resume
 a3s install use --source release
 a3s install use/browser
 a3s install use/office       # 可选 OfficeCLI 兼容 provider
-a3s install use/ocr          # 固定版本的本地 PP-OCRv6 模型
+a3s install use/ocr          # 可选：提前安装或修复模型
 
 # OCR 通过 ONNX Runtime 在本地运行。
 a3s use ocr doctor --json
+a3s use ocr extract ./scan.png --json  # 首次使用自动准备模型
 ```
 
 Use 在 TUI 启动时 ready 后，Code 会监听其带版本 registry，并把内置 Browser、原生
@@ -58,7 +59,9 @@ Skill 热插拔进 session。
 
 主 model 不会看到 `mcp__use_*`，而是把应用请求委派给只能调用这组工具的专用 `use`
 worker。closed-world read-only 操作（包括 PP-OCRv6 doctor 与提取）无需额外确认，除非
-父级策略显式拒绝；网络/open-world、Office 或 Browser mutation、destructive、submit，
+父级策略显式拒绝。doctor 发现 OCR 模型缺失或损坏时，worker 会通过父级确认请求幂等
+`ocr_install` 网络 mutation，成功后继续提取；直接运行 `a3s use ocr extract` 也会自动
+准备同一组固定模型。网络/open-world、Office 或 Browser mutation、destructive、submit，
 以及缺少 behavior annotations 的操作都会升级到父 TUI HITL。父级 deny 始终有效，
 Office mutation 也不会自动重试。
 

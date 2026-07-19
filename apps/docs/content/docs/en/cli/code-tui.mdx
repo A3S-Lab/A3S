@@ -93,10 +93,11 @@ strict no-mutation boundaries. Providers may also be prepared explicitly:
 a3s install use --source release
 a3s install use/browser
 a3s install use/office       # optional OfficeCLI compatibility
-a3s install use/ocr          # pinned local PP-OCRv6 models
+a3s install use/ocr          # optional model pre-warm or repair
 
 # OCR runs locally through ONNX Runtime.
 a3s use ocr doctor --json
+a3s use ocr extract ./scan.png --json  # first use prepares models
 ```
 
 When Use is ready at startup, the TUI watches its versioned registry and
@@ -111,10 +112,13 @@ The primary model does not see `mcp__use_*` tools. It delegates application
 requests to the dedicated `use` worker, which is restricted to those tools.
 Closed-world read-only operations, including PP-OCRv6 doctor and extraction,
 run without an extra prompt unless the parent policy explicitly denies them.
-Open-world/network access, Office or Browser mutations, destructive operations,
-submit risk, and missing behavior annotations escalate to the parent TUI.
-Parent denials remain authoritative, and Office mutations are never retried
-automatically.
+If doctor reports missing or damaged OCR models, the worker requests the
+idempotent `ocr_install` network mutation through parent confirmation and then
+continues to extraction. Direct `a3s use ocr extract` prepares the same pinned
+models automatically. Open-world/network access, Office or Browser mutations,
+destructive operations, submit risk, and missing behavior annotations escalate
+to the parent TUI. Parent denials remain authoritative, and Office mutations
+are never retried automatically.
 
 For the complete route, artifact, OCR model, and safety contract, see
 [Browser, Office, And OCR Through A3S Use](/docs/code/tui#browser-office-and-ocr-through-a3s-use).

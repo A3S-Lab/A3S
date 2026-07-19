@@ -107,9 +107,12 @@ a3s install use/browser
 # 可选的 OfficeCLI 兼容 provider；原生 Office 已内置在 Use 中。
 a3s install use/office
 
-# 安装或修复固定版本的本地 PP-OCRv6 模型。
+# 可选：提前安装或修复固定版本的本地 PP-OCRv6 模型。
 a3s install use/ocr
 a3s use ocr doctor --json
+
+# 策略允许时，第一次提取会自动安装模型。
+a3s use ocr extract ./scan.png --json
 ```
 
 当 Use 主程序 ready 后，Code 会读取它带版本的 capability registry，
@@ -127,13 +130,15 @@ shell、workspace、无关 MCP 或递归委派工具。受管 Skill 只提供领
 用户可以直接说“用 Browser 检查这个页面”“用 Office 更新这个工作簿”或“对这张扫描图做
 OCR”，无需手写工具名。能力不可用时，worker 会返回 typed failure，不会换用其他工具兜底。
 默认 Browser surface 包含 doctor 和有界安装工具；缺少 managed Browser 时，只能在父
-TUI 确认后由 Use worker 请求安装。
+TUI 确认后由 Use worker 请求安装。OCR 使用相同的 first-use 路径：只读 doctor
+发现模型缺失或损坏后，worker 会通过父级确认请求有界 `ocr_install` 工具，安装成功后
+继续提取。直接运行 `a3s use ocr extract` 也会自动准备模型，无需先执行独立安装命令。
 
 | 能力 | Code surface | Provider 与确认行为 |
 | --- | --- | --- |
 | Browser | `mcp__use_browser__*` | 使用已发现的 browser，或通过需父级 HITL 的 mutation 请求 managed provider。封闭会话内的只读检查可直接执行；导航、网络/open-world 读取、输入、点击与提交需要 HITL。 |
 | 原生 Office | `mcp__use_office__*` | 使用带 revision/conflict 检查的有界原生 Office package kernel。读取是 closed-world；修改与破坏性保存需要 HITL。 |
-| 内置 OCR | `mcp__use_ocr__*` | 通过 ONNX Runtime 在本地运行固定版本的 `PP-OCRv6_small` 检测与识别模型。doctor 与提取均为 closed-world read-only 工具，source bytes 不会离开设备。 |
+| 内置 OCR | `mcp__use_ocr__*` | 通过 ONNX Runtime 在本地运行固定版本的 `PP-OCRv6_small` 检测与识别模型。doctor 与提取是 closed-world read-only 工具；独立的幂等安装器属于需要父级 HITL 的 open-world mutation。source bytes 不会离开设备。 |
 
 MCP behavior metadata 只能提升风险，不能降低父级策略。只有同时声明
 `readOnlyHint=true`、`openWorldHint=false` 且不是 destructive 的操作才无额外确认。

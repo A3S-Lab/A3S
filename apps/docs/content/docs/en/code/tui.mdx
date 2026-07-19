@@ -126,9 +126,12 @@ a3s install use/browser
 # Optional OfficeCLI compatibility provider. Native Office is built into Use.
 a3s install use/office
 
-# Install or repair the pinned local PP-OCRv6 models.
+# Optional pre-warm or repair of the pinned local PP-OCRv6 models.
 a3s install use/ocr
 a3s use ocr doctor --json
+
+# The first extraction installs the models automatically when policy allows.
+a3s use ocr extract ./scan.png --json
 ```
 
 When the parent Use binary is ready, Code consumes its versioned
@@ -153,7 +156,12 @@ boundary. Ask naturally, for example, “Use Browser to inspect this page,”
 capability is unavailable, the worker reports the typed failure instead of
 falling back to another tool. The default Browser surface includes doctor and a
 bounded installer; missing managed Browser files can therefore be prepared
-inside the Use worker only after parent TUI confirmation.
+inside the Use worker only after parent TUI confirmation. OCR follows the same
+first-use pattern: after a read-only doctor reports missing or damaged models,
+the worker requests the bounded `ocr_install` tool through parent confirmation
+and continues to extraction after installation succeeds. Direct
+`a3s use ocr extract` prepares the models automatically without requiring a
+separate install command.
 
 The projected routes are intentionally distinct:
 
@@ -161,7 +169,7 @@ The projected routes are intentionally distinct:
 | --- | --- | --- |
 | Browser | `mcp__use_browser__*` | Uses a discovered browser or requests the managed provider through a mutation that requires parent HITL. Closed-world session inspection can run without an extra prompt; navigation, network/open-world reads, input, clicks, and submits require HITL. |
 | Native Office | `mcp__use_office__*` | Uses the bounded native Office package kernel and its revision/conflict checks. Reads are closed-world; mutations and destructive saves require HITL. |
-| Built-in OCR | `mcp__use_ocr__*` | Runs the pinned `PP-OCRv6_small` detection and recognition models locally through ONNX Runtime. Doctor and extraction are closed-world read-only tools; source bytes never leave the device. |
+| Built-in OCR | `mcp__use_ocr__*` | Runs the pinned `PP-OCRv6_small` detection and recognition models locally through ONNX Runtime. Doctor and extraction are closed-world read-only tools; the separate idempotent installer is an open-world mutation requiring parent HITL. Source bytes never leave the device. |
 
 MCP behavior metadata is escalation-only. An operation is frictionless only
 when it declares `readOnlyHint=true`, `openWorldHint=false`, and is not
