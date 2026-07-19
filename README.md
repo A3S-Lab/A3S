@@ -34,11 +34,11 @@ is Rust.
 
 | Area | Paths | Purpose |
 | --- | --- | --- |
-| Product surfaces | `crates/cli`, `crates/bench`, `apps/web`, `apps/box`, `apps/docs` | CLI, browser workspace, benchmark control component, native app, and documentation site. |
+| Product surfaces | `crates/cli`, `crates/bench`, `apps/web`, `apps/box`, `apps/cloud`, `apps/docs` | CLI, browser workspace, benchmark control component, native app, Cloud control plane, and documentation site. |
 | Agent runtime | `crates/code`, `crates/ahp`, `crates/acl`, `crates/common` | Sessions, tools, policy, protocol, config, and shared types. |
 | UI systems | `crates/tui`, `crates/gui`, `crates/webview` | Terminal UI, native RSX UI, and trusted WebView helpers. |
 | Use and retrieval | `crates/use`, `crates/search` | Browser, native Office, and OCR capability surfaces, external Use extensions, and search through the shared Browser runtime. |
-| State and coordination | `crates/memory`, `crates/event`, `crates/flow`, `crates/lane` | Memory, events, workflows, and queues. |
+| State and coordination | `crates/memory`, `crates/event`, `crates/flow`, `crates/lane`, `crates/orm` | Memory, events, workflows, queues, and typed persistence. |
 | Runtime safety and operations | `crates/runtime`, `crates/box`, `crates/observer`, `crates/sentry` | Provider-neutral execution, isolation, observability, and runtime control. |
 | Services | `crates/boot`, `crates/gateway`, `crates/power` | Service framework, ingress, and model serving. |
 | Distribution | `crates/updater`, `homebrew-tap` | CLI self-update support and Homebrew formulae. |
@@ -49,26 +49,28 @@ is Rust.
 | --- | --- | --- |
 | [A3S Web](apps/web/) | 0.1.0 | Browser workspace for the A3S Code product, served by the local CLI. |
 | [A3S Box Desktop](apps/box/) | 0.1.0 | Native A3S Box management client. |
+| [A3S Cloud](apps/cloud/) | 0.1.0 | Multi-tenant control plane, node agent, and versioned Cloud contracts. |
 | [a3s](crates/cli/) | 0.9.1 | End-user CLI and typed component-management entrypoint. |
 | [a3s-code](crates/code/) | core and SDKs 5.3.1 | Rust agent runtime plus Node and Python SDK bindings. |
 | [a3s-gui](crates/gui/) | 0.1.0 | Native GUI runtime with hooks, RSX templates, semantic UI, and platform hosts. |
 | [a3s-tui](crates/tui/) | 0.1.10 | Terminal UI framework used by `a3s code`. |
 | [a3s-flow](crates/flow/) | 0.4.1 | Durable workflow engine with event-sourced runs and replay. |
+| [a3s-orm](crates/orm/) | 0.1.0 | Typed SQL, migrations, and PostgreSQL/SQLite persistence. |
 | [a3s-memory](crates/memory/) | 0.1.2 | Pluggable long-term memory storage for agents. |
 | [a3s-event](crates/event/) | 0.3.0 | Event subscription, dispatch, and persistence. |
 | [a3s-lane](crates/lane/) | 0.5.0 | Rust-only priority and job queue with Redis, flows, repeat jobs, worker leases, retry, and DLQ. |
 | [a3s-use](crates/use/) | 0.1.1 | Typed Browser, native Office, and OCR capability layer plus native CLI, standard MCP, and Skill extension surfaces. |
 | [a3s-search](crates/search/) | 1.4.3 | Embeddable meta-search engine using `a3s-use-browser` for headless browsing. |
 | [a3s-bench](crates/bench/) | 0.1.0 | Reproducible evaluation of coding agents, automated systems, and deterministic tools. |
-| [a3s-runtime](crates/runtime/) | 0.1.0 | Provider-neutral execution contract and Runtime client. |
+| [a3s-runtime](crates/runtime/) | 0.2.0 | Provider-neutral execution contract and Runtime client. |
 | [a3s-box](crates/box/) | 3.0.5 | Docker-like MicroVM runtime for Linux OCI workloads. |
 | [a3s-observer](crates/observer/) | 0.11.0 | eBPF observability for LLM calls, tools, files, and egress. |
-| [a3s-sentry](crates/sentry/) | 0.6.0 | Tiered runtime security control. |
-| [a3s-boot](crates/boot/) | 0.1.0 | Nest-inspired modular service framework for Rust APIs. |
-| [a3s-gateway](crates/gateway/) | 1.0.11 | Reverse proxy, routing, middleware, streaming, and scale-to-zero. |
+| [a3s-sentry](crates/sentry/) | 0.7.0 | Tiered runtime security control. |
+| [a3s-boot](crates/boot/) | 0.1.1 | Nest-inspired modular service framework for Rust APIs. |
+| [a3s-gateway](crates/gateway/) | 1.0.12 | Reverse proxy, routing, middleware, streaming, and scale-to-zero. |
 | [a3s-power](crates/power/) | 0.4.2 | Privacy-preserving LLM inference for TEE environments. |
 | [a3s-ahp](crates/ahp/) | 2.4.0 | Agent Harness Protocol supervision primitives. |
-| [a3s-acl](crates/acl/) | 0.2.1 | Agent Configuration Language parser. |
+| [a3s-acl](crates/acl/) | 0.2.2 | Agent Configuration Language parser. |
 | [a3s-webview](crates/webview/) | 0.1.1 | Native trusted WebView popup helper. |
 | [a3s-common](crates/common/) | 0.1.1 | Shared primitives and transport types. |
 | [a3s-updater](crates/updater/) | 0.3.0 | Verified component transactions and self-update support for CLI binaries. |
@@ -154,6 +156,9 @@ Local development:
 ```bash
 git submodule update --init --recursive
 
+# Verify the exact Cloud integration stack and contract fixtures.
+just cloud-stack-check
+
 # Run A3S Code from source.
 just code
 
@@ -205,7 +210,12 @@ git commit -m "Update <component> snapshot"
 
 Applications under `apps/` use app-local workflows. The root `justfile` only
 orchestrates common entry points such as `just code`, `just dev`, `just web`,
-`just use-hotplug-e2e`, and `just box-check`.
+`just use-hotplug-e2e`, and `just cloud-stack-check`.
+
+Cloud integration revisions and protocol levels are recorded in
+`compat/cloud-stack.acl`. Update that ACL lock and the corresponding gitlinks
+together; its verifier rejects missing, dirty, or mismatched inputs before the
+cross-repository contract gate runs.
 
 ## Documentation
 

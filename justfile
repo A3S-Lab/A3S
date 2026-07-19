@@ -85,6 +85,19 @@ flow-test:
     cd crates/flow && cargo test --all-targets
 
 # ============================================================================
+# A3S Cloud Compatibility
+# ============================================================================
+
+# Verify the exact Cloud stack, resolve it, and run its cross-repository gates
+cloud-stack-check:
+    node --test scripts/verify-cloud-stack.test.mjs
+    node scripts/verify-cloud-stack.mjs
+    cargo metadata --manifest-path apps/cloud/Cargo.toml --locked --format-version 1 > /dev/null
+    cargo check --manifest-path apps/cloud/Cargo.toml --workspace --all-targets --locked
+    cargo test --manifest-path apps/cloud/Cargo.toml --locked -p a3s-cloud-contracts
+    cargo check --manifest-path crates/gateway/Cargo.toml --locked --all-targets --features wire
+
+# ============================================================================
 # Maintenance
 # ============================================================================
 

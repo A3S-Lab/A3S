@@ -55,12 +55,21 @@
 [submodule "apps/desktop"]
 	path = apps/desktop
 	url = git@github.com:A3S-Lab/Desktop.git
+[submodule "apps/cloud"]
+	path = apps/cloud
+	url = git@github.com:A3S-Lab/Cloud.git
 [submodule "crates/flow"]
 	path = crates/flow
 	url = git@github.com:A3S-Lab/Flow.git
 [submodule "crates/boot"]
 	path = crates/boot
 	url = git@github.com:A3S-Lab/Boot.git
+[submodule "crates/runtime"]
+	path = crates/runtime
+	url = git@github.com:A3S-Lab/Runtime.git
+[submodule "crates/orm"]
+	path = crates/orm
+	url = git@github.com:A3S-Lab/ORM.git
 [submodule "crates/use"]
 	path = crates/use
 	url = git@github.com:A3S-Lab/Use.git
