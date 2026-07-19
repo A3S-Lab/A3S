@@ -2,11 +2,14 @@
 
 use anyhow::{bail, Context};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 use std::io::Cursor;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use tempfile::TempDir;
 
-const MAX_ARCHIVE_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+const MAX_ARCHIVE_BYTES: u64 = 512 * 1024 * 1024;
+const MAX_EXTRACTED_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+const MAX_EXTRACTED_ENTRIES: usize = 50_000;
 
 /// Download one release asset into memory.
 pub async fn download_asset(url: &str) -> anyhow::Result<Vec<u8>> {
@@ -15,7 +18,7 @@ pub async fn download_asset(url: &str) -> anyhow::Result<Vec<u8>> {
         .timeout(std::time::Duration::from_secs(300))
         .build()
         .context("failed to build release download client")?;
-    let response = client
+    let mut response = client
         .get(url)
         .send()
         .await
@@ -33,14 +36,23 @@ pub async fn download_asset(url: &str) -> anyhow::Result<Vec<u8>> {
     {
         bail!("release asset exceeds the {} byte limit", MAX_ARCHIVE_BYTES);
     }
-    let bytes = response
-        .bytes()
+    let initial_capacity = response
+        .content_length()
+        .unwrap_or_default()
+        .min(MAX_ARCHIVE_BYTES) as usize;
+    let mut bytes = Vec::with_capacity(initial_capacity);
+    while let Some(chunk) = response
+        .chunk()
         .await
-        .with_context(|| format!("failed to read release asset body from {url}"))?;
-    if bytes.len() as u64 > MAX_ARCHIVE_BYTES {
-        bail!("release asset exceeds the {} byte limit", MAX_ARCHIVE_BYTES);
+        .with_context(|| format!("failed to read release asset body from {url}"))?
+    {
+        let next_len = bytes.len().saturating_add(chunk.len());
+        if next_len as u64 > MAX_ARCHIVE_BYTES {
+            bail!("release asset exceeds the {} byte limit", MAX_ARCHIVE_BYTES);
+        }
+        bytes.extend_from_slice(&chunk);
     }
-    Ok(bytes.to_vec())
+    Ok(bytes)
 }
 
 /// Return a lowercase SHA-256 digest.
@@ -75,36 +87,41 @@ pub fn extract_tar_gz_archive(data: &[u8], dest_dir: &Path) -> anyhow::Result<Ve
     let gz = flate2::read::GzDecoder::new(data);
     let mut archive = tar::Archive::new(gz);
     let mut extracted = Vec::new();
+    let mut seen = BTreeSet::new();
+    let mut extracted_bytes = 0_u64;
 
-    for entry in archive.entries().context("failed to read tar entries")? {
+    for (entry_count, entry) in archive
+        .entries()
+        .context("failed to read tar entries")?
+        .enumerate()
+    {
         let mut entry = entry.context("failed to read tar entry")?;
-        let relative = entry.path().context("failed to read tar entry path")?;
-        if relative.is_absolute()
-            || relative.components().any(|component| {
-                matches!(
-                    component,
-                    std::path::Component::ParentDir | std::path::Component::RootDir
-                )
-            })
-        {
-            bail!(
-                "archive entry escapes extraction root: {}",
-                relative.display()
-            );
+        if entry_count >= MAX_EXTRACTED_ENTRIES {
+            bail!("archive exceeds the {MAX_EXTRACTED_ENTRIES} entry limit");
         }
-        let output = dest_dir.join(relative.as_ref());
-        if !output.starts_with(dest_dir) {
-            bail!(
-                "archive entry escapes extraction root: {}",
-                relative.display()
-            );
-        }
-
+        let entry_path = entry.path().context("failed to read tar entry path")?;
         let entry_type = entry.header().entry_type();
+        let Some(relative) = sanitized_relative_path(&entry_path)? else {
+            if entry_type.is_dir() {
+                // Common tar producers emit `./` as an explicit marker for the
+                // extraction root. It does not create or own a child path.
+                continue;
+            }
+            bail!("archive contains a non-directory root entry");
+        };
+        if !seen.insert(relative.clone()) {
+            bail!("archive contains duplicate entry {}", relative.display());
+        }
+        let output = dest_dir.join(&relative);
+
         if entry_type.is_dir() {
             std::fs::create_dir_all(&output)
                 .with_context(|| format!("failed to create {}", output.display()))?;
         } else if entry_type.is_file() {
+            extracted_bytes = extracted_bytes.saturating_add(entry.size());
+            if extracted_bytes > MAX_EXTRACTED_BYTES {
+                bail!("archive exceeds the {MAX_EXTRACTED_BYTES} extracted byte limit");
+            }
             if let Some(parent) = output.parent() {
                 std::fs::create_dir_all(parent)
                     .with_context(|| format!("failed to create {}", parent.display()))?;
@@ -131,7 +148,12 @@ pub fn extract_zip_archive(data: &[u8], dest_dir: &Path) -> anyhow::Result<Vec<P
     std::fs::create_dir_all(dest_dir)
         .with_context(|| format!("failed to create extraction root {}", dest_dir.display()))?;
     let mut archive = zip::ZipArchive::new(Cursor::new(data)).context("failed to read ZIP")?;
+    if archive.len() > MAX_EXTRACTED_ENTRIES {
+        bail!("ZIP exceeds the {MAX_EXTRACTED_ENTRIES} entry limit");
+    }
     let mut extracted = Vec::new();
+    let mut seen = BTreeSet::new();
+    let mut extracted_bytes = 0_u64;
 
     for index in 0..archive.len() {
         let mut entry = archive
@@ -143,18 +165,28 @@ pub fn extract_zip_archive(data: &[u8], dest_dir: &Path) -> anyhow::Result<Vec<P
                 entry.name()
             );
         }
-        let relative = entry
+        let enclosed = entry
             .enclosed_name()
             .with_context(|| format!("ZIP entry escapes extraction root: {}", entry.name()))?;
-        let output = dest_dir.join(&relative);
-        if !output.starts_with(dest_dir) {
-            bail!("ZIP entry escapes extraction root: {}", relative.display());
+        let Some(relative) = sanitized_relative_path(&enclosed)? else {
+            if entry.is_dir() {
+                continue;
+            }
+            bail!("ZIP contains a non-directory root entry");
+        };
+        if !seen.insert(relative.clone()) {
+            bail!("ZIP contains duplicate entry {}", relative.display());
         }
+        let output = dest_dir.join(&relative);
 
         if entry.is_dir() {
             std::fs::create_dir_all(&output)
                 .with_context(|| format!("failed to create {}", output.display()))?;
         } else if entry.is_file() {
+            extracted_bytes = extracted_bytes.saturating_add(entry.size());
+            if extracted_bytes > MAX_EXTRACTED_BYTES {
+                bail!("ZIP exceeds the {MAX_EXTRACTED_BYTES} extracted byte limit");
+            }
             if let Some(parent) = output.parent() {
                 std::fs::create_dir_all(parent)
                     .with_context(|| format!("failed to create {}", parent.display()))?;
@@ -169,6 +201,26 @@ pub fn extract_zip_archive(data: &[u8], dest_dir: &Path) -> anyhow::Result<Vec<P
         }
     }
     Ok(extracted)
+}
+
+fn sanitized_relative_path(path: &Path) -> anyhow::Result<Option<PathBuf>> {
+    if path.as_os_str().is_empty() {
+        bail!("archive contains an empty entry path");
+    }
+    let mut sanitized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Normal(segment) => sanitized.push(segment),
+            Component::CurDir => {}
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                bail!("archive entry escapes extraction root: {}", path.display())
+            }
+        }
+    }
+    if sanitized.as_os_str().is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(sanitized))
 }
 
 /// Extract a supported release archive according to its published file name.
@@ -186,95 +238,36 @@ pub fn extract_release_archive(
     }
 }
 
-/// Download a `.tar.gz` asset and extract the binary from it.
+/// Safely extract a verified release archive and resolve exactly one binary.
 ///
-/// Returns `(binary_path, temp_dir)`. The caller must keep `TempDir` alive
-/// until the extracted binary has been consumed (e.g. copied into place).
-/// Dropping `TempDir` automatically cleans up the temporary directory.
-pub async fn download_and_extract(
-    url: &str,
+/// The caller must verify the archive digest before calling this function.
+/// `TempDir` keeps every extracted file isolated until replacement completes.
+pub(crate) fn extract_release_binary(
+    data: &[u8],
+    archive_name: &str,
     binary_name: &str,
 ) -> anyhow::Result<(PathBuf, TempDir)> {
-    let client = reqwest::Client::builder()
-        .user_agent("a3s-updater/0.1")
-        .timeout(std::time::Duration::from_secs(300))
-        .build()
-        .map_err(|e| anyhow::anyhow!("Failed to build HTTP client: {}", e))?;
-
-    let response = client
-        .get(url)
-        .send()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to download asset from {}: {}", url, e))?;
-
-    if !response.status().is_success() {
-        return Err(anyhow::anyhow!(
-            "Download failed with status {} for {}",
-            response.status(),
-            url
-        ));
+    let temp_dir = TempDir::new().context("failed to create release staging directory")?;
+    let files = extract_release_archive(data, temp_dir.path(), archive_name)?;
+    let mut matches = files.into_iter().filter(|path| {
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name == binary_name)
+    });
+    let binary = matches
+        .next()
+        .with_context(|| format!("binary '{binary_name}' not found in release archive"))?;
+    if matches.next().is_some() {
+        bail!("release archive contains multiple binaries named '{binary_name}'");
     }
-
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to read download body: {}", e))?;
-
-    // Create a cryptographically unique temp directory (auto-cleaned on drop)
-    let temp_dir =
-        TempDir::new().map_err(|e| anyhow::anyhow!("Failed to create temp directory: {}", e))?;
-
-    // Decompress gzip and extract tar
-    extract_tar_gz(&bytes, temp_dir.path(), binary_name)?;
-
-    let binary_path = temp_dir.path().join(binary_name);
-    if !binary_path.exists() {
-        return Err(anyhow::anyhow!(
-            "Binary '{}' not found in downloaded archive",
-            binary_name
-        ));
-    }
-
-    Ok((binary_path, temp_dir))
-}
-
-/// Extract a `.tar.gz` archive, looking for the target binary.
-fn extract_tar_gz(data: &[u8], dest_dir: &Path, binary_name: &str) -> anyhow::Result<()> {
-    let gz = flate2::read::GzDecoder::new(data);
-    let mut archive = tar::Archive::new(gz);
-
-    for entry in archive
-        .entries()
-        .map_err(|e| anyhow::anyhow!("Failed to read tar entries: {}", e))?
+    #[cfg(unix)]
     {
-        let mut entry = entry.map_err(|e| anyhow::anyhow!("Failed to read tar entry: {}", e))?;
+        use std::os::unix::fs::PermissionsExt;
 
-        // Only extract regular files — reject symlinks and hardlinks to prevent
-        // path traversal via crafted archives.
-        let entry_type = entry.header().entry_type();
-        if !entry_type.is_file() {
-            continue;
-        }
-
-        let path = entry
-            .path()
-            .map_err(|e| anyhow::anyhow!("Failed to read entry path: {}", e))?;
-
-        // Extract only the target binary (may be at root or nested)
-        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-
-        if file_name == binary_name {
-            entry
-                .unpack(dest_dir.join(binary_name))
-                .map_err(|e| anyhow::anyhow!("Failed to extract '{}': {}", binary_name, e))?;
-            return Ok(());
-        }
+        std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755))
+            .with_context(|| format!("failed to make {} executable", binary.display()))?;
     }
-
-    Err(anyhow::anyhow!(
-        "Binary '{}' not found in archive",
-        binary_name
-    ))
+    Ok((binary, temp_dir))
 }
 
 #[cfg(test)]
@@ -329,6 +322,49 @@ mod tests {
             builder.finish().unwrap();
         }
         assert!(extract_tar_gz_archive(&linked_archive, temp.path()).is_err());
+    }
+
+    #[test]
+    fn tar_archive_accepts_an_explicit_current_directory_root() {
+        let mut tar_bytes = Vec::new();
+        {
+            let encoder =
+                flate2::write::GzEncoder::new(&mut tar_bytes, flate2::Compression::default());
+            let mut builder = tar::Builder::new(encoder);
+
+            let mut root = tar::Header::new_gnu();
+            root.set_path(".").unwrap();
+            root.set_entry_type(tar::EntryType::Directory);
+            root.set_size(0);
+            root.set_mode(0o755);
+            root.set_cksum();
+            builder.append(&root, std::io::empty()).unwrap();
+
+            let body = b"fixture";
+            let mut binary = tar::Header::new_gnu();
+            binary.set_path("./a3s-use").unwrap();
+            binary.set_size(body.len() as u64);
+            binary.set_mode(0o755);
+            binary.set_cksum();
+            builder.append(&binary, &body[..]).unwrap();
+            builder.finish().unwrap();
+        }
+
+        let temp = tempfile::tempdir().unwrap();
+        let files = extract_tar_gz_archive(&tar_bytes, temp.path()).unwrap();
+        assert_eq!(files, [temp.path().join("a3s-use")]);
+        assert_eq!(std::fs::read(&files[0]).unwrap(), b"fixture");
+    }
+
+    #[test]
+    fn archive_path_sanitization_distinguishes_root_markers_from_empty_paths() {
+        assert_eq!(sanitized_relative_path(Path::new(".")).unwrap(), None);
+        assert_eq!(
+            sanitized_relative_path(Path::new("./package/a3s-use")).unwrap(),
+            Some(PathBuf::from("package/a3s-use"))
+        );
+        assert!(sanitized_relative_path(Path::new("")).is_err());
+        assert!(sanitized_relative_path(Path::new("../escape")).is_err());
     }
 
     #[test]
