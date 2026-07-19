@@ -17,7 +17,13 @@ the heavier product behavior in the component crates.
 | `a3s code resume` | Resume the newest saved session in the current workspace. |
 | `a3s code update` | Alias for the CLI self-update path. |
 | `a3s box <args...>` | Run `a3s-box <args...>`, bootstrapping Box when missing. |
-| `a3s list` | Print installed `a3s-*` tools found on `PATH`. |
+| `a3s bench <args...>` | Run an explicitly installed A3S Bench control component. |
+| `a3s search <args...>` | Run an explicitly installed A3S Search component. |
+| `a3s use <args...>` | Reuse or first-use install A3S Use, then forward the native Use command. |
+| `a3s list` | Report catalog component state and registered external tools without mutation. |
+| `a3s install <component>` | Install or repair a typed catalog component or delegated Use runtime. |
+| `a3s upgrade <component>` | Upgrade one installed managed component. |
+| `a3s uninstall <component>` | Remove only files owned by that component receipt. |
 | `a3s top` | Open the live monitor for boxes, coding agents, sessions, events, and processes. |
 | `a3s update` | Check the latest release and upgrade when possible. |
 | `a3s --version` | Print the CLI version. |
@@ -28,9 +34,42 @@ binary name.
 
 ## Dispatch Model
 
-`a3s code` stays in-process and calls the TUI module. `a3s box ...` shells out to
-the `a3s-box` binary after discovery/bootstrap. Other product helpers remain
-separate binaries rather than being linked into the umbrella CLI.
+`a3s code` stays in-process and calls the TUI module. Product proxies resolve a
+typed component receipt and execute the corresponding binary. Box and Use opt
+into first-use installation; Bench and Search require explicit preparation.
+Delegated IDs such as `use/browser`, `use/document`, `use/office`, and
+`use/ocr` are installed through the authoritative `a3s-use` component command
+rather than a second package manager.
+
+## Use Commands And Automatic Preparation
+
+```bash
+# Optional deterministic pre-warm.
+a3s install use
+a3s install use/browser
+a3s install use/document
+a3s install use/office
+a3s install use/ocr
+
+# Normal first use prepares only what is needed.
+a3s use browser render https://example.com
+a3s use office native create report.docx --json
+a3s use document inspect report.docx --json
+a3s use document parse report.docx --ocr auto --json
+a3s use ocr extract scan.png --json
+```
+
+The first `a3s use` invocation installs the complete verified Use archive.
+Browser then shares one managed Chrome cache with A3S Search. Native Office and
+document inspection are already in process. OfficeCLI is prepared only for
+compatibility commands. OCR and Document use one release-packaged
+`PP-OCRv6_small` ONNX bundle; a missing bundle is installed only when an
+operation actually selects raster inference.
+
+Diagnostics, help, capability snapshots, and `document inspect` never download
+runtime assets. Offline and no-auto-install policy failures are explicit rather
+than falling back to Tesseract, Python, PaddlePaddle, another browser, or a
+remote service.
 
 ## Runtime Boundaries
 
@@ -39,3 +78,5 @@ separate binaries rather than being linked into the umbrella CLI.
   persistence.
 - A3S TUI owns terminal rendering and input handling.
 - A3S Box owns sandbox/container runtime behavior.
+- A3S Use owns Browser, Document, Office, OCR, and extension execution
+  contracts; the umbrella CLI owns product release selection and receipts.

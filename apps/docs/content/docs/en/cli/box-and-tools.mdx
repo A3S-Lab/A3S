@@ -43,13 +43,45 @@ When present in the release archive, bootstrap installs:
 - `a3s-box-guest-init`
 - `a3s-box-cri`
 
-## Tool Listing
+## Component And Tool Listing
 
-`a3s list` scans visible `a3s-*` executables so users can see which A3S product
-tools are available on their machine.
+`a3s list` reports the typed catalog and registered external tools without
+installing, upgrading, or executing them. The catalog distinguishes bundled
+Code, first-use Box and Use, explicitly installed Bench and Search, and
+delegated Use capabilities.
+
+## A3S Use First-Use Flow
+
+Installing the umbrella CLI does not install A3S Use. The first
+`a3s use ...` command or `a3s code` TUI startup resolves a healthy Use receipt
+or downloads and verifies the complete platform release when policy allows.
+The release keeps these assets together:
+
+- `a3s-use` and its Browser driver;
+- Browser, Document, Office, and OCR Skills;
+- the PP-OCRv6 Small detection and recognition ONNX models; and
+- the Browser Dashboard and license/provenance files.
+
+Subsequent capability preparation is idempotent. Browser shares the same
+`a3s-use-browser` Chrome directory with Search. Native Office needs no provider;
+only optional compatibility commands prepare OfficeCLI. Document and OCR share
+one PP-OCRv6 model directory, so preparing either does not create a duplicate
+model installation.
+
+```bash
+a3s install use/browser   # optional Browser pre-warm
+a3s install use/document  # optional shared PP-OCRv6 pre-warm
+a3s install use/office    # optional OfficeCLI compatibility
+a3s install use/ocr       # same PP-OCRv6 bundle as Document
+```
+
+`--offline`, `A3S_OFFLINE=1`, and `A3S_NO_AUTO_INSTALL=1` disable first-use
+downloads. Explicit `a3s install ...` commands remain available for machines
+that must be prepared before going offline.
 
 ## Boundaries
 
-The CLI does not implement container isolation itself. It discovers, installs,
-and launches Box; the Box repository owns runtime, CRI, networking, image, and
-TEE behavior.
+The CLI does not implement container isolation or application automation
+itself. It discovers, installs, and launches Box and Use; their repositories
+own runtime behavior, Browser automation, native document parsing, and local
+OCR.

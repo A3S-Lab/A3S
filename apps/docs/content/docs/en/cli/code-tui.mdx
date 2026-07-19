@@ -71,7 +71,7 @@ interactive product:
 | `a3s` CLI | Process startup, config discovery, update flow, resume commands, terminal lifecycle, and helper binaries such as `a3s-webview`. |
 | `a3s-code-core` | Agent sessions, model calls, tool registry, permissions, memory, delegation, dynamic workflows, persistence, verification, and event replay. |
 | `a3s-tui` | Terminal rendering, component library, layout, input surfaces, menus, overlays, panels, and transcript widgets. |
-| Optional A3S Use integration | Built-in Browser, native Office, OCR, optional OfficeCLI compatibility, and signed external application domains projected through standard MCP and managed Skills. |
+| Optional A3S Use integration | Built-in Browser, Document, native Office, local OCR, optional OfficeCLI compatibility, and signed external application domains projected through standard MCP and managed Skills. |
 | A3S OS integration | Optional signed-in capabilities such as Runtime batches, Workflow as a Service, Knowledge service deployment, RemoteUI ViewLinks, and asset activity. |
 
 Local work remains available without `/login`: chat, file edits, workspace
@@ -92,42 +92,49 @@ strict no-mutation boundaries. Providers may also be prepared explicitly:
 ```bash
 a3s install use --source release
 a3s install use/browser
+a3s install use/document     # native parser plus shared OCR model pre-warm
 a3s install use/office       # optional OfficeCLI compatibility
-a3s install use/ocr          # optional model pre-warm or repair
+a3s install use/ocr          # same PP-OCRv6 bundle as Document
 
 # Direct first use prepares only the runtime that is actually needed.
 a3s use browser open https://example.com
 a3s use office native create report.docx --json  # no extra provider
 a3s use office get report.docx /body --json      # prepares OfficeCLI compatibility
+a3s use document inspect report.docx --json      # native, read-only, no install
+a3s use document parse report.docx --ocr auto --json
 a3s use ocr doctor --json
-a3s use ocr extract ./scan.png --json  # first use prepares models
+a3s use ocr extract ./scan.png --json  # packaged or first-use models
 ```
 
 When Use is ready at startup, the TUI watches its versioned registry and
-hot-plugs Browser, native Office, Office compatibility, OCR, and other signed
-extensions as standard MCP plus verified Skills. `/use` and `/use status`
-report binary, registry, provider, MCP, and Skill readiness. `/use repair`
-prints explicit commands but never installs or mutates anything itself. If
-first-use setup was disabled or failed, restart Code once after explicitly
-installing the parent.
+hot-plugs Browser, Document, native Office, Office compatibility, OCR, and
+other signed extensions as standard MCP plus verified Skills. The verified Use
+archive already contains all four Skills and PP-OCRv6 Small ONNX models.
+Browser and Search share one `a3s-use-browser` Chrome cache, while Document and
+OCR share one model directory. `/use` and `/use status` report binary,
+registry, provider, MCP, and Skill readiness. `/use repair` prints explicit
+commands but never installs or mutates anything itself. If first-use setup was
+disabled or failed, restart Code once after explicitly installing the parent.
 
 The primary model does not see `mcp__use_*` tools. It delegates application
 requests to the dedicated `use` worker, which is restricted to those tools.
 Closed-world read-only operations, including PP-OCRv6 doctor and extraction,
-run without an extra prompt unless the parent policy explicitly denies them.
-Missing Browser assets use the confirmed shared installer. Native Office needs
-no provider; an operation outside its surface can request
-`office_install_compat` through parent confirmation. If OCR doctor reports
-missing or damaged models, the worker similarly requests the idempotent
-`ocr_install` mutation and continues after installation. Direct Browser
-launches, Office compatibility commands, and OCR extraction prepare their
-required assets automatically. Open-world/network access, mutations,
-destructive operations, submit risk, and missing behavior annotations escalate
-to the parent TUI. Parent denials remain authoritative, and Office mutations
-are never retried automatically.
+native document inspection, and document parsing, run without an extra prompt
+unless the parent policy explicitly denies them. Missing Browser assets use the
+confirmed shared installer. Native Office needs no provider; an operation
+outside its surface can request `office_install_compat` through parent
+confirmation. If Document or OCR reports missing or damaged models, the worker
+requests `document_install_ocr` or `ocr_install`; both prepare the same
+idempotent PP-OCRv6 bundle and continue only after parent confirmation. Direct
+Browser launches, Office compatibility commands, OCR extraction, and Document
+parsing with selected raster evidence prepare their required assets
+automatically. Open-world/network access, mutations, destructive operations,
+submit risk, and missing behavior annotations escalate to the parent TUI.
+Parent denials remain authoritative, and Office mutations are never retried
+automatically.
 
 For the complete route, artifact, OCR model, and safety contract, see
-[Browser, Office, And OCR Through A3S Use](/docs/code/tui#browser-office-and-ocr-through-a3s-use).
+[Browser, Document, Office, And OCR Through A3S Use](/docs/code/tui#browser-document-office-and-ocr-through-a3s-use).
 
 ## Slash Command Families
 

@@ -42,34 +42,41 @@ a3s code resume
 ```bash
 a3s install use --source release
 a3s install use/browser
+a3s install use/document     # 原生 parser 与共享 OCR model 预热
 a3s install use/office       # 可选 OfficeCLI 兼容 provider
-a3s install use/ocr          # 可选：提前安装或修复模型
+a3s install use/ocr          # 与 Document 相同的 PP-OCRv6 bundle
 
 # 直接首次使用只准备实际需要的 runtime。
 a3s use browser open https://example.com
 a3s use office native create report.docx --json  # 无需额外 provider
 a3s use office get report.docx /body --json      # 准备 OfficeCLI 兼容层
+a3s use document inspect report.docx --json      # 原生只读，不安装
+a3s use document parse report.docx --ocr auto --json
 a3s use ocr doctor --json
-a3s use ocr extract ./scan.png --json  # 首次使用自动准备模型
+a3s use ocr extract ./scan.png --json  # 使用 packaged/first-use 模型
 ```
 
-Use 在 TUI 启动时 ready 后，Code 会监听其带版本 registry，并把内置 Browser、原生
-Office、OCR、可选 Office 兼容层与已安装的其他签名 extension 作为标准 MCP 和已校验
-Skill 热插拔进 session。
+Use 在 TUI 启动时 ready 后，Code 会监听其带版本 registry，并把内置 Browser、
+Document、原生 Office、OCR、可选 Office 兼容层与已安装的其他签名 extension 作为标准
+MCP 和已校验 Skill 热插拔进 session。已校验的 Use archive 本身包含四类 Skill 与
+PP-OCRv6 Small ONNX 模型；Browser/Search 共用一个 Chrome cache，Document/OCR
+共用一个模型目录。
 `/use` 与 `/use status` 查看 binary、registry、provider、MCP 和 Skill readiness；
 `/use repair` 自身只输出显式命令，绝不会自动安装或修改状态。若 first-use 准备被禁用
 或失败，显式安装主程序后需重启 Code 一次。
 
 主 model 不会看到 `mcp__use_*`，而是把应用请求委派给只能调用这组工具的专用 `use`
-worker。closed-world read-only 操作（包括 PP-OCRv6 doctor 与提取）无需额外确认，除非
-父级策略显式拒绝。Browser 缺少 runtime 时使用需确认的共享安装器；原生 Office 无需
-provider，只有兼容操作才会通过父级确认请求 `office_install_compat`；OCR 缺少模型时
-同样请求幂等 `ocr_install`。直接 Browser 启动、Office 兼容命令和 OCR 提取都会按需自动
-准备资源。网络/open-world、mutation、destructive、submit，以及缺少 behavior annotations
+worker。closed-world read-only 操作（包括 PP-OCRv6 doctor/提取、原生 document inspect
+与 parse）无需额外确认，除非父级策略显式拒绝。Browser 缺少 runtime 时使用需确认的
+共享安装器；原生 Office 无需 provider，只有兼容操作才会通过父级确认请求
+`office_install_compat`；Document/OCR 缺少模型时请求 `document_install_ocr` 或
+`ocr_install`，两者准备同一份幂等 PP-OCRv6 bundle。直接 Browser 启动、Office
+兼容命令、OCR 提取，以及真正选择 raster evidence 的 Document parse 都会按需自动准备
+资源。网络/open-world、mutation、destructive、submit，以及缺少 behavior annotations
 的操作都会升级到父 TUI HITL。父级 deny 始终有效，Office mutation 也不会自动重试。
 
 完整 route、artifact、OCR 模型与安全契约见
-[通过 A3S Use 使用 Browser、Office 与 OCR](/cn/docs/code/tui#通过-a3s-use-使用-browseroffice-与-ocr)。
+[通过 A3S Use 使用 Browser、Document、Office 与 OCR](/cn/docs/code/tui#通过-a3s-use-使用-browserdocumentoffice-与-ocr)。
 
 ## Slash Commands
 

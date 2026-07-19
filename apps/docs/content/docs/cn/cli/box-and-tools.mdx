@@ -41,11 +41,40 @@ OS/arch 组合应从 release page 手动安装 Box。
 - `a3s-box-guest-init`
 - `a3s-box-cri`
 
-## Tool Listing
+## Component 与 Tool Listing
 
-`a3s list` 会扫描可见的 `a3s-*` executables，让用户知道本机有哪些 A3S product tools 可用。
+`a3s list` 会只读报告 typed catalog 与已注册 external tools，不会安装、升级或执行它们。
+catalog 会区分 bundled Code、支持 first-use 的 Box/Use、需要显式安装的 Bench/Search，
+以及 delegated Use capability。
+
+## A3S Use First-Use Flow
+
+安装 umbrella CLI 时不会安装 A3S Use。第一次执行 `a3s use ...`，或启动
+`a3s code` TUI 时，CLI 会复用健康 Use receipt；如果 policy 允许，则下载并校验完整的
+platform release。该 release 会把以下内容保持在一起：
+
+- `a3s-use` 与 Browser driver；
+- Browser、Document、Office、OCR Skills；
+- PP-OCRv6 Small detection/recognition ONNX 模型；
+- Browser Dashboard 与 license/provenance 文件。
+
+后续 capability preparation 是幂等的。Browser 与 Search 共用同一个
+`a3s-use-browser` Chrome 目录。原生 Office 不需要 provider；只有可选 compatibility
+command 才会准备 OfficeCLI。Document 与 OCR 共用一个 PP-OCRv6 model directory，
+所以准备任意一个都不会重复安装模型。
+
+```bash
+a3s install use/browser   # 可选 Browser 预热
+a3s install use/document  # 可选 parser/共享 PP-OCRv6 预热
+a3s install use/office    # 可选 OfficeCLI compatibility
+a3s install use/ocr       # 与 Document 相同的 PP-OCRv6 bundle
+```
+
+`--offline`、`A3S_OFFLINE=1` 与 `A3S_NO_AUTO_INSTALL=1` 会禁止 first-use
+下载。需要离线工作的机器仍可提前执行显式 `a3s install ...`。
 
 ## Boundaries
 
-CLI 自身不实现 container isolation。它负责发现、安装和启动 Box；Box repository 负责 runtime、
-CRI、networking、image 和 TEE behavior。
+CLI 自身不实现 container isolation 或 application automation。它负责发现、安装和启动
+Box/Use；对应 repository 负责 runtime behavior、Browser automation、原生 document
+parsing 与本地 OCR。

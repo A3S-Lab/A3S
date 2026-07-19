@@ -16,7 +16,13 @@ description: a3s umbrella CLI 的 public command surface、dispatch behavior 和
 | `a3s code resume` | 恢复当前 workspace 最新 saved session。 |
 | `a3s code update` | CLI self-update path 的别名。 |
 | `a3s box <args...>` | 运行 `a3s-box <args...>`，缺失时 bootstrap Box。 |
-| `a3s list` | 打印 `PATH` 上找到的已安装 `a3s-*` tools。 |
+| `a3s bench <args...>` | 运行已显式安装的 A3S Bench control component。 |
+| `a3s search <args...>` | 运行已显式安装的 A3S Search component。 |
+| `a3s use <args...>` | 复用或 first-use 安装 A3S Use，然后转发原生 Use command。 |
+| `a3s list` | 不修改状态地报告 catalog component 与已注册 external tool。 |
+| `a3s install <component>` | 安装或修复 typed catalog component / delegated Use runtime。 |
+| `a3s upgrade <component>` | 升级一个已安装的 managed component。 |
+| `a3s uninstall <component>` | 只删除该 component receipt 拥有的文件。 |
 | `a3s top` | 打开 boxes、coding agents、sessions、events、processes 的 live monitor。 |
 | `a3s update` | 检查最新 release，并在可行时升级。 |
 | `a3s --version` | 打印 CLI version。 |
@@ -26,8 +32,37 @@ description: a3s umbrella CLI 的 public command surface、dispatch behavior 和
 
 ## Dispatch Model
 
-`a3s code` 留在当前进程内调用 TUI module。`a3s box ...` 会在 discovery/bootstrap 后 shell out
-到 `a3s-box` binary。其它 product helpers 保持为独立 binaries，而不是链接进 umbrella CLI。
+`a3s code` 留在当前进程内调用 TUI module。Product proxy 根据 typed component receipt
+解析并执行对应 binary。Box 与 Use 支持 first-use 安装；Bench 和 Search 需要显式准备。
+`use/browser`、`use/document`、`use/office`、`use/ocr` 等 delegated ID
+通过权威 `a3s-use` component command 安装，而不是进入第二套 package manager。
+
+## Use Commands 与自动准备
+
+```bash
+# 可选：确定性预热。
+a3s install use
+a3s install use/browser
+a3s install use/document
+a3s install use/office
+a3s install use/ocr
+
+# 正常首次使用只准备真正需要的资源。
+a3s use browser render https://example.com
+a3s use office native create report.docx --json
+a3s use document inspect report.docx --json
+a3s use document parse report.docx --ocr auto --json
+a3s use ocr extract scan.png --json
+```
+
+第一次 `a3s use` 会安装完整且已校验的 Use archive。Browser 随后与 A3S Search
+共用一个 managed Chrome cache。原生 Office 与 document inspection 已经在进程内；
+只有 compatibility command 才会准备 OfficeCLI。OCR 与 Document 共用 release 已包含的
+`PP-OCRv6_small` ONNX bundle；只有真正选择 raster inference 且模型缺失时才安装。
+
+diagnostic、help、capability snapshot 与 `document inspect` 不会下载 runtime asset。
+offline/no-auto-install policy 会返回明确错误，不会回退到 Tesseract、Python、
+PaddlePaddle、另一套 Browser 或远程服务。
 
 ## Runtime Boundaries
 
@@ -35,3 +70,5 @@ description: a3s umbrella CLI 的 public command surface、dispatch behavior 和
 - A3S Code 负责 agent session、model/tool execution、workspace services 和 persistence。
 - A3S TUI 负责 terminal rendering 和 input handling。
 - A3S Box 负责 sandbox/container runtime behavior。
+- A3S Use 负责 Browser、Document、Office、OCR 与 extension execution contract；
+  umbrella CLI 负责 product release selection 和 receipt。

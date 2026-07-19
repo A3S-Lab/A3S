@@ -9,7 +9,7 @@ description: Umbrella command for the A3S stack and the entry point for the a3s 
 coding-agent terminal experience and delegates product commands to the matching
 component binary.
 
-The current crate version is `a3s` `0.6.0`. Its repository metadata points to
+The current crate version is `a3s` `0.9.1`. Its repository metadata points to
 [`A3S-Lab/Cli`](https://github.com/A3S-Lab/Cli).
 
 ## What It Does
@@ -19,7 +19,9 @@ The current crate version is `a3s` `0.6.0`. Its repository metadata points to
 | `a3s code` | Launches the interactive coding-agent TUI backed by `a3s-code-core` and rendered with `a3s-tui`. |
 | `a3s code resume <id>` | Resumes a saved TUI session from the current workspace. |
 | `a3s box ...` | Proxies to `a3s-box ...` and can bootstrap the Box runtime on first use. |
-| `a3s list` | Lists installed `a3s-*` tools visible to the CLI. |
+| `a3s use ...` | Installs the verified A3S Use release on first real use, then exposes Browser, Document, native Office, local OCR, Box, and installed extension routes. |
+| `a3s list` | Lists the typed component catalog, local readiness, and registered external tools without installing anything. |
+| `a3s install/upgrade/uninstall <component>` | Manages only registered, ownership-tracked A3S components and delegated Use runtimes. |
 | `a3s top` | Opens the live process/container/agent monitor. |
 | `a3s update` | Checks the latest CLI release and upgrades through Homebrew or a standalone release asset. |
 | `a3s <tool> --help` | Passes help through to the selected tool. |
@@ -54,6 +56,38 @@ Runtime, and A3S OS views.
 It can use normal ACL model configuration and, where the host has opted in,
 account-backed model tabs. The CLI keeps host tools inside the A3S Code adapter
 path rather than handing arbitrary tool execution to another runtime.
+
+## First-Use Application Capabilities
+
+Installing `a3s` does not immediately download A3S Use. The first
+`a3s use ...` command, or `a3s code` startup, installs the complete verified Use
+release when networking and first-use setup are allowed. `--offline`,
+`A3S_OFFLINE=1`, and `A3S_NO_AUTO_INSTALL=1` are strict no-download boundaries.
+
+The installed release includes the Browser driver and Skills, native Office,
+Document and OCR Skills, and PP-OCRv6 Small ONNX models. Runtime behavior is
+then demand-driven:
+
+- Browser reuses a system Chrome or prepares the shared
+  `~/.local/share/a3s/use/browser` cache. A3S Search uses the same
+  `a3s-use-browser` cache and does not install another Chrome.
+- Native DOCX, XLSX, and PPTX Office operations need no external application.
+  Only an unpromoted compatibility command prepares the optional OfficeCLI
+  provider.
+- OCR and Document share the packaged PP-OCRv6 bundle. If a source or stripped
+  install lacks it, the first extraction or document parse that selects raster
+  evidence prepares the pinned models under the same policy.
+- PP-OCRv6 runs locally through ONNX Runtime. It does not require Tesseract,
+  Python, PaddlePaddle, Microsoft Office, LibreOffice, Browser, or a remote OCR
+  service.
+
+```bash
+a3s use browser open https://example.com
+a3s use office native create report.docx --json
+a3s use document inspect report.docx --json
+a3s use document parse report.docx --ocr auto --json
+a3s use ocr extract scan.png --json
+```
 
 ## Boundaries
 
