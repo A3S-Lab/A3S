@@ -36,19 +36,20 @@ const translations: StreamdownTranslations = {
 export default function StreamingMarkdown({ content, streaming }: { content: string; streaming: boolean }) {
   return (
     <Streamdown
-      className={`streaming-markdown${streaming ? ' is-streaming' : ''}`}
+      className={`streaming-markdown a3s-document-markdown${streaming ? ' is-streaming' : ''}`}
       dir='auto'
       aria-busy={streaming || undefined}
       mode={streaming ? 'streaming' : 'static'}
       isAnimating={streaming}
       parseIncompleteMarkdown
+      normalizeHtmlIndentation
       plugins={{ code }}
       shikiTheme={['github-light', 'github-dark']}
       controls={{
         code: { copy: true, download: false },
         table: { copy: true, download: false, fullscreen: true },
       }}
-      lineNumbers={false}
+      lineNumbers
       translations={translations}
     >
       {content}

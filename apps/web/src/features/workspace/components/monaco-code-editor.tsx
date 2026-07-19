@@ -455,6 +455,7 @@ export const MonacoCodeEditor = forwardRef<
           ariaLabel: `编辑 ${basename(path)}`,
           automaticLayout: true,
           bracketPairColorization: { enabled: true },
+          contextmenu: true,
           cursorBlinking: 'smooth',
           cursorSmoothCaretAnimation: 'on',
           detectIndentation: true,
@@ -496,7 +497,7 @@ function navigationActions(
   return [
     editor.addAction({
       id: 'a3s.code-navigation.definition',
-      label: 'Go to Definition',
+      label: '转到定义',
       keybindings: [monaco.KeyCode.F12],
       contextMenuGroupId: 'navigation',
       contextMenuOrder: 1,
@@ -504,14 +505,14 @@ function navigationActions(
     }),
     editor.addAction({
       id: 'a3s.code-navigation.declaration',
-      label: 'Go to Declaration',
+      label: '转到声明',
       contextMenuGroupId: 'navigation',
       contextMenuOrder: 2,
       run: () => navigate('declaration'),
     }),
     editor.addAction({
       id: 'a3s.code-navigation.references',
-      label: 'Go to References',
+      label: '查找所有引用',
       keybindings: [monaco.KeyMod.Shift | monaco.KeyCode.F12],
       contextMenuGroupId: 'navigation',
       contextMenuOrder: 3,
@@ -519,7 +520,7 @@ function navigationActions(
     }),
     editor.addAction({
       id: 'a3s.code-navigation.implementations',
-      label: 'Go to Implementations',
+      label: '转到实现',
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.F12],
       contextMenuGroupId: 'navigation',
       contextMenuOrder: 4,

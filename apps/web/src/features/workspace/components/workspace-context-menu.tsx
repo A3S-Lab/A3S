@@ -132,6 +132,7 @@ export function WorkspaceContextMenu({
           <WorkspaceContextMenuButton
             item={item}
             onSelect={() => {
+              restoreFocusRef.current?.focus();
               onClose();
               item.onSelect();
             }}

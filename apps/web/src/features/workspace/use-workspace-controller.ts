@@ -155,6 +155,10 @@ function updateDiffTab(tabId: string, update: (tab: WorkspaceDiffEditorTab) => v
 }
 
 export function useWorkspaceController() {
+  const pendingCloseQueueRef = useRef<{ generation: number; ids: string[] }>({
+    generation: appState.workspaceGeneration,
+    ids: [],
+  });
   const workspaceSearchRequestId = useRef(0);
   const directoryRequestIds = useRef(new Map<string, number>());
   const fileLoadOperations = useRef(new WeakMap<WorkspaceFileEditorTab, symbol>());
@@ -342,14 +346,39 @@ export function useWorkspaceController() {
     navigateTask('review');
   });
 
-  const closeEditorTab = useMemoizedFn((tabId: string) => {
-    const tab = appState.editorTabs.find((candidate) => candidate.id === tabId);
-    if (!tab) return;
-    if (tab.kind === 'file' && isFileEditorTabDirty(tab)) {
-      appState.pendingEditorTabCloseId = tabId;
+  const continueEditorTabClose = useMemoizedFn(() => {
+    const queue = pendingCloseQueueRef.current;
+    if (queue.generation !== appState.workspaceGeneration) {
+      pendingCloseQueueRef.current = { generation: appState.workspaceGeneration, ids: [] };
       return;
     }
-    removeEditorTabs((candidate) => candidate.id === tabId);
+    while (queue.ids.length > 0) {
+      const tabId = queue.ids.shift();
+      if (!tabId) continue;
+      const tab = appState.editorTabs.find((candidate) => candidate.id === tabId);
+      if (!tab) continue;
+      if (tab.kind === 'file' && isFileEditorTabDirty(tab)) {
+        appState.pendingEditorTabCloseId = tabId;
+        return;
+      }
+      removeEditorTabs((candidate) => candidate.id === tabId);
+    }
+  });
+
+  const closeEditorTabs = useMemoizedFn((tabIds: readonly string[]) => {
+    const requestedIds = new Set(tabIds);
+    const requestedTabs = appState.editorTabs.filter((tab) => requestedIds.has(tab.id));
+    pendingCloseQueueRef.current = {
+      generation: appState.workspaceGeneration,
+      ids: requestedTabs.filter((tab) => tab.kind === 'file' && isFileEditorTabDirty(tab)).map((tab) => tab.id),
+    };
+    appState.pendingEditorTabCloseId = null;
+    removeEditorTabs((tab) => requestedIds.has(tab.id) && !(tab.kind === 'file' && isFileEditorTabDirty(tab)));
+    continueEditorTabClose();
+  });
+
+  const closeEditorTab = useMemoizedFn((tabId: string) => {
+    closeEditorTabs([tabId]);
   });
 
   const confirmEditorTabClose = useMemoizedFn(() => {
@@ -358,9 +387,11 @@ export function useWorkspaceController() {
     appState.pendingEditorTabCloseId = null;
     if (appState.fileConflict?.tabId === tabId) appState.fileConflict = null;
     removeEditorTabs((tab) => tab.id === tabId);
+    continueEditorTabClose();
   });
 
   const cancelEditorTabClose = useMemoizedFn(() => {
+    pendingCloseQueueRef.current = { generation: appState.workspaceGeneration, ids: [] };
     appState.pendingEditorTabCloseId = null;
   });
 
@@ -840,6 +871,7 @@ export function useWorkspaceController() {
     consumeEditorLocation,
     activateEditorTab,
     closeEditorTab,
+    closeEditorTabs,
     confirmEditorTabClose,
     cancelEditorTabClose,
     updateEditorDraft,

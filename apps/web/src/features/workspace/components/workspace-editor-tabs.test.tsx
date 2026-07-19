@@ -59,6 +59,55 @@ describe('Workspace editor tabs', () => {
     expect(close.closest('[role="tab"]')).toBeNull();
   });
 
+  it('offers Chinese tab operations and closes tabs to the right as one safe request', () => {
+    const closeEditorTabs = vi.fn();
+    const actions = {
+      activateEditorTab: vi.fn(),
+      closeEditorTab: vi.fn(),
+      closeEditorTabs,
+    } as unknown as WorkspaceActions;
+    render(<WorkspaceEditorTabs actions={actions} />);
+
+    fireEvent.contextMenu(screen.getByRole('tab', { name: 'lib.rs，code/src' }), {
+      clientX: 120,
+      clientY: 32,
+    });
+
+    const menu = screen.getByRole('menu', { name: 'lib.rs，code/src 标签页操作' });
+    expect(menu).toHaveTextContent('关闭');
+    expect(menu).toHaveTextContent('关闭其他标签页');
+    expect(menu).toHaveTextContent('关闭右侧标签页');
+    expect(menu).toHaveTextContent('关闭全部标签页');
+    expect(menu).toHaveTextContent('复制相对路径');
+    fireEvent.click(within(menu).getByRole('menuitem', { name: '关闭右侧标签页' }));
+
+    expect(closeEditorTabs).toHaveBeenCalledWith([fileEditorTabId('/repo/README.md')]);
+  });
+
+  it('copies a relative path and supports keyboard dismissal with focus restoration', async () => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const actions = {
+      activateEditorTab: vi.fn(),
+      closeEditorTab: vi.fn(),
+      closeEditorTabs: vi.fn(),
+    } as unknown as WorkspaceActions;
+    render(<WorkspaceEditorTabs actions={actions} />);
+    const tab = screen.getByRole('tab', { name: 'README.md' });
+    tab.focus();
+    fireEvent.keyDown(tab, { key: 'F10', shiftKey: true });
+
+    expect(screen.getByRole('menuitem', { name: '关闭' })).toHaveFocus();
+    fireEvent.click(screen.getByRole('menuitem', { name: '复制相对路径' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('README.md'));
+    expect(tab).toHaveFocus();
+
+    fireEvent.keyDown(tab, { key: 'F10', shiftKey: true });
+    const menu = screen.getByRole('menu', { name: 'README.md 标签页操作' });
+    fireEvent.keyDown(menu, { key: 'Escape' });
+    expect(tab).toHaveFocus();
+  });
+
   it('supports automatic arrow, Home, End, and Delete navigation', async () => {
     const activateEditorTab = vi.fn((tabId: string) => {
       appState.activeEditorTabId = tabId;

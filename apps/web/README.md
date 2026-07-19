@@ -38,9 +38,12 @@ Product implementation is governed by the
 - A calm turn-based execution document with restored Skill/file context,
   stable Code response headers, local copy and continue-edit actions,
   lifecycle-aware Markdown reasoning, reader-controlled stream following, and
-  Streamdown/Shiki rendering for prose, code, and tables. Its semantic tool
-  timeline merges live events, output, HITL decisions, and recovery into one
-  execution block.
+  typographically tuned Streamdown/Shiki rendering for headings, lists, task
+  lists, quotations, tables, links, images, footnotes, inline code, and
+  line-numbered code blocks. Its semantic tool timeline merges live events,
+  output, HITL decisions, and recovery into one execution block, with
+  syntax-highlighted commands and arguments, working-directory context, live
+  output metrics, copy actions, and a compact tail preview after completion.
 - Visible task execution mode with a mode-specific icon, provider-tabbed model
   selection, an independent Effort slider with English values and Chinese
   guidance, task goal timing, context usage, manual context compaction, and an
@@ -62,6 +65,9 @@ Product implementation is governed by the
   lazy-loaded Monaco editing, independent dirty file tabs with shortest-unique
   parent labels for same-named files, a semantic roving tab strip with
   post-close focus recovery and editor-to-editor `Ctrl+Tab` focus handoff,
+  Simplified Chinese Monaco and code-navigation menus, pointer and keyboard
+  tab context menus for guarded close-one/other/right/all operations and path
+  copying,
   keyboard save/close/tab switching scoped to workspace focus, an editor-safe
   `Cmd/Ctrl+B` task-sidebar toggle, bounded
   back/forward location history,
@@ -105,7 +111,9 @@ Monaco shares the workspace-scoped native Code Intelligence runtime owned by
 the CLI backend. The file toolbar exposes definition, declaration, references,
 implementations, and Go to Symbol in Editor together with their keyboard
 shortcuts. The same navigation commands remain available from Monaco's context
-menu; diagnostics appear as Monaco markers. The editor toolbar keeps a bounded,
+menu, whose native actions and A3S additions use the same Simplified Chinese
+catalog as the surrounding Web IDE; diagnostics appear as Monaco markers. The
+editor toolbar keeps a bounded,
 workspace-scoped location history: `Ctrl+-` returns to the previous file and
 caret, while `Ctrl+Shift+-` moves forward. Open drafts are reused rather than
 reread, a new navigation clears the forward branch, and file rename/delete

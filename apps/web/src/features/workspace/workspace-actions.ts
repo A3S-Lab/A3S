@@ -15,6 +15,7 @@ export interface WorkspaceActions {
   consumeEditorLocation(tabId: string): void;
   activateEditorTab(tabId: string): void;
   closeEditorTab(tabId: string): void;
+  closeEditorTabs(tabIds: readonly string[]): void;
   confirmEditorTabClose(): void;
   cancelEditorTabClose(): void;
   updateEditorDraft(tabId: string, content: string): void;

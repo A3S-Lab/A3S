@@ -28,6 +28,12 @@ import type { TaskActions } from '../task-actions';
 import { CopyButton } from './conversation-message-actions';
 import { PermissionDecision, type ToolDecisionState } from './permission-decision';
 import {
+  outputLineCount,
+  ToolCollapsedOutputPreview,
+  ToolCommandPreview,
+  ToolInvocationInline,
+} from './tool-command-preview';
+import {
   isFileEditCall,
   selectToolCallsForDisplay,
   summarizeToolCalls,
@@ -143,7 +149,11 @@ function ToolCallItem({
         </span>
         <span className='tool-call-title'>
           <strong>{toolActionLabel(call)}</strong>
-          {target && <small>{target}</small>}
+          {target && (
+            <small>
+              <ToolInvocationInline call={call} fallback={target} />
+            </small>
+          )}
         </span>
         <span className='tool-call-state'>
           <StateIcon state={call.state} />
@@ -153,53 +163,61 @@ function ToolCallItem({
         </span>
         <ChevronDown className='tool-call-chevron' size={14} />
       </button>
+      {!open && call.output && <ToolCollapsedOutputPreview output={call.output} />}
       <div className='tool-call-body' id={bodyId} hidden={!open}>
-        {call.state === 'awaiting' && (
-          <PermissionDecision
-            call={call}
-            sessionId={sessionId}
-            decision={decision}
-            error={decisionError}
-            actions={actions}
-          />
+        {open && (
+          <>
+            {call.state === 'awaiting' && (
+              <PermissionDecision
+                call={call}
+                sessionId={sessionId}
+                decision={decision}
+                error={decisionError}
+                actions={actions}
+              />
+            )}
+            {call.state === 'denied' && call.reason && <p className='tool-call-message denied'>{call.reason}</p>}
+            {call.state === 'timed-out' && call.reason && <p className='tool-call-message timed-out'>{call.reason}</p>}
+            {call.state === 'interrupted' && call.reason && (
+              <p className='tool-call-message interrupted'>{call.reason}</p>
+            )}
+            <ToolCommandPreview call={call} />
+            <ToolExecutionMeta call={call} />
+            {argumentsText && (
+              <ToolInlineDisclosure className='tool-call-arguments' label='调用参数' icon={<Braces size={12} />}>
+                <pre>{argumentsText}</pre>
+              </ToolInlineDisclosure>
+            )}
+            {reviewAvailable ? (
+              <div className='tool-call-review'>
+                <span>
+                  <FileDiff size={15} />
+                  <span>
+                    <strong>{filePath || '工作区文件已变更'}</strong>
+                    <small>在工作区中查看完整 Diff，并决定是否保留变更。</small>
+                  </span>
+                </span>
+                <Button tone='secondary' onClick={openReview}>
+                  审阅变更
+                </Button>
+              </div>
+            ) : (
+              call.output && <ToolCallResult call={call} />
+            )}
+            {reviewAvailable && call.output && (
+              <ToolInlineDisclosure className='tool-call-raw-output' label='查看原始工具输出'>
+                <pre>{call.output}</pre>
+              </ToolInlineDisclosure>
+            )}
+            {!call.output && call.state === 'running' && (
+              <p className='tool-call-message running'>工具正在执行，输出会在这里持续更新。</p>
+            )}
+            {call.state === 'failed' && !call.output && (
+              <p className='tool-call-message failed'>{call.reason || call.errorKind || '工具没有返回可用结果。'}</p>
+            )}
+            {['failed', 'denied', 'timed-out'].includes(call.state) && <ToolCallRecovery call={call} />}
+          </>
         )}
-        {call.state === 'denied' && call.reason && <p className='tool-call-message denied'>{call.reason}</p>}
-        {call.state === 'timed-out' && call.reason && <p className='tool-call-message timed-out'>{call.reason}</p>}
-        {call.state === 'interrupted' && call.reason && <p className='tool-call-message interrupted'>{call.reason}</p>}
-        <ToolExecutionMeta call={call} />
-        {argumentsText && (
-          <ToolInlineDisclosure className='tool-call-arguments' label='调用参数' icon={<Braces size={12} />}>
-            <pre>{argumentsText}</pre>
-          </ToolInlineDisclosure>
-        )}
-        {reviewAvailable ? (
-          <div className='tool-call-review'>
-            <span>
-              <FileDiff size={15} />
-              <span>
-                <strong>{filePath || '工作区文件已变更'}</strong>
-                <small>在工作区中查看完整 Diff，并决定是否保留变更。</small>
-              </span>
-            </span>
-            <Button tone='secondary' onClick={openReview}>
-              审阅变更
-            </Button>
-          </div>
-        ) : (
-          call.output && <ToolCallResult call={call} />
-        )}
-        {reviewAvailable && call.output && (
-          <ToolInlineDisclosure className='tool-call-raw-output' label='查看原始工具输出'>
-            <pre>{call.output}</pre>
-          </ToolInlineDisclosure>
-        )}
-        {!call.output && call.state === 'running' && (
-          <p className='tool-call-message running'>工具正在执行，输出会在这里持续更新。</p>
-        )}
-        {call.state === 'failed' && !call.output && (
-          <p className='tool-call-message failed'>{call.reason || call.errorKind || '工具没有返回可用结果。'}</p>
-        )}
-        {['failed', 'denied', 'timed-out'].includes(call.state) && <ToolCallRecovery call={call} />}
       </div>
     </section>
   );
@@ -268,6 +286,7 @@ function ToolCallResult({ call }: { call: ToolCallProjection }) {
   const outputRef = useRef<HTMLPreElement>(null);
   const [following, setFollowing] = useState(true);
   const running = call.state === 'running' || call.state === 'preparing';
+  const lines = outputLineCount(call.output);
 
   useEffect(() => {
     const output = outputRef.current;
@@ -277,7 +296,9 @@ function ToolCallResult({ call }: { call: ToolCallProjection }) {
   return (
     <section className='tool-call-result' aria-label='工具输出'>
       <header>
-        <span>{running ? '实时输出' : '输出'}</span>
+        <span>
+          {running ? '实时输出' : '输出'} · {lines} 行
+        </span>
         <span className='tool-call-result-actions'>
           {running && !following && (
             <button
@@ -295,17 +316,19 @@ function ToolCallResult({ call }: { call: ToolCallProjection }) {
           <CopyButton content={call.output} label='复制工具输出' />
         </span>
       </header>
-      <pre
-        ref={outputRef}
-        className={`tool-call-output ${call.state === 'failed' ? 'error' : ''}`}
-        onScroll={(event) => {
-          if (!running) return;
-          const output = event.currentTarget;
-          setFollowing(output.scrollHeight - output.scrollTop - output.clientHeight < 24);
-        }}
-      >
-        {call.output}
-      </pre>
+      <div role='log' aria-label={running ? '实时工具输出' : '工具输出记录'} aria-live={running ? 'polite' : 'off'}>
+        <pre
+          ref={outputRef}
+          className={`tool-call-output ${call.state === 'failed' ? 'error' : ''}`}
+          onScroll={(event) => {
+            if (!running) return;
+            const output = event.currentTarget;
+            setFollowing(output.scrollHeight - output.scrollTop - output.clientHeight < 24);
+          }}
+        >
+          {call.output}
+        </pre>
+      </div>
     </section>
   );
 }
@@ -340,11 +363,17 @@ function truncateEvidence(value: string): string {
 }
 
 function ToolIcon({ name }: { name: string }) {
-  switch (name.trim().toLowerCase()) {
+  const normalized = name.trim().toLowerCase().split(/[.:/]/).at(-1);
+  switch (normalized) {
     case 'bash':
+    case 'execute':
+    case 'execute_command':
+    case 'run_command':
     case 'shell':
+    case 'shell_command':
     case 'run':
     case 'exec':
+    case 'terminal':
       return <SquareTerminal size={15} />;
     case 'read':
     case 'cat':

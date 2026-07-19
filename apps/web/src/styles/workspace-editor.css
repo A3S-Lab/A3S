@@ -114,6 +114,11 @@
   color: var(--a3s-ink);
 }
 
+.workspace-editor-tab.contextual {
+  background: var(--a3s-panel-strong);
+  color: var(--a3s-ink);
+}
+
 .workspace-editor-tab.active {
   background: var(--a3s-panel);
   color: var(--a3s-ink);

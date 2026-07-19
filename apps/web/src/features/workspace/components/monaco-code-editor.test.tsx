@@ -8,7 +8,7 @@ import { workspaceEditorModelPath } from './monaco-editor-model-store';
 import { MonacoCodeEditor, type MonacoCodeEditorHandle } from './monaco-code-editor';
 
 const testMonaco = monaco as unknown as {
-  __actions: Array<{ id: string; run: () => void | Promise<void> }>;
+  __actions: Array<{ id: string; label?: string; run: () => void | Promise<void> }>;
   __editorActionRuns: string[];
   __documentSymbolProviders: Array<{
     languageSelector: string;
@@ -83,6 +83,18 @@ describe('Monaco code-intelligence bridge', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it('registers Chinese labels for A3S actions in the editor context menu', async () => {
+    renderEditor();
+
+    await waitFor(() => expect(testMonaco.__actions).toHaveLength(4));
+    expect(testMonaco.__actions.map(({ id, label }) => [id, label])).toEqual([
+      ['a3s.code-navigation.definition', '转到定义'],
+      ['a3s.code-navigation.declaration', '转到声明'],
+      ['a3s.code-navigation.references', '查找所有引用'],
+      ['a3s.code-navigation.implementations', '转到实现'],
+    ]);
   });
 
   it('reports live cursor, selection, and line-ending state from the Monaco model', async () => {

@@ -1,3 +1,6 @@
+// Monaco reads its NLS table while editor modules are evaluated, so the
+// Simplified Chinese catalog must be the first runtime dependency.
+import 'monaco-editor/esm/nls.messages.zh-cn.js';
 import type * as MonacoNamespace from 'monaco-editor';
 import * as editorApi from 'monaco-editor/esm/vs/editor/editor.api.js';
 import * as css from 'monaco-editor/esm/vs/language/css/monaco.contribution.js';

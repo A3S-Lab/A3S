@@ -204,7 +204,10 @@ entries.
 **Contracts:**
 
 - assistant Markdown uses Streamdown streaming mode while pending and static
-  mode after completion, with Shiki code highlighting and Chinese control text;
+  mode after completion, with Chinese control text, light/dark Shiki themes,
+  line-numbered code blocks, normalized embedded-HTML indentation, and
+  document typography for headings, paragraphs, nested lists, task lists,
+  quotations, tables, links, images, footnotes, and inline code;
 - `InstructionMessage` removes transport wrappers while retaining selected
   Skills and workspace files as typed resource chips; its Continue editing
   action restores both content and resources to the current draft;
@@ -243,6 +246,17 @@ calls remain open. Full output stays available in a scrollable disclosure and
 is never permanently sliced. File-editing calls hand off to the Monaco review
 surface, with raw tool output remaining available as a secondary disclosure.
 Running output follows its own bottom only until the reader scrolls away.
+Shell calls expose the exact command, syntax-highlighted program, flags,
+strings, paths, operators, redirections, and variables, plus the working
+directory when supplied. Detection accepts both plain and provider-qualified
+tool names such as `bash`, `shell_command`, and
+`functions.shell_command`. Other tools use a compact highlighted
+`tool(key=value)` presentation with the highest-signal arguments first.
+Preparing and running calls publish a live state; output reports its line count,
+offers copying, and follows the tail until the reader scrolls away. A collapsed
+completed call retains the final two output lines with explicit omission and
+truncation labels instead of hiding all execution evidence.
+
 Output copy, permission outcomes, and safe recovery belong to the same tool
 block. A global recovery card is omitted only when its normalized error message
 explicitly repeats failed-tool output or typed error evidence, or is the exact
@@ -699,8 +713,9 @@ known binary extensions directly and content-sample unfamiliar extensions.
 **Role:** keep file and diff documents in one ordered, horizontally scrollable
 tab model.
 
-**Actions:** activate, close, middle-click close, keyboard traversal, and expose
-per-file loading and dirty state.
+**Actions:** activate, close, middle-click close, keyboard traversal, expose
+per-file loading and dirty state, and open a tab context menu by pointer or
+`Shift+F10`.
 
 **Contract:** opening another file never discards a draft. A dirty close offers
 Save and Close, Don't Save, and Cancel. `Cmd/Ctrl+W` follows the same guard.
@@ -714,6 +729,12 @@ the same guarded close path. If removal disconnects the current focus, focus
 moves to the surviving active tab or the empty editor's Quick Open action; a
 still-connected control elsewhere keeps focus. Any active-tab change that
 disconnects its invoking control falls back to the newly active tab.
+The viewport-bounded Chinese context menu closes the selected tab, all other
+tabs, tabs to its right, or all tabs, and copies either the absolute or
+workspace-relative path. Multi-tab close processes dirty documents in tab
+order through the existing Save/Don't Save/Cancel guard. Cancelling stops the
+remaining close queue, and a workspace-generation change invalidates it so an
+old task cannot close tabs in the newly selected workspace.
 
 ### `MonacoFileEditor`
 
@@ -726,15 +747,18 @@ references, implementations, and file outline. Monaco shortcuts and its editor
 context menu invoke the same navigation boundary.
 
 **Contract:** Monaco and its language workers are bundled locally and loaded on
-demand. The shared editor/diff runtime keeps Monaco's complete standalone
-contribution surface, four worker-backed language-service families (JSON, CSS,
-HTML, and TypeScript/JavaScript), and only the tokenizers needed by the
-product's ACL/HCL, shell, C/C++, JavaScript/TypeScript, CSS, Go, HTML, JSON,
-Markdown, Python, Rust, SQL, INI/TOML, XML, and YAML mappings. It starts from
-the scoped editor API rather than the package-wide entry, so unsupported
-language tokenizers and unused protocol code are not part of editor activation.
-Semantic targets reuse normal workspace file selection; dirty buffers remain
-local and navigation labels results that come from the saved document.
+demand. The Simplified Chinese NLS catalog loads before any editor module, so
+Monaco's native context menu, command palette, and built-in editing actions
+match the Chinese A3S navigation commands. The shared editor/diff runtime keeps
+Monaco's complete standalone contribution surface, four worker-backed
+language-service families (JSON, CSS, HTML, and TypeScript/JavaScript), and
+only the tokenizers needed by the product's ACL/HCL, shell, C/C++,
+JavaScript/TypeScript, CSS, Go, HTML, JSON, Markdown, Python, Rust, SQL,
+INI/TOML, XML, and YAML mappings. It starts from the scoped editor API rather
+than the package-wide entry, so unsupported language tokenizers and unused
+protocol code are not part of editor activation. Semantic targets reuse normal
+workspace file selection; dirty buffers remain local and navigation labels
+results that come from the saved document.
 One mounted editor switches between models whose virtual URI combines task
 scope and the normalized path first assigned to the document. A referenced
 model owns its live undo/redo stack, cursor and selections, folding, scroll,

@@ -22,6 +22,15 @@ const expectedBasicLanguages = [
 const expectedLanguageServices = ['css', 'html', 'json', 'typescript'].sort();
 
 describe('Monaco runtime import graph', () => {
+  it('loads Simplified Chinese messages before Monaco evaluates editor actions', () => {
+    const source = runtimeSource();
+    const locale = source.indexOf('monaco-editor/esm/nls.messages.zh-cn.js');
+    const editor = source.indexOf('monaco-editor/esm/vs/editor/editor.api.js');
+
+    expect(locale).toBeGreaterThanOrEqual(0);
+    expect(locale).toBeLessThan(editor);
+  });
+
   it('starts from the editor API without importing the broad package entry', () => {
     const source = runtimeSource();
 

@@ -263,7 +263,7 @@ describe('ExecutionStream permission decisions', () => {
     fireEvent.click(argumentsDisclosure);
     expect(argumentsDisclosure).toHaveAttribute('aria-expanded', 'true');
     expect(rawArguments).toBeVisible();
-    expect(screen.getAllByText(/cargo test/)).toHaveLength(3);
+    expect(screen.getByRole('region', { name: '命令预览' })).toHaveTextContent('cargo test');
     fireEvent.click(screen.getByRole('button', { name: '允许一次' }));
     expect(confirmToolUse).toHaveBeenCalledWith('session-approval', 'tool-7', true);
   });
@@ -527,12 +527,60 @@ describe('ExecutionStream permission decisions', () => {
     const details = container.querySelector('.tool-call-item');
     const disclosure = details?.querySelector('button[aria-expanded]');
     expect(disclosure).toHaveAttribute('aria-expanded', 'false');
-    expect(container.querySelector('.tool-call-output')).toHaveTextContent('final line must remain visible');
-    expect(container.querySelector('.tool-call-output')?.textContent).toBe(completeOutput);
+    expect(screen.getByLabelText('输出预览')).toHaveTextContent('final line must remain visible');
+    expect(container.querySelector('.tool-call-output')).not.toBeInTheDocument();
     fireEvent.click(disclosure!);
     expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+    expect(container.querySelector('.tool-call-output')?.textContent).toBe(completeOutput);
     expect(screen.getByRole('region', { name: '执行过程' })).toHaveTextContent('1 项操作已完成');
     expect(screen.getByLabelText('执行信息')).toHaveTextContent('bash');
+  });
+
+  it('renders the shell command, parameters, cwd, and incremental output as the primary execution preview', () => {
+    appState.activeSessionId = 'session-command-preview';
+    appState.messagesBySession['session-command-preview'] = [
+      {
+        id: 'assistant-command-preview',
+        sessionId: 'session-command-preview',
+        role: 'assistant',
+        content: '',
+        createdAt: new Date().toISOString(),
+        pending: true,
+        events: [
+          {
+            type: 'tool_execution_start',
+            tool_id: 'tool-command-preview',
+            tool_name: 'bash',
+            args: {
+              command: 'cargo test -p a3s-cli --test web_cli',
+              cwd: '/repo/crates/cli',
+            },
+          },
+          {
+            type: 'tool_output_delta',
+            tool_id: 'tool-command-preview',
+            tool_name: 'bash',
+            delta: 'running 13 tests\n',
+          },
+          {
+            type: 'tool_output_delta',
+            tool_id: 'tool-command-preview',
+            tool_name: 'bash',
+            delta: 'test result: ok\n',
+          },
+        ],
+      },
+    ];
+
+    const { container } = render(<ExecutionStream actions={{} as TaskActions} />);
+
+    const command = screen.getByRole('region', { name: '命令预览' });
+    expect(command).toHaveTextContent('cargo test -p a3s-cli --test web_cli');
+    expect(command).toHaveTextContent('/repo/crates/cli');
+    expect(command.querySelector('[data-syntax-role="program"]')).toHaveTextContent('cargo');
+    expect(command.querySelectorAll('[data-syntax-role="flag"]')).toHaveLength(2);
+    expect(screen.getByRole('log', { name: '实时工具输出' })).toHaveTextContent('test result: ok');
+    expect(container.querySelector('.tool-call-result')).toHaveTextContent('实时输出 · 2 行');
   });
 
   it('compacts older successful tool calls without hiding active evidence', () => {
@@ -644,10 +692,49 @@ describe('ExecutionStream permission decisions', () => {
 
     const { container } = render(<ExecutionStream actions={{} as TaskActions} />);
     expect(await screen.findByRole('heading', { name: '构建结果' }, { timeout: 10_000 })).toBeInTheDocument();
-    expect(container.querySelector('.streaming-markdown')).toBeInTheDocument();
+    expect(container.querySelector('.streaming-markdown')).toHaveClass('a3s-document-markdown');
     await waitFor(() => expect(container.querySelector('pre code span')).toBeInTheDocument());
+    expect(container.querySelector('pre code')?.className).toContain('counter-reset');
     expect(screen.getByRole('button', { name: '复制代码' })).toBeInTheDocument();
   }, 20_000);
+
+  it('renders refined GFM document elements with accessible semantics', async () => {
+    appState.activeSessionId = 'session-refined-markdown';
+    appState.messagesBySession['session-refined-markdown'] = [
+      {
+        id: 'assistant-refined-markdown',
+        sessionId: 'session-refined-markdown',
+        role: 'assistant',
+        content: [
+          '## 发布检查',
+          '',
+          '> 请先完成验证。',
+          '',
+          '- [x] 类型检查',
+          '- [ ] 浏览器验收',
+          '',
+          '| 项目 | 状态 |',
+          '| --- | --- |',
+          '| 构建 | 通过 |',
+          '',
+          '---',
+          '',
+          '[查看文档](https://example.com/docs)',
+        ].join('\n'),
+        createdAt: new Date().toISOString(),
+      },
+    ];
+
+    const { container } = render(<ExecutionStream actions={{} as TaskActions} />);
+
+    expect(await screen.findByRole('heading', { name: '发布检查' })).toBeInTheDocument();
+    expect(container.querySelector('.streaming-markdown')).toHaveClass('a3s-document-markdown');
+    expect(container.querySelector('blockquote')).toHaveTextContent('请先完成验证');
+    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(2);
+    expect(screen.getByRole('table')).toHaveTextContent('构建');
+    expect(container.querySelector('hr')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '查看文档' })).toHaveAttribute('data-streamdown', 'link');
+  });
 
   it('renders completed reasoning as collapsed Markdown instead of plain preformatted text', async () => {
     appState.activeSessionId = 'session-reasoning-markdown';

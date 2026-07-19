@@ -1,9 +1,12 @@
 .execution-markdown .streaming-markdown {
+  --markdown-soft-accent: color-mix(in srgb, var(--a3s-blue) 6%, var(--a3s-panel));
   min-width: 0;
   color: var(--a3s-ink);
   font-size: inherit;
-  line-height: inherit;
+  line-height: 1.72;
+  letter-spacing: 0.002em;
   overflow-wrap: anywhere;
+  text-wrap: pretty;
 }
 
 .execution-markdown .streaming-markdown.is-streaming > :last-child::after {
@@ -26,51 +29,173 @@
   margin-bottom: 0;
 }
 
-.execution-markdown .streaming-markdown :where(h1, h2, h3, h4) {
-  margin: 1.35em 0 0.55em;
+.execution-markdown .streaming-markdown :where(h1, h2, h3, h4, h5, h6) {
+  margin: 1.55em 0 0.58em;
+  scroll-margin-top: 18px;
   color: var(--a3s-ink);
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  font-weight: 680;
+  letter-spacing: -0.024em;
+  line-height: 1.28;
+  text-wrap: balance;
 }
 
 .execution-markdown .streaming-markdown :where(h1) {
-  font-size: 1.45em;
+  font-size: 1.55em;
+  font-weight: 720;
 }
 
 .execution-markdown .streaming-markdown :where(h2) {
-  font-size: 1.25em;
+  padding-bottom: 0.32em;
+  border-bottom: 1px solid color-mix(in srgb, var(--a3s-line) 82%, transparent);
+  font-size: 1.32em;
 }
 
-.execution-markdown .streaming-markdown :where(h3, h4) {
-  font-size: 1.08em;
+.execution-markdown .streaming-markdown :where(h3) {
+  font-size: 1.14em;
 }
 
-.execution-markdown .streaming-markdown :where(p, ul, ol, blockquote, table) {
-  margin: 0.65em 0;
+.execution-markdown .streaming-markdown :where(h4) {
+  font-size: 1.04em;
+}
+
+.execution-markdown .streaming-markdown :where(h5, h6) {
+  color: var(--a3s-muted);
+  font-size: 0.96em;
+  letter-spacing: 0;
+}
+
+.execution-markdown .streaming-markdown :where(p, ul, ol, blockquote, table, details) {
+  margin: 0.78em 0;
+}
+
+.execution-markdown .streaming-markdown :where(strong) {
+  color: color-mix(in srgb, var(--a3s-ink) 94%, black);
+  font-weight: 670;
+}
+
+:root.dark .execution-markdown .streaming-markdown :where(strong) {
+  color: color-mix(in srgb, var(--a3s-ink) 96%, white);
+}
+
+.execution-markdown .streaming-markdown :where(em) {
+  text-decoration-color: color-mix(in srgb, var(--a3s-blue) 20%, transparent);
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.14em;
+}
+
+.execution-markdown .streaming-markdown :where(del) {
+  color: var(--a3s-faint);
+  text-decoration-color: color-mix(in srgb, var(--a3s-red) 58%, transparent);
 }
 
 .execution-markdown .streaming-markdown :where(ul, ol) {
-  padding-left: 1.5em;
+  padding-left: 1.55em;
 }
 
-.execution-markdown .streaming-markdown :where(a) {
+.execution-markdown .streaming-markdown :where(li) {
+  margin: 0.26em 0;
+  padding-left: 0.12em;
+}
+
+.execution-markdown .streaming-markdown :where(li > p) {
+  margin: 0.32em 0;
+}
+
+.execution-markdown .streaming-markdown :where(li > ul, li > ol) {
+  margin: 0.34em 0 0.2em;
+}
+
+.execution-markdown .streaming-markdown :where(ul > li)::marker {
+  color: color-mix(in srgb, var(--a3s-blue) 70%, var(--a3s-muted));
+  font-size: 0.86em;
+}
+
+.execution-markdown .streaming-markdown :where(ol > li)::marker {
+  color: var(--a3s-muted);
+  font-size: 0.92em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 620;
+}
+
+.execution-markdown .streaming-markdown :where(.contains-task-list) {
+  padding-left: 0.18em;
+  list-style: none;
+}
+
+.execution-markdown .streaming-markdown :where(.task-list-item) {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55em;
+  padding: 0.18em 0;
+}
+
+.execution-markdown .streaming-markdown :where(.task-list-item > input[type="checkbox"]) {
+  width: 1.05em;
+  height: 1.05em;
+  margin: 0.28em 0 0;
+  flex: 0 0 auto;
+  accent-color: var(--a3s-blue);
+}
+
+.execution-markdown .streaming-markdown :where(a, [data-streamdown="link"]) {
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--a3s-blue);
-  text-decoration-color: color-mix(in srgb, var(--a3s-blue) 35%, transparent);
-  text-underline-offset: 2px;
+  cursor: pointer;
+  font-weight: 520;
+  text-decoration-color: color-mix(in srgb, var(--a3s-blue) 32%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  transition:
+    color 120ms ease,
+    text-decoration-color 120ms ease;
+}
+
+.execution-markdown .streaming-markdown :where(a:hover, [data-streamdown="link"]:hover) {
+  color: color-mix(in srgb, var(--a3s-blue) 82%, var(--a3s-ink));
+  text-decoration-color: currentColor;
 }
 
 .execution-markdown .streaming-markdown :where(blockquote) {
-  padding-left: 12px;
-  border-left: 2px solid var(--a3s-line-strong);
+  padding: 0.68em 0.9em 0.68em 1em;
+  border: 1px solid color-mix(in srgb, var(--a3s-blue) 12%, var(--a3s-line));
+  border-left: 3px solid color-mix(in srgb, var(--a3s-blue) 55%, var(--a3s-line-strong));
+  border-radius: 0 8px 8px 0;
+  background: var(--markdown-soft-accent);
   color: var(--a3s-muted);
+  font-style: normal;
+}
+
+.execution-markdown .streaming-markdown :where(blockquote > :first-child) {
+  margin-top: 0;
+}
+
+.execution-markdown .streaming-markdown :where(blockquote > :last-child) {
+  margin-bottom: 0;
+}
+
+.execution-markdown .streaming-markdown :where(hr) {
+  height: 1px;
+  margin: 1.65em 0;
+  border: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--a3s-line-strong) 12%,
+    var(--a3s-line-strong) 88%,
+    transparent
+  );
 }
 
 .execution-markdown .streaming-markdown :where(:not(pre) > code) {
-  padding: 1px 5px;
-  border: 1px solid var(--a3s-line);
+  padding: 0.08em 0.38em 0.12em;
+  border: 1px solid color-mix(in srgb, var(--a3s-line-strong) 82%, transparent);
   border-radius: 5px;
-  background: var(--a3s-panel-soft);
-  font: 0.92em/1.5 "SFMono-Regular", Consolas, monospace;
+  background: color-mix(in srgb, var(--a3s-panel-soft) 82%, var(--a3s-panel));
+  color: color-mix(in srgb, var(--a3s-ink) 86%, var(--a3s-purple));
+  font: 0.9em/1.55 "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  white-space: break-spaces;
 }
 
 .execution-markdown .streaming-markdown :where(pre) {
@@ -82,19 +207,88 @@
 
 .execution-markdown .streaming-markdown :where(table) {
   width: 100%;
+  margin: 0;
   border-collapse: collapse;
-  font-size: 0.94em;
+  font-size: 0.92em;
+  line-height: 1.5;
 }
 
 .execution-markdown .streaming-markdown :where(th, td) {
-  padding: 7px 9px;
-  border: 1px solid var(--a3s-line);
+  padding: 8px 10px;
+  border: 0;
+  border-right: 1px solid var(--a3s-line);
+  border-bottom: 1px solid var(--a3s-line);
   text-align: left;
+  vertical-align: top;
+}
+
+.execution-markdown .streaming-markdown :where(th:last-child, td:last-child) {
+  border-right: 0;
 }
 
 .execution-markdown .streaming-markdown :where(th) {
+  background: color-mix(in srgb, var(--a3s-panel-soft) 88%, var(--a3s-panel));
+  color: var(--a3s-muted);
+  font-size: 0.94em;
+  font-weight: 650;
+  letter-spacing: 0.015em;
+}
+
+.execution-markdown .streaming-markdown :where(tbody tr:nth-child(even)) {
+  background: color-mix(in srgb, var(--a3s-panel-soft) 42%, transparent);
+}
+
+.execution-markdown .streaming-markdown :where(tbody tr:hover) {
+  background: color-mix(in srgb, var(--a3s-blue) 4%, var(--a3s-panel));
+}
+
+.execution-markdown .streaming-markdown :where(img) {
+  display: block;
+  max-width: min(100%, 880px);
+  height: auto;
+  margin: 1.1em auto;
+  border: 1px solid var(--a3s-line);
+  border-radius: 10px;
+  background:
+    linear-gradient(45deg, var(--a3s-panel-soft) 25%, transparent 25%) 0 0 / 12px 12px,
+    linear-gradient(-45deg, var(--a3s-panel-soft) 25%, transparent 25%) 0 0 / 12px 12px,
+    var(--a3s-panel);
+  box-shadow: 0 8px 24px color-mix(in srgb, black 8%, transparent);
+}
+
+.execution-markdown .streaming-markdown :where(kbd) {
+  display: inline-flex;
+  min-width: 1.7em;
+  min-height: 1.55em;
+  align-items: center;
+  justify-content: center;
+  padding: 0.02em 0.42em;
+  border: 1px solid var(--a3s-line-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
   background: var(--a3s-panel-soft);
-  font-weight: 600;
+  color: var(--a3s-muted);
+  font: 0.82em/1.4 "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+}
+
+.execution-markdown .streaming-markdown :where(details) {
+  padding: 0.7em 0.85em;
+  border: 1px solid var(--a3s-line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--a3s-panel-soft) 52%, var(--a3s-panel));
+}
+
+.execution-markdown .streaming-markdown :where(summary) {
+  color: var(--a3s-ink);
+  cursor: pointer;
+  font-weight: 620;
+}
+
+.execution-markdown .streaming-markdown :where(mark) {
+  padding: 0.04em 0.2em;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--a3s-warning) 20%, transparent);
+  color: inherit;
 }
 
 .execution-markdown-fallback {
@@ -105,20 +299,25 @@
 .execution-markdown [data-streamdown="code-block"],
 .execution-markdown [data-streamdown="table-wrapper"] {
   gap: 0 !important;
-  margin: 1em 0 !important;
+  margin: 1.05em 0 !important;
   padding: 0 !important;
   overflow: hidden;
   border: 1px solid var(--a3s-line) !important;
-  border-radius: 9px !important;
+  border-radius: 10px !important;
   background: var(--a3s-panel) !important;
+  box-shadow: 0 4px 14px color-mix(in srgb, black 4%, transparent) !important;
 }
 
 .execution-markdown [data-streamdown="code-block-header"] {
-  height: 32px !important;
-  padding: 0 9px;
+  height: 34px !important;
+  padding: 0 11px;
   border-bottom: 1px solid var(--a3s-line);
   background: var(--a3s-panel-soft);
   color: var(--a3s-muted);
+  font-size: 10px;
+  font-weight: 620;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .execution-markdown [data-streamdown="code-block-actions"] {
@@ -135,14 +334,32 @@
   --sdm-bg: var(--a3s-panel);
   --shiki-dark-bg: var(--a3s-panel);
   max-height: 480px;
-  padding: 12px 13px !important;
+  padding: 13px 14px 14px !important;
   border: 0 !important;
   border-radius: 0 !important;
   background: var(--a3s-panel) !important;
 }
 
+.execution-markdown [data-streamdown="code-block-body"] pre {
+  margin: 0;
+  font: 11.5px/1.72 "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  tab-size: 2;
+}
+
+.execution-markdown [data-streamdown="code-block-body"] pre code > span {
+  min-height: 1.72em;
+}
+
+.execution-markdown [data-streamdown="code-block-body"] pre code > span::before {
+  width: 2.2em !important;
+  margin-right: 1.15em !important;
+  color: var(--a3s-faint) !important;
+  font-size: 0.88em !important;
+  font-variant-numeric: tabular-nums;
+}
+
 .execution-markdown [data-streamdown="table-wrapper"] > div:first-child {
-  min-height: 32px;
+  min-height: 34px;
   padding: 3px 6px;
   border-bottom: 1px solid var(--a3s-line);
   background: var(--a3s-panel-soft);
@@ -150,11 +367,12 @@
 
 .execution-markdown [data-streamdown="table-wrapper"] > div:first-child::before {
   margin-right: auto;
-  padding-left: 4px;
+  padding-left: 5px;
   color: var(--a3s-muted);
   content: "表格";
   font-size: 10px;
-  font-weight: 550;
+  font-weight: 620;
+  letter-spacing: 0.04em;
 }
 
 .execution-markdown [data-streamdown="table-wrapper"] > div:last-child {
@@ -162,6 +380,10 @@
   border: 0 !important;
   border-radius: 0 !important;
   background: var(--a3s-panel) !important;
+}
+
+.execution-markdown [data-streamdown="table-wrapper"] > div:last-child table {
+  min-width: 460px;
 }
 
 .execution-markdown [data-streamdown="table-wrapper"] button,
@@ -178,6 +400,18 @@
   color: var(--a3s-ink);
 }
 
+.execution-markdown .streaming-markdown :where([data-footnotes]) {
+  margin-top: 1.8em;
+  padding-top: 0.8em;
+  border-top: 1px solid var(--a3s-line);
+  color: var(--a3s-muted);
+  font-size: 0.9em;
+}
+
+.execution-markdown .streaming-markdown ::selection {
+  background: color-mix(in srgb, var(--a3s-blue) 22%, transparent);
+}
+
 :root.dark .execution-markdown [data-streamdown="code-block"],
 :root.dark .execution-markdown [data-streamdown="table-wrapper"] {
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 2%);
@@ -190,7 +424,35 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .execution-markdown .streaming-markdown :where(a, [data-streamdown="link"]) {
+    transition: none;
+  }
+
   .execution-markdown .streaming-markdown.is-streaming > :last-child::after {
     animation: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .execution-markdown .streaming-markdown {
+    line-height: 1.68;
+  }
+
+  .execution-markdown .streaming-markdown :where(h1) {
+    font-size: 1.42em;
+  }
+
+  .execution-markdown .streaming-markdown :where(h2) {
+    font-size: 1.24em;
+  }
+
+  .execution-markdown [data-streamdown="code-block-body"] {
+    padding-right: 10px !important;
+    padding-left: 10px !important;
+  }
+
+  .execution-markdown [data-streamdown="code-block-body"] pre code > span::before {
+    width: 1.8em !important;
+    margin-right: 0.8em !important;
   }
 }
