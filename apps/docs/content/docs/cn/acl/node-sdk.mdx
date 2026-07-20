@@ -1,6 +1,6 @@
 ---
 title: Node SDK
-description: "@a3s-lab/acl 的 JavaScript/TypeScript bounded parsing、native ACL generation、canonical digests 和 builders。"
+description: "@a3s-lab/acl 的 JavaScript/TypeScript bounded parsing、multi-diagnostics、native ACL generation、canonical digests 和 builders。"
 ---
 
 # Node SDK
@@ -44,8 +44,9 @@ const generated = generate(new DocumentBuilder().block(provider).build());
 | API | 作用 |
 | --- | --- |
 | `parse(input, limits?)` | 使用默认或显式 resource limits，把 ACL text 解析成 `Document`。 |
-| `DEFAULT_PARSE_LIMITS` | Document bytes、nesting、collection items 和 token bytes 的 shared immutable defaults。 |
-| `ParseError`、`DIAGNOSTIC_CODES` | Stable codes、complete spans、UTF-8 byte offsets 和 redacted messages。 |
+| `collectDiagnostics(input, limits?)` | 在不构造 partial AST 的前提下收集 bounded diagnostics。 |
+| `DEFAULT_PARSE_LIMITS` | Document bytes、nesting、collection items、token bytes 和 diagnostic count 的 shared immutable defaults。 |
+| `ParseError`、`DIAGNOSTIC_CODES`、`DiagnosticReport` | Stable codes、complete spans、UTF-8 byte offsets、redacted messages 和明确的 truncation state。 |
 | `generate(doc)` | 生成 labels 位于 block headers 的 native ACL text。 |
 | `canonicalBytes(doc)`、`canonicalDigest(doc)` | 生成 stable cross-SDK bytes 和带 algorithm prefix 的 SHA-256 digest。 |
 | `CanonicalError` | 对 non-finite numbers、non-scalar strings 和 non-portable identifiers 返回不回显值的错误。 |
@@ -70,6 +71,7 @@ try {
     maxNestingDepth: 32,
     maxCollectionItems: 1_000,
     maxTokenBytes: 16 * 1024,
+    maxDiagnostics: 20,
   });
 } catch (error) {
   if (error instanceof ParseError) {
@@ -80,6 +82,22 @@ try {
 
 Document 和 token sizes 使用 UTF-8 bytes。Diagnostic messages 只标识 token
 kinds，不包含 source token values 或 snippets。
+
+Parse API 仍然是 fail-fast。CLI 和 editor integrations 可以使用 bounded
+budget 收集多个错误：
+
+```typescript
+import {collectDiagnostics} from '@a3s-lab/acl';
+
+const report = collectDiagnostics('first = ]\nsecond = ]', {
+  maxDiagnostics: 20,
+});
+```
+
+发生 syntax error 后，collection 会从下一 source line 继续。
+Resource-limit diagnostics 仍然是 fatal。Report 最多保存
+`maxDiagnostics` 个 errors，只有在继续观察到超出 budget 的 error 后才会把
+`truncated` 设为 true。
 
 ## Native And Canonical Output
 

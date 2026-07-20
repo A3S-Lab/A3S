@@ -1,6 +1,6 @@
 ---
 title: Rust API
-description: Rust bounded parsing, diagnostics, canonical digests, native ACL generation, AST, and builders for a3s-acl.
+description: Rust bounded parsing, multi-diagnostics, canonical digests, native ACL generation, AST, and builders for a3s-acl.
 ---
 
 # Rust API
@@ -34,8 +34,9 @@ The public crate exports:
 | API | Role |
 | --- | --- |
 | `parse` / `parse_acl` | Parse ACL text into a `Document`. |
-| `parse_with_limits`, `ParseLimits` | Parse untrusted input with explicit document, nesting, collection, and token limits. |
-| `DiagnosticCode`, `ParseError` | Return stable codes, UTF-8 byte spans, and redacted messages. |
+| `parse_with_limits`, `ParseLimits` | Parse untrusted input with explicit document, nesting, collection, token, and diagnostic limits. |
+| `collect_diagnostics`, `collect_diagnostics_with_limits` | Collect bounded diagnostics without constructing a partial AST. |
+| `DiagnosticCode`, `ParseError`, `DiagnosticReport` | Return stable codes, UTF-8 byte spans, redacted messages, and explicit truncation state. |
 | `generate` / `generate_acl` | Generate ACL text from a `Document`. |
 | `generate_from_map` | Build ACL text from a `HashMap<String, Value>`. |
 | `canonical_bytes`, `canonical_digest` | Produce stable cross-SDK bytes and an algorithm-prefixed SHA-256 digest. |
@@ -55,6 +56,7 @@ let document = parse_with_limits(
         max_nesting_depth: 32,
         max_collection_items: 1_000,
         max_token_bytes: 16 * 1024,
+        max_diagnostics: 20,
     },
 )?;
 ```
@@ -63,6 +65,26 @@ Document and token sizes count UTF-8 bytes. `ParseError` exposes a stable
 `DiagnosticCode`, a complete source span with UTF-8 byte offsets, and
 compatibility `line` / `column` fields. Messages identify token kinds without
 including source token values or snippets.
+
+The parse APIs remain fail-fast. CLI and editor integrations can collect
+multiple errors with a bounded budget:
+
+```rust
+use a3s_acl::{collect_diagnostics_with_limits, ParseLimits};
+
+let report = collect_diagnostics_with_limits(
+    "first = ]\nsecond = ]",
+    ParseLimits {
+        max_diagnostics: 20,
+        ..ParseLimits::default()
+    },
+);
+```
+
+After a syntax error, collection resumes at the next source line.
+Resource-limit diagnostics remain fatal. A report stores at most
+`max_diagnostics` errors and sets `truncated` only after observing another
+error beyond that budget.
 
 ## AST
 

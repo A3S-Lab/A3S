@@ -1,6 +1,6 @@
 ---
 title: Rust API
-description: a3s-acl 的 Rust bounded parsing、diagnostics、canonical digests、native ACL generation、AST 和 builders。
+description: a3s-acl 的 Rust bounded parsing、multi-diagnostics、canonical digests、native ACL generation、AST 和 builders。
 ---
 
 # Rust API
@@ -34,8 +34,9 @@ Public crate exports：
 | API | 作用 |
 | --- | --- |
 | `parse` / `parse_acl` | 把 ACL text 解析成 `Document`。 |
-| `parse_with_limits`、`ParseLimits` | 使用显式 document、nesting、collection 和 token limits 解析 untrusted input。 |
-| `DiagnosticCode`、`ParseError` | 返回 stable codes、UTF-8 byte spans 和 redacted messages。 |
+| `parse_with_limits`、`ParseLimits` | 使用显式 document、nesting、collection、token 和 diagnostic limits 解析 untrusted input。 |
+| `collect_diagnostics`、`collect_diagnostics_with_limits` | 在不构造 partial AST 的前提下收集 bounded diagnostics。 |
+| `DiagnosticCode`、`ParseError`、`DiagnosticReport` | 返回 stable codes、UTF-8 byte spans、redacted messages 和明确的 truncation state。 |
 | `generate` / `generate_acl` | 从 `Document` 生成 ACL text。 |
 | `generate_from_map` | 从 `HashMap<String, Value>` 生成 ACL text。 |
 | `canonical_bytes`、`canonical_digest` | 生成 stable cross-SDK bytes 和带 algorithm prefix 的 SHA-256 digest。 |
@@ -55,6 +56,7 @@ let document = parse_with_limits(
         max_nesting_depth: 32,
         max_collection_items: 1_000,
         max_token_bytes: 16 * 1024,
+        max_diagnostics: 20,
     },
 )?;
 ```
@@ -63,6 +65,26 @@ Document 和 token sizes 使用 UTF-8 bytes。`ParseError` 提供 stable
 `DiagnosticCode`、带 UTF-8 byte offsets 的 complete source span，以及
 compatibility `line` / `column` fields。Messages 只标识 token kinds，不包含
 source token values 或 snippets。
+
+Parse APIs 仍然是 fail-fast。CLI 和 editor integrations 可以使用 bounded
+budget 收集多个错误：
+
+```rust
+use a3s_acl::{collect_diagnostics_with_limits, ParseLimits};
+
+let report = collect_diagnostics_with_limits(
+    "first = ]\nsecond = ]",
+    ParseLimits {
+        max_diagnostics: 20,
+        ..ParseLimits::default()
+    },
+);
+```
+
+发生 syntax error 后，collection 会从下一 source line 继续。
+Resource-limit diagnostics 仍然是 fatal。Report 最多保存
+`max_diagnostics` 个 errors，只有在继续观察到超出 budget 的 error 后才会把
+`truncated` 设为 true。
 
 ## AST
 

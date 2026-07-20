@@ -9,7 +9,7 @@ component "acl" {
   package = "a3s-acl"
   path = "crates/acl"
   repository = "git@github.com:A3S-Lab/ACL.git"
-  revision = "9e55b23f3659cea390fe51d911c53a26a6902ac5"
+  revision = "cef613ef945cff9ebbc5a36b983d1daaa1067fdb"
   source = "git"
   version = "0.2.2"
 }

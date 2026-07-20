@@ -1,6 +1,6 @@
 ---
 title: Node SDK
-description: JavaScript and TypeScript bounded parsing, native ACL generation, canonical digests, and builders in @a3s-lab/acl.
+description: JavaScript and TypeScript bounded parsing, multi-diagnostics, native ACL generation, canonical digests, and builders in @a3s-lab/acl.
 ---
 
 # Node SDK
@@ -44,8 +44,9 @@ const generated = generate(new DocumentBuilder().block(provider).build());
 | API | Role |
 | --- | --- |
 | `parse(input, limits?)` | Parse ACL text into a `Document` with default or explicit resource limits. |
-| `DEFAULT_PARSE_LIMITS` | Shared immutable defaults for document bytes, nesting, collection items, and token bytes. |
-| `ParseError`, `DIAGNOSTIC_CODES` | Stable codes, complete spans, UTF-8 byte offsets, and redacted messages. |
+| `collectDiagnostics(input, limits?)` | Collect bounded diagnostics without constructing a partial AST. |
+| `DEFAULT_PARSE_LIMITS` | Shared immutable defaults for document bytes, nesting, collection items, token bytes, and diagnostic count. |
+| `ParseError`, `DIAGNOSTIC_CODES`, `DiagnosticReport` | Stable codes, complete spans, UTF-8 byte offsets, redacted messages, and explicit truncation state. |
 | `generate(doc)` | Generate native ACL text with labels in block headers. |
 | `canonicalBytes(doc)`, `canonicalDigest(doc)` | Produce stable cross-SDK bytes and an algorithm-prefixed SHA-256 digest. |
 | `CanonicalError` | Report non-finite numbers, non-scalar strings, and non-portable identifiers without echoing values. |
@@ -70,6 +71,7 @@ try {
     maxNestingDepth: 32,
     maxCollectionItems: 1_000,
     maxTokenBytes: 16 * 1024,
+    maxDiagnostics: 20,
   });
 } catch (error) {
   if (error instanceof ParseError) {
@@ -80,6 +82,22 @@ try {
 
 Document and token sizes count UTF-8 bytes. Diagnostic messages identify token
 kinds but never include source token values or snippets.
+
+The parse API remains fail-fast. CLI and editor integrations can collect
+multiple errors with a bounded budget:
+
+```typescript
+import {collectDiagnostics} from '@a3s-lab/acl';
+
+const report = collectDiagnostics('first = ]\nsecond = ]', {
+  maxDiagnostics: 20,
+});
+```
+
+After a syntax error, collection resumes at the next source line.
+Resource-limit diagnostics remain fatal. A report stores at most
+`maxDiagnostics` errors and sets `truncated` only after observing another error
+beyond that budget.
 
 ## Native And Canonical Output
 
