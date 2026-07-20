@@ -28,7 +28,16 @@ Use `canonical_bytes` / `canonical_digest` in Rust and `canonicalBytes` /
 `canonicalDigest` in Node when configuration is signed, stored, or compared.
 Canonical output uses UTF-8, LF line endings, exactly one final newline, sorted
 portable attribute and object keys, and last-value-wins duplicate object keys.
-Block, label, list, and function-argument order remains significant.
+These base APIs preserve block, label, list, and function-argument order.
+
+After schema admission, Rust
+`canonical_bytes_with_schema` / `canonical_digest_with_schema` and Node
+`canonicalBytesWithSchema` / `canonicalDigestWithSchema` can recursively
+normalize occurrences of a declared block name whose schema rule marks it
+`unordered`. Matching blocks are compared by canonical UTF-8 bytes and replace
+only their original slots. Other names, unknown blocks, labels, lists, calls,
+and unmarked blocks remain ordered. The schema-aware APIs use the schema only
+as normalization metadata; they do not perform admission.
 
 Finite numbers use ECMAScript shortest-round-trip formatting, including `0` for
 negative zero. Unicode scalar sequences are preserved without normalization.
@@ -58,11 +67,14 @@ ACL owns:
 - generating text from AST
 - value constructors and document builders
 - parser diagnostics
+- declarative document-shape schemas and bounded validation reports
+- base and schema-aware canonical bytes and digests
 - language-neutral config shape
 
 The host component owns:
 
-- validating whether a block or attribute is allowed
+- defining the trusted schema at each product boundary
+- validating domain rules beyond document shape
 - evaluating function calls
 - resolving environment variables or secret-store references
 - applying defaults

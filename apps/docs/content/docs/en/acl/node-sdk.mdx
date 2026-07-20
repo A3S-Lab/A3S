@@ -1,6 +1,6 @@
 ---
 title: Node SDK
-description: JavaScript and TypeScript bounded parsing, schema admission, multi-diagnostics, native ACL generation, canonical digests, and builders in @a3s-lab/acl.
+description: JavaScript and TypeScript bounded parsing, schema admission, multi-diagnostics, native generation, schema-aware canonical digests, and builders in @a3s-lab/acl.
 ---
 
 # Node SDK
@@ -52,6 +52,7 @@ const generated = generate(new DocumentBuilder().block(provider).build());
 | `Schema`, `AttributeSchema`, `BlockSchema`, `ValueSchema` | TypeScript definitions for closed-by-default document, block, and recursive value rules. |
 | `generate(doc)` | Generate native ACL text with labels in block headers. |
 | `canonicalBytes(doc)`, `canonicalDigest(doc)` | Produce stable cross-SDK bytes and an algorithm-prefixed SHA-256 digest. |
+| `canonicalBytesWithSchema(doc, schema)`, `canonicalDigestWithSchema(doc, schema)` | Recursively normalize schema-declared unordered block occurrences before producing bytes or a digest. |
 | `CanonicalError` | Report non-finite numbers, non-scalar strings, and non-portable identifiers without echoing values. |
 | `string`, `number`, `boolean`, `bool`, `nullValue`, `list`, `call` | Value constructors. |
 | `BlockBuilder`, `DocumentBuilder` | Structured document builders. |
@@ -124,7 +125,8 @@ Schemas reject undeclared attributes, blocks, and object fields by default.
 They can declare required or optional attributes, block occurrence and label
 cardinalities, and recursive `Any`, `String`, `Number`, `Bool`, `Null`, `List`,
 `Object`, `Call`, and `OneOf` rules. Extension points require the corresponding
-explicit allow flag.
+explicit allow flag. A block rule's `unordered: true` metadata affects only
+schema-aware canonicalization, not validation.
 
 Schema reports use stable `acl.schema.*` codes and logical paths such as
 `$.blocks.provider[0].attributes.api_key`. Messages and paths never include
@@ -146,6 +148,44 @@ alternate generator modes and generator options are not supported.
 Use `canonicalBytes` or `canonicalDigest` for signatures, durable identity, and
 cross-SDK comparisons. Canonical bytes preserve ordered ACL constructs while
 sorting semantically unordered attribute and object keys.
+
+After schema admission, use the schema-aware APIs when a trusted schema
+declares repeatable block occurrences as unordered:
+
+```typescript
+import {
+  canonicalBytes,
+  canonicalBytesWithSchema,
+  canonicalDigestWithSchema,
+  parse,
+  validateDocument,
+  type Schema,
+} from '@a3s-lab/acl';
+
+const document = parse('provider "z" {}\nprovider "a" {}');
+const schema: Schema = {
+  blocks: {
+    provider: {
+      labels: {min: 1, max: 1},
+      unordered: true,
+    },
+  },
+};
+const report = validateDocument(document, schema);
+if (report.diagnostics.length > 0 || report.truncated) {
+  throw new Error('document failed schema admission');
+}
+
+const orderedBytes = canonicalBytes(document);
+const normalizedBytes = canonicalBytesWithSchema(document, schema);
+const digest = canonicalDigestWithSchema(document, schema);
+```
+
+For each body, normalization recursively sorts occurrences of each same
+declared block name by canonical UTF-8 bytes while retaining their existing
+positions. Other block types, unknown blocks, labels, lists, calls, and
+unmarked blocks remain ordered. The schema-aware APIs use the schema only as
+normalization metadata and do not perform admission themselves.
 
 ## Boundary
 

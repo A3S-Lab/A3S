@@ -27,7 +27,17 @@ document shape。
 `canonical_digest`，Node 使用 `canonicalBytes` / `canonicalDigest`。
 Canonical output 使用 UTF-8、LF line endings、恰好一个 final newline、
 sorted portable attribute/object keys，并对 duplicate object keys 使用
-last-value-wins。Block、label、list 和 function-argument order 保持有意义。
+last-value-wins。这些 base APIs 会保留 block、label、list 和
+function-argument order。
+
+完成 schema admission 后，Rust 的
+`canonical_bytes_with_schema` / `canonical_digest_with_schema` 和 Node 的
+`canonicalBytesWithSchema` / `canonicalDigestWithSchema` 可以递归规范化 schema
+rule 标记为 `unordered` 的同一种 declared block name 的 occurrences。
+Matching blocks 按 canonical UTF-8 bytes 比较，并且只替换原有 slots。其它
+names、unknown blocks、labels、lists、calls 和 unmarked blocks 仍然保持顺序。
+Schema-aware APIs 只把 schema 用作 normalization metadata，不会执行
+admission。
 
 Finite numbers 使用 ECMAScript shortest-round-trip formatting，negative zero
 输出为 `0`。Unicode scalar sequences 不做 normalization。Digest 格式为
@@ -55,11 +65,14 @@ ACL 负责：
 - 从 AST 生成 text
 - value constructors 和 document builders
 - parser diagnostics
+- declarative document-shape schemas 和 bounded validation reports
+- base 和 schema-aware canonical bytes 与 digests
 - language-neutral config shape
 
 宿主组件负责：
 
-- 验证 block 或 attribute 是否允许
+- 定义每个 product boundary 使用的 trusted schema
+- 验证 document shape 之外的 domain rules
 - 执行 function calls
 - 解析 environment variables 或 secret-store references
 - 应用 defaults

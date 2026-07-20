@@ -1,6 +1,6 @@
 ---
 title: Rust API
-description: Rust bounded parsing, schema admission, multi-diagnostics, canonical digests, native ACL generation, AST, and builders for a3s-acl.
+description: Rust bounded parsing, schema admission, multi-diagnostics, schema-aware canonical digests, native ACL generation, AST, and builders for a3s-acl.
 ---
 
 # Rust API
@@ -43,6 +43,7 @@ The public crate exports:
 | `generate` / `generate_acl` | Generate ACL text from a `Document`. |
 | `generate_from_map` | Build ACL text from a `HashMap<String, Value>`. |
 | `canonical_bytes`, `canonical_digest` | Produce stable cross-SDK bytes and an algorithm-prefixed SHA-256 digest. |
+| `canonical_bytes_with_schema`, `canonical_digest_with_schema` | Recursively normalize schema-declared unordered block occurrences before producing bytes or a digest. |
 | `CanonicalError` | Reject unsupported programmatic values without echoing them. |
 | `Lexer` / `Parser` | Advanced tokenization and parsing entry points. |
 
@@ -117,7 +118,9 @@ Schemas reject undeclared attributes, blocks, and object fields by default.
 They can declare required or optional attributes, block occurrence and label
 cardinalities, and recursive `Any`, `String`, `Number`, `Bool`, `Null`, `List`,
 `Object`, `Call`, and `OneOf` rules. Extension points require the corresponding
-explicit allow flag.
+explicit allow flag. `BlockSchema::unordered(true)` marks matching occurrences
+as semantically unordered for schema-aware canonicalization; it does not change
+validation.
 
 Schema reports use stable `acl.schema.*` codes and logical paths such as
 `$.blocks.provider[0].attributes.api_key`. Messages and paths never include
@@ -176,16 +179,40 @@ There is no label-as-attribute compatibility mode.
 ## Canonical Bytes And Digests
 
 ```rust
-use a3s_acl::{canonical_bytes, canonical_digest};
+use a3s_acl::{
+    canonical_bytes, canonical_bytes_with_schema, canonical_digest_with_schema,
+    parse, validate_document, BlockSchema, Cardinality, Schema,
+};
 
-let bytes = canonical_bytes(&doc)?;
-let digest = canonical_digest(&doc)?;
+let document = parse(
+    "provider \"z\" {}\nprovider \"a\" {}",
+)?;
+let schema = Schema::new().block(
+    "provider",
+    BlockSchema::new(Schema::new())
+        .labels(Cardinality::exactly(1))
+        .unordered(true),
+);
+assert!(validate_document(&document, &schema).is_empty());
+
+let ordered_bytes = canonical_bytes(&document)?;
+let normalized_bytes = canonical_bytes_with_schema(&document, &schema)?;
+let digest = canonical_digest_with_schema(&document, &schema)?;
+assert_ne!(ordered_bytes, normalized_bytes);
 assert!(digest.starts_with("sha256:"));
 ```
 
 Use canonical APIs for signatures, durable identity, and cross-SDK
 comparisons. Canonical bytes preserve ordered ACL constructs while sorting
-semantically unordered attribute and object keys.
+semantically unordered attribute and object keys. After schema admission, the
+schema-aware APIs additionally sort occurrences of each same declared block
+name whose rule sets `unordered`. Normalization is recursive and compares
+canonical UTF-8 bytes, but retains the occurrences' existing positions, so
+other block types and unknown blocks do not move. Labels, lists, calls, and
+unmarked blocks remain ordered.
+
+Schema-aware canonicalization does not perform schema admission. Validate the
+document separately before using a trusted schema as normalization metadata.
 
 ## Notes
 

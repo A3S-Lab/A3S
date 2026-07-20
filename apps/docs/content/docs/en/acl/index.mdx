@@ -23,7 +23,7 @@ is `@a3s-lab/acl` `0.2.2`. The crate repository metadata points to
 | Functions | First-class call values such as `env(...)`, `concat(...)`, and custom function names. |
 | AST | `Document`, `Block`, typed values, builders, value constructors, and `Value` accessors. |
 | Generation | Native ACL output, block-header labels, sorted attributes and objects, type-stable strings, and map generation. |
-| Integrity | Byte-identical Rust/Node canonical UTF-8 and algorithm-prefixed SHA-256 digests. |
+| Integrity | Byte-identical Rust/Node canonical UTF-8, algorithm-prefixed SHA-256 digests, and recursive schema-aware normalization for declared unordered block occurrences. |
 | SDKs | Rust crate `a3s-acl`; Node package `@a3s-lab/acl` with TypeScript definitions. |
 
 ## Start Here
@@ -31,10 +31,11 @@ is `@a3s-lab/acl` `0.2.2`. The crate repository metadata points to
 - [Syntax](/docs/acl/syntax) documents blocks, attributes, values, calls,
   comments, and parser boundaries.
 - [Rust API](/docs/acl/rust-api) covers bounded parsing, schema admission,
-  multi-diagnostic collection, canonical digests, generation, builders, and
-  AST value helpers.
+  multi-diagnostic collection, schema-aware canonical digests, generation,
+  builders, and AST value helpers.
 - [Node SDK](/docs/acl/node-sdk) covers the JavaScript/TypeScript parser,
-  schema validator, native ACL generator, canonical APIs, and builders.
+  schema validator, native ACL generator, schema-aware canonical APIs, and
+  builders.
 - [Generation And Boundaries](/docs/acl/generation-boundaries) explains stable
   output, canonical bytes, secret handling, and host-component ownership.
 
