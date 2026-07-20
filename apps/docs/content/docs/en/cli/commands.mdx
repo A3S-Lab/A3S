@@ -50,9 +50,9 @@ command.
 `a3s code` and the local Web backend run through the integrated Code runtime.
 Product proxies resolve a typed component ID from the trusted catalog and then
 execute the recorded absolute path. Components that explicitly opt in may use
-a visible first-use installation; `--offline` or `--non-interactive` prevents
-surprise downloads. Read-only help, version, listing, and status paths do not
-trigger delayed installation.
+a visible first-use installation; `--offline`, `A3S_OFFLINE=1`, or
+`A3S_NO_AUTO_INSTALL=1` prevents downloads. Read-only help, version, listing,
+and status paths do not trigger delayed installation.
 
 `a3s install` is not a universal frontend for Homebrew, APT, DNF, Pacman,
 Winget, npm, pip, Cargo, or arbitrary package names. It manages registered A3S
@@ -60,11 +60,11 @@ components and uses only a source declared for that component. Native package
 manager adapters preserve the native manager's ownership instead of copying
 its files into A3S receipts.
 
-macOS and Linux are the current runtime, release, and managed-install targets.
-Windows CLI/MCP/Skill and manifest types remain a compile/package preview on
-the roadmap; native Windows installation, recovery, locking, and persistent
-Browser sessions are not part of the current support claim. WSL follows the
-Linux contract.
+macOS and Linux are the broad runtime, release, and managed-install targets.
+Windows x86_64 supports the registered WebView release and its Code first-use
+lifecycle; broader native Windows installation, recovery, locking, and
+persistent Browser sessions remain roadmap work. WSL follows the Linux
+contract.
 
 ## Runtime Boundaries
 

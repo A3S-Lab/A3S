@@ -107,9 +107,19 @@ routes are deduplicated, and a restored tracker snapshot reconstructs the same
 identity. This presentation uses the existing subagent events and does not add
 a private RPC protocol.
 
-The current runtime and managed-component targets are macOS and Linux. Native
-Windows lifecycle support remains on the roadmap; WSL follows the Linux
-contract.
+## WebView First Use
+
+Before terminal takeover, Code also reuses a healthy `webview` component or
+installs its checksum-verified platform release. The resolved absolute path is
+passed directly to RemoteUI and Agent Island, so a managed install does not
+depend on PATH refresh. Setup failure is non-fatal and emits recovery commands:
+`a3s doctor webview` and `a3s install webview`.
+
+Offline mode and `A3S_NO_AUTO_INSTALL=1` remain strict no-network, no-receipt
+boundaries. macOS and Linux are the broad managed-component targets; WebView
+also has a verified Windows x86_64 release and first-use lifecycle. Broader
+native Windows component support remains on the roadmap, and WSL follows the
+Linux contract.
 
 ## Slash Command Families
 

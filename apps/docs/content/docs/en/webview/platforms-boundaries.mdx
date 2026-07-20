@@ -29,9 +29,11 @@ The event loop waits for native events and exits on `CloseRequested`.
 
 ## Fallback Ownership
 
-If `a3s-webview` is missing, `a3s code` may fall back to opening a normal system
-browser. That fallback belongs to the TUI host. The helper process itself does
-not discover or launch alternate browsers.
+Before terminal takeover, an online `a3s code` launch prepares the verified
+platform helper when it is missing and automatic setup is allowed. If setup
+fails, the TUI may fall back to a normal system browser. That fallback belongs
+to the TUI host. The helper process itself does not discover or launch alternate
+browsers.
 
 ## Non-Goals
 
