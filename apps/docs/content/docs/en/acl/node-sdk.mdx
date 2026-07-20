@@ -1,6 +1,6 @@
 ---
 title: Node SDK
-description: JavaScript and TypeScript parsing, generation, builders, lexer/parser classes, and HCL output in @a3s-lab/acl.
+description: JavaScript and TypeScript bounded parsing, native ACL generation, canonical digests, and builders in @a3s-lab/acl.
 ---
 
 # Node SDK
@@ -11,7 +11,7 @@ Install the Node package:
 npm install @a3s-lab/acl
 ```
 
-The current package version in this repository is `0.2.1`.
+The checked-in package version is `0.2.2`.
 
 ## Parse And Generate
 
@@ -43,26 +43,52 @@ const generated = generate(new DocumentBuilder().block(provider).build());
 
 | API | Role |
 | --- | --- |
-| `parse(input)` | Parse ACL text into a `Document`. |
-| `generate(doc)` | Generate ACL-style text. |
-| `generateHCL(doc)` | Generate label-as-attribute HCL-shaped text. |
+| `parse(input, limits?)` | Parse ACL text into a `Document` with default or explicit resource limits. |
+| `DEFAULT_PARSE_LIMITS` | Shared immutable defaults for document bytes, nesting, collection items, and token bytes. |
+| `ParseError`, `DIAGNOSTIC_CODES` | Stable codes, complete spans, UTF-8 byte offsets, and redacted messages. |
+| `generate(doc)` | Generate native ACL text with labels in block headers. |
+| `canonicalBytes(doc)`, `canonicalDigest(doc)` | Produce stable cross-SDK bytes and an algorithm-prefixed SHA-256 digest. |
+| `CanonicalError` | Report non-finite numbers, non-scalar strings, and non-portable identifiers without echoing values. |
 | `string`, `number`, `boolean`, `bool`, `nullValue`, `list`, `call` | Value constructors. |
 | `BlockBuilder`, `DocumentBuilder` | Structured document builders. |
 | `Lexer`, `Parser` | Advanced tokenization/parsing classes. |
 
 The package ships TypeScript definitions in `src/index.d.ts`.
 
-## HCL Output Mode
+## Bounded Admission
 
-The Node generator has a `generateHCL` helper. It writes labels as attributes
-inside the generated block. For `models` blocks, the label attribute is named
-`id`; for other blocks it is named `name`.
+Pass explicit limits at an API boundary:
 
 ```typescript
-import {generateHCL} from '@a3s-lab/acl';
+import {ParseError, parse} from '@a3s-lab/acl';
 
-const hcl = generateHCL(doc);
+const source = 'limits { max_tasks = 10 }';
+
+try {
+  const document = parse(source, {
+    maxDocumentBytes: 64 * 1024,
+    maxNestingDepth: 32,
+    maxCollectionItems: 1_000,
+    maxTokenBytes: 16 * 1024,
+  });
+} catch (error) {
+  if (error instanceof ParseError) {
+    console.error(error.code, error.span);
+  }
+}
 ```
+
+Document and token sizes count UTF-8 bytes. Diagnostic messages identify token
+kinds but never include source token values or snippets.
+
+## Native And Canonical Output
+
+`generate` has one native ACL output contract. Labels remain in block headers;
+alternate generator modes and generator options are not supported.
+
+Use `canonicalBytes` or `canonicalDigest` for signatures, durable identity, and
+cross-SDK comparisons. Canonical bytes preserve ordered ACL constructs while
+sorting semantically unordered attribute and object keys.
 
 ## Boundary
 

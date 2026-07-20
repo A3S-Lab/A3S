@@ -1,6 +1,6 @@
 ---
 title: A3S ACL
-description: A3S 组件使用的类 HCL Agent Configuration Language。
+description: A3S 组件使用的类型化 Agent Configuration Language。
 ---
 
 # A3S ACL
@@ -9,35 +9,36 @@ description: A3S 组件使用的类 HCL Agent Configuration Language。
 Rust crate 与 Node.js/TypeScript SDK，可以把 ACL 文本解析成 AST，也可以从结构化
 值生成 ACL 文本。
 
-当前 Rust crate 是 `a3s-acl` `0.2.1`，当前 Node package 是 `@a3s-lab/acl`
-`0.2.1`。crate repository metadata 指向
+仓库中 Rust crate 是 `a3s-acl` `0.2.2`，Node package 是 `@a3s-lab/acl`
+`0.2.2`。crate repository metadata 指向
 [`A3S-Lab/ACL`](https://github.com/A3S-Lab/ACL)。
 
 ## 能力地图
 
 | 领域 | 当前能力 |
 | --- | --- |
-| 语法 | 类 HCL attributes、带 label 的 blocks、nested blocks、lists、objects、strings、numbers、booleans、null、function calls、comments，以及 `=` / `:` assignments。 |
-| Lexer/parser | Source spans、line/column parse errors、comment skipping、string escapes、negative numbers 和 scientific notation。 |
+| 语法 | ACL attributes、带 label 的 blocks、nested blocks、lists、objects、strings、numbers、booleans、null、function calls、comments，以及 `=` / `:` assignments。 |
+| Lexer/parser | Bounded parsing、stable diagnostic codes、UTF-8 byte spans、comment skipping、string escapes、negative numbers 和 scientific notation。 |
 | 函数 | 支持把 `env(...)`、`concat(...)` 和自定义函数名表示为 first-class call values。 |
 | AST | `Document`、`Block`、typed values、builders、value constructors 和 `Value` accessors。 |
-| 生成 | 支持 parse/generate 双向流程、sorted attributes、string escaping、map generation 和 label-as-attribute output mode。 |
+| 生成 | Native ACL output、block-header labels、sorted attributes 和 objects、type-stable strings，以及 map generation。 |
+| 完整性 | Rust/Node byte-identical canonical UTF-8 和带 algorithm prefix 的 SHA-256 digests。 |
 | SDK | Rust crate `a3s-acl`；Node package `@a3s-lab/acl`，带 TypeScript definitions。 |
 
 ## 从这里开始
 
 - [Syntax](/cn/docs/acl/syntax) 说明 blocks、attributes、values、calls、
   comments 和 parser boundaries。
-- [Rust API](/cn/docs/acl/rust-api) 覆盖 `parse`、`generate`、builders、
-  `GeneratorConfig` 和 AST value helpers。
+- [Rust API](/cn/docs/acl/rust-api) 覆盖 bounded parsing、diagnostics、canonical
+  digests、generation、builders 和 AST value helpers。
 - [Node SDK](/cn/docs/acl/node-sdk) 覆盖 JavaScript/TypeScript parser、
-  generator、builders 和 `generateHCL`。
-- [Generation And Boundaries](/cn/docs/acl/generation-boundaries) 说明 output
-  modes、secret handling，以及 ACL 自身不会评估什么。
+  native ACL generator、canonical APIs 和 builders。
+- [Generation And Boundaries](/cn/docs/acl/generation-boundaries) 说明 stable
+  output、canonical bytes、secret handling 和 host-component ownership。
 
 ## 示例
 
-```hcl
+```text
 default_model = "provider/model-id"
 
 providers "provider" {

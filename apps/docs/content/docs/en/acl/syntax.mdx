@@ -5,13 +5,13 @@ description: Blocks, labels, attributes, values, calls, comments, and parser bou
 
 # ACL Syntax
 
-ACL is intentionally close to HCL: a document is parsed into a list of named
-blocks. Top-level bare attributes are represented as single-attribute blocks so
-editing tools can keep one uniform AST shape.
+ACL uses a compact attribute-and-block syntax. A document is parsed into a list
+of named blocks. Top-level bare attributes are represented as single-attribute
+blocks so editing tools can keep one uniform AST shape.
 
 ## Blocks And Attributes
 
-```hcl
+```text
 default_model = "provider/model-id"
 
 providers "provider" {
@@ -53,10 +53,21 @@ attributes. Do not model append semantics with `+=`.
 Double-quoted strings support common escapes such as newline, carriage return,
 tab, backslash, and escaped quote. Single-quoted strings are also tokenized.
 
-## Parse Errors
+## Resource Limits And Parse Errors
 
-`ParseError` carries a message plus line and column. The lexer tracks spans for
-tokens, which lets editor integrations point users at the failing location.
+The high-level parser applies the same defaults in both SDKs:
+
+| Limit | Default |
+| --- | ---: |
+| UTF-8 document size | 1 MiB |
+| Structural nesting depth | 64 |
+| Items in one document or collection | 10,000 |
+| UTF-8 source token size | 256 KiB |
+
+`ParseError` carries a stable machine-readable code, a complete source span,
+and compatibility line/column fields. Span offsets count UTF-8 bytes, so Rust
+and Node identify the same location even when Unicode precedes an error.
+Messages identify token kinds without echoing token values or source snippets.
 
 ## Evaluation Boundary
 

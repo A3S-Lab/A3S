@@ -1,6 +1,6 @@
 ---
 title: Rust API
-description: Rust parser, generator, AST, builders, value helpers, and generator configuration for a3s-acl.
+description: Rust bounded parsing, diagnostics, canonical digests, native ACL generation, AST, and builders for a3s-acl.
 ---
 
 # Rust API
@@ -9,7 +9,7 @@ Install the Rust crate:
 
 ```toml
 [dependencies]
-a3s-acl = "0.2.1"
+a3s-acl = "0.2.2"
 ```
 
 ## Parse And Generate
@@ -34,10 +34,35 @@ The public crate exports:
 | API | Role |
 | --- | --- |
 | `parse` / `parse_acl` | Parse ACL text into a `Document`. |
+| `parse_with_limits`, `ParseLimits` | Parse untrusted input with explicit document, nesting, collection, and token limits. |
+| `DiagnosticCode`, `ParseError` | Return stable codes, UTF-8 byte spans, and redacted messages. |
 | `generate` / `generate_acl` | Generate ACL text from a `Document`. |
 | `generate_from_map` | Build ACL text from a `HashMap<String, Value>`. |
+| `canonical_bytes`, `canonical_digest` | Produce stable cross-SDK bytes and an algorithm-prefixed SHA-256 digest. |
+| `CanonicalError` | Reject unsupported programmatic values without echoing them. |
 | `Lexer` / `Parser` | Advanced tokenization and parsing entry points. |
-| `ParseError` | Error with message, line, and column. |
+
+## Bounded Admission
+
+```rust
+use a3s_acl::{parse_with_limits, ParseLimits};
+
+let input = "limits { max_tasks = 10 }";
+let document = parse_with_limits(
+    input,
+    ParseLimits {
+        max_document_bytes: 64 * 1024,
+        max_nesting_depth: 32,
+        max_collection_items: 1_000,
+        max_token_bytes: 16 * 1024,
+    },
+)?;
+```
+
+Document and token sizes count UTF-8 bytes. `ParseError` exposes a stable
+`DiagnosticCode`, a complete source span with UTF-8 byte offsets, and
+compatibility `line` / `column` fields. Messages identify token kinds without
+including source token values or snippets.
 
 ## AST
 
@@ -67,21 +92,34 @@ let doc = DocumentBuilder::new().block(provider).build();
 Builder helpers include `string`, `number`, `integer`, `boolean`, `null`,
 `list`, and `call`.
 
-## GeneratorConfig
+## Native Generation
 
 ```rust
 use a3s_acl::{Generator, GeneratorConfig};
 
 let generator = Generator::with_config(GeneratorConfig {
-    indent: "  ",
+    indent: "    ",
     comments: false,
-    labels_as_attrs: true,
 });
+let text = generator.generate(&doc);
 ```
 
-`labels_as_attrs` writes block labels as attributes inside the block instead of
-in the block header. This is useful when an integration prefers an
-attribute-oriented HCL shape.
+Generation has one native ACL contract: block labels remain in block headers.
+There is no label-as-attribute compatibility mode.
+
+## Canonical Bytes And Digests
+
+```rust
+use a3s_acl::{canonical_bytes, canonical_digest};
+
+let bytes = canonical_bytes(&doc)?;
+let digest = canonical_digest(&doc)?;
+assert!(digest.starts_with("sha256:"));
+```
+
+Use canonical APIs for signatures, durable identity, and cross-SDK
+comparisons. Canonical bytes preserve ordered ACL constructs while sorting
+semantically unordered attribute and object keys.
 
 ## Notes
 

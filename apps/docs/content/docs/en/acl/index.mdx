@@ -1,6 +1,6 @@
 ---
 title: A3S ACL
-description: HCL-like Agent Configuration Language used across A3S components.
+description: Typed Agent Configuration Language used across A3S components.
 ---
 
 # A3S ACL
@@ -9,35 +9,36 @@ description: HCL-like Agent Configuration Language used across A3S components.
 configuration. It provides a Rust crate and a Node.js/TypeScript SDK for parsing
 ACL text into an AST and generating ACL text back from structured values.
 
-The current Rust crate is `a3s-acl` `0.2.1`, and the current Node package is
-`@a3s-lab/acl` `0.2.1`. The crate repository metadata points to
+The checked-in Rust crate is `a3s-acl` `0.2.2`, and the checked-in Node package
+is `@a3s-lab/acl` `0.2.2`. The crate repository metadata points to
 [`A3S-Lab/ACL`](https://github.com/A3S-Lab/ACL).
 
 ## Capability Map
 
 | Area | Current capability |
 | --- | --- |
-| Syntax | HCL-like attributes, labeled blocks, nested blocks, lists, objects, strings, numbers, booleans, null, function calls, comments, and `=` / `:` assignments. |
-| Lexer/parser | Source spans, line/column parse errors, comment skipping, string escapes, negative numbers, and scientific notation. |
+| Syntax | ACL attributes, labeled blocks, nested blocks, lists, objects, strings, numbers, booleans, null, function calls, comments, and `=` / `:` assignments. |
+| Lexer/parser | Bounded parsing, stable diagnostic codes, UTF-8 byte spans, comment skipping, string escapes, negative numbers, and scientific notation. |
 | Functions | First-class call values such as `env(...)`, `concat(...)`, and custom function names. |
 | AST | `Document`, `Block`, typed values, builders, value constructors, and `Value` accessors. |
-| Generation | Bidirectional parse/generate flow, sorted attributes, string escaping, map generation, and label-as-attribute output mode. |
+| Generation | Native ACL output, block-header labels, sorted attributes and objects, type-stable strings, and map generation. |
+| Integrity | Byte-identical Rust/Node canonical UTF-8 and algorithm-prefixed SHA-256 digests. |
 | SDKs | Rust crate `a3s-acl`; Node package `@a3s-lab/acl` with TypeScript definitions. |
 
 ## Start Here
 
 - [Syntax](/docs/acl/syntax) documents blocks, attributes, values, calls,
   comments, and parser boundaries.
-- [Rust API](/docs/acl/rust-api) covers `parse`, `generate`, builders,
-  `GeneratorConfig`, and AST value helpers.
+- [Rust API](/docs/acl/rust-api) covers bounded parsing, diagnostics, canonical
+  digests, generation, builders, and AST value helpers.
 - [Node SDK](/docs/acl/node-sdk) covers the JavaScript/TypeScript parser,
-  generator, builders, and `generateHCL`.
-- [Generation And Boundaries](/docs/acl/generation-boundaries) explains output
-  modes, secret handling, and what ACL does not evaluate by itself.
+  native ACL generator, canonical APIs, and builders.
+- [Generation And Boundaries](/docs/acl/generation-boundaries) explains stable
+  output, canonical bytes, secret handling, and host-component ownership.
 
 ## Example
 
-```hcl
+```text
 default_model = "provider/model-id"
 
 providers "provider" {

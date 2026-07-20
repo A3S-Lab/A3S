@@ -1,6 +1,6 @@
 ---
 title: Node SDK
-description: "@a3s-lab/acl 的 JavaScript/TypeScript parsing、generation、builders、lexer/parser classes 和 HCL output。"
+description: "@a3s-lab/acl 的 JavaScript/TypeScript bounded parsing、native ACL generation、canonical digests 和 builders。"
 ---
 
 # Node SDK
@@ -11,7 +11,7 @@ description: "@a3s-lab/acl 的 JavaScript/TypeScript parsing、generation、buil
 npm install @a3s-lab/acl
 ```
 
-当前仓库中的 package version 是 `0.2.1`。
+仓库中的 package version 是 `0.2.2`。
 
 ## Parse And Generate
 
@@ -43,25 +43,52 @@ const generated = generate(new DocumentBuilder().block(provider).build());
 
 | API | 作用 |
 | --- | --- |
-| `parse(input)` | 把 ACL text 解析成 `Document`。 |
-| `generate(doc)` | 生成 ACL-style text。 |
-| `generateHCL(doc)` | 生成 label-as-attribute HCL-shaped text。 |
+| `parse(input, limits?)` | 使用默认或显式 resource limits，把 ACL text 解析成 `Document`。 |
+| `DEFAULT_PARSE_LIMITS` | Document bytes、nesting、collection items 和 token bytes 的 shared immutable defaults。 |
+| `ParseError`、`DIAGNOSTIC_CODES` | Stable codes、complete spans、UTF-8 byte offsets 和 redacted messages。 |
+| `generate(doc)` | 生成 labels 位于 block headers 的 native ACL text。 |
+| `canonicalBytes(doc)`、`canonicalDigest(doc)` | 生成 stable cross-SDK bytes 和带 algorithm prefix 的 SHA-256 digest。 |
+| `CanonicalError` | 对 non-finite numbers、non-scalar strings 和 non-portable identifiers 返回不回显值的错误。 |
 | `string`、`number`、`boolean`、`bool`、`nullValue`、`list`、`call` | Value constructors。 |
 | `BlockBuilder`、`DocumentBuilder` | Structured document builders。 |
 | `Lexer`、`Parser` | Advanced tokenization/parsing classes。 |
 
 Package 在 `src/index.d.ts` 中提供 TypeScript definitions。
 
-## HCL Output Mode
+## Bounded Admission
 
-Node generator 有 `generateHCL` helper。它会把 labels 写成 generated block 内部的 attributes。
-对 `models` blocks，label attribute 名为 `id`；其它 blocks 使用 `name`。
+在 API boundary 传入显式 limits：
 
 ```typescript
-import {generateHCL} from '@a3s-lab/acl';
+import {ParseError, parse} from '@a3s-lab/acl';
 
-const hcl = generateHCL(doc);
+const source = 'limits { max_tasks = 10 }';
+
+try {
+  const document = parse(source, {
+    maxDocumentBytes: 64 * 1024,
+    maxNestingDepth: 32,
+    maxCollectionItems: 1_000,
+    maxTokenBytes: 16 * 1024,
+  });
+} catch (error) {
+  if (error instanceof ParseError) {
+    console.error(error.code, error.span);
+  }
+}
 ```
+
+Document 和 token sizes 使用 UTF-8 bytes。Diagnostic messages 只标识 token
+kinds，不包含 source token values 或 snippets。
+
+## Native And Canonical Output
+
+`generate` 只有一个 native ACL output contract。Labels 保留在 block headers；
+alternate generator modes 和 generator options 均不支持。
+
+签名、durable identity 和 cross-SDK comparisons 应使用 `canonicalBytes` 或
+`canonicalDigest`。Canonical bytes 会保留 ordered ACL constructs，同时对
+semantically unordered attribute 和 object keys 排序。
 
 ## 边界
 

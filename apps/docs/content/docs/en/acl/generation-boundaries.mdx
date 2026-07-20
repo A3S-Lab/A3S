@@ -16,14 +16,29 @@ and structured while leaving sensitive value resolution to the host component.
 | String escaping | Quotes, backslashes, newline, carriage return, and tab are escaped. |
 | Lists and objects | Values are generated inline. |
 | Function calls | Calls are preserved as syntax, for example `env("PROVIDER_API_KEY")`. |
-| Labels | Default output writes labels in block headers. |
-| Label-as-attribute mode | Rust exposes `GeneratorConfig.labels_as_attrs`; Node exposes `generateHCL`. |
+| Labels | Output writes every label in its native ACL block header. |
+
+Native ACL is the only output mode. Neither SDK provides a label-as-attribute
+generator mode, and Node rejects generator options instead of silently
+producing a different document shape.
+
+## Canonical Bytes And Digests
+
+Use `canonical_bytes` / `canonical_digest` in Rust and `canonicalBytes` /
+`canonicalDigest` in Node when configuration is signed, stored, or compared.
+Canonical output uses UTF-8, LF line endings, exactly one final newline, sorted
+portable attribute and object keys, and last-value-wins duplicate object keys.
+Block, label, list, and function-argument order remains significant.
+
+Finite numbers use ECMAScript shortest-round-trip formatting, including `0` for
+negative zero. Unicode scalar sequences are preserved without normalization.
+The digest format is `sha256:<64 lowercase hexadecimal characters>`.
 
 ## Secret Hygiene
 
 Store references, not secrets:
 
-```hcl
+```text
 providers "provider" {
   api_key = env("PROVIDER_API_KEY")
   base_url = env("PROVIDER_BASE_URL")
