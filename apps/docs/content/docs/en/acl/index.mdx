@@ -19,6 +19,7 @@ is `@a3s-lab/acl` `0.2.2`. The crate repository metadata points to
 | --- | --- |
 | Syntax | ACL attributes, labeled blocks, nested blocks, lists, objects, strings, numbers, booleans, null, function calls, comments, and `=` / `:` assignments. |
 | Lexer/parser | Bounded parsing and multi-diagnostic collection, stable diagnostic codes, UTF-8 byte spans, comment skipping, string escapes, negative numbers, and scientific notation. |
+| Admission | Closed-by-default declarative schemas, recursive value rules, stable logical paths, redacted diagnostics, and bounded Rust/Node validation reports. |
 | Functions | First-class call values such as `env(...)`, `concat(...)`, and custom function names. |
 | AST | `Document`, `Block`, typed values, builders, value constructors, and `Value` accessors. |
 | Generation | Native ACL output, block-header labels, sorted attributes and objects, type-stable strings, and map generation. |
@@ -29,10 +30,11 @@ is `@a3s-lab/acl` `0.2.2`. The crate repository metadata points to
 
 - [Syntax](/docs/acl/syntax) documents blocks, attributes, values, calls,
   comments, and parser boundaries.
-- [Rust API](/docs/acl/rust-api) covers bounded parsing, multi-diagnostic
-  collection, canonical digests, generation, builders, and AST value helpers.
+- [Rust API](/docs/acl/rust-api) covers bounded parsing, schema admission,
+  multi-diagnostic collection, canonical digests, generation, builders, and
+  AST value helpers.
 - [Node SDK](/docs/acl/node-sdk) covers the JavaScript/TypeScript parser,
-  native ACL generator, canonical APIs, and builders.
+  schema validator, native ACL generator, canonical APIs, and builders.
 - [Generation And Boundaries](/docs/acl/generation-boundaries) explains stable
   output, canonical bytes, secret handling, and host-component ownership.
 

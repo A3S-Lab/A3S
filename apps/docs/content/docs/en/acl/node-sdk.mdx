@@ -1,6 +1,6 @@
 ---
 title: Node SDK
-description: JavaScript and TypeScript bounded parsing, multi-diagnostics, native ACL generation, canonical digests, and builders in @a3s-lab/acl.
+description: JavaScript and TypeScript bounded parsing, schema admission, multi-diagnostics, native ACL generation, canonical digests, and builders in @a3s-lab/acl.
 ---
 
 # Node SDK
@@ -47,6 +47,9 @@ const generated = generate(new DocumentBuilder().block(provider).build());
 | `collectDiagnostics(input, limits?)` | Collect bounded diagnostics without constructing a partial AST. |
 | `DEFAULT_PARSE_LIMITS` | Shared immutable defaults for document bytes, nesting, collection items, token bytes, and diagnostic count. |
 | `ParseError`, `DIAGNOSTIC_CODES`, `DiagnosticReport` | Stable codes, complete spans, UTF-8 byte offsets, redacted messages, and explicit truncation state. |
+| `validateDocument(document, schema, limits?)` | Validate a parsed `Document` against a declarative schema with a bounded report. |
+| `SCHEMA_DIAGNOSTIC_CODES`, `SchemaDiagnostic`, `SchemaReport` | Stable schema codes, logical paths, redacted messages, and explicit truncation state. |
+| `Schema`, `AttributeSchema`, `BlockSchema`, `ValueSchema` | TypeScript definitions for closed-by-default document, block, and recursive value rules. |
 | `generate(doc)` | Generate native ACL text with labels in block headers. |
 | `canonicalBytes(doc)`, `canonicalDigest(doc)` | Produce stable cross-SDK bytes and an algorithm-prefixed SHA-256 digest. |
 | `CanonicalError` | Report non-finite numbers, non-scalar strings, and non-portable identifiers without echoing values. |
@@ -99,6 +102,42 @@ Resource-limit diagnostics remain fatal. A report stores at most
 `maxDiagnostics` errors and sets `truncated` only after observing another error
 beyond that budget.
 
+## Schema Admission
+
+Parse untrusted text with explicit limits, then validate the resulting
+document before activating it:
+
+```typescript
+import {parse, validateDocument, type Schema} from '@a3s-lab/acl';
+
+const limits = {maxDiagnostics: 20};
+const document = parse('version = 1', limits);
+const schema: Schema = {
+  attributes: {
+    version: {required: true, value: {kind: 'Number'}},
+  },
+};
+const report = validateDocument(document, schema, limits);
+```
+
+Schemas reject undeclared attributes, blocks, and object fields by default.
+They can declare required or optional attributes, block occurrence and label
+cardinalities, and recursive `Any`, `String`, `Number`, `Bool`, `Null`, `List`,
+`Object`, `Call`, and `OneOf` rules. Extension points require the corresponding
+explicit allow flag.
+
+Schema reports use stable `acl.schema.*` codes and logical paths such as
+`$.blocks.provider[0].attributes.api_key`. Messages and paths never include
+attribute values, call arguments, or block labels. Reports use
+`maxDiagnostics` and set `truncated` only after observing an additional schema
+error beyond that budget.
+
+Malformed or cyclic programmatic documents, invalid cardinality ranges, empty
+unions, unknown schema fields, and schema cycles fail with `TypeError` before
+validation. Schema admission validates document shape; host components still
+own numeric ranges, secret resolution, provider credentials, and other product
+semantics.
+
 ## Native And Canonical Output
 
 `generate` has one native ACL output contract. Labels remain in block headers;
@@ -110,6 +149,6 @@ sorting semantically unordered attribute and object keys.
 
 ## Boundary
 
-The SDK is a parser/generator and AST builder. It does not load environment
-variables, fetch remote configuration, validate provider credentials, or execute
-functions such as `env(...)`.
+The SDK parses, generates, builds, and validates declarative ACL document
+shapes. It does not load environment variables, fetch remote configuration,
+validate provider credentials, or execute functions such as `env(...)`.

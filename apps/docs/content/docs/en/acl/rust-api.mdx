@@ -1,6 +1,6 @@
 ---
 title: Rust API
-description: Rust bounded parsing, multi-diagnostics, canonical digests, native ACL generation, AST, and builders for a3s-acl.
+description: Rust bounded parsing, schema admission, multi-diagnostics, canonical digests, native ACL generation, AST, and builders for a3s-acl.
 ---
 
 # Rust API
@@ -37,6 +37,9 @@ The public crate exports:
 | `parse_with_limits`, `ParseLimits` | Parse untrusted input with explicit document, nesting, collection, token, and diagnostic limits. |
 | `collect_diagnostics`, `collect_diagnostics_with_limits` | Collect bounded diagnostics without constructing a partial AST. |
 | `DiagnosticCode`, `ParseError`, `DiagnosticReport` | Return stable codes, UTF-8 byte spans, redacted messages, and explicit truncation state. |
+| `validate_document`, `validate_document_with_limits` | Validate a parsed `Document` against a declarative schema with a bounded report. |
+| `Schema`, `AttributeSchema`, `BlockSchema`, `ValueSchema` | Define closed-by-default document, block, and recursive value rules. |
+| `SchemaDiagnosticCode`, `SchemaDiagnostic`, `SchemaReport` | Return stable schema codes, logical paths, redacted messages, and explicit truncation state. |
 | `generate` / `generate_acl` | Generate ACL text from a `Document`. |
 | `generate_from_map` | Build ACL text from a `HashMap<String, Value>`. |
 | `canonical_bytes`, `canonical_digest` | Produce stable cross-SDK bytes and an algorithm-prefixed SHA-256 digest. |
@@ -85,6 +88,47 @@ After a syntax error, collection resumes at the next source line.
 Resource-limit diagnostics remain fatal. A report stores at most
 `max_diagnostics` errors and sets `truncated` only after observing another
 error beyond that budget.
+
+## Schema Admission
+
+Parse untrusted text with explicit limits, then validate the resulting
+document before activating it:
+
+```rust
+use a3s_acl::{
+    parse_with_limits, validate_document_with_limits, AttributeSchema,
+    ParseLimits, Schema, ValueSchema,
+};
+
+let limits = ParseLimits {
+    max_diagnostics: 20,
+    ..ParseLimits::default()
+};
+let document = parse_with_limits("version = 1", limits)?;
+let schema = Schema::new().attribute(
+    "version",
+    AttributeSchema::required(ValueSchema::number()),
+);
+let report = validate_document_with_limits(&document, &schema, limits);
+assert!(report.is_empty());
+```
+
+Schemas reject undeclared attributes, blocks, and object fields by default.
+They can declare required or optional attributes, block occurrence and label
+cardinalities, and recursive `Any`, `String`, `Number`, `Bool`, `Null`, `List`,
+`Object`, `Call`, and `OneOf` rules. Extension points require the corresponding
+explicit allow flag.
+
+Schema reports use stable `acl.schema.*` codes and logical paths such as
+`$.blocks.provider[0].attributes.api_key`. Messages and paths never include
+attribute values, call arguments, or block labels. The report uses
+`ParseLimits::max_diagnostics` and sets `truncated` only after observing an
+additional schema error beyond that budget.
+
+Invalid cardinality ranges and empty unions return `SchemaDefinitionError`
+while constructing the trusted schema. Schema admission validates document
+shape; host components still own numeric ranges, secret resolution, provider
+credentials, and other product semantics.
 
 ## AST
 

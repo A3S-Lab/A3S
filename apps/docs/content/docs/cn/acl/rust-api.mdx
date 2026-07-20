@@ -1,6 +1,6 @@
 ---
 title: Rust API
-description: a3s-acl 的 Rust bounded parsing、multi-diagnostics、canonical digests、native ACL generation、AST 和 builders。
+description: a3s-acl 的 Rust bounded parsing、schema admission、multi-diagnostics、canonical digests、native ACL generation、AST 和 builders。
 ---
 
 # Rust API
@@ -37,6 +37,9 @@ Public crate exports：
 | `parse_with_limits`、`ParseLimits` | 使用显式 document、nesting、collection、token 和 diagnostic limits 解析 untrusted input。 |
 | `collect_diagnostics`、`collect_diagnostics_with_limits` | 在不构造 partial AST 的前提下收集 bounded diagnostics。 |
 | `DiagnosticCode`、`ParseError`、`DiagnosticReport` | 返回 stable codes、UTF-8 byte spans、redacted messages 和明确的 truncation state。 |
+| `validate_document`、`validate_document_with_limits` | 使用 declarative schema 验证 parsed `Document`，并返回 bounded report。 |
+| `Schema`、`AttributeSchema`、`BlockSchema`、`ValueSchema` | 定义 closed-by-default document、block 和 recursive value rules。 |
+| `SchemaDiagnosticCode`、`SchemaDiagnostic`、`SchemaReport` | 返回 stable schema codes、logical paths、redacted messages 和明确的 truncation state。 |
 | `generate` / `generate_acl` | 从 `Document` 生成 ACL text。 |
 | `generate_from_map` | 从 `HashMap<String, Value>` 生成 ACL text。 |
 | `canonical_bytes`、`canonical_digest` | 生成 stable cross-SDK bytes 和带 algorithm prefix 的 SHA-256 digest。 |
@@ -85,6 +88,46 @@ let report = collect_diagnostics_with_limits(
 Resource-limit diagnostics 仍然是 fatal。Report 最多保存
 `max_diagnostics` 个 errors，只有在继续观察到超出 budget 的 error 后才会把
 `truncated` 设为 true。
+
+## Schema Admission
+
+使用显式 limits 解析 untrusted text，然后在 activation 前验证得到的
+document：
+
+```rust
+use a3s_acl::{
+    parse_with_limits, validate_document_with_limits, AttributeSchema,
+    ParseLimits, Schema, ValueSchema,
+};
+
+let limits = ParseLimits {
+    max_diagnostics: 20,
+    ..ParseLimits::default()
+};
+let document = parse_with_limits("version = 1", limits)?;
+let schema = Schema::new().attribute(
+    "version",
+    AttributeSchema::required(ValueSchema::number()),
+);
+let report = validate_document_with_limits(&document, &schema, limits);
+assert!(report.is_empty());
+```
+
+Schemas 默认拒绝 undeclared attributes、blocks 和 object fields。它们可以声明
+required/optional attributes、block occurrence 和 label cardinalities，以及
+recursive `Any`、`String`、`Number`、`Bool`、`Null`、`List`、`Object`、
+`Call` 和 `OneOf` rules。Extension points 必须使用相应的显式 allow flag。
+
+Schema reports 使用 stable `acl.schema.*` codes 和
+`$.blocks.provider[0].attributes.api_key` 这样的 logical paths。Messages 和
+paths 不包含 attribute values、call arguments 或 block labels。Report 使用
+`ParseLimits::max_diagnostics`，只有在继续观察到超出 budget 的 schema error
+后才会把 `truncated` 设为 true。
+
+构造 trusted schema 时，invalid cardinality ranges 和 empty unions 会返回
+`SchemaDefinitionError`。Schema admission 只验证 document shape；numeric
+ranges、secret resolution、provider credentials 和其它 product semantics 仍由
+host component 负责。
 
 ## AST
 

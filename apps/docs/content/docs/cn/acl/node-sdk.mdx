@@ -1,6 +1,6 @@
 ---
 title: Node SDK
-description: "@a3s-lab/acl 的 JavaScript/TypeScript bounded parsing、multi-diagnostics、native ACL generation、canonical digests 和 builders。"
+description: "@a3s-lab/acl 的 JavaScript/TypeScript bounded parsing、schema admission、multi-diagnostics、native ACL generation、canonical digests 和 builders。"
 ---
 
 # Node SDK
@@ -47,6 +47,9 @@ const generated = generate(new DocumentBuilder().block(provider).build());
 | `collectDiagnostics(input, limits?)` | 在不构造 partial AST 的前提下收集 bounded diagnostics。 |
 | `DEFAULT_PARSE_LIMITS` | Document bytes、nesting、collection items、token bytes 和 diagnostic count 的 shared immutable defaults。 |
 | `ParseError`、`DIAGNOSTIC_CODES`、`DiagnosticReport` | Stable codes、complete spans、UTF-8 byte offsets、redacted messages 和明确的 truncation state。 |
+| `validateDocument(document, schema, limits?)` | 使用 declarative schema 验证 parsed `Document`，并返回 bounded report。 |
+| `SCHEMA_DIAGNOSTIC_CODES`、`SchemaDiagnostic`、`SchemaReport` | Stable schema codes、logical paths、redacted messages 和明确的 truncation state。 |
+| `Schema`、`AttributeSchema`、`BlockSchema`、`ValueSchema` | Closed-by-default document、block 和 recursive value rules 的 TypeScript definitions。 |
 | `generate(doc)` | 生成 labels 位于 block headers 的 native ACL text。 |
 | `canonicalBytes(doc)`、`canonicalDigest(doc)` | 生成 stable cross-SDK bytes 和带 algorithm prefix 的 SHA-256 digest。 |
 | `CanonicalError` | 对 non-finite numbers、non-scalar strings 和 non-portable identifiers 返回不回显值的错误。 |
@@ -99,6 +102,41 @@ Resource-limit diagnostics 仍然是 fatal。Report 最多保存
 `maxDiagnostics` 个 errors，只有在继续观察到超出 budget 的 error 后才会把
 `truncated` 设为 true。
 
+## Schema Admission
+
+使用显式 limits 解析 untrusted text，然后在 activation 前验证得到的
+document：
+
+```typescript
+import {parse, validateDocument, type Schema} from '@a3s-lab/acl';
+
+const limits = {maxDiagnostics: 20};
+const document = parse('version = 1', limits);
+const schema: Schema = {
+  attributes: {
+    version: {required: true, value: {kind: 'Number'}},
+  },
+};
+const report = validateDocument(document, schema, limits);
+```
+
+Schemas 默认拒绝 undeclared attributes、blocks 和 object fields。它们可以声明
+required/optional attributes、block occurrence 和 label cardinalities，以及
+recursive `Any`、`String`、`Number`、`Bool`、`Null`、`List`、`Object`、
+`Call` 和 `OneOf` rules。Extension points 必须使用相应的显式 allow flag。
+
+Schema reports 使用 stable `acl.schema.*` codes 和
+`$.blocks.provider[0].attributes.api_key` 这样的 logical paths。Messages 和
+paths 不包含 attribute values、call arguments 或 block labels。Reports 使用
+`maxDiagnostics`，只有在继续观察到超出 budget 的 schema error 后才会把
+`truncated` 设为 true。
+
+Malformed 或 cyclic programmatic documents、invalid cardinality ranges、empty
+unions、unknown schema fields 和 schema cycles 会在 validation 前以
+`TypeError` 失败。Schema admission 只验证 document shape；numeric ranges、
+secret resolution、provider credentials 和其它 product semantics 仍由 host
+component 负责。
+
 ## Native And Canonical Output
 
 `generate` 只有一个 native ACL output contract。Labels 保留在 block headers；
@@ -110,5 +148,6 @@ semantically unordered attribute 和 object keys 排序。
 
 ## 边界
 
-SDK 是 parser/generator 和 AST builder。它不会加载环境变量、拉取远程配置、验证 provider
-credentials，也不会执行 `env(...)` 等函数。
+SDK 负责解析、生成、构造和验证 declarative ACL document shapes。它不会加载
+环境变量、拉取远程配置、验证 provider credentials，也不会执行 `env(...)`
+等函数。
