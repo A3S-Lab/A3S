@@ -56,7 +56,7 @@ Manifest 默认启用 dry-run，让首次 rollout 先 shadow policy decisions，
 
 | Metric | 为什么重要 | 第一反应 |
 | --- | --- | --- |
-| `sentry_overload_degraded_total` | Worker queue 满了，escalation 只能落到 fail mode。 | 增加 workers 或 queue，减少 escalation volume，调慢 tier，或有意识地选择 fail-closed。 |
+| `sentry_overload_degraded_total` | Escalation 被满 worker queue 拒绝。完整 evidence 使用 fail mode；incomplete command evidence 保持 unresolved。 | 增加 workers 或 queue，减少 escalation volume，调慢 tier，或为完整 evidence overload 有意识地选择 fail-closed。 |
 | `sentry_enforce_failed_total` | 某个 block 需要写 deny file，但写入失败。 | 检查 volume space、mount mode、file permissions 和 configured paths。 |
 
 `sentry_events_total` 和 `sentry_blocked_total` 用于观察流量与 block ratio trend。`/healthz` 只说明 daemon 存活，不证明每个 deny 都已落地。
@@ -73,7 +73,9 @@ L1 在每个 event 上运行并保持低成本。Escalation 进入 bounded worke
 - `A3S_SENTRY_AGENT_TIMEOUT`：L3 A3S Code investigation timeout。
 - `A3S_SENTRY_SPECULATE`：高 severity event 值得并行 L2/L3 时启用。
 
-如果 overload 上升，说明当前部署对 event mix 来说资源不足，或 deeper tier 对 escalation rate 来说太慢。
+如果 overload 上升，说明当前部署对 event mix 来说资源不足，或 deeper tier
+对 escalation rate 来说太慢。完整 evidence event 按 fail mode 解决；
+incomplete `ToolExec` evidence 保持为 audited L1 escalation。
 
 ## L2 Or L3 Outage
 
@@ -97,5 +99,6 @@ Sentry restart 期间，Observer guards 仍可继续执行已有 deny files。
 
 - Observer-event Sentry 是 reactive。它能 block 下一次匹配动作，不一定能 block 产生 event 的那一次动作。
 - Inline Gateway inspection 是路由到 proxy 的 LLM/MCP traffic 的 pre-forward path。
+- Bundled daemon 会 audit incomplete-evidence escalation，但不提供 durable external L3 queue；staged SDK consumer 必须负责持久化和 dispatch。
 - Deny 是 coarse 且 node-local 的：IP 或 executable-path block 可能影响同 node 上其它 workload。
 - L2 和 L3 会处理 attacker-influenced content。确定性的 L1 和 kernel guard enforcement 仍应作为底线。

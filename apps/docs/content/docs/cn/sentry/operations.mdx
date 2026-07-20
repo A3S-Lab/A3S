@@ -27,12 +27,13 @@ Guard 会热加载这些文件。Deny files 是运行态，不是 source-of-trut
 
 | Metric | 含义 |
 | --- | --- |
-| `sentry_overload_degraded_total` | Escalation 无法处理，落入配置的 fail mode。 |
+| `sentry_overload_degraded_total` | Escalation 被满 worker queue 拒绝。完整 evidence 使用 fail mode；incomplete command evidence 保持 unresolved。 |
 | `sentry_enforce_failed_total` | Decision 需要 enforce，但写 deny record 失败。 |
 | `sentry_blocked_total` | 按 tier 和 event family 统计 block。 |
 | `sentry_events_total` | 总判断事件数。 |
 
-在 fail-open 部署中，overload degradation 或 enforce failure 都意味着某次 block 可能没有落地。
+任何非零 overload rate 都表示 worker pool 资源不足。在 fail-open 部署中，
+完整 evidence 的 overflow 或 enforce failure 意味着某次 block 可能没有落地。
 
 ## Queue 和 Timeout 调优
 
@@ -44,8 +45,14 @@ L2 和 L3 在 ingest thread 之外的 worker pools 运行。需要调：
 - 深度 A3S Code investigation 的 L3 timeout。
 - 高 severity event 是否值得 L2/L3 parallel 的 speculation threshold。
 
+完整 evidence 的 queue overflow 会按配置 fail mode 解决。Incomplete
+`ToolExec` evidence 即使在 overload 时也保持为 audited L1 escalation。
+
 ## 边界
 
 - Observer-event Sentry 是 reactive；它可能阻断下一步 action，而不是产生 event 的那一步。
+- Bundled daemon 会 audit incomplete-evidence escalation，但不提供 durable
+  external L3 queue。需要 deeper work 时，staged SDK consumer 必须负责持久化
+  和 dispatch。
 - Deny 可能比较粗：binary path 与 IP-based enforcement 可能影响同节点上的多个进程。
 - L2/L3 会读取攻击者影响的内容。确定性的 L1 底线和外部 kernel guard 仍然重要。

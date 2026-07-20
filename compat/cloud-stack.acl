@@ -80,7 +80,7 @@ component "sentry" {
   package = "a3s-sentry"
   path = "crates/sentry"
   repository = "git@github.com:A3S-Lab/Sentry.git"
-  revision = "cf93cc28ffe49e6b97d0197da778db923cb4a72f"
+  revision = "2502afd000707b3d0758659b104c8f2ae8cd1fb7"
   source = "git"
   version = "0.7.0"
 }

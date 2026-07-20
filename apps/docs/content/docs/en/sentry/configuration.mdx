@@ -128,9 +128,15 @@ For committed samples, prefer environment substitution in the host application o
 
 ## Fail Mode
 
-Sentry defaults to fail-open. If L1 escalates and no deeper tier resolves the event, the event is allowed. The same posture applies when a slow tier overloads the queue.
+Sentry defaults to fail-open. If L1 escalates and no deeper tier resolves the event, the event is allowed. Complete-evidence escalations rejected by a full worker queue use the same posture.
 
 Fail-closed changes unresolved escalation and overload degradation into blocks. Use it for safety-first workloads only when L2/L3 capacity and the operational blast radius are understood.
+
+Incomplete `ToolExec` evidence is deliberately different. A dangerous captured
+prefix can still block, but an ambiguous truncated or incompletely reassembled
+command remains an L1 escalation in both fail modes. The bundled daemon audits
+the unresolved result, including during worker overload; durable external L3
+dispatch belongs to a staged SDK consumer.
 
 ## Deny Sinks
 
@@ -145,4 +151,7 @@ Exec deny is path-oriented. A deny action on a bare binary name may not map to a
 - `GET /metrics` with counters for judged events, blocks, overload degradation, and enforce failures.
 - `GET /healthz` with `200 ok` while the daemon is alive.
 
-Alert on `sentry_overload_degraded_total` and `sentry_enforce_failed_total`; both indicate that an intended block may not have landed.
+Alert on `sentry_overload_degraded_total` and `sentry_enforce_failed_total`.
+The first counts escalations rejected by the full worker queue:
+complete-evidence events use the fail mode, while incomplete command evidence
+remains unresolved. The second means a deny-file write failed.

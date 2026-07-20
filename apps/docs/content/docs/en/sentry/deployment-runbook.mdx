@@ -56,7 +56,7 @@ Page on rising values for:
 
 | Metric | Why it matters | First response |
 | --- | --- | --- |
-| `sentry_overload_degraded_total` | Escalations fell through to the fail mode because the worker queue was full. | Increase workers or queue, reduce escalation volume, tune the slow tier, or choose fail-closed deliberately. |
+| `sentry_overload_degraded_total` | Escalations were rejected by the full worker queue. Complete evidence uses the fail mode; incomplete command evidence remains unresolved. | Increase workers or queue, reduce escalation volume, tune the slow tier, or choose fail-closed deliberately for complete-evidence overflow. |
 | `sentry_enforce_failed_total` | A block wanted to write a deny file and failed. | Check volume space, mount mode, file permissions, and configured paths. |
 
 Use `sentry_events_total` and `sentry_blocked_total` for traffic and block-ratio trends. `/healthz` only says the daemon is alive; it does not prove that every deny landed.
@@ -73,7 +73,10 @@ Tune:
 - `A3S_SENTRY_AGENT_TIMEOUT` for the L3 A3S Code investigation.
 - `A3S_SENTRY_SPECULATE` for high-severity events where parallel L2/L3 is worth the extra cost.
 
-If overload rises, the deployment is under-provisioned for the current event mix or the deeper tier is too slow for the escalation rate.
+If overload rises, the deployment is under-provisioned for the current event
+mix or the deeper tier is too slow for the escalation rate. Complete-evidence
+events resolve through the fail mode; incomplete `ToolExec` evidence remains an
+audited L1 escalation.
 
 ## L2 Or L3 Outage
 
@@ -97,5 +100,6 @@ Observer guards can continue enforcing existing deny files while Sentry restarts
 
 - Observer-event Sentry is reactive. It can block the next matching action, not necessarily the action that produced the event.
 - Inline Gateway inspection is the pre-forward path for LLM/MCP traffic that is routed through the proxy.
+- The bundled daemon audits incomplete-evidence escalations but does not provide a durable external L3 queue; staged SDK consumers must own persistence and dispatch.
 - Denies are coarse and node-local: an IP or executable-path block can affect other workloads on the same node.
 - L2 and L3 process attacker-influenced content. Keep deterministic L1 and kernel guard enforcement as the floor.

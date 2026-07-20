@@ -23,14 +23,27 @@ enforced = sentry.evaluate_and_enforce(tool_exec(2, ["/usr/bin/ncat", "host", "4
 
 ## TypeScript
 
-TypeScript SDK 通过 native package 暴露同一个 judge：
+TypeScript SDK 通过 native package 暴露同一个 judge。Staged method 在 N-API
+worker pool 上运行并返回 typed promise：
 
 ```ts
-import { Sentry, egress } from '@a3s-lab/sentry';
+import { Sentry, egress, fileAccess } from '@a3s-lab/sentry';
 
 const sentry = Sentry.create('sentry.acl');
 const decision = sentry.evaluate(egress(1, '169.254.169.254', 80));
+
+const fast = await sentry.evaluateThroughL2(
+  fileAccess(2, '/home/agent/.aws/credentials', false),
+);
+if (fast.stageStatus === 'escalated') {
+  await durableL3Queue.send(fast);
+}
 ```
+
+`evaluateThroughL2` 不会调用 L3，也不会通过 `fail_closed` 解决 unresolved
+escalation。它的 `ThroughL2Result` 包含 `l1Decision`、可选
+`l2Decision`、`effectiveDecision`、`stageStatus` 和可选
+`escalationCause`。
 
 ## 统一 ACL 配置
 
@@ -48,3 +61,7 @@ SDK 配置可以描述：
 
 Rust host 可以直接用 `LiveRules`、`Pipeline` 和 judge implementations 构建 pipeline。
 当产品已经拥有 event source 和 enforcement sinks 时，这是最低层集成路径。
+
+当产品还拥有 durable L3 queue 时，使用 `Pipeline::evaluate_through_l2`。
+这个 method 在 fast tiers 后停止并保留 unresolved escalation；caller 必须
+持久化并 dispatch 该 result，不能把它当作 allow。

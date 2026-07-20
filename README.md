@@ -65,7 +65,7 @@ is Rust.
 | [a3s-runtime](crates/runtime/) | 0.2.0 | Provider-neutral execution contract and Runtime client. |
 | [a3s-box](crates/box/) | 3.0.5 | Docker-like MicroVM runtime for Linux OCI workloads. |
 | [a3s-observer](crates/observer/) | 0.11.0 | eBPF observability for LLM calls, tools, files, and egress. |
-| [a3s-sentry](crates/sentry/) | 0.7.0 | Tiered runtime security control. |
+| [a3s-sentry](crates/sentry/) | 0.7.0 | Tiered runtime security control with staged L3 dispatch and incomplete-evidence safeguards. |
 | [a3s-boot](crates/boot/) | 0.1.1 | Nest-inspired modular service framework for Rust APIs. |
 | [a3s-gateway](crates/gateway/) | 1.0.12 | Reverse proxy, routing, middleware, streaming, and scale-to-zero. |
 | [a3s-power](crates/power/) | 0.4.2 | Privacy-preserving LLM inference for TEE environments. |
