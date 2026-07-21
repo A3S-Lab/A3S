@@ -6,9 +6,11 @@
 
 mod component;
 mod download;
+mod fleet;
 mod github;
 mod install;
 mod platform;
+mod systemd;
 
 pub use component::{
     uninstall_owned_files, ComponentReceipt, DirectoryActivation, InstallProvenance, ReceiptStore,
@@ -18,10 +20,17 @@ pub use download::{
     download_asset, extract_release_archive, extract_tar_gz_archive, extract_zip_archive,
     sha256_hex, verify_sha256,
 };
+pub use fleet::{
+    FleetUpdater, FleetUpgradeHost, ManagedComponent, ProtocolRange, ReleaseChannel,
+    RollbackConstraints, SignedTargetMetadata, TargetMetadata, TrustedReleaseKey, UpgradeEvent,
+    UpgradePaths, UpgradePolicy, UpgradeReceipt, UpgradeState, FLEET_RECEIPT_SCHEMA_VERSION,
+    SIGNED_TARGET_SCHEMA_VERSION,
+};
 pub use github::{
     asset_sha256, fetch_latest_release, fetch_release, find_matching_asset, parse_version, Asset,
     Release,
 };
+pub use systemd::{activate_systemd_unit, stage_systemd_unit, SystemdUnitSpec};
 
 /// Configuration for the update check — each binary provides its own.
 pub struct UpdateConfig {

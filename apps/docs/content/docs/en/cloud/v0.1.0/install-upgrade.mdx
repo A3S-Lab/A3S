@@ -1,0 +1,93 @@
+---
+title: Install, Upgrade, and Rollback
+description: Source-pinned installation and cautious upgrade and rollback procedures for the 0.1.0 integration snapshot.
+---
+
+# Install, Upgrade, and Rollback
+
+Status: **Experimental**
+
+Snapshot: `cloud-0.1.0`
+
+Cloud 0.1.0 has no published production package. The supported evidence path
+builds from the exact compatibility lock. Do not replace revision pins with a
+moving branch in an operational environment.
+
+## Prerequisites
+
+- Linux, Rust 1.88 or later, Docker, and PostgreSQL 17;
+- Gateway `1.0.12` and Runtime `0.2.0` at the locked revisions;
+- write access to persistent PostgreSQL, artifact, log, and node-state paths;
+- separate environment variables for database, bootstrap, Gateway, and
+  provider credentials; and
+- a tested backup and a maintenance window before an upgrade.
+
+NATS JetStream is optional when `events.provider = "memory"`. S3-compatible
+storage is optional for the local log profile and required when the configured
+production policy selects it.
+
+## Build and start the pinned snapshot
+
+From a recursive checkout of the root repository at the snapshot revision:
+
+```bash
+docker compose \
+  --env-file apps/cloud/deploy/dev/.env.example \
+  --file apps/cloud/deploy/dev/compose.yaml \
+  up --detach --wait
+
+export A3S_CLOUD_POSTGRES_URL="postgres://a3s_cloud:a3s_cloud@127.0.0.1:54320/a3s_cloud"
+export A3S_CLOUD_BOOTSTRAP_TOKEN="replace-with-at-least-32-random-characters"
+export A3S_CLOUD_GITHUB_WEBHOOK_SECRET="replace-with-32-to-512-random-bytes"
+
+cargo build --manifest-path apps/cloud/Cargo.toml --locked --release \
+  -p a3s-cloud-control-plane -p a3s-cloud-node-agent
+apps/cloud/target/release/a3s-cloud-control-plane apps/cloud/config/cloud.acl
+```
+
+Startup applies the checked-in migrations. Keep the complete
+[`cloud.acl`](https://github.com/A3S-Lab/Cloud/blob/5d7307cc7bf5b155f708ca9f5bd3e5d06745b68d/config/cloud.acl)
+and
+[`node.example.acl`](https://github.com/A3S-Lab/Cloud/blob/5d7307cc7bf5b155f708ca9f5bd3e5d06745b68d/config/node.example.acl)
+as the starting point; both are parsed by the docs gate and by Cloud's typed
+configuration tests.
+
+Verify liveness and dependency readiness before admitting traffic:
+
+```bash
+curl --fail http://127.0.0.1:8080/api/v1/health/live
+curl --fail http://127.0.0.1:8080/api/v1/health/ready
+curl --fail http://127.0.0.1:8080/api/v1/openapi.json > /dev/null
+```
+
+## Upgrade sequence
+
+1. Record the current root revision, compatibility lock, binary digests, and
+   database migration level.
+2. Take and verify the backups in [Recovery](./recovery).
+3. Stop new mutations at the ingress and wait for in-flight operations to
+   become terminal. Do not stop workers while operations still own leases.
+4. Build the new exact lock in a separate directory. Run its tests before
+   touching the active binaries.
+5. Stop the affected control-plane roles, install the candidate binaries and
+   configuration atomically, then start workers before reopening API traffic.
+6. Require live, ready, OpenAPI, PostgreSQL, event-relay, Gateway, and node
+   observation checks to pass. Keep the old binaries and backup until then.
+
+Workload A-to-B update and cloned-revision rollback are **Verified** E0
+operations. Control-plane binary packaging and unattended fleet rollout are
+not. `a3s-updater` 0.4.0 supplies an **Experimental** signed, health-gated
+node-agent/Gateway transaction, but this snapshot does not wire it to Cloud
+fleet scheduling and exposes no operator command for it.
+
+## Rollback decision
+
+If no migration ran, restore the prior binaries and configuration, start the
+previous role set, and repeat every health check. If a migration ran, do not
+assume downgrade compatibility. Restore the verified pre-upgrade PostgreSQL
+backup into an isolated database first, start the old binary against it, and
+promote only after authoritative queries and node observations match.
+
+Never declare rollback complete only because a process started. Gateway
+revision acknowledgement, Runtime health, operation terminal state, and the
+exact applied component version are the completion evidence.

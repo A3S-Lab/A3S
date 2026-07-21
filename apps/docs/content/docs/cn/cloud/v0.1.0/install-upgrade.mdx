@@ -1,0 +1,82 @@
+---
+title: 安装、升级与回滚
+description: 0.1.0 集成快照的源码固定安装、谨慎升级和回滚步骤。
+---
+
+# 安装、升级与回滚
+
+Status: **Experimental**
+
+Snapshot: `cloud-0.1.0`
+
+Cloud 0.1.0 尚无生产安装包。当前证据路径从精确兼容锁构建。在运维环境中，
+不要用移动分支代替 revision pin。
+
+## 前置条件
+
+- Linux、Rust 1.88 或更高版本、Docker 和 PostgreSQL 17；
+- 兼容锁指定 revision 的 Gateway `1.0.12` 与 Runtime `0.2.0`；
+- PostgreSQL、artifact、日志和节点状态持久化路径的写权限；
+- 数据库、bootstrap、Gateway 和 provider 凭据分别通过环境变量提供；
+- 升级前完成可验证备份，并安排维护窗口。
+
+当 `events.provider = "memory"` 时，NATS JetStream 是可选项。本地日志 profile
+可不使用 S3-compatible 存储；生产策略一旦选择该 provider，就必须提供它。
+
+## 构建并启动固定快照
+
+在根仓库对应 revision 的递归 checkout 中执行：
+
+```bash
+docker compose \
+  --env-file apps/cloud/deploy/dev/.env.example \
+  --file apps/cloud/deploy/dev/compose.yaml \
+  up --detach --wait
+
+export A3S_CLOUD_POSTGRES_URL="postgres://a3s_cloud:a3s_cloud@127.0.0.1:54320/a3s_cloud"
+export A3S_CLOUD_BOOTSTRAP_TOKEN="replace-with-at-least-32-random-characters"
+export A3S_CLOUD_GITHUB_WEBHOOK_SECRET="replace-with-32-to-512-random-bytes"
+
+cargo build --manifest-path apps/cloud/Cargo.toml --locked --release \
+  -p a3s-cloud-control-plane -p a3s-cloud-node-agent
+apps/cloud/target/release/a3s-cloud-control-plane apps/cloud/config/cloud.acl
+```
+
+启动时会应用已检入 migration。应以完整的
+[`cloud.acl`](https://github.com/A3S-Lab/Cloud/blob/5d7307cc7bf5b155f708ca9f5bd3e5d06745b68d/config/cloud.acl)
+和
+[`node.example.acl`](https://github.com/A3S-Lab/Cloud/blob/5d7307cc7bf5b155f708ca9f5bd3e5d06745b68d/config/node.example.acl)
+为起点。文档 gate 使用锁定的 `a3s-acl` 解析它们，Cloud 类型化配置测试也会验证它们。
+
+接入流量前验证进程与依赖健康：
+
+```bash
+curl --fail http://127.0.0.1:8080/api/v1/health/live
+curl --fail http://127.0.0.1:8080/api/v1/health/ready
+curl --fail http://127.0.0.1:8080/api/v1/openapi.json > /dev/null
+```
+
+## 升级顺序
+
+1. 记录当前根 revision、兼容锁、二进制 digest 和数据库 migration level。
+2. 按[恢复文档](./recovery)完成并验证备份。
+3. 在入口停止新 mutation，等待在途 operation 终止。仍有 lease 时不要停止 worker。
+4. 在单独目录构建新的精确兼容锁；接触活动二进制前先运行测试。
+5. 停止受影响的 control-plane role，原子安装候选二进制与配置；先启动 worker，
+   再重新开放 API 流量。
+6. live、ready、OpenAPI、PostgreSQL、event relay、Gateway 和节点 observation
+   全部通过前，保留旧二进制与备份。
+
+工作负载 A 到 B 更新以及克隆 revision 回滚是 **Verified** E0 操作。control-plane
+二进制打包与无人值守 fleet rollout 不是。`a3s-updater` 0.4.0 提供
+**Experimental** 的 node-agent/Gateway 签名健康门禁事务，但此快照尚未把它接入
+Cloud fleet scheduling，也没有对应运维命令。
+
+## 回滚判断
+
+若没有执行 migration，恢复旧二进制与配置，启动原有 role，并重复全部健康检查。
+若执行过 migration，不得假定向下兼容。先把升级前 PostgreSQL 备份恢复到隔离数据库，
+用旧二进制连接它；只有权威查询与节点 observation 一致后才能提升为主环境。
+
+进程启动并不代表回滚完成。完成证据必须包含 Gateway revision acknowledgement、
+Runtime health、operation terminal state 和精确实际组件版本。

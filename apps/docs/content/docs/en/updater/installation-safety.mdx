@@ -31,14 +31,15 @@ Dropping that `TempDir` cleans up extracted files after replacement.
 | Copy fails | Attempt to rename the backup back into place, then return an error. |
 | Permission update fails | Return an error after copy. |
 
-## Boundaries
+## Legacy CLI Path Boundaries
 
-A3S Updater does not:
+The GitHub Release CLI replacement path does not:
 
 - refresh Homebrew taps
 - manage package-manager installations
 - restart the caller into the new binary
-- verify a detached signature
+- verify signed fleet metadata (use [`FleetUpdater`](./fleet-upgrades) for the
+  separate Ed25519-verified Linux service lifecycle)
 - support Windows binary replacement
 - infer asset names outside the configured naming convention
 

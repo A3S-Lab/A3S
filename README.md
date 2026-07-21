@@ -68,7 +68,7 @@ selected product exposes them.
 | State and coordination | `crates/memory`, `crates/event`, `crates/flow`, `crates/lane`, `crates/orm` | Memory, events, workflows, queues, and typed persistence. |
 | Runtime safety and operations | `crates/runtime`, `crates/box`, `crates/observer`, `crates/sentry` | Provider-neutral execution, isolation, observability, and runtime control. |
 | Services | `crates/boot`, `crates/gateway`, `crates/power` | Service framework, ingress, and model serving. |
-| Distribution | `crates/updater`, `homebrew-tap` | CLI self-update support and Homebrew formulae. |
+| Distribution | `crates/updater`, `homebrew-tap` | Verified CLI updates, signed health-gated fleet lifecycle primitives, and Homebrew formulae. |
 
 ### Basic usage
 
@@ -138,6 +138,9 @@ to loopback by default.
 - **Service Infrastructure**: Build modular async services with Boot, route AI
   traffic with Gateway, and operate the implemented portions of the self-hosted
   Cloud control plane
+- **Signed Fleet Upgrade Primitives**: Admit Ed25519-signed node-agent and Gateway
+  targets, bound retrieval and service operations, gate activation on health and
+  version checks, recover durable receipts after reboot, and roll back failures
 - **Safety and Observability Components**: Add eBPF-backed observation on
   supported Linux hosts and tiered runtime policy through Observer and Sentry
 - **Native SDK and UI Components**: Embed A3S Code from Rust, Node.js, or Python,
@@ -157,7 +160,7 @@ to loopback by default.
 | Application automation | A3S Use | Built-in Browser, native Office, and local PP-OCRv6 domains plus ACL-declared external domains | Domain availability depends on installed runtime/model assets; external packages keep their native CLI, standard MCP, or Skill contracts |
 | Search | A3S Search | Multi-engine aggregation, deduplication, consensus ranking, CLI output, and optional A3S Use browser rendering | Engines, proxies, and browser providers depend on network and local runtime availability |
 | General execution | A3S Runtime | Immutable finite Task and long-running Service generations with capabilities, idempotent lifecycle, observations, logs, and exec contracts | Runtime defines contracts and managed durability; callers still choose and supply a concrete provider |
-| Cloud control plane | A3S Cloud | Tenancy, PostgreSQL state, durable operations, node enrollment/control, observations, SSE, and a Web console | Foundation, node control, and digest-pinned OCI deployment are complete; reachability is in progress, while source workflows, control surfaces, assets, stateful resources, and multi-node scale remain planned |
+| Cloud control plane | A3S Cloud | Tenancy, PostgreSQL state, durable operations, node enrollment/control, observations, SSE, and a Web console | The [versioned Cloud 0.1.0 docs](apps/docs/content/docs/en/cloud/v0.1.0/) separate verified E0 behavior from experimental updater wiring and planned C0/S0/H0 work; `compat/cloud-stack.acl` is authoritative. |
 | Services | A3S Boot, Gateway | Modular async services, typed providers, protocol pipelines, reverse proxying, streaming, middleware, and AI traffic controls | Optional transports, brokers, scaling executors, certificates, and external backends must be supplied and operated separately |
 | Coordination and data | Flow, Event, Lane, Memory, ORM | Durable workflows, pluggable events, priority scheduling, agent memory, and typed SQL | Distributed stores and database drivers are feature- and backend-specific; an abstraction is not a claim that every backend is bundled |
 | Privacy and safety | Power, Observer, Sentry | TEE-oriented inference, agent observability, and tiered runtime security controls | Hardware attestation, eBPF collection, and enforcement depend on host capabilities and explicit deployment configuration |
@@ -603,8 +606,8 @@ version or release channel.
 | [A3S Search](crates/search/) | Embeddable and command-line meta-search with ranking, deduplication, proxies, and optional browser rendering |
 | [A3S Use](crates/use/) | Typed Browser, native Office, OCR, external application, and standard MCP capability host |
 | [A3S Science](packages/science/) | Independently versioned scientific Skills, MCP data services, compute workflows, and research tooling |
-| [A3S Cloud](apps/cloud/) | Self-hosted control plane for desired state, durable operations, outbound-managed Runtime nodes, and verified OCI deployment; reachability is in progress, with source delivery, developer workflows, automation surfaces, assets, stateful resources, and multi-node scale planned |
-| [Documentation](apps/docs/) | Next.js documentation, tutorials, and project reference site |
+| [A3S Cloud](apps/cloud/) | Self-hosted control plane for desired state, durable operations, outbound-managed Runtime nodes, and verified OCI deployment; the [versioned Cloud 0.1.0 reference](apps/docs/content/docs/en/cloud/v0.1.0/) records exact compatibility and maturity boundaries |
+| [Documentation](apps/docs/) | Next.js documentation, tutorials, project references, and versioned bilingual Cloud operations guidance |
 
 ### Runtime, coordination, and data
 
@@ -637,7 +640,7 @@ version or release channel.
 | [A3S WebView](crates/webview/) | Native helper for authenticated RemoteUI windows and the always-on-top Agent Island, with platform WebView dependencies |
 | [A3S Observer](crates/observer/) | Language-neutral observation model plus Linux eBPF collector components for agent activity |
 | [A3S Sentry](crates/sentry/) | Tiered rule, model, and agent runtime security control built around observed activity |
-| [A3S Updater](crates/updater/) | GitHub Releases self-update support used by A3S CLI binaries |
+| [A3S Updater](crates/updater/) | GitHub Releases self-update support plus signed, health-gated node-agent and Gateway lifecycle primitives |
 | [Homebrew Tap](homebrew-tap/) | Formulae for published A3S command-line products and helpers |
 
 ## Architecture

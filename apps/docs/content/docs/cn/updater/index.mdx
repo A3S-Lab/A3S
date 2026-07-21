@@ -1,6 +1,6 @@
 ---
 title: A3S Updater
-description: 基于 GitHub Releases 的 A3S CLI 二进制自更新库。
+description: 提供已验证的 CLI 替换，以及带签名和健康门禁的集群升级原语。
 ---
 
 # A3S Updater
@@ -8,7 +8,7 @@ description: 基于 GitHub Releases 的 A3S CLI 二进制自更新库。
 `a3s-updater` 是 A3S 命令行工具使用的小型库：检查 GitHub Releases、下载匹配当前
 平台的 archive、提取目标二进制，并替换当前运行的二进制。
 
-当前 crate version 是 `a3s-updater` `0.2.0`。
+当前 crate 版本是 `a3s-updater` `0.4.0`。
 
 ## 能力地图
 
@@ -20,6 +20,9 @@ description: 基于 GitHub Releases 的 A3S CLI 二进制自更新库。
 | Asset 命名 | 查找 `<binary>-<version>-<os>-<arch>.tar.gz` 形态的 archive。 |
 | Archive 处理 | 下载 `.tar.gz`，只把 regular files 提取到 temporary directory，并按文件名选择目标二进制。 |
 | 安装 | 当前 executable 先改名为 backup，再复制新 binary，设置 Unix executable 权限；复制失败会恢复 backup。 |
+| 集群元数据 | 验证 Ed25519 签名的组件身份、版本、SHA-256 摘要、协议范围、发布通道和回滚约束。 |
+| 集群激活 | 暂存节点代理或 Gateway 二进制与 systemd 单元，持久化每个状态，并以健康检查和实际版本作为成功门禁。 |
+| 恢复 | 重放可抗中断的收据；激活或健康检查失败时自动恢复旧二进制；下载始终由节点向外发起。 |
 
 ## 从这里开始
 
@@ -29,8 +32,10 @@ description: 基于 GitHub Releases 的 A3S CLI 二进制自更新库。
   expected asset names、download 和 archive extraction。
 - [Installation Safety](/cn/docs/updater/installation-safety) 覆盖 executable
   replacement、backup/restore behavior、permissions 和 boundaries。
+- [集群升级](/cn/docs/updater/fleet-upgrades) 说明签名元数据、类型化主机操作、
+  持久化收据、健康门禁和重启恢复。
 
 ## 边界
 
-该库当前面向 CLI 二进制替换和 GitHub Release assets。它不是包管理器；不支持的
-操作系统或架构会明确报错，而不是猜测。
+原有 GitHub Release 路径用于 CLI 二进制替换。集群路径用于 Linux 服务，但不负责
+调度滚动发布，也不提供远程 shell。Cloud 接入仍由明确的主机实现负责。

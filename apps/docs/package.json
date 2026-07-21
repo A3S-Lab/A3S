@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "check:cloud": "bun scripts/validate-cloud-docs.mjs"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.18",

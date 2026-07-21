@@ -1,10 +1,22 @@
 name: Deploy Docs
 
 on:
+  pull_request:
+    paths:
+      - 'apps/docs/**'
+      - 'apps/cloud'
+      - 'crates/acl'
+      - 'crates/runtime'
+      - 'compat/cloud-stack.acl'
+      - '.github/workflows/docs.yml'
   push:
     branches: [main]
     paths:
       - 'apps/docs/**'
+      - 'apps/cloud'
+      - 'crates/acl'
+      - 'crates/runtime'
+      - 'compat/cloud-stack.acl'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
@@ -22,6 +34,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Initialize locked Cloud documentation sources
+        run: >-
+          git -c url.https://github.com/.insteadOf=git@github.com:
+          submodule update --init --depth 1 apps/cloud crates/acl crates/runtime
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/cloud -> target
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -30,6 +55,16 @@ jobs:
       - name: Install dependencies
         working-directory: apps/docs
         run: bun install --frozen-lockfile
+
+      - name: Validate Cloud documentation contracts
+        working-directory: apps/docs
+        run: bun run check:cloud
+
+      - name: Validate shipped Cloud ACL configurations
+        working-directory: apps/cloud
+        run: |
+          cargo test --locked -p a3s-cloud-control-plane loads_shipped_cloud_acl
+          cargo test --locked -p a3s-cloud-node-agent loads_shipped_node_example_acl
 
       - name: Build
         working-directory: apps/docs
@@ -41,6 +76,7 @@ jobs:
           path: apps/docs/out
 
   deploy:
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     environment:

@@ -30,14 +30,15 @@ description: Executable replacement、backup restore、Unix permissions、temp-d
 | Copy fails | 尝试把 backup rename 回原位，然后返回 error。 |
 | Permission update fails | copy 后返回 error。 |
 
-## Boundaries
+## 旧版 CLI 路径边界
 
-A3S Updater 不负责：
+GitHub Release CLI 替换路径不负责：
 
 - refresh Homebrew taps
 - 管理 package-manager installations
 - 把 caller restart 到 new binary
-- 验证 detached signature
+- 验证签名的 fleet metadata（独立的 Ed25519 Linux 服务生命周期请使用
+  [`FleetUpdater`](./fleet-upgrades)）
 - 支持 Windows binary replacement
 - 推断 configured naming convention 之外的 asset names
 

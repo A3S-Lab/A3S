@@ -1,6 +1,6 @@
 ---
 title: A3S Updater
-description: Self-update library for A3S CLI binaries via GitHub Releases.
+description: Verified CLI replacement and signed, health-gated fleet upgrade primitives.
 ---
 
 # A3S Updater
@@ -9,7 +9,7 @@ description: Self-update library for A3S CLI binaries via GitHub Releases.
 Releases, download the matching platform archive, extract the target binary,
 and replace the currently running binary.
 
-The current crate version is `a3s-updater` `0.2.0`.
+The current crate version is `a3s-updater` `0.4.0`.
 
 ## Capability Map
 
@@ -21,6 +21,9 @@ The current crate version is `a3s-updater` `0.2.0`.
 | Asset naming | Looks for archives named `<binary>-<version>-<os>-<arch>.tar.gz`. |
 | Archive handling | Downloads `.tar.gz`, extracts only regular files into a temporary directory, and selects the requested binary by file name. |
 | Installation | Renames the current executable to a backup, copies the new binary into place, sets Unix executable permissions, and restores on copy failure. |
+| Fleet metadata | Verifies Ed25519-signed component identity, version, SHA-256 digest, protocol range, release channel, and rollback constraints. |
+| Fleet activation | Stages node-agent or Gateway binaries and systemd units, persists every state transition, and gates success on health and exact applied version. |
+| Recovery | Replays interruption-safe receipts, automatically restores the prior binary after activation or health failure, and keeps downloads outbound from the node. |
 
 ## Start Here
 
@@ -30,9 +33,11 @@ The current crate version is `a3s-updater` `0.2.0`.
   expected asset names, download, and archive extraction.
 - [Installation Safety](/docs/updater/installation-safety) covers executable
   replacement, backup/restore behavior, permissions, and boundaries.
+- [Fleet Upgrades](/docs/updater/fleet-upgrades) documents signed metadata,
+  typed host operations, durable receipts, health gating, and reboot recovery.
 
 ## Boundary
 
-The library currently targets CLI-style binary replacement and GitHub Release
-assets. It is not a package manager, and unsupported operating systems or
-architectures are reported as unsupported rather than guessed.
+The original GitHub Release path targets CLI-style replacement. The fleet path
+targets Linux services but deliberately does not schedule rollouts or provide
+remote shell access. Cloud wiring remains an explicit host responsibility.

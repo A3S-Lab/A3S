@@ -1,0 +1,93 @@
+---
+title: Dependency and Process Runbooks
+description: Roles, prerequisites, verification, recovery, and rollback for every current Cloud dependency.
+---
+
+# Dependency and Process Runbooks
+
+Status: **Experimental**
+
+Snapshot: `cloud-0.1.0`
+
+These runbooks describe the current integration snapshot. Provider-specific HA
+topology, retention, RPO, and RTO remain operator policy until H0 is verified.
+
+## Process roles
+
+| Role | Owns | Required dependencies | Safe verification |
+| --- | --- | --- | --- |
+| `api` | REST, OpenAPI, authentication, accepted intent | PostgreSQL, configured security providers | live/ready endpoints and a scoped read query |
+| `worker` | durable operations, deployments, builds, edge/certificate convergence, retention | PostgreSQL, Flow, node control, Runtime nodes, Gateway; object storage as configured | lease age, operation progress, node observations, Gateway acknowledgements |
+| `relay` | PostgreSQL outbox publication | PostgreSQL and NATS when selected | outbox watermark, publish latency, NATS stream health |
+| `all` | all three roles in one process | union of the above | use for development, not an HA claim |
+
+Start data services first, then relay/worker, then API ingress. Stop ingress
+first, wait for mutations, then workers/relay. Never run workers from two
+restored sites without proven fencing.
+
+## PostgreSQL
+
+Prerequisites: supported PostgreSQL, TLS/network policy, backups, capacity for
+migrations and outbox growth. Alert on ready-health failure, connection
+exhaustion, long transactions, stale worker leases, and outbox lag.
+
+On failure, close mutation ingress, preserve the database and logs, restore or
+fail over through the provider, then start Cloud with workers paused. Verify
+migration level and authoritative queries before workers resume. Roll back by
+returning to the last verified database authority; never merge two writable
+histories.
+
+## NATS JetStream
+
+Status: **Optional** when the in-memory event provider is selected. PostgreSQL
+remains authoritative. Verify stream existence, retention, consumer health,
+and the Cloud outbox watermark. On failure, keep accepted intent in PostgreSQL,
+stop or back off relay publication, restore NATS through its provider, and
+resume idempotent publication. Consumers must tolerate redelivery. Do not mark
+an operation failed solely because a derived event relay is temporarily down.
+
+## Object storage
+
+Status: **Optional** for the local profile and required by production policies
+that select S3-compatible logs, artifacts, backups, SBOMs, or provenance.
+Require TLS, bucket versioning/retention as policy dictates, least-privilege
+credentials, and digest verification. On corruption or absence, keep metadata
+truthful and report an explicit gap; never substitute unverified bytes.
+Rollback a storage migration by restoring the prior endpoint and version IDs
+before workers resume writes.
+
+## Gateway
+
+Gateway owns ingress, complete route snapshots, managed public certificates,
+and exact reload acknowledgements. Verify management authentication, service
+health, installed revision/digest, routes, certificate SAN/expiry, and a routed
+probe. On failed reload, keep the previous complete snapshot active. Roll back
+through a new command that installs the previous verified snapshot; never edit
+only one route behind Cloud's revision authority.
+
+## Runtime nodes
+
+Nodes make outbound mTLS connections, persist command journals, execute
+provider-neutral Runtime units, and ship observations/logs. Verify certificate
+validity, heartbeat freshness, capability set, free resources, Runtime state,
+command receipts, and log watermarks. Drain before maintenance. Preserve state
+directories during repair so idempotent commands can replay. If identity is
+lost, re-enroll and reconcile; do not copy another node's private key.
+
+## Flow workers
+
+Flow advances durable deployment, build, cleanup, and recovery operations.
+Verify worker lease age, run/event sequence, retry backoff, command TTLs, and
+terminal cleanup. On a crash, restart against the same PostgreSQL authority and
+let the persisted run resume. Do not manually skip a failed step or issue a new
+logical operation until the idempotency and resource receipts prove the old
+one terminal.
+
+## Control-plane recovery gate
+
+After any dependency incident, require all of the following before reopening
+mutations: live and ready health, PostgreSQL authority, bounded outbox lag,
+non-stale worker leases, current node observations, exact Gateway
+acknowledgement, verified object digests, and no unexplained non-terminal
+operation. If any check fails, keep ingress closed and restore the previous
+verified dependency or snapshot.

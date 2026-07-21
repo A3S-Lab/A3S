@@ -1,0 +1,74 @@
+---
+title: 备份、恢复与灾难恢复
+description: 在托管 Cloud 备份恢复仍处于规划阶段时使用的人工基础设施恢复边界。
+---
+
+# 备份、恢复与灾难恢复
+
+Status: **Planned**
+
+Snapshot: `cloud-0.1.0`
+
+托管数据库、volume、backup、restore 和生产灾难恢复 workflow 属于 S0/H0，尚未发布。
+本页是当前快照的人工基础设施 runbook；它不会创建 A3S Cloud `Backup` resource，
+也不承诺 RPO/RTO。
+
+## 恢复集合
+
+把以下内容作为一个具名、受访问控制的恢复集合：
+
+- PostgreSQL：desired state、operation、outbox fact 与 projection 的权威来源；
+- 配置的 artifact 与日志 object store，包括 object digest 和 provider version ID；
+- 启用 NATS provider 时的 NATS JetStream 状态；
+- 不含 secret value 的 control-plane ACL 文件；
+- 按 provider 自身流程保存的 Vault/KMS/PKI policy 与可恢复 key material；
+- 节点本地 Runtime state、Gateway snapshot/certificate state 与 updater receipt。
+  节点 private key 不得复制到 PostgreSQL。
+
+## PostgreSQL 备份
+
+前置条件：operation 终止窗口、已知 migration revision、足够的加密存储，以及不会写入
+command history 的凭据。暂停可能创建 operation 的 mutation 和 worker，然后执行：
+
+```bash
+export BACKUP_DIR="/secure/a3s-cloud-backups/2026-07-22T000000Z"
+mkdir -p "$BACKUP_DIR"
+pg_dump --format=custom --serializable-deferrable \
+  --file="$BACKUP_DIR/control-plane.dump" "$PGDATABASE"
+pg_restore --list "$BACKUP_DIR/control-plane.dump" > "$BACKUP_DIR/control-plane.list"
+sha256sum "$BACKUP_DIR/control-plane.dump" > "$BACKUP_DIR/SHA256SUMS"
+```
+
+把根 revision 和 `compat/cloud-stack.acl` 与 digest 一起记录。dump 和存储快照完成后
+才能恢复 worker。
+
+## 隔离恢复演练
+
+前置条件：全新的数据库名、隔离的 object-store prefix、禁用 outbound notification，
+并且没有生产 Gateway 或节点凭据。
+
+```bash
+export RESTORE_DATABASE="a3s_cloud_restore_drill"
+createdb "$RESTORE_DATABASE"
+pg_restore --exit-on-error --no-owner \
+  --dbname="$RESTORE_DATABASE" "$BACKUP_DIR/control-plane.dump"
+```
+
+让精确记录的二进制连接隔离数据库与存储。验证 migration level、组织/项目/环境数量、
+非终止 operation、outbox watermark、活动 workload revision、Gateway snapshot digest
+和 object SHA-256。执行一次只读 API 查询。不得让恢复出的 worker 连接生产节点。
+
+## 灾难恢复与提升
+
+1. 在隔离网络中建立替代 PostgreSQL、NATS 和 object storage，并恢复完整集合。
+2. 按 Vault/KMS/PKI 流程恢复 provider key；任何可能泄露的 secret 都要轮换。
+3. 在 API ingress 关闭时启动 control plane。PostgreSQL 和存储检查通过后才启动
+   relay 与 worker role。
+4. 通过向外 mTLS 重新注册或连接节点。command/revision/digest 不匹配的旧节点或
+   Gateway acknowledgement 必须拒绝。
+5. ready health、operation convergence、Gateway routing、日志与 restore query
+   都通过后，才依次开放只读与 mutation 流量。
+
+提升会改变权威来源，对客户端可能不可逆。替代站点通过完整 gate 前，保留故障站点与
+恢复集合。若要回退提升，关闭替代入口、停止其 worker、恢复原权威 endpoint，
+重新验证 fencing 后再开放。
