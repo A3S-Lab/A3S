@@ -89,7 +89,8 @@ The first active Work release includes:
   or the file context menu, with left/right navigation across the current
   filtered and sorted entries. Folders expose metadata without recursive reads;
   common text, HTML, and SVG are rendered as inert text; PNG, JPEG, GIF, WebP,
-  BMP, and AVIF render as images; PDF uses the read-only PDF viewer; and
+  BMP, and AVIF render as images; PDF uses EmbedPDF/PDFium with editing commands
+  disabled in Quick Look; and
   DOCX/XLSX/XLS/ODS/CSV/PPTX are converted into memory-only previews. Preview
   conversion does not add artifacts to the repository or autosave them, and
   opening an editable copy remains an explicit action. Text is limited to
@@ -393,7 +394,14 @@ The first active Work release includes:
   with an explicit diagnostic. Unsupported transition families, sounds, and
   through-black options are also diagnosed rather than silently treated as
   editable;
-- source-backed PDF import with progressive PDF.js page rendering;
+- source-backed PDF import and full EmbedPDF/PDFium editing. The native viewer
+  owns search, thumbnails, page layouts, annotations, forms, signatures, stamps,
+  redaction, undo/redo, printing, and modified-copy export. Work loads the
+  version-matched PDFium WASM asset bundled from the installed
+  `@embedpdf/pdfium` dependency, requests a real updated PDF binary from the
+  EmbedPDF export plugin, persists that binary as the managed A3S source, and
+  writes the same bytes through verified replacement when a local path is
+  bound. Original-source download remains a separately labeled action;
 - PDF export from documents, spreadsheets, and presentations through
   artifact-specific print layouts, including document paper size, orientation,
   margins, explicit page and section breaks, continuous and odd/even-page
@@ -483,6 +491,9 @@ every command in a traditional office suite.
 - [x] Add bounded, read-only Quick Look for folders, common text and raster
   images, PDF, and supported Office imports, with Space/toolbar/context-menu
   entry points and adjacent-item keyboard navigation.
+- [x] Replace PDF.js with the same EmbedPDF/PDFium stack used by A3S OS, retain
+  its complete editing interface, and persist modified PDF binaries to A3S and
+  verified bound local files.
 - [ ] Add operating-system Trash, native file watching, sidebar tags, and
   large-folder virtualization. Internal drag-and-drop moves, persisted local
   folder favorites, and Finder-style arrow, range, Home/End, parent, and open
@@ -835,7 +846,8 @@ Office interoperability
 ├── SheetJS              spreadsheet import/export
 ├── JSZip + OOXML parser PPTX import and compatibility inspection
 ├── PptxGenJS            PPTX export
-├── PDF.js               progressive PDF preview
+├── EmbedPDF             complete PDF editor and plugin UI
+├── PDFium/WASM          dependency-bundled PDF rendering, mutation, and serialization
 └── html2canvas + jsPDF  PDF export
 ```
 
@@ -857,7 +869,7 @@ WorkArtifact
 ├── document      HTML-based rich-text sections and per-section page settings
 ├── spreadsheet   FortuneSheet workbook data
 ├── presentation  ordered slides with positioned native elements and notes
-└── pdf           source-backed read-only PDF metadata
+└── pdf           source-backed binary edited and serialized by PDFium
 ```
 
 The selected operating-system folder is authoritative for the local-files
@@ -990,5 +1002,6 @@ numbers, and both page orders, conditional-format
 parsing, editing, XLSX round-tripping, deterministic
 icon/data-bar/scale evaluation and rendering, cell-comment interoperability,
 and sheet-protection and editable-range interoperability, plus progressive
-source-backed PDF loading. Full completion additionally requires the
+source-backed EmbedPDF loading and real PDFium modified-copy persistence. Full
+completion additionally requires the
 browser-level and advanced format-fidelity evidence listed above.

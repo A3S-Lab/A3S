@@ -144,15 +144,15 @@ feel like one continuous task rather than separate applications.
 
 ## Journey 6: Explore durable memory
 
-**Intent:** understand what A3S has retained, how strongly it is retained, and
-which knowledge connects across tasks without changing the store.
+**Intent:** understand what A3S has retained and review what it proposes to
+reuse, without exposing implementation detail as the main experience.
 
 1. The user opens Memory from the Activity Bar or command palette. The current
    task and Result Workspace state remain mounted conceptually and are restored
    when the user returns.
-2. Memory loads all entry pages and one complete graph topology. Summary cards
-   explain memories, entities, relations, aliases, retention distribution,
-   extraction, consolidation, conflicts, and forgetting candidates.
+2. Memory loads all entry pages and one complete graph topology. The page shows
+   the memories directly with one truthful filtered/total count; internal scores
+   and identifiers do not occupy the default layout.
 3. The user searches content, tags, metadata, sources, or entity names and may
    combine time, type, source, retention, forgetting, and lifecycle filters.
 4. Graph opens in focused 3D mode with an accurate rendered/total count. The
@@ -161,12 +161,17 @@ which knowledge connects across tasks without changing the store.
    browser.
 5. Timeline presents the same filtered memories chronologically without losing
    the current query or selection.
-6. Selecting a memory explains its content, importance, access activity,
-   retention, lifecycle, entities, and metadata. Selecting an entity explains
-   aliases, mentions, importance, relations, and linked memories. Cross-links
-   continue in the same inspector.
-7. The user returns to Tasks or opens Memory settings. No exploration action
-   consolidates, forgets, or deletes a memory.
+6. Selecting a memory explains its content, any available retention reason,
+   source, recent use, and linked content. Scores, raw metadata, paths, and
+   internal identifiers are not shown. Cross-links continue in the same
+   inspector.
+7. In Learning, the user initially sees only items that need confirmation or
+   have updates. They can review evidence, save or ignore the item, request the
+   full catalog, return a saved item to its unmaterialized baseline, and restore
+   any preserved version when needed. Automatically matured local assets appear
+   in the same auditable history and are never published automatically.
+8. The user returns to Tasks or opens Memory settings. No exploration or
+   learning-review action deletes or rewrites a source memory.
 
 **Recovery:** an initial failure offers retry; an empty store explains how the
 first memory appears; zero filtered results preserve the filters with one reset

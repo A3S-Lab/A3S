@@ -1,9 +1,9 @@
 # A3S Web Super-App Product Architecture
 
-> Strategic direction. The product taxonomy below remains useful, but the
-> current shell does not hardcode Work or Science. Code is the default and A3S
-> Use packages contribute additional workbench views through the verified
-> plugin contract.
+> Strategic direction. Code and Work are built-in products in the current
+> shell, with Code as the default. Research, Finance, and other vertical
+> workbenches are contributed by A3S Use packages through the verified plugin
+> contract.
 
 ## Product decision
 
@@ -13,7 +13,7 @@ A3S Web is one desktop super app with three outcome-oriented products:
 A3S Web
 ├── A3S Work       办公
 ├── A3S Code       编码
-└── A3S Science    科学
+└── A3S Science    科研
 ```
 
 The classification follows durable user domains rather than backend modules,
@@ -34,9 +34,10 @@ Primary surface completes the selected object's workflow
 The fixed 52 px Activity Bar uses this order:
 
 1. A3S Code — 编码
-2. enabled `contributes.activity_bar` views, sorted by package order and title
-3. Code Memory, after a visual divider
-4. Plugin Marketplace and Settings, pinned to the system section
+2. A3S Work — 办公
+3. enabled `contributes.activity_bar` views, sorted by package order and title
+4. Code Memory, Plugin Marketplace, and Settings, pinned together in the
+   bottom system section
 
 Account management remains a Settings section. Package contributions are
 identified by `<route>:<activity-id>` and disappear when their package is
@@ -138,7 +139,7 @@ separate read-only Memory surface exposes complete-store graph, timeline,
 retention, search, filters, and inspection without becoming a new product or
 Result Workspace mode.
 
-## A3S Science — 科学
+## A3S Science — 科研
 
 ### Outcome
 

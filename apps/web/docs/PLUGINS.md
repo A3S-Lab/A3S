@@ -3,9 +3,10 @@
 ## Product model
 
 A3S Web treats an installed A3S Use package as the equivalent of a VS Code
-extension package. Code is the first and default Activity Bar entry. An enabled
-package can add a workbench view through the `contributes.activity_bar`
-contribution point; Work and Science are not hardcoded shell entries.
+extension package. Code is the first and default Activity Bar entry, and Work
+is the second built-in entry. An enabled package can add a workbench view
+through the `contributes.activity_bar` contribution point; vertical products
+such as Research and Finance are not hardcoded shell entries.
 
 The package remains the unit of identity, trust, installation, upgrade,
 disable, and removal. A contribution adds navigation and a non-callable HTML
@@ -31,8 +32,8 @@ registry revision and digest before rendering.
 ```acl
 contributes {
   activity_bar "research" {
-    title       = "Science"
-    description = "Prepare evidence-backed life-science research tasks."
+    title       = "科研"
+    description = "Prepare reviewable, evidence-backed research tasks across disciplines."
     icon        = "flask-conical"
     entry       = "web/activity.html"
     skill       = "a3s-use-science"
@@ -91,23 +92,47 @@ The protocol supports:
 - `activity.ready`: view startup completion;
 - `activity.error`: a bounded user-visible runtime error;
 - `context.propose`: a bounded title, summary, prompt, and up to 12 display
-  fields.
+  fields, plus the optional `usePackageSkill` routing decision.
 
 There is no generic execute message.
 
 ## Context handoff
 
 `context.propose` always opens a host-owned review dialog. The user sees the
-summary, fields, exact prompt, and host-verified Skill before anything enters
-Code. Accepting the review appends the context to the Code composer and selects
-the same-package Skill; dismissing it has no side effect. Plugin HTML cannot
-submit a task directly.
+summary, fields, exact prompt, and host-verified Skill decision before anything
+enters Code. `usePackageSkill` defaults to `true` for backward compatibility;
+when it is `false`, accepting the review appends only the prompt and does not
+select a Skill. A plugin cannot name an arbitrary Skill: the host can attach
+only the Skill declared by the same installed package. Dismissing the proposal
+has no side effect, and plugin HTML cannot submit a task directly.
+
+The Research contribution uses this distinction deliberately. Its workbench
+organizes a task as a project and follows a question → evidence → analysis →
+artifact → review loop. Life-science sources may request the verified
+`a3s-use-science` Skill. Other disciplines use Code's current general research
+capabilities and do not receive the life-science Skill. Every brief asks for a
+reviewable research package with a provenance note covering sources, methods or
+code, execution records, key parameters, artifact relationships, and unfinished
+verification items.
+
+The product organization takes inspiration from Claude Science's project and
+artifact-centered workbench and Open Science's plan → execute → produce →
+preview flow. A3S does not copy either shell or grant their runtime authority:
+the contribution remains an isolated A3S Web Code surface, and Code/Work own
+execution, files, editable artifacts, logs, and final review.
 
 ## Marketplace lifecycle
 
 The Marketplace reads only configured TUF registries. Unconfigured or failed
 registries remain visible with their verification state but contribute no
 installable packages.
+
+The catalog keeps discovery and trust inspection separate. The Plugins view
+provides one complete catalog plus an installed-only view, with text search and
+Stable, Beta, or Nightly channel filters. It does not invent recommendations in
+the browser. The Sources view shows a plain verification state and keeps TUF
+metadata under Technical information. Selecting install or upgrade from a
+package card opens confirmation; it never mutates the installation directly.
 
 Every install, upgrade, or uninstall is two phase:
 

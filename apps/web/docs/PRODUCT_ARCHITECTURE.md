@@ -71,10 +71,10 @@ AppShell
     │                       ├── ModeNavigator
     │                       └── ArtifactViewport
     └── MemoryPage
-        ├── MemorySummary
         ├── MemoryFiltersPanel
         ├── MemoryGraph / MemoryTimeline
-        └── MemoryInspector
+        ├── MemoryInspector
+        └── EvolutionWorkbench
 ```
 
 The active mode supplies the navigator and viewport content:
@@ -139,14 +139,18 @@ It never infers task provenance.
 
 Owns paged overview loading, refresh authority, Memory UI state, whole-store
 filtering, bounded connected 3D graph projection, timeline grouping, and
-memory/entity inspection. The first page owns graph topology; later pages add
+memory/entity inspection. It also adapts the typed Evolution overview and
+review mutations into the Learning tab; candidate inference remains in the
+LLM-backed CLI service. The first page owns graph topology; later pages add
 entries without repeating that payload. The Three.js renderer is a lazy
 boundary and never enters the initial shell bundle. A failed refresh keeps the
 last successful snapshot, and only the latest non-aborted request may settle
 shared state.
 
-It is read-only and independent of task-scoped Result Workspace state. It does
-not own memory extraction, consolidation, pruning, or configuration mutation.
+Memory exploration is read-only and independent of task-scoped Result Workspace
+state. Learning review may materialize or roll back versioned derived assets,
+but does not mutate source memories. The feature does not own extraction,
+candidate classification, consolidation, pruning, or configuration mutation.
 
 ### `features/settings`
 

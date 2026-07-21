@@ -1,10 +1,10 @@
 # A3S Web
 
 A3S Web is a desktop super-app shell. Code is the first and default Activity
-Bar destination. Installed A3S Use packages can add reviewed workbench views;
-the existing Work filesystem surface remains available to owned routes but is
-no longer a hardcoded Activity entry. Code is a task workspace, not a
-slash-command launcher or a generic chat client.
+Bar destination, and Work is the second built-in product. Installed A3S Use
+packages can add reviewed workbench views for vertical capabilities such as
+Research and Finance. Code is a task workspace, not a slash-command launcher
+or a generic chat client.
 
 Product implementation is governed by the
 [super-app plan](docs/SUPER_APP.md),
@@ -21,9 +21,10 @@ sandbox, messaging, and review contracts are defined in
 
 ## Current product surface
 
-- A VS Code-style Activity Bar with Code first, enabled package contributions
-  ordered from the live A3S Use registry, a Code Memory shortcut, a signed
-  plugin Marketplace, and Settings. Work and Science are not hardcoded entries.
+- A VS Code-style Activity Bar with built-in Code and Work entries followed by
+  enabled package contributions ordered from the live A3S Use registry. Memory,
+  the signed plugin Marketplace, and Settings share the pinned bottom section.
+  Research and Finance are not hardcoded entries.
 - A Finder-inspired A3S Work local-files workspace backed by the real filesystem:
   it initially follows the default A3S Code workspace shown in Settings, while
   an explicit Work “Switch workspace” choice is persisted as a user override.
@@ -78,7 +79,9 @@ sandbox, messaging, and review contracts are defined in
   files, favorites, server-owned autosave, folders, move/copy/rename,
   recoverable trash, imported source-file recovery, version history,
   DOCX/XLSX/PPTX import and export,
-  progressive source-backed PDF preview, PDF export from every native editor,
+  source-backed PDF editing through EmbedPDF and a version-matched PDFium/WASM
+  asset bundled from the installed `@embedpdf/pdfium` dependency,
+  PDF export from every native editor,
   and compatibility review before degraded saves or exports. A shared
   print-preview workflow opens from the toolbar or Cmd/Ctrl+P, shows the actual
   document, worksheet, notes-page, slide, or handout pagination, supports page
@@ -110,6 +113,12 @@ sandbox, messaging, and review contracts are defined in
   source types, and additional simple metadata. Uncommon Word style paths are
   retained for DOCX output and reported while Work preview uses an APA
   fallback.
+  PDF files keep EmbedPDF's complete native interaction model for search,
+  thumbnails, annotations, forms, signatures, stamps, redaction, history,
+  printing, and modified-copy export. Saving asks PDFium for a real updated PDF
+  binary, replaces the managed A3S source, and writes the same bytes through the
+  verified local-file path when the artifact is bound; the header keeps original
+  source download explicitly separate from modified PDF export.
   Body-text revision mode records typed,
   pasted, replaced, and Backspace/Delete text as attributed insertions or
   deletions; a review panel can locate, accept, or reject one or all changes.
@@ -305,12 +314,12 @@ sandbox, messaging, and review contracts are defined in
   than a separate full-screen page.
 - A compact, grouped Code Task Library with on-demand search and one
   current-task workspace; rename and delete stay inline in the affected row.
-- A dedicated, read-only Code Memory workspace with complete-store retrieval,
-  retention and lifecycle summaries, content/entity search, combinable filters,
-  a lazy-loaded 3D knowledge graph, a chronological timeline, and memory/entity
-  inspectors. The graph defaults to a focused projection and can switch to a
-  bounded whole-store panorama without sending unbounded topology into the
-  force simulation.
+- A dedicated Code Memory workspace with complete-store retrieval,
+  plain-language search and filters, a lazy-loaded 3D relationship view, a
+  chronological list, and focused memory/entity detail. Internal scores, paths,
+  raw fields, and identifiers are not shown. A separate Learning tab shows
+  only items that need review by default and supports save, ignore, reconsider,
+  update, and recoverable version rollback.
 - A continuous task conversation with Workspace and Activity opened as
   contextual right-side views.
 - Natural-language task composition with a searchable recent-workspace picker,
@@ -412,6 +421,19 @@ nodes and 4,000 relations, while always reporting rendered and complete totals.
 An accessible node browser provides keyboard selection outside the canvas.
 Refresh failure keeps the last successful snapshot visible with an inline
 retry.
+
+Learning candidates come from the CLI's LLM-structured memory evolution
+service; the browser does not infer them with keyword rules. Matching evidence
+accumulates across sessions, and a conflict-free candidate can become a local
+versioned asset automatically only after strict maturity thresholds. It is
+never published automatically. The default list contains ready candidates and
+saved candidates with updates. Saving, returning to the unmaterialized
+baseline, or restoring a learned preference or method uses the typed Evolution
+API. Preference instructions are injected into bounded prompt context, Skills
+are loaded into the registry, and the activation barrier clears only after all
+affected live sessions rebuild successfully. Existing versions, audit history,
+and recovery actions remain available in a collapsed History section without
+crowding the review flow.
 
 Memory visualization is intentionally non-destructive. Manual consolidation,
 forgetting, and knowledge-base mutation remain excluded until those actions
