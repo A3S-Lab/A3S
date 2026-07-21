@@ -9,7 +9,7 @@
 
 use std::fs::{File, OpenOptions};
 use std::io::Write;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{bail, Context};
@@ -19,6 +19,12 @@ use fs2::FileExt;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+
+mod validation;
+
+use validation::{
+    decode_hex, validate_absolute_path, validate_artifact_url, validate_identifier, validate_sha256,
+};
 
 pub const SIGNED_TARGET_SCHEMA_VERSION: u32 = 1;
 pub const FLEET_RECEIPT_SCHEMA_VERSION: u32 = 1;
@@ -930,71 +936,6 @@ fn sync_directory(_path: &Path) -> anyhow::Result<()> {
 
 fn same_target(left: &SignedTargetMetadata, right: &SignedTargetMetadata) -> bool {
     left == right
-}
-
-fn validate_identifier(value: &str, label: &str) -> anyhow::Result<()> {
-    if value.is_empty()
-        || value.len() > 128
-        || !value
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
-    {
-        bail!("{label} must be a bounded ASCII identifier");
-    }
-    Ok(())
-}
-
-fn validate_sha256(value: &str) -> anyhow::Result<()> {
-    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        bail!("artifact SHA-256 must contain exactly 64 hexadecimal characters");
-    }
-    if value.bytes().any(|byte| byte.is_ascii_uppercase()) {
-        bail!("artifact SHA-256 must use lowercase hexadecimal");
-    }
-    Ok(())
-}
-
-fn validate_artifact_url(value: &str) -> anyhow::Result<()> {
-    if value.len() > 2048 {
-        bail!("artifact URL is too long");
-    }
-    let url = url::Url::parse(value).context("artifact URL is invalid")?;
-    if url.scheme() != "https"
-        || url.host_str().is_none()
-        || !url.username().is_empty()
-        || url.password().is_some()
-        || url.query().is_some()
-        || url.fragment().is_some()
-    {
-        bail!("artifact URL must be credential-free HTTPS without query or fragment data");
-    }
-    Ok(())
-}
-
-fn validate_absolute_path(path: &Path, label: &str) -> anyhow::Result<()> {
-    if !path.is_absolute()
-        || path
-            .components()
-            .any(|part| matches!(part, Component::ParentDir | Component::CurDir))
-    {
-        bail!("{label} must be an absolute path without traversal");
-    }
-    Ok(())
-}
-
-fn decode_hex<const N: usize>(value: &str, label: &str) -> anyhow::Result<[u8; N]> {
-    if value.len() != N * 2 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        bail!(
-            "{label} must contain exactly {} hexadecimal characters",
-            N * 2
-        );
-    }
-    let mut output = [0_u8; N];
-    for (index, chunk) in value.as_bytes().chunks_exact(2).enumerate() {
-        let text = std::str::from_utf8(chunk)?;
-        output[index] = u8::from_str_radix(text, 16)?;
-    }
-    Ok(output)
 }
 
 fn unix_seconds() -> u64 {
