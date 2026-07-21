@@ -14,9 +14,10 @@
 
 ## Overview
 
-A3S is the orchestration repository for A3S Code, A3S Box, A3S Bench, and their
-Rust-first platform components. Crates under `crates/` are independent git
-submodules, and applications live under `apps/`.
+A3S is the orchestration repository for A3S Code, A3S Box, A3S Bench, A3S
+Science, and their Rust-first platform components. Crates under `crates/` are
+independent git submodules, applications live under `apps/`, and reusable
+product packages live under `packages/`.
 
 The `a3s` command is the unified product entrypoint: `a3s code` launches the
 interactive coding agent, `a3s box` manages isolated runtimes, `a3s bench` runs
@@ -35,6 +36,7 @@ is Rust.
 | Area | Paths | Purpose |
 | --- | --- | --- |
 | Product surfaces | `crates/cli`, `crates/bench`, `apps/web`, `apps/box`, `apps/cloud`, `apps/docs` | CLI, browser workspace, benchmark control component, native app, Cloud control plane, and documentation site. |
+| Capability packages | `packages/science` | First-party scientific Skills, MCP data services, compute workflows, and research tooling. |
 | Agent runtime | `crates/code`, `crates/ahp`, `crates/acl`, `crates/common` | Sessions, tools, policy, protocol, config, and shared types. |
 | UI systems | `crates/tui`, `crates/gui`, `crates/webview` | Terminal UI, native RSX UI, and trusted WebView helpers. |
 | Use and retrieval | `crates/use`, `crates/search` | Browser, native Office, and OCR capability surfaces, external Use extensions, and search through the shared Browser runtime. |
@@ -50,6 +52,7 @@ is Rust.
 | [A3S Web](apps/web/) | 0.1.0 | Browser workspace for the A3S Code product, served by the local CLI. |
 | [A3S Box Desktop](apps/box/) | 0.1.0 | Native A3S Box management client. |
 | [A3S Cloud](apps/cloud/) | 0.1.0 | Multi-tenant control plane, node agent, and versioned Cloud contracts. |
+| [A3S Science](packages/science/) | — | Scientific Skill catalog, MCP data services, compute workflows, and research tooling. |
 | [a3s](crates/cli/) | 0.9.1 | End-user CLI and typed component-management entrypoint. |
 | [a3s-code](crates/code/) | core and SDKs 5.3.1 | Rust agent runtime plus Node and Python SDK bindings. |
 | [a3s-gui](crates/gui/) | 0.1.0 | Native GUI runtime with hooks, RSX templates, semantic UI, and platform hosts. |

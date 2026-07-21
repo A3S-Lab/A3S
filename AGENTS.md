@@ -11,6 +11,8 @@ a3s/
 ├── apps/
 │   ├── cloud/        # Cloud control plane and node agent (submodule)
 │   └── docs/         # Documentation site
+├── packages/
+│   └── science/      # Scientific Skills and research tooling (submodule)
 ├── crates/           # Rust crates as submodules
 │   ├── acl/ ahp/ box/ code/ event/ flow/ gateway/
 │   ├── lane/ memory/ orm/ power/ runtime/ search/ use/
@@ -24,7 +26,7 @@ Root rules:
 - Do not create `Cargo.toml`, `src/`, or a Rust workspace in the repository root.
 - Do not run `cargo init` or `cargo new` in the repository root.
 - The root `justfile` is for monorepo orchestration only; do not treat root as a Rust crate.
-- Work inside the relevant submodule or application directory.
+- Work inside the relevant submodule, application, or package directory.
 - The root git remote should point to `git@github.com:A3S-Lab/a3s.git`.
 
 ## Git Safety

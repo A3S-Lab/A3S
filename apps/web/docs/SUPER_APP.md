@@ -219,6 +219,8 @@ sidebar, but the Activity Bar and primary action remain available.
 The current implementation activates Code only:
 
 - Work and Science buttons remain visible and announce coming soon;
+- Science's first-party capability catalog is maintained in
+  `packages/science`, while its interactive workspace remains roadmap work;
 - future products do not navigate to placeholder workspaces;
 - Settings is the only shared shell destination in the Activity Bar;
 - Account remains available inside Settings;

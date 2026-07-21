@@ -73,3 +73,6 @@
 [submodule "crates/use"]
 	path = crates/use
 	url = git@github.com:A3S-Lab/Use.git
+[submodule "packages/science"]
+	path = packages/science
+	url = git@github.com:A3S-Lab/Science.git
