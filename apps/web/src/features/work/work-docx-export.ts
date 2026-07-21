@@ -591,21 +591,18 @@ async function imageToDocx(element: HTMLImageElement, docx: typeof import('docx'
   const alt = element.getAttribute('alt') || element.getAttribute('title') || 'Image';
   if (!source) return new docx.TextRun(`[${alt}]`);
   try {
-    const blob = await fetch(source).then((response) => {
-      if (!response.ok) throw new Error(`Image request failed with HTTP ${response.status}`);
-      return response.blob();
-    });
-    const type = docxImageType(blob.type, source);
+    const image = await loadImageSource(source);
+    const type = docxImageType(image.contentType, source);
     if (!type) return new docx.TextRun(`[${alt}]`);
     const dimensions =
       element.width > 0 && element.height > 0
         ? { width: element.width, height: element.height }
-        : await imageDimensions(blob);
+        : await imageDimensions(new Blob([image.data], { type: image.contentType }));
     const maximumWidth = 520;
     const scale = Math.min(1, maximumWidth / Math.max(1, dimensions.width));
     return new docx.ImageRun({
       type,
-      data: await blob.arrayBuffer(),
+      data: image.data,
       transformation: {
         width: Math.max(24, Math.round(dimensions.width * scale)),
         height: Math.max(24, Math.round(dimensions.height * scale)),
@@ -615,6 +612,27 @@ async function imageToDocx(element: HTMLImageElement, docx: typeof import('docx'
   } catch {
     return new docx.TextRun(`[${alt}]`);
   }
+}
+
+async function loadImageSource(source: string): Promise<{ contentType: string; data: ArrayBuffer }> {
+  if (!source.toLowerCase().startsWith('data:')) {
+    const response = await fetch(source);
+    if (!response.ok) throw new Error(`Image request failed with HTTP ${response.status}`);
+    return {
+      contentType: response.headers.get('content-type') ?? '',
+      data: await response.arrayBuffer(),
+    };
+  }
+
+  const comma = source.indexOf(',');
+  if (comma < 0) throw new Error('Image data URL has no payload');
+  const metadata = source.slice(5, comma).split(';');
+  const contentType = metadata[0] || 'application/octet-stream';
+  const payload = decodeURIComponent(source.slice(comma + 1));
+  const bytes = metadata.some((value) => value.toLowerCase() === 'base64')
+    ? Uint8Array.from(atob(payload), (character) => character.charCodeAt(0))
+    : new TextEncoder().encode(payload);
+  return { contentType, data: bytes.buffer };
 }
 
 function docxImageType(contentType: string, source: string): 'jpg' | 'png' | 'gif' | 'bmp' | null {
