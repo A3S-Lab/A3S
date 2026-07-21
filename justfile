@@ -76,16 +76,16 @@ windhole-check:
     cd apps/windhole && just check
 
 # ============================================================================
-# A3S Box Desktop
+# A3S Desktop
 # ============================================================================
 
-# Start the native A3S Box desktop client
-box:
-    cd apps/box && cargo run --locked
+# Start the native A3S Code desktop app
+desktop:
+    cd apps/desktop && cargo run --locked
 
-# Test the native A3S Box desktop client
-box-check:
-    cd apps/box && cargo test --locked --all-targets
+# Test the native A3S Code desktop app
+desktop-check:
+    cd apps/desktop && cargo test --locked --all-targets
 
 # ============================================================================
 # A3S Flow

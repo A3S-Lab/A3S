@@ -60,7 +60,7 @@ selected product exposes them.
 
 | Area | Paths | Purpose |
 | --- | --- | --- |
-| Product surfaces | `crates/cli`, `crates/bench`, `apps/web`, `apps/box`, `apps/cloud`, `apps/docs` | CLI, browser workspace, benchmark control component, native app, Cloud control plane, and documentation site. |
+| Product surfaces | `crates/cli`, `crates/bench`, `apps/web`, `apps/desktop`, `apps/cloud`, `apps/docs` | CLI, browser workspace, benchmark control component, native app, Cloud control plane, and documentation site. |
 | Capability packages | `packages/science` | First-party scientific Skills, MCP data services, compute workflows, and research tooling. |
 | Agent runtime | `crates/code`, `crates/ahp`, `crates/acl`, `crates/common` | Sessions, tools, policy, protocol, config, and shared types. |
 | UI systems | `crates/tui`, `crates/gui`, `crates/webview` | Terminal UI, native RSX UI, and trusted WebView helpers. |
@@ -716,8 +716,8 @@ just web
 # Exercise real Use hot-plug and release-shaped Code first-use.
 just use-hotplug-e2e
 
-# Run the A3S Box desktop client.
-just box
+# Run the native A3S Code desktop app.
+just desktop
 
 # Test the GUI runtime and RSX support.
 cd crates/gui
