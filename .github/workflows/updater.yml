@@ -37,7 +37,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Test all targets
-        run: cargo test --all-targets --locked
+        run: cargo test --all-targets
 
       - name: Lint all targets
-        run: cargo clippy --all-targets --locked -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings

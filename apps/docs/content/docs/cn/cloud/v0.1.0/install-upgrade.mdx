@@ -68,7 +68,7 @@ curl --fail http://127.0.0.1:8080/api/v1/openapi.json > /dev/null
    全部通过前，保留旧二进制与备份。
 
 工作负载 A 到 B 更新以及克隆 revision 回滚是 **Verified** E0 操作。control-plane
-二进制打包与无人值守 fleet rollout 不是。`a3s-updater` 0.4.0 提供
+二进制打包与无人值守 fleet rollout 不是。当前 `a3s-updater` 源码提供
 **Experimental** 的 node-agent/Gateway 签名健康门禁事务，但此快照尚未把它接入
 Cloud fleet scheduling，也没有对应运维命令。
 

@@ -89,7 +89,7 @@ component "updater" {
   package = "a3s-updater"
   path = "crates/updater"
   source = "workspace"
-  version = "0.4.0"
+  version = "0.3.0"
 }
 protocol "cloud-gateway-snapshot" {
   level = 2

@@ -20,7 +20,7 @@
     "orm": { "version": "0.1.0", "revision": "6fdeae38032a5134e858cf3985f47d60cb5180ac" },
     "runtime": { "version": "0.2.0", "revision": "cfaac63af6f76beebdc64a1ec228cedc42bb98ec" },
     "sentry": { "version": "0.7.0", "revision": "c1b45120662224fe1f3065d6888da0d291b4ff07" },
-    "updater": { "version": "0.4.0", "source": "workspace" }
+    "updater": { "version": "0.3.0", "source": "workspace" }
   },
   "protocols": {
     "cloud-gateway-snapshot": { "level": 2, "schema": "a3s.cloud.gateway-snapshot.v2" },
