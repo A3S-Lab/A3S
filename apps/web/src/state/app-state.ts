@@ -44,8 +44,7 @@ const initialTaskProduct: TaskProduct = initialShellState.activeProduct === 'wor
 const initialTaskState = createTaskState(initialTaskProduct);
 const initialTaskKey = taskDraftKey(initialTaskState.activeSessionId, initialTaskProduct);
 const initialWorkspaceState = createWorkspaceState(initialTaskKey);
-const initialWorkspaceSnapshot =
-  initialWorkspaceState.workspaceSnapshotsByTask[initialTaskKey];
+const initialWorkspaceSnapshot = initialWorkspaceState.workspaceSnapshotsByTask[initialTaskKey];
 if (initialWorkspaceSnapshot) initialShellState.taskView = initialWorkspaceSnapshot.taskView;
 
 export const appState = proxy<AppState>({

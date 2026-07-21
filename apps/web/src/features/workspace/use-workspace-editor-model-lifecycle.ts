@@ -15,7 +15,13 @@ export function useWorkspaceEditorModelLifecycle(): void {
       addFileTabModelPaths(retained, snapshot.state.editorModelScope, snapshot.state.editorTabs);
     }
     return retained;
-  }, [state.activeProduct, state.activeSessionId, state.editorModelScope, state.editorTabs, state.workspaceSnapshotsByTask]);
+  }, [
+    state.activeProduct,
+    state.activeSessionId,
+    state.editorModelScope,
+    state.editorTabs,
+    state.workspaceSnapshotsByTask,
+  ]);
 
   useEffect(() => {
     if (state.activeProduct === 'work') return;

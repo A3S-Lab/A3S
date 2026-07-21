@@ -17,14 +17,7 @@ import {
   showToast,
   switchActiveTask,
 } from '../../state/app-state';
-import type {
-  AgentEvent,
-  ChatMessage,
-  CodeSession,
-  QueuedTurn,
-  SessionControls,
-  TurnQueue,
-} from '../../types/api';
+import type { AgentEvent, ChatMessage, CodeSession, QueuedTurn, SessionControls, TurnQueue } from '../../types/api';
 import { parseGoalCommand, type GoalCommand } from './goal-command';
 import {
   beginSessionControlsRequest,
