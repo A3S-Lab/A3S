@@ -179,7 +179,10 @@ export function SpreadsheetEditor({
   const printSettingCount = spreadsheetPrintSettingCount(content);
   const formulaCount = useMemo(() => spreadsheetFormulaCount(materializedContent), [materializedContent]);
   const pivotCount = useMemo(() => spreadsheetPivotCount(materializedContent), [materializedContent]);
-  const workbookSheets = useMemo(() => spreadsheetSheetsWithChartPreviews(materializedContent), [materializedContent]);
+  const workbookSheets = useMemo(
+    () => spreadsheetSheetsWithChartPreviews(materializedContent).map(prepareSpreadsheetWorkbookSheet),
+    [materializedContent]
+  );
   const chartPreviewKey = workbookSheets
     .flatMap((sheet) =>
       (sheet.images ?? [])
@@ -363,7 +366,7 @@ export function SpreadsheetEditor({
       >
         <Workbook
           ref={workbookRef}
-          key={`${preview ? 'spreadsheet-preview' : 'spreadsheet-edit'}:${conditionalFormatKey}:${protectionKey}:${chartPreviewKey}`}
+          key={`spreadsheet:${conditionalFormatKey}:${protectionKey}:${chartPreviewKey}`}
           data={workbookSheets}
           lang='zh'
           allowEdit={!preview}
@@ -436,6 +439,41 @@ export function SpreadsheetEditor({
       )}
     </section>
   );
+}
+
+function prepareSpreadsheetWorkbookSheet(
+  sheet: WorkSpreadsheetContent['sheets'][number]
+): WorkSpreadsheetContent['sheets'][number] {
+  const selections = sheet.luckysheet_select_save?.length
+    ? sheet.luckysheet_select_save.map((selection) => {
+        const rowStart = finiteSelectionIndex(selection.row[0], 0);
+        const columnStart = finiteSelectionIndex(selection.column[0], 0);
+        return {
+          ...selection,
+          row: [rowStart, finiteSelectionIndex(selection.row[1], rowStart)],
+          column: [columnStart, finiteSelectionIndex(selection.column[1], columnStart)],
+          row_focus: finiteSelectionIndex(selection.row_focus, rowStart),
+          column_focus: finiteSelectionIndex(selection.column_focus, columnStart),
+        };
+      })
+    : [
+        {
+          row: [0, 0],
+          column: [0, 0],
+          row_focus: 0,
+          column_focus: 0,
+        },
+      ];
+  const celldata = sheet.data
+    ? sheet.data.flatMap((row, rowIndex) =>
+        row.flatMap((cell, columnIndex) => (cell ? [{ r: rowIndex, c: columnIndex, v: cell }] : []))
+      )
+    : sheet.celldata;
+  return { ...sheet, celldata, luckysheet_select_save: selections };
+}
+
+function finiteSelectionIndex(value: number | undefined, fallback: number): number {
+  return Number.isFinite(value) && value !== undefined ? value : fallback;
 }
 
 function SpreadsheetRibbonTool({
