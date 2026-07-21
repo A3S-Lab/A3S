@@ -1,0 +1,131 @@
+name: Installers
+
+on:
+  push:
+    paths:
+      - ".gitattributes"
+      - "install.sh"
+      - "install.ps1"
+      - "scripts/test-install.sh"
+      - "scripts/test-install.ps1"
+      - ".github/workflows/installers.yml"
+      - "README.md"
+  pull_request:
+    paths:
+      - ".gitattributes"
+      - "install.sh"
+      - "install.ps1"
+      - "scripts/test-install.sh"
+      - "scripts/test-install.ps1"
+      - ".github/workflows/installers.yml"
+      - "README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unix-tests:
+    name: Unix fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check shell syntax
+        run: |
+          sh -n install.sh
+          bash -n scripts/test-install.sh
+
+      - name: Run installer fixtures
+        run: bash scripts/test-install.sh
+
+  windows-tests:
+    name: Windows fixtures
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $files = 'install.ps1', 'scripts/test-install.ps1'
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $file), [ref]$tokens, [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -ne 0) {
+              throw ($errors | ForEach-Object { $_.ToString() } | Out-String)
+            }
+          }
+
+      - name: Test with Windows PowerShell 5.1
+        shell: powershell
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-install.ps1
+
+      - name: Test with PowerShell 7
+        shell: pwsh
+        run: ./scripts/test-install.ps1
+
+  unix-release-smoke:
+    name: ${{ matrix.name }} release
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x64
+            os: ubuntu-latest
+          - name: macOS
+            os: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install latest release
+        env:
+          A3S_GITHUB_TOKEN: ${{ github.token }}
+          A3S_INSTALL_DIR: ${{ runner.temp }}/a3s-smoke/bin
+          A3S_DATA_HOME: ${{ runner.temp }}/a3s-smoke/data
+        run: sh install.sh --no-modify-path
+
+      - name: Verify binary and Web workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          binary="${RUNNER_TEMP}/a3s-smoke/bin/a3s"
+          version="$("$binary" --version | awk '{ print $2 }')"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test -f "${RUNNER_TEMP}/a3s-smoke/data/web/${version}/index.html"
+
+  windows-release-smoke:
+    name: Windows x64 release
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install and verify latest release
+        shell: powershell
+        env:
+          A3S_GITHUB_TOKEN: ${{ github.token }}
+          A3S_DATA_HOME: ${{ runner.temp }}\a3s-smoke\data
+        run: |
+          $installDir = Join-Path $env:RUNNER_TEMP 'a3s-smoke\bin'
+          & .\install.ps1 -InstallDir $installDir
+          $binary = Join-Path $installDir 'a3s.exe'
+          $output = (& $binary --version | Out-String).Trim()
+          if ($output -notmatch '^a3s (\d+\.\d+\.\d+)$') {
+            throw "unexpected version output: $output"
+          }
+          $index = Join-Path $env:A3S_DATA_HOME "web\$($Matches[1])\index.html"
+          if (-not (Test-Path -LiteralPath $index -PathType Leaf)) {
+            throw "missing Web workspace: $index"
+          }

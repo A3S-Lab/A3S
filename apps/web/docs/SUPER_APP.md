@@ -236,8 +236,9 @@ The current implementation activates Code, Memory, and verified plugin views:
   document, spreadsheet, or presentation handlers; its
   complete filesystem-first contract is defined in
   [WORK_OFFICE.md](WORK_OFFICE.md);
-- installed packages such as `a3s/science` may contribute real views; there are
-  no coming-soon product buttons or placeholder workspaces;
+- installed packages such as `a3s/science` may contribute real views; its
+  first-party capability catalog is maintained under `packages/science`, and
+  there are no coming-soon product buttons or placeholder workspaces;
 - Memory is an owned Code capability shortcut; Marketplace and Settings are
   shared shell destinations;
 - Account remains available inside Settings;
