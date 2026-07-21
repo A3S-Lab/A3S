@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react';
+import { Cloud, Grid2X2, PanelsTopLeft, Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { WorkspaceContextMenu } from '../../workspace/components/workspace-context-menu';
 import { presentationAgentMenuItems } from '../components/work-editor-agent-menus';
@@ -25,6 +25,14 @@ import { PresentationChartPanel } from './presentation-chart-panel';
 import { presentationCommentCount, PresentationCommentsPanel } from './presentation-comments-panel';
 import { PresentationDesignPanel, type PresentationDesignMode } from './presentation-design-panel';
 import {
+  clamp,
+  fileToDataUrl,
+  newSlide,
+  structuredCopy,
+  updatePresentationElements,
+  updateSlide,
+} from './presentation-editor-operations';
+import {
   EditableSlideTable,
   RichEditableText,
   SlideCanvas,
@@ -33,14 +41,16 @@ import {
   slideTextStyle,
 } from './presentation-slide-canvas';
 import { PresentationToolbar } from './presentation-toolbar';
-import { PresentationTransitionPanel } from './presentation-transition-panel';
 import { usePresentationClipboard } from './use-presentation-clipboard';
+import { WorkOfficeStatusBar, WorkOfficeZoomControls } from './work-office-chrome';
 
 interface PresentationEditorProps {
   content: WorkPresentationContent;
   preview: boolean;
+  saveStatus?: string;
   onChange: (content: WorkPresentationContent) => void;
   onAgentRequest?: (request: WorkEditorAgentRequest) => void | Promise<void>;
+  onStartSlideshow?: () => void;
 }
 
 interface DragState {
@@ -64,7 +74,14 @@ interface PresentationAgentMenuState {
   elementId: string | null;
 }
 
-export function PresentationEditor({ content, preview, onChange, onAgentRequest }: PresentationEditorProps) {
+export function PresentationEditor({
+  content,
+  preview,
+  saveStatus = '已自动保存',
+  onChange,
+  onAgentRequest,
+  onStartSlideshow,
+}: PresentationEditorProps) {
   const contentRef = useRef(content);
   const [selectedSlideId, setSelectedSlideId] = useState(content.slides[0]?.id ?? '');
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
@@ -73,6 +90,8 @@ export function PresentationEditor({ content, preview, onChange, onAgentRequest 
   const [designMode, setDesignMode] = useState<PresentationDesignMode>('slide');
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [agentMenu, setAgentMenu] = useState<PresentationAgentMenuState | null>(null);
+  const [viewMode, setViewMode] = useState<'normal' | 'sorter'>('normal');
+  const [zoom, setZoom] = useState(90);
   const canvasRef = useRef<HTMLElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -544,6 +563,20 @@ export function PresentationEditor({ content, preview, onChange, onAgentRequest 
         editingDesign={designMode !== 'slide'}
         onToggleDesign={toggleDesignPanel}
         background={activeBackground}
+        transition={selectedSlide.transition}
+        onTransitionChange={(transition) =>
+          updateSlide(content, selectedSlide.id, (slide) => ({ ...slide, transition }), onChange)
+        }
+        onApplyTransitionToAll={() =>
+          onChange({
+            ...content,
+            slides: content.slides.map((slide) => ({
+              ...slide,
+              transition: selectedSlide.transition ? structuredCopy(selectedSlide.transition) : undefined,
+            })),
+          })
+        }
+        onStartSlideshow={onStartSlideshow}
       />
       {designOpen && selectedLayout && selectedMaster && (
         <PresentationDesignPanel
@@ -648,26 +681,222 @@ export function PresentationEditor({ content, preview, onChange, onAgentRequest 
           onClose={() => setSelectedElementId(null)}
         />
       )}
-      {designMode === 'slide' && (
-        <PresentationTransitionPanel
-          transition={selectedSlide.transition}
-          onChange={(transition) =>
-            updateSlide(content, selectedSlide.id, (slide) => ({ ...slide, transition }), onChange)
-          }
-          onApplyToAll={() =>
-            onChange({
-              ...content,
-              slides: content.slides.map((slide) => ({
-                ...slide,
-                transition: selectedSlide.transition ? structuredCopy(selectedSlide.transition) : undefined,
-              })),
-            })
-          }
-        />
-      )}
+      {viewMode === 'normal' ? (
+        <div className='work-presentation-layout'>
+          <aside className='work-slide-strip' aria-label='幻灯片'>
+            {content.slides.map((slide, index) => (
+              <button
+                type='button'
+                className={slide.id === selectedSlide.id ? 'active' : ''}
+                key={slide.id}
+                onClick={() => {
+                  setSelectedSlideId(slide.id);
+                  setSelectedElementId(null);
+                  setDesignMode('slide');
+                }}
+                onContextMenu={(event) => {
+                  setSelectedSlideId(slide.id);
+                  setSelectedElementId(null);
+                  openAgentMenu(event, slide, index);
+                }}
+              >
+                <span>{index + 1}</span>
+                <SlideCanvas content={designContent} slide={slide} interactive={false} aspectRatio={aspectRatio} />
+              </button>
+            ))}
+            <button type='button' className='work-slide-add' onClick={addSlide}>
+              <Plus size={15} />
+              添加幻灯片
+            </button>
+          </aside>
 
-      <div className='work-presentation-layout'>
-        <aside className='work-slide-strip' aria-label='幻灯片'>
+          <div className='work-slide-stage' onPointerMove={continueDrag} onPointerUp={() => (dragRef.current = null)}>
+            <section
+              ref={canvasRef}
+              className='work-slide-canvas interactive'
+              aria-label={canvasName}
+              style={{
+                background: activeBackground,
+                aspectRatio,
+                width: `${zoom}%`,
+                maxWidth: `${(1050 * zoom) / 100}px`,
+              }}
+              onPointerDown={() => setSelectedElementId(null)}
+              onContextMenu={(event) => {
+                if (designMode !== 'slide') return;
+                openAgentMenu(
+                  event,
+                  selectedSlide,
+                  content.slides.findIndex((slide) => slide.id === selectedSlide.id)
+                );
+              }}
+            >
+              {inheritedElements.map((element) => (
+                <SlideElementPreview element={element} key={`inherited:${element.id}`} origin='inherited' />
+              ))}
+              {placeholderGuides.map((definition) => (
+                <button
+                  type='button'
+                  className='work-slide-placeholder-guide'
+                  key={`placeholder:${definition.placeholder?.key ?? definition.id}`}
+                  style={slideElementStyle(definition)}
+                  aria-label={`添加${definition.placeholder?.type === 'title' ? '标题' : '内容'}占位符`}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    const element: WorkSlideElement = {
+                      ...structuredCopy(definition),
+                      id: createWorkId('element'),
+                      text: '',
+                      textRuns: undefined,
+                    };
+                    updatePresentationElements(
+                      designContent,
+                      'slide',
+                      selectedSlide.id,
+                      (elements) => [...elements, element],
+                      onChange
+                    );
+                    setSelectedElementId(element.id);
+                  }}
+                >
+                  {definition.placeholder?.prompt ?? '单击添加内容'}
+                </button>
+              ))}
+              {activeElements.map((element) => (
+                <fieldset
+                  className={`work-slide-element ${element.type} ${element.placeholder ? 'placeholder' : ''} ${
+                    element.id === selectedElementId ? 'selected' : ''
+                  }`}
+                  key={element.id}
+                  data-slide-element-origin={designMode}
+                  style={slideElementStyle(element)}
+                  onFocus={() => setSelectedElementId(element.id)}
+                  onContextMenu={(event) => {
+                    setSelectedElementId(element.id);
+                    if (designMode !== 'slide') return;
+                    openAgentMenu(
+                      event,
+                      selectedSlide,
+                      content.slides.findIndex((slide) => slide.id === selectedSlide.id),
+                      element
+                    );
+                  }}
+                  onPointerDown={(event) => {
+                    if (
+                      event.target instanceof HTMLTextAreaElement ||
+                      (event.target instanceof HTMLElement && event.target.closest('[data-slide-editor]'))
+                    ) {
+                      setSelectedElementId(element.id);
+                      event.stopPropagation();
+                      return;
+                    }
+                    beginDrag(event, element, 'move');
+                  }}
+                >
+                  <legend className='sr-only'>{element.altText?.trim() || element.text?.trim() || '幻灯片元素'}</legend>
+                  {element.type === 'image' && element.image ? (
+                    <img src={element.image.dataUrl} alt={element.altText ?? element.image.name} draggable={false} />
+                  ) : element.type === 'table' && element.table ? (
+                    <EditableSlideTable
+                      element={element}
+                      onChange={(rows) => updateElement({ table: { ...element.table, rows } })}
+                    />
+                  ) : element.type === 'chart' && element.chart ? (
+                    <SlideChart chart={element.chart} label={element.altText ?? element.chart.title ?? '图表'} />
+                  ) : element.textRuns?.length ? (
+                    <RichEditableText
+                      element={element}
+                      onCommit={(text) => updateElement({ text, textRuns: undefined })}
+                    />
+                  ) : element.text || element.type === 'text' || element.type === 'shape' ? (
+                    <textarea
+                      value={element.text}
+                      aria-label='幻灯片文本'
+                      placeholder={element.placeholder?.prompt}
+                      spellCheck
+                      style={slideTextStyle(element)}
+                      onFocus={() => setSelectedElementId(element.id)}
+                      onChange={(event) => {
+                        setSelectedElementId(element.id);
+                        updateElement({ text: event.target.value, textRuns: undefined });
+                      }}
+                    />
+                  ) : null}
+                  {element.id === selectedElementId && (
+                    <>
+                      <span
+                        className='work-slide-move-handle'
+                        aria-hidden='true'
+                        onPointerDown={(event) => beginDrag(event, element, 'move')}
+                      />
+                      <span
+                        className='work-slide-resize-handle'
+                        aria-hidden='true'
+                        onPointerDown={(event) => beginDrag(event, element, 'resize')}
+                      />
+                    </>
+                  )}
+                </fieldset>
+              ))}
+              {designMode === 'slide' &&
+                (selectedSlide.comments ?? []).map((comment, index) => (
+                  <button
+                    type='button'
+                    className={`work-presentation-comment-pin ${comment.id === activeCommentId ? 'active' : ''}`}
+                    key={comment.id}
+                    aria-label={`打开演示批注 ${index + 1}`}
+                    style={{ left: `${comment.x}%`, top: `${comment.y}%` }}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setActiveCommentId(comment.id);
+                      setCommentsOpen(true);
+                    }}
+                  >
+                    {index + 1}
+                  </button>
+                ))}
+            </section>
+            <footer>
+              <span>
+                {designMode === 'layout'
+                  ? `布局：${selectedLayout?.name ?? ''}`
+                  : designMode === 'master'
+                    ? `母版：${selectedMaster?.name ?? ''}`
+                    : `幻灯片 ${
+                        content.slides.findIndex((slide) => slide.id === selectedSlide.id) + 1
+                      } / ${content.slides.length}`}
+              </span>
+              <span>
+                {(content.width ?? 13.333).toFixed(2)} × {(content.height ?? 7.5).toFixed(2)}
+              </span>
+            </footer>
+            {designMode === 'slide' && (
+              <label className='work-slide-notes'>
+                <span>演讲者备注</span>
+                <textarea
+                  value={selectedSlide.notes ?? ''}
+                  placeholder='添加演讲者备注'
+                  onChange={(event) =>
+                    updateSlide(
+                      content,
+                      selectedSlide.id,
+                      (slide) => ({ ...slide, notes: event.target.value }),
+                      onChange
+                    )
+                  }
+                />
+              </label>
+            )}
+          </div>
+        </div>
+      ) : (
+        <section
+          className='work-presentation-sorter'
+          aria-label='幻灯片浏览视图'
+          style={{ '--work-presentation-sorter-width': `${Math.round(220 * (zoom / 100))}px` } as React.CSSProperties}
+        >
           {content.slides.map((slide, index) => (
             <button
               type='button'
@@ -676,195 +905,60 @@ export function PresentationEditor({ content, preview, onChange, onAgentRequest 
               onClick={() => {
                 setSelectedSlideId(slide.id);
                 setSelectedElementId(null);
-                setDesignMode('slide');
               }}
-              onContextMenu={(event) => {
-                setSelectedSlideId(slide.id);
-                setSelectedElementId(null);
-                openAgentMenu(event, slide, index);
-              }}
+              onDoubleClick={() => setViewMode('normal')}
             >
-              <span>{index + 1}</span>
               <SlideCanvas content={designContent} slide={slide} interactive={false} aspectRatio={aspectRatio} />
+              <span>{index + 1}</span>
+              <strong>{slide.name}</strong>
             </button>
           ))}
-          <button type='button' className='work-slide-add' onClick={addSlide}>
-            <Plus size={15} />
-            添加幻灯片
-          </button>
-        </aside>
-
-        <div className='work-slide-stage' onPointerMove={continueDrag} onPointerUp={() => (dragRef.current = null)}>
-          <section
-            ref={canvasRef}
-            className='work-slide-canvas interactive'
-            aria-label={canvasName}
-            style={{ background: activeBackground, aspectRatio }}
-            onPointerDown={() => setSelectedElementId(null)}
-            onContextMenu={(event) => {
-              if (designMode !== 'slide') return;
-              openAgentMenu(
-                event,
-                selectedSlide,
-                content.slides.findIndex((slide) => slide.id === selectedSlide.id)
-              );
-            }}
-          >
-            {inheritedElements.map((element) => (
-              <SlideElementPreview element={element} key={`inherited:${element.id}`} origin='inherited' />
-            ))}
-            {placeholderGuides.map((definition) => (
-              <button
-                type='button'
-                className='work-slide-placeholder-guide'
-                key={`placeholder:${definition.placeholder?.key ?? definition.id}`}
-                style={slideElementStyle(definition)}
-                aria-label={`添加${definition.placeholder?.type === 'title' ? '标题' : '内容'}占位符`}
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  const element: WorkSlideElement = {
-                    ...structuredCopy(definition),
-                    id: createWorkId('element'),
-                    text: '',
-                    textRuns: undefined,
-                  };
-                  updatePresentationElements(
-                    designContent,
-                    'slide',
-                    selectedSlide.id,
-                    (elements) => [...elements, element],
-                    onChange
-                  );
-                  setSelectedElementId(element.id);
-                }}
-              >
-                {definition.placeholder?.prompt ?? '单击添加内容'}
-              </button>
-            ))}
-            {activeElements.map((element) => (
-              <fieldset
-                className={`work-slide-element ${element.type} ${element.placeholder ? 'placeholder' : ''} ${
-                  element.id === selectedElementId ? 'selected' : ''
-                }`}
-                key={element.id}
-                data-slide-element-origin={designMode}
-                style={slideElementStyle(element)}
-                onFocus={() => setSelectedElementId(element.id)}
-                onContextMenu={(event) => {
-                  setSelectedElementId(element.id);
-                  if (designMode !== 'slide') return;
-                  openAgentMenu(
-                    event,
-                    selectedSlide,
-                    content.slides.findIndex((slide) => slide.id === selectedSlide.id),
-                    element
-                  );
-                }}
-                onPointerDown={(event) => {
-                  if (
-                    event.target instanceof HTMLTextAreaElement ||
-                    (event.target instanceof HTMLElement && event.target.closest('[data-slide-editor]'))
-                  ) {
-                    setSelectedElementId(element.id);
-                    event.stopPropagation();
-                    return;
-                  }
-                  beginDrag(event, element, 'move');
-                }}
-              >
-                <legend className='sr-only'>{element.altText?.trim() || element.text?.trim() || '幻灯片元素'}</legend>
-                {element.type === 'image' && element.image ? (
-                  <img src={element.image.dataUrl} alt={element.altText ?? element.image.name} draggable={false} />
-                ) : element.type === 'table' && element.table ? (
-                  <EditableSlideTable
-                    element={element}
-                    onChange={(rows) => updateElement({ table: { ...element.table, rows } })}
-                  />
-                ) : element.type === 'chart' && element.chart ? (
-                  <SlideChart chart={element.chart} label={element.altText ?? element.chart.title ?? '图表'} />
-                ) : element.textRuns?.length ? (
-                  <RichEditableText
-                    element={element}
-                    onCommit={(text) => updateElement({ text, textRuns: undefined })}
-                  />
-                ) : element.text || element.type === 'text' || element.type === 'shape' ? (
-                  <textarea
-                    value={element.text}
-                    aria-label='幻灯片文本'
-                    placeholder={element.placeholder?.prompt}
-                    spellCheck
-                    style={slideTextStyle(element)}
-                    onFocus={() => setSelectedElementId(element.id)}
-                    onChange={(event) => {
-                      setSelectedElementId(element.id);
-                      updateElement({ text: event.target.value, textRuns: undefined });
-                    }}
-                  />
-                ) : null}
-                {element.id === selectedElementId && (
-                  <>
-                    <span
-                      className='work-slide-move-handle'
-                      aria-hidden='true'
-                      onPointerDown={(event) => beginDrag(event, element, 'move')}
-                    />
-                    <span
-                      className='work-slide-resize-handle'
-                      aria-hidden='true'
-                      onPointerDown={(event) => beginDrag(event, element, 'resize')}
-                    />
-                  </>
-                )}
-              </fieldset>
-            ))}
-            {designMode === 'slide' &&
-              (selectedSlide.comments ?? []).map((comment, index) => (
-                <button
-                  type='button'
-                  className={`work-presentation-comment-pin ${comment.id === activeCommentId ? 'active' : ''}`}
-                  key={comment.id}
-                  aria-label={`打开演示批注 ${index + 1}`}
-                  style={{ left: `${comment.x}%`, top: `${comment.y}%` }}
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setActiveCommentId(comment.id);
-                    setCommentsOpen(true);
-                  }}
-                >
-                  {index + 1}
-                </button>
-              ))}
-          </section>
-          <footer>
-            <span>
-              {designMode === 'layout'
-                ? `布局：${selectedLayout?.name ?? ''}`
-                : designMode === 'master'
-                  ? `母版：${selectedMaster?.name ?? ''}`
-                  : `幻灯片 ${
-                      content.slides.findIndex((slide) => slide.id === selectedSlide.id) + 1
-                    } / ${content.slides.length}`}
-            </span>
-            <span>
-              {(content.width ?? 13.333).toFixed(2)} × {(content.height ?? 7.5).toFixed(2)}
-            </span>
-          </footer>
-          {designMode === 'slide' && (
-            <label className='work-slide-notes'>
-              <span>演讲者备注</span>
-              <textarea
-                value={selectedSlide.notes ?? ''}
-                placeholder='添加演讲者备注'
-                onChange={(event) =>
-                  updateSlide(content, selectedSlide.id, (slide) => ({ ...slide, notes: event.target.value }), onChange)
-                }
-              />
-            </label>
-          )}
-        </div>
-      </div>
+        </section>
+      )}
+      <WorkOfficeStatusBar
+        className='work-presentation-status'
+        controls={
+          <>
+            <button
+              type='button'
+              aria-label='普通演示视图'
+              title='普通演示视图'
+              aria-pressed={viewMode === 'normal'}
+              onClick={() => setViewMode('normal')}
+            >
+              <PanelsTopLeft size={13} />
+            </button>
+            <button
+              type='button'
+              aria-label='幻灯片浏览视图'
+              title='幻灯片浏览视图'
+              aria-pressed={viewMode === 'sorter'}
+              onClick={() => setViewMode('sorter')}
+            >
+              <Grid2X2 size={13} />
+            </button>
+            <span className='work-office-status-divider' />
+            <WorkOfficeZoomControls
+              zoom={zoom}
+              decreaseLabel='缩小演示文稿'
+              increaseLabel='放大演示文稿'
+              outputLabel='演示缩放比例'
+              sliderLabel='演示缩放'
+              onChange={setZoom}
+            />
+          </>
+        }
+      >
+        <output aria-label='幻灯片状态'>
+          幻灯片 {content.slides.findIndex((slide) => slide.id === selectedSlide.id) + 1} / {content.slides.length}
+        </output>
+        <output aria-label='演示备注状态'>{selectedSlide.notes?.trim() ? '已添加演讲者备注' : '无演讲者备注'}</output>
+        <output aria-label='演示批注状态'>批注：{presentationCommentCount(content.slides)}</output>
+        <output aria-label='演示保存状态' className='work-office-save-status'>
+          <Cloud size={12} />
+          {saveStatus}
+        </output>
+      </WorkOfficeStatusBar>
       {designMode === 'slide' && agentMenu && onAgentRequest && (
         <WorkspaceContextMenu
           label={agentMenu.target === 'element' ? '演示元素 AI 操作' : '幻灯片 AI 操作'}
@@ -895,87 +989,4 @@ export function PresentationEditor({ content, preview, onChange, onAgentRequest 
       )}
     </section>
   );
-}
-
-function updatePresentationElements(
-  content: WorkPresentationContent,
-  mode: PresentationDesignMode,
-  targetId: string,
-  update: (elements: WorkSlideElement[]) => WorkSlideElement[],
-  onChange: (content: WorkPresentationContent) => void
-) {
-  if (mode === 'slide') {
-    updateSlide(content, targetId, (slide) => ({ ...slide, elements: update(slide.elements) }), onChange);
-    return;
-  }
-  const normalized = withPresentationDesign(content);
-  if (mode === 'layout') {
-    onChange({
-      ...normalized,
-      layouts: normalized.layouts?.map((layout) =>
-        layout.id === targetId ? { ...layout, elements: update(structuredCopy(layout.elements)) } : layout
-      ),
-    });
-    return;
-  }
-  onChange({
-    ...normalized,
-    masters: normalized.masters?.map((master) =>
-      master.id === targetId ? { ...master, elements: update(structuredCopy(master.elements)) } : master
-    ),
-  });
-}
-
-function updateSlide(
-  content: WorkPresentationContent,
-  slideId: string,
-  update: (slide: WorkSlide) => WorkSlide,
-  onChange: (content: WorkPresentationContent) => void
-) {
-  onChange({
-    ...content,
-    slides: content.slides.map((slide) => (slide.id === slideId ? update(structuredCopy(slide)) : slide)),
-  });
-}
-
-function newSlide(number: number): WorkSlide {
-  return {
-    id: createWorkId('slide'),
-    name: `幻灯片 ${number}`,
-    background: '#ffffff',
-    elements: [
-      {
-        id: createWorkId('element'),
-        type: 'text',
-        x: 9,
-        y: 12,
-        width: 82,
-        height: 16,
-        text: '输入标题',
-        fontSize: 30,
-        color: '#172033',
-        fill: 'transparent',
-        bold: true,
-        align: 'left',
-      },
-    ],
-  };
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(Math.max(value, minimum), maximum);
-}
-
-function structuredCopy<T>(value: T): T {
-  if (typeof structuredClone === 'function') return structuredClone(value);
-  return JSON.parse(JSON.stringify(value)) as T;
-}
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener('load', () => resolve(String(reader.result)));
-    reader.addEventListener('error', () => reject(reader.error ?? new Error('Image could not be read')));
-    reader.readAsDataURL(file);
-  });
 }

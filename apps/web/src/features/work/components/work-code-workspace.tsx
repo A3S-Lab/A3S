@@ -187,15 +187,23 @@ export function WorkCodeWorkspace({
                   )}
                 </div>
               )}
-              <footer className='work-code-statusbar'>
-                <span>{workFileExtension(tab.path).toLocaleUpperCase() || 'Plain Text'}</span>
-                <div>
+              <output className='work-code-statusbar' aria-label='编辑器状态'>
+                <span className='work-code-statusbar-group'>
+                  <span>
+                    {isMarkdown(tab.path)
+                      ? 'Markdown'
+                      : workFileExtension(tab.path).toLocaleUpperCase() || 'Plain Text'}
+                  </span>
+                  <span>{tab.draft.split(/\r?\n/).length} 行</span>
+                  {isMarkdown(tab.path) && <span>左侧编辑 · 右侧实时预览</span>}
+                </span>
+                <span className='work-code-statusbar-group'>
                   <span>{tab.content === tab.draft ? '已保存' : '未保存'}</span>
                   <span>UTF-8</span>
                   <span>LF</span>
                   {!tab.loading && !tab.loadError && <span>{intelligenceStatus}</span>}
-                </div>
-              </footer>
+                </span>
+              </output>
             </section>
           )}
         </main>

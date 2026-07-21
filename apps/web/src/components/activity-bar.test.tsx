@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createCodeShellState } from '../features/code/code-state';
 import { appState } from '../state/app-state';
 import type { PluginActivityItem } from '../types/api';
 import { ActivityBar } from './activity-bar';
@@ -11,7 +12,7 @@ const sciencePlugin: PluginActivityItem = {
   version: '1.2.3',
   enabled: true,
   id: 'research',
-  title: 'Science',
+  title: '科研',
   description: 'Explore scientific sources.',
   icon: 'flask-conical',
   skill: 'a3s-use-science',
@@ -44,7 +45,20 @@ describe('A3S activity bar', () => {
     appState.settingsOpen = false;
   });
 
-  it('keeps Code first and replaces hardcoded products with enabled plugin contributions', async () => {
+  it('selects Code as the first and default destination on a fresh URL', () => {
+    window.history.replaceState(null, '', '/');
+    Object.assign(appState, createCodeShellState());
+    render(<ActivityBar />);
+
+    const buttons = screen.getAllByRole('button');
+    expect(buttons[0]).toHaveAttribute('aria-label', '编码');
+    expect(buttons[1]).toHaveAttribute('aria-label', '办公');
+    expect(buttons[0]).toHaveAttribute('aria-current', 'page');
+    expect(appState.activeProduct).toBe('code');
+    expect(appState.codeSurface).toBe('tasks');
+  });
+
+  it('keeps Code and Work built in while loading enabled plugin contributions', async () => {
     appState.pluginCatalog.items = [
       sciencePlugin,
       { ...sciencePlugin, key: 'search:find', route: 'search', id: 'find', title: 'Search', order: 20, icon: 'search' },
@@ -54,23 +68,30 @@ describe('A3S activity bar', () => {
 
     expect(screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
       '编码',
+      '办公',
       'Search',
-      'Science',
+      '科研',
       '记忆',
       '插件市场',
       '设置',
     ]);
-    expect(screen.queryByRole('button', { name: '办公' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /科学/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hidden' })).not.toBeInTheDocument();
+    const productSection = screen.getByRole('button', { name: '编码' }).parentElement;
+    expect(productSection).toHaveClass('activity-products');
+    expect(productSection).toContainElement(screen.getByRole('button', { name: '办公' }));
+    expect(productSection).toContainElement(screen.getByRole('button', { name: '科研' }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Science' }));
+    fireEvent.click(screen.getByRole('button', { name: '科研' }));
     expect(appState.activeProduct).toBe('plugin');
     expect(appState.activePluginKey).toBe('science:research');
     expect(window.location.hash).toBe('#plugin/science%3Aresearch');
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Science' })).toHaveAttribute('aria-current', 'page')
-    );
+    await waitFor(() => expect(screen.getByRole('button', { name: '科研' })).toHaveAttribute('aria-current', 'page'));
+
+    fireEvent.click(screen.getByRole('button', { name: '办公' }));
+    expect(appState.activeProduct).toBe('work');
+    expect(window.location.hash).toBe('#work/home');
+    await waitFor(() => expect(screen.getByRole('button', { name: '办公' })).toHaveAttribute('aria-current', 'page'));
   });
 
   it('opens the signed plugin marketplace as a system entry', async () => {
@@ -86,6 +107,11 @@ describe('A3S activity bar', () => {
 
   it('keeps settings in the system section', async () => {
     render(<ActivityBar />);
+    const systemSection = screen.getByRole('button', { name: '设置' }).parentElement;
+    expect(systemSection).toHaveClass('activity-system');
+    expect(systemSection).toContainElement(screen.getByRole('button', { name: '记忆' }));
+    expect(systemSection).toContainElement(screen.getByRole('button', { name: '插件市场' }));
+    expect(systemSection?.querySelectorAll('.activity-button')).toHaveLength(3);
     expect(screen.queryByRole('button', { name: '账户与连接' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '设置' })).toHaveAttribute('data-activity-tooltip', '设置');
     fireEvent.click(screen.getByRole('button', { name: '设置' }));

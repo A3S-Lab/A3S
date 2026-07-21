@@ -30,11 +30,12 @@ events or leaving the task:
 
 ## Current product boundary
 
-The Activity Bar keeps Code first and loads additional workbench views from
-verified A3S Use package contributions. It does not reserve hardcoded Work or
-Science placeholders. This document continues to define Code only. The owned
-Work route is governed by [WORK_OFFICE.md](WORK_OFFICE.md), while plugin trust
-and isolation are governed by [PLUGINS.md](PLUGINS.md).
+The Activity Bar keeps Code first and Work second as built-in products, then
+loads additional workbench views from verified A3S Use package contributions.
+It does not reserve hardcoded Research or Finance placeholders. This document
+continues to define Code only. The owned Work route is governed by
+[WORK_OFFICE.md](WORK_OFFICE.md), while plugin trust and isolation are governed
+by [PLUGINS.md](PLUGINS.md).
 
 A3S Code owns:
 
@@ -335,11 +336,12 @@ action are implemented.
 
 ## Deferred products and capabilities
 
-Work has a separate product contract and implementation boundary. Science
-requires separate product discovery before implementation. Task branching,
-memory mutation and manual consolidation, knowledge-base management, callable
-plugin UI APIs, automation authoring, remote workspaces, team collaboration, and
-mobile layouts are outside the current Code boundary.
+Work has a separate product contract and implementation boundary. Research and
+Finance workbenches remain installable package capabilities rather than Code
+features. Task branching, memory mutation and manual consolidation,
+knowledge-base management, callable plugin UI APIs, automation authoring,
+remote workspaces, team collaboration, and mobile layouts are outside the
+current Code boundary.
 
 Any future capability must first identify:
 

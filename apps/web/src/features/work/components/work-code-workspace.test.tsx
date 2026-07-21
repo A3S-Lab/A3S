@@ -64,6 +64,9 @@ describe('Work WebIDE workspace', () => {
     expect(screen.getByLabelText('Markdown 编辑区')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Markdown 实时预览' })).toHaveTextContent('Project');
     expect(screen.getByRole('region', { name: 'Markdown 实时预览' })).toHaveTextContent('Ready');
+    expect(screen.getByRole('status', { name: '编辑器状态' })).toHaveTextContent('Markdown');
+    expect(screen.getByRole('status', { name: '编辑器状态' })).toHaveTextContent('3 行');
+    expect(screen.getByRole('status', { name: '编辑器状态' })).toHaveTextContent('左侧编辑 · 右侧实时预览');
 
     fireEvent.change(screen.getByRole('textbox', { name: '模拟 Monaco 编辑器' }), {
       target: { value: '# Updated' },

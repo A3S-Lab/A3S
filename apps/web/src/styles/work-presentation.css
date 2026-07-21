@@ -7,6 +7,62 @@
   background: var(--a3s-bg);
 }
 
+.work-presentation-sorter {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: repeat(auto-fill, minmax(var(--work-presentation-sorter-width, 220px), 1fr));
+  align-content: start;
+  gap: 22px 18px;
+  padding: 30px;
+  overflow: auto;
+  background: color-mix(in srgb, var(--a3s-bg) 86%, #dfe3e9);
+}
+
+.work-presentation-sorter > button {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 7px;
+  padding: 8px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--a3s-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.work-presentation-sorter > button:hover {
+  background: color-mix(in srgb, var(--a3s-panel) 66%, transparent);
+}
+
+.work-presentation-sorter > button.active {
+  border-color: color-mix(in srgb, #db663b 68%, transparent);
+  background: var(--a3s-panel);
+}
+
+.work-presentation-sorter .work-slide-canvas {
+  grid-column: 1 / -1;
+  width: 100%;
+  box-shadow: 0 6px 18px rgb(26 30 43 / 13%);
+}
+
+.work-presentation-sorter > button > span {
+  color: var(--a3s-faint);
+  font-size: 9px;
+}
+
+.work-presentation-sorter > button > strong {
+  overflow: hidden;
+  color: var(--a3s-ink);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .presentation-toolbar {
   height: 44px;
   flex-basis: 44px;

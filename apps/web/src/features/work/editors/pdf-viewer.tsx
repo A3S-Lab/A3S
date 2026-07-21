@@ -1,215 +1,164 @@
-import { ChevronDown, ChevronUp, Download, Minus, Plus } from 'lucide-react';
-import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist';
-import { useEffect, useRef, useState } from 'react';
+import { PDFViewer, type ExportPlugin, type PluginRegistry } from '@embedpdf/react-pdf-viewer';
+import { AlertCircle, Check, Loader2, Save } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-let pdfRuntimePromise: Promise<typeof import('pdfjs-dist')> | null = null;
+type PdfSaveState = 'idle' | 'saving' | 'saved' | 'error';
 
-export function PdfViewer({ loadSource, onDownload }: { loadSource: () => Promise<Blob>; onDownload?: () => void }) {
-  const [document, setDocument] = useState<PDFDocumentProxy | null>(null);
-  const [zoom, setZoom] = useState(100);
-  const [page, setPage] = useState(1);
-  const [error, setError] = useState<string | null>(null);
-  const scrollerRef = useRef<HTMLDivElement>(null);
+const PDFIUM_WASM_PATH = '/workspace/vendor/embedpdf/pdfium.wasm';
+
+export function PdfViewer({
+  fileName = 'document.pdf',
+  loadSource,
+  onSave,
+  saveLabel = '保存到 A3S',
+  sourceKey,
+}: {
+  fileName?: string;
+  loadSource: () => Promise<Blob>;
+  onSave?: (pdf: Blob) => Promise<boolean>;
+  saveLabel?: string;
+  sourceKey?: string;
+}) {
+  const [sourceUrl, setSourceUrl] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [viewerReady, setViewerReady] = useState(false);
+  const [saveState, setSaveState] = useState<PdfSaveState>('idle');
+  const [retryCount, setRetryCount] = useState(0);
+  const registryRef = useRef<PluginRegistry | null>(null);
 
   useEffect(() => {
-    let current = true;
-    let loaded: PDFDocumentProxy | null = null;
+    let disposed = false;
+    let objectUrl: string | null = null;
+    registryRef.current = null;
+    setViewerReady(false);
+    setSaveState('idle');
+    setSourceUrl(null);
+    setLoadError(null);
+
     void loadSource()
-      .then(async (blob) => {
-        const runtime = await loadPdfRuntime();
-        loaded = await runtime.getDocument({ data: await blob.arrayBuffer() }).promise;
-        if (current) setDocument(loaded);
+      .then((source) => {
+        if (disposed) return;
+        objectUrl = URL.createObjectURL(
+          source.type === 'application/pdf' ? source : new Blob([source], { type: 'application/pdf' })
+        );
+        setSourceUrl(objectUrl);
       })
-      .catch((reason: unknown) => {
-        if (current) setError(pdfErrorMessage(reason));
+      .catch((error: unknown) => {
+        if (!disposed) setLoadError(pdfErrorMessage(error));
       });
+
     return () => {
-      current = false;
-      void loaded?.destroy();
+      disposed = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [loadSource]);
+  }, [loadSource, retryCount, sourceKey]);
 
-  const moveToPage = (next: number) => {
-    if (!document) return;
-    const target = Math.min(Math.max(next, 1), document.numPages);
-    setPage(target);
-    scrollerRef.current
-      ?.querySelector<HTMLElement>(`[data-pdf-page="${target}"]`)
-      ?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-  };
+  const savePdf = useCallback(async () => {
+    const registry = registryRef.current;
+    if (!registry || !onSave || saveState === 'saving') return;
+    setSaveState('saving');
+    try {
+      await registry.pluginsReady();
+      const exportPlugin = registry.getPlugin<ExportPlugin>('export');
+      if (!exportPlugin) throw new Error('EmbedPDF export plugin is unavailable.');
+      const buffer = await exportPlugin.provides().saveAsCopy().toPromise();
+      const saved = await onSave(new Blob([buffer], { type: 'application/pdf' }));
+      setSaveState(saved ? 'saved' : 'error');
+    } catch {
+      setSaveState('error');
+    }
+  }, [onSave, saveState]);
 
-  if (error) {
+  useEffect(() => {
+    if (!onSave) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      void savePdf();
+    };
+    window.addEventListener('keydown', onKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
+  }, [onSave, savePdf]);
+
+  if (loadError) {
     return (
       <section className='work-pdf-state error' role='alert'>
-        <strong>无法预览 PDF</strong>
-        <span>{error}</span>
-        {onDownload && (
-          <button type='button' onClick={onDownload}>
-            <Download size={14} />
-            下载原始文件
-          </button>
-        )}
+        <AlertCircle size={24} />
+        <strong>PDF 加载失败</strong>
+        <span>{loadError}</span>
+        <button type='button' onClick={() => setRetryCount((value) => value + 1)}>
+          重试
+        </button>
       </section>
     );
   }
-  if (!document) {
+
+  if (!sourceUrl) {
     return (
-      <output className='work-pdf-state'>
-        <span className='work-state-spinner' />
-        正在读取 PDF…
+      <output className='work-pdf-state' aria-live='polite'>
+        <Loader2 className='spin' size={22} />
+        正在加载 PDF…
       </output>
     );
   }
 
   return (
-    <section className='work-pdf-viewer'>
-      <div className='work-office-toolbar work-pdf-toolbar' role='toolbar' aria-label='PDF 预览工具栏'>
-        <button type='button' aria-label='上一页' disabled={page === 1} onClick={() => moveToPage(page - 1)}>
-          <ChevronUp size={15} />
-        </button>
-        <label>
-          <span>页码</span>
-          <input
-            type='number'
-            min={1}
-            max={document.numPages}
-            value={page}
-            aria-label='PDF 页码'
-            onChange={(event) => moveToPage(Number(event.target.value) || 1)}
-          />
-          <i>/ {document.numPages}</i>
-        </label>
-        <button
-          type='button'
-          aria-label='下一页'
-          disabled={page === document.numPages}
-          onClick={() => moveToPage(page + 1)}
-        >
-          <ChevronDown size={15} />
-        </button>
-        <span className='work-toolbar-divider' />
-        <button type='button' aria-label='缩小' disabled={zoom <= 50} onClick={() => setZoom((value) => value - 10)}>
-          <Minus size={15} />
-        </button>
-        <output aria-label='PDF 缩放比例'>{zoom}%</output>
-        <button type='button' aria-label='放大' disabled={zoom >= 200} onClick={() => setZoom((value) => value + 10)}>
-          <Plus size={15} />
-        </button>
-        {onDownload && (
-          <>
-            <span className='work-toolbar-spacer' />
-            <button type='button' onClick={onDownload}>
-              <Download size={14} />
-              下载
-            </button>
-          </>
-        )}
-      </div>
-      <div
-        ref={scrollerRef}
-        className='work-pdf-pages'
-        onScroll={(event) => {
-          const pages = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[data-pdf-page]'));
-          const top = event.currentTarget.getBoundingClientRect().top + 24;
-          const currentPage = pages.findLast((item) => item.getBoundingClientRect().top <= top)?.dataset.pdfPage ?? '1';
-          setPage(Number(currentPage));
-        }}
-      >
-        {Array.from({ length: document.numPages }, (_, index) => (
-          <PdfPage document={document} pageNumber={index + 1} zoom={zoom} key={index + 1} />
-        ))}
+    <section className='work-pdf-viewer' aria-label={`PDF 编辑器：${fileName}`}>
+      {onSave && (
+        <div className='work-pdf-integration-bar'>
+          <span>
+            <strong>EmbedPDF · PDFium</strong>
+            批注、表单、签名、盖章和涂黑会写入导出的 PDF
+          </span>
+          <output className={saveState} aria-label='PDF 保存状态'>
+            {saveState === 'saving' && '正在生成 PDF…'}
+            {saveState === 'saved' && (
+              <>
+                <Check size={13} /> 已保存
+              </>
+            )}
+            {saveState === 'error' && '保存失败，请重试'}
+          </output>
+          <button type='button' disabled={!viewerReady || saveState === 'saving'} onClick={() => void savePdf()}>
+            <Save size={14} />
+            {saveLabel}
+          </button>
+        </div>
+      )}
+      <div className='work-pdf-embed'>
+        <PDFViewer
+          key={sourceUrl}
+          className='work-pdf-native-viewer'
+          style={{ width: '100%', height: '100%' }}
+          config={{
+            src: sourceUrl,
+            // EmbedPDF creates a Blob worker, so a root-relative URL has no
+            // usable base inside WorkerGlobalScope. Keep this absolute.
+            wasmUrl: new URL(PDFIUM_WASM_PATH, window.location.href).href,
+            tabBar: 'never',
+            theme: {
+              preference: 'system',
+              light: { accent: { primary: '#2867d8' } },
+              dark: { accent: { primary: '#7da7ff' } },
+            },
+            i18n: { defaultLocale: 'zh-CN' },
+            annotations: { annotationAuthor: 'A3S Work 用户', autoCommit: true },
+            export: { defaultFileName: fileName },
+            fonts: { ui: null, signature: null },
+            disabledCategories: onSave ? undefined : ['annotation', 'redaction', 'form', 'history'],
+          }}
+          onReady={(registry) => {
+            registryRef.current = registry;
+            setViewerReady(true);
+          }}
+        />
       </div>
     </section>
   );
 }
 
-function PdfPage({ document, pageNumber, zoom }: { document: PDFDocumentProxy; pageNumber: number; zoom: number }) {
-  const hostRef = useRef<HTMLElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const renderTaskRef = useRef<RenderTask | null>(null);
-  const [visible, setVisible] = useState(pageNumber === 1);
-  const [text, setText] = useState('');
-
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host || visible || typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) setVisible(true);
-      },
-      { rootMargin: '800px 0px' }
-    );
-    observer.observe(host);
-    return () => observer.disconnect();
-  }, [visible]);
-
-  useEffect(() => {
-    if (!visible) return;
-    let current = true;
-    let page: PDFPageProxy | null = null;
-    const render = async () => {
-      page = await document.getPage(pageNumber);
-      const canvas = canvasRef.current;
-      const host = hostRef.current;
-      if (!current || !canvas || !host) return;
-      const base = page.getViewport({ scale: 1 });
-      const availableWidth = Math.max(320, Math.min(host.clientWidth - 32, 1120));
-      const scale = (availableWidth / base.width) * (zoom / 100);
-      const viewport = page.getViewport({ scale });
-      const pixelRatio = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
-      canvas.width = Math.floor(viewport.width * pixelRatio);
-      canvas.height = Math.floor(viewport.height * pixelRatio);
-      canvas.style.width = `${viewport.width}px`;
-      canvas.style.height = `${viewport.height}px`;
-      renderTaskRef.current?.cancel();
-      renderTaskRef.current = page.render({
-        canvas,
-        viewport,
-        transform: pixelRatio === 1 ? undefined : [pixelRatio, 0, 0, pixelRatio, 0, 0],
-      });
-      await renderTaskRef.current.promise;
-      const content = await page.getTextContent();
-      if (current) {
-        setText(
-          content.items
-            .filter((item): item is typeof item & { str: string } => 'str' in item)
-            .map((item) => item.str)
-            .join(' ')
-        );
-      }
-    };
-    void render().catch((reason: unknown) => {
-      if (current && !(reason instanceof Error && reason.name === 'RenderingCancelledException')) {
-        setText('此页无法渲染');
-      }
-    });
-    return () => {
-      current = false;
-      renderTaskRef.current?.cancel();
-      page?.cleanup();
-    };
-  }, [document, pageNumber, visible, zoom]);
-
-  return (
-    <article ref={hostRef} className='work-pdf-page' data-pdf-page={pageNumber} aria-label={`PDF 第 ${pageNumber} 页`}>
-      <canvas ref={canvasRef} role='img' aria-label={`PDF 第 ${pageNumber} 页预览`} />
-      {text && <p className='sr-only'>{text}</p>}
-      <footer>{pageNumber}</footer>
-    </article>
-  );
-}
-
-function loadPdfRuntime(): Promise<typeof import('pdfjs-dist')> {
-  if (pdfRuntimePromise) return pdfRuntimePromise;
-  pdfRuntimePromise = import('pdfjs-dist').then((runtime) => {
-    runtime.GlobalWorkerOptions.workerSrc = '/vendor/pdf.worker.min.mjs';
-    return runtime;
-  });
-  return pdfRuntimePromise;
-}
-
-function pdfErrorMessage(reason: unknown): string {
-  if (!(reason instanceof Error)) return 'PDF 文件无法读取';
-  if (reason.name === 'PasswordException') return '此 PDF 受密码保护，当前预览器还不能解锁。';
-  return reason.message || 'PDF 文件无法读取';
+function pdfErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return '无法读取这个 PDF 文件。';
 }

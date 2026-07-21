@@ -59,12 +59,49 @@ describe('Work spreadsheet editor', () => {
     workbookMocks.sheets = undefined;
   });
 
+  it('uses a keyboard-accessible spreadsheet ribbon and a live workbook status bar', async () => {
+    const content = spreadsheetContent();
+    const onChange = vi.fn();
+    render(<SpreadsheetEditor content={content} preview={false} saveStatus='已保存到 A3S' onChange={onChange} />);
+
+    const tablist = screen.getByRole('tablist', { name: '表格功能区' });
+    expect(tablist).toBeInTheDocument();
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      '首页',
+      '插入',
+      '公式',
+      '数据',
+      '审阅',
+      '视图',
+    ]);
+
+    const homeTab = screen.getByRole('tab', { name: '首页' });
+    fireEvent.keyDown(homeTab, { key: 'ArrowRight' });
+    await waitFor(() => expect(screen.getByRole('tab', { name: '插入' })).toHaveFocus());
+
+    fireEvent.click(screen.getByRole('tab', { name: '公式' }));
+    expect(screen.getByRole('button', { name: /^名称管理器/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^公式与计算/ })).toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getByTestId('fortune-sheet'));
+    expect(screen.getByLabelText('表格选区状态')).toHaveTextContent('A1:B2');
+    expect(screen.getByLabelText('表格保存状态')).toHaveTextContent('已保存到 A3S');
+
+    fireEvent.click(screen.getByRole('button', { name: '放大表格' }));
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sheets: [expect.objectContaining({ zoomRatio: 1.1 })],
+      })
+    );
+  });
+
   it('creates, updates, and deletes scoped named ranges', async () => {
     const content = spreadsheetContent();
     const sheetId = content.sheets[0].id!;
     const onChange = vi.fn();
     render(<SpreadsheetHarness initial={content} onChange={onChange} />);
 
+    fireEvent.click(screen.getByRole('tab', { name: '公式' }));
     fireEvent.click(screen.getByRole('button', { name: /^名称管理器/ }));
     fireEvent.click(screen.getByRole('button', { name: '新建名称' }));
     fireEvent.change(screen.getByLabelText('名称'), { target: { value: '收入目标' } });
@@ -110,6 +147,7 @@ describe('Work spreadsheet editor', () => {
     const onChange = vi.fn();
     render(<SpreadsheetHarness initial={content} onChange={onChange} />);
 
+    fireEvent.click(screen.getByRole('tab', { name: '视图' }));
     fireEvent.click(screen.getByRole('button', { name: /^打印设置/ }));
     fireEvent.change(screen.getByLabelText('打印范围'), { target: { value: 'A0:C4' } });
     fireEvent.click(screen.getByRole('button', { name: '保存打印设置' }));
@@ -430,6 +468,7 @@ describe('Work spreadsheet editor', () => {
     const onChange = vi.fn();
     render(<SpreadsheetHarness initial={content} onChange={onChange} />);
 
+    fireEvent.click(screen.getByRole('tab', { name: '审阅' }));
     fireEvent.click(screen.getByRole('button', { name: /^工作表保护/ }));
     fireEvent.click(screen.getByLabelText('启用工作表保护'));
     await waitFor(() => {
@@ -484,6 +523,7 @@ describe('Work spreadsheet editor', () => {
     render(<SpreadsheetHarness initial={content} onChange={onChange} />);
 
     fireEvent.mouseDown(screen.getByTestId('fortune-sheet'));
+    fireEvent.click(screen.getByRole('tab', { name: '插入' }));
     fireEvent.click(screen.getByRole('button', { name: /^图表/ }));
     fireEvent.click(screen.getByRole('button', { name: '根据当前选区新建' }));
 
@@ -598,6 +638,7 @@ describe('Work spreadsheet editor', () => {
     render(<SpreadsheetHarness initial={content} onChange={onChange} />);
 
     fireEvent.mouseDown(screen.getByTestId('fortune-sheet'));
+    fireEvent.click(screen.getByRole('tab', { name: '插入' }));
     fireEvent.click(screen.getByRole('button', { name: /^图表/ }));
     fireEvent.click(screen.getByRole('button', { name: '根据当前选区新建' }));
     await waitFor(() => expect(onChange.mock.lastCall?.[0].sheets[0].charts).toHaveLength(1));
@@ -695,6 +736,7 @@ describe('Work spreadsheet editor', () => {
     render(<SpreadsheetHarness initial={content} onChange={onChange} />);
 
     fireEvent.mouseDown(screen.getByTestId('fortune-sheet'));
+    fireEvent.click(screen.getByRole('tab', { name: '插入' }));
     fireEvent.click(screen.getByRole('button', { name: /^图表/ }));
     fireEvent.click(screen.getByRole('button', { name: '根据当前选区新建' }));
     await waitFor(() => expect(onChange.mock.lastCall?.[0].sheets[0].charts).toHaveLength(1));
@@ -733,6 +775,7 @@ describe('Work spreadsheet editor', () => {
     render(<SpreadsheetHarness initial={content} onChange={onChange} />);
 
     fireEvent.mouseDown(screen.getByTestId('fortune-sheet'));
+    fireEvent.click(screen.getByRole('tab', { name: '插入' }));
     fireEvent.click(screen.getByRole('button', { name: /^图表/ }));
     fireEvent.click(screen.getByRole('button', { name: '根据当前选区新建' }));
     await waitFor(() => expect(onChange.mock.lastCall?.[0].sheets[0].charts).toHaveLength(1));
@@ -761,6 +804,7 @@ describe('Work spreadsheet editor', () => {
     render(<SpreadsheetHarness initial={content} onChange={onChange} />);
 
     fireEvent.mouseDown(screen.getByTestId('fortune-sheet'));
+    fireEvent.click(screen.getByRole('tab', { name: '插入' }));
     fireEvent.click(screen.getByRole('button', { name: /^图表/ }));
     fireEvent.click(screen.getByRole('button', { name: '根据当前选区新建' }));
     await waitFor(() => expect(onChange.mock.lastCall?.[0].sheets[0].charts).toHaveLength(1));
@@ -802,6 +846,7 @@ describe('Work spreadsheet editor', () => {
     render(<SpreadsheetHarness initial={content} onChange={onChange} />);
 
     fireEvent.mouseDown(screen.getByTestId('fortune-sheet'));
+    fireEvent.click(screen.getByRole('tab', { name: '公式' }));
     fireEvent.click(screen.getByRole('button', { name: /^公式与计算/ }));
     expect(screen.getByRole('region', { name: '公式兼容性诊断' })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('计算模式'), { target: { value: 'manual' } });

@@ -3,6 +3,7 @@ import type { CellObject, WorkSheet } from 'xlsx';
 import { createWorkDocumentBlob, importWorkDocumentFile } from './work-document-file-io';
 import { downloadBlob, fileNameWithoutExtension, safeFileName } from './work-file-download';
 import { createWorkPresentationBlob, importWorkPresentationFile } from './work-presentation-file-io';
+import { readWorkSourceBlob } from './work-repository';
 import { createWorkArtifact, createWorkId } from './work-templates';
 import { type WorkArtifact, type WorkArtifactKind, workArtifactExtension } from './work-types';
 import { exportXlsxCellComment, importXlsxCellComment } from './work-spreadsheet-comments';
@@ -59,7 +60,7 @@ export async function createWorkArtifactBlob(artifact: WorkArtifact): Promise<Bl
   if (artifact.kind === 'document') return createWorkDocumentBlob(artifact);
   if (artifact.kind === 'spreadsheet') return createSpreadsheetBlob(artifact);
   if (artifact.kind === 'presentation') return createWorkPresentationBlob(artifact);
-  throw new Error('PDF 文件是只读的，不能保存为可编辑副本。');
+  return readWorkSourceBlob(artifact);
 }
 
 async function importSpreadsheet(file: File, extension: string): Promise<WorkArtifact> {

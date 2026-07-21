@@ -25,10 +25,6 @@ export default defineConfig({
         from: './node_modules/pptxgenjs/dist/pptxgen.bundle.js',
         to: 'vendor/pptxgen.bundle.js',
       },
-      {
-        from: './node_modules/pdfjs-dist/build/pdf.worker.min.mjs',
-        to: 'vendor/pdf.worker.min.mjs',
-      },
     ],
     distPath: {
       root: 'dist/workspace',

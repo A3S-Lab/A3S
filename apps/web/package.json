@@ -16,6 +16,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@embedpdf/react-pdf-viewer": "2.14.3",
     "@fortune-sheet/core": "^1.0.4",
     "@fortune-sheet/react": "^1.0.4",
     "@monaco-editor/react": "^4.7.0",
@@ -44,7 +45,6 @@
     "lucide-react": "^0.544.0",
     "mammoth": "^1.12.0",
     "monaco-editor": "^0.55.1",
-    "pdfjs-dist": "^5.4.149",
     "pptxgenjs": "^4.0.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

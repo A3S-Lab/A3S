@@ -493,7 +493,7 @@ export function useWorkController() {
   });
 
   const saveLocalFile = useMemoizedFn(async (options: { force?: boolean } = {}) => {
-    if (!activeArtifact || activeArtifact.kind === 'pdf') return false;
+    if (!activeArtifact) return false;
     const binding = readWorkLocalFileBinding(activeArtifact.id);
     if (!binding) return false;
     if (!(await persistNow(activeArtifact))) return false;
@@ -536,7 +536,7 @@ export function useWorkController() {
       requestedName: string,
       options: { allowOverwrite?: boolean } = {}
     ): Promise<'saved' | 'exists' | 'error'> => {
-      if (!activeArtifact || activeArtifact.kind === 'pdf') return 'error';
+      if (!activeArtifact) return 'error';
       setLocalSaveState('saving');
       setLocalConflict(null);
       try {
@@ -637,6 +637,52 @@ export function useWorkController() {
     return readWorkSourceBlob(activeArtifact);
   });
 
+  const savePdfSource = useMemoizedFn(async (pdf: Blob): Promise<boolean> => {
+    if (!activeArtifact || activeArtifact.kind !== 'pdf') return false;
+    const artifact = activeArtifact;
+    const binding = readWorkLocalFileBinding(artifact.id);
+    setSaveState('saving');
+    setLocalConflict(null);
+    try {
+      if (!(await persistNow(artifact))) return false;
+      const fileName = artifact.source?.name ?? `${artifact.title}.pdf`;
+      const source = new File([pdf], fileName, { type: 'application/pdf' });
+      const saved = await saveWorkSource(artifact, source);
+      replaceArtifact(saved, setArtifacts, setActiveArtifact);
+      setSaveState('saved');
+
+      if (!binding) {
+        showToast('PDF 修改已保存到 A3S', 'success');
+        return true;
+      }
+
+      setLocalSaveState('saving');
+      const bytes = new Uint8Array(await pdf.arrayBuffer());
+      const snapshot = await writeWorkLocalFileAtomically(codeApi, binding.path, bytes, {
+        expectedFingerprint: binding.fingerprint,
+      });
+      saveWorkLocalFileBinding({ ...binding, ...snapshot, updatedAt: Date.now() });
+      setLocalBindingVersion((value) => value + 1);
+      setLocalSaveState('saved');
+      showToast(`PDF 修改已保存到 A3S 并写回 ${binding.path}`, 'success');
+      return true;
+    } catch (error) {
+      if (error instanceof WorkLocalFileConflictError && binding) {
+        setLocalConflict({
+          path: binding.path,
+          missing: error.actualFingerprint === null,
+        });
+        setLocalSaveState('conflict');
+        showToast('PDF 已保存到 A3S，但本地文件已在外部更改。', 'info');
+        return false;
+      }
+      setSaveState('error');
+      setLocalSaveState('error');
+      showToast(saveErrorMessage(error, 'PDF 保存失败'), 'error');
+      return false;
+    }
+  });
+
   return {
     artifacts,
     folders,
@@ -684,6 +730,7 @@ export function useWorkController() {
     restoreVersion,
     downloadSource,
     sourceBlob,
+    savePdfSource,
     saveNow: persistNow,
   };
 }
@@ -724,6 +771,6 @@ function saveErrorMessage(error: unknown, fallback = '文件保存失败'): stri
 }
 
 async function artifactBytes(artifact: WorkArtifact): Promise<Uint8Array> {
-  const blob = await createWorkArtifactBlob(artifact);
+  const blob = artifact.kind === 'pdf' ? await readWorkSourceBlob(artifact) : await createWorkArtifactBlob(artifact);
   return new Uint8Array(await blob.arrayBuffer());
 }

@@ -466,14 +466,14 @@
   font-size: 8px;
 }
 
-.work-code-statusbar > div {
+.work-code-statusbar-group {
   display: flex;
   min-width: 0;
   align-items: center;
   gap: 12px;
 }
 
-.work-code-statusbar > div span:last-child {
+.work-code-statusbar-group > span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

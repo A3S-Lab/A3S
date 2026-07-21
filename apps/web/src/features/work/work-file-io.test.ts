@@ -1,8 +1,15 @@
 import JSZip from 'jszip';
 import PptxGenJS from 'pptxgenjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { exportWorkArtifact, importWorkFile, WORK_IMPORT_ACCEPT, workKindForFile } from './work-file-io';
+import {
+  createWorkArtifactBlob,
+  exportWorkArtifact,
+  importWorkFile,
+  WORK_IMPORT_ACCEPT,
+  workKindForFile,
+} from './work-file-io';
 import { createPptxPresentation } from './work-pptx-export';
+import { saveWorkArtifact, saveWorkSource } from './work-repository';
 import { defaultSheetProtectionAuthority } from './work-spreadsheet-protection';
 import { createWorkArtifact } from './work-templates';
 
@@ -28,6 +35,20 @@ describe('Work Office file interoperability', () => {
       title: 'Research',
       content: { type: 'pdf' },
     });
+  });
+
+  it('returns the current managed PDF source when exporting an artifact blob', async () => {
+    vi.stubGlobal('indexedDB', undefined);
+    const artifact = await saveWorkArtifact(createWorkArtifact('blank-document'));
+    artifact.kind = 'pdf';
+    artifact.content = { type: 'pdf' };
+    const pdf = new File(['%PDF-1.7 edited'], 'Research.pdf', { type: 'application/pdf' });
+    const saved = await saveWorkSource(artifact, pdf);
+
+    const exported = await createWorkArtifactBlob(saved);
+
+    expect(exported.type).toBe('application/pdf');
+    await expect(exported.text()).resolves.toBe('%PDF-1.7 edited');
   });
 
   it('imports PPTX geometry, rich text, images, tables, charts, notes, and diagnostics', async () => {

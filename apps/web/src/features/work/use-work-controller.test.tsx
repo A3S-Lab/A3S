@@ -12,6 +12,7 @@ const repository = vi.hoisted(() => ({
   loadWorkLibrary: vi.fn(),
   purgeWorkArtifact: vi.fn(),
   purgeWorkFolder: vi.fn(),
+  readWorkSourceBlob: vi.fn(),
   restoreWorkArtifact: vi.fn(),
   restoreWorkArtifactVersion: vi.fn(),
   restoreWorkFolder: vi.fn(),
@@ -238,6 +239,53 @@ describe('Work controller compatibility review', () => {
     expect(localFileApi.renamePath).toHaveBeenCalledWith(expect.any(String), '/docs/Plan.docx');
     expect(result.current.localSaveState).toBe('saved');
     expect(readWorkLocalFileBinding(artifact.id)?.fingerprint).toBe(await fingerprintWorkFile(output));
+  });
+
+  it('persists an EmbedPDF export to A3S and writes the same PDF back to its bound file', async () => {
+    const artifact = createWorkArtifact('blank-document');
+    artifact.kind = 'pdf';
+    artifact.content = { type: 'pdf' };
+    artifact.source = {
+      name: 'Proposal.pdf',
+      contentType: 'application/pdf',
+      size: 3,
+      updatedAt: Date.now(),
+    };
+    const original = Uint8Array.from([1, 2, 3]);
+    const output = Uint8Array.from([37, 80, 68, 70]);
+    saveWorkLocalFileBinding({
+      artifactId: artifact.id,
+      path: '/docs/Proposal.pdf',
+      fingerprint: await fingerprintWorkFile(original),
+      size: original.byteLength,
+      updatedAt: Date.now(),
+    });
+    repository.loadWorkLibrary.mockResolvedValue({
+      artifacts: [artifact],
+      folders: [],
+      limits: null,
+      storage: 'local',
+    });
+    localFileApi.pathExists.mockResolvedValue({ exists: true });
+    localFileApi.readBinaryFile.mockResolvedValueOnce(original).mockResolvedValueOnce(output);
+    const { result } = renderHook(() => useWorkController());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(() => result.current.openArtifact(artifact.id));
+
+    let saved = false;
+    await act(async () => {
+      saved = await result.current.savePdfSource(new Blob([output], { type: 'application/pdf' }));
+    });
+
+    expect(saved).toBe(true);
+    expect(repository.saveWorkSource).toHaveBeenCalledWith(
+      expect.objectContaining({ id: artifact.id }),
+      expect.objectContaining({ name: 'Proposal.pdf', type: 'application/pdf' })
+    );
+    expect(localFileApi.writeBinaryFile).toHaveBeenCalledWith(expect.stringMatching(/\.a3s-.*\.tmp$/), output);
+    expect(localFileApi.renamePath).toHaveBeenCalledWith(expect.any(String), '/docs/Proposal.pdf');
+    expect(result.current.saveState).toBe('saved');
+    expect(result.current.localSaveState).toBe('saved');
   });
 
   it('keeps edited content and exposes a review state when the bound file changed externally', async () => {

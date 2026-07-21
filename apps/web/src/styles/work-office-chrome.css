@@ -1,0 +1,260 @@
+.work-office-ribbon {
+  z-index: 8;
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  flex-direction: column;
+  border-bottom: 1px solid var(--a3s-line);
+  background: var(--a3s-panel);
+  box-shadow: 0 2px 7px rgb(24 31 46 / 4%);
+}
+
+.work-office-ribbon-tabs {
+  display: flex;
+  min-width: 0;
+  height: 33px;
+  flex: 0 0 33px;
+  align-items: stretch;
+  justify-content: center;
+  gap: 17px;
+  padding: 0 18px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.work-office-ribbon-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.work-office-ribbon-tabs button {
+  position: relative;
+  min-width: 42px;
+  padding: 0 3px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--a3s-muted);
+  font: inherit;
+  font-size: 10px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.work-office-ribbon-tabs button::after {
+  position: absolute;
+  right: 4px;
+  bottom: 0;
+  left: 4px;
+  height: 2px;
+  border-radius: 999px 999px 0 0;
+  background: transparent;
+  content: "";
+}
+
+.work-office-ribbon-tabs button:hover {
+  color: var(--a3s-ink);
+}
+
+.work-office-ribbon-tabs button:focus-visible {
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px var(--a3s-blue);
+}
+
+.work-office-ribbon-tabs button[aria-selected="true"] {
+  color: var(--a3s-blue);
+  font-weight: 680;
+}
+
+.work-office-ribbon-tabs button[aria-selected="true"]::after {
+  background: var(--a3s-blue);
+}
+
+.work-office-ribbon-panel {
+  min-width: 0;
+}
+
+.work-office-ribbon .work-office-toolbar {
+  height: 70px;
+  min-height: 70px;
+  flex-basis: 70px;
+  align-items: stretch;
+  gap: 0;
+  padding: 4px 10px 5px;
+  border: 0;
+}
+
+.work-office-ribbon-group {
+  position: relative;
+  display: flex;
+  height: 61px;
+  flex: 0 0 auto;
+  align-items: stretch;
+  padding: 0 9px 12px;
+  border-right: 1px solid var(--a3s-line);
+}
+
+.work-office-ribbon-group:first-child {
+  padding-left: 2px;
+}
+
+.work-office-ribbon-group:last-child {
+  border-right: 0;
+}
+
+.work-office-ribbon-group > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+}
+
+.work-office-ribbon-group > span {
+  position: absolute;
+  right: 8px;
+  bottom: 0;
+  left: 8px;
+  overflow: hidden;
+  color: var(--a3s-faint);
+  font-size: 7px;
+  line-height: 9px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-office-ribbon .work-office-toolbar button.with-label {
+  width: auto;
+  min-width: 52px;
+  height: 48px;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 7px 3px;
+}
+
+.work-office-ribbon .work-office-toolbar button.with-label > span {
+  max-width: 76px;
+  overflow: hidden;
+  font-size: 8px;
+  line-height: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-office-ribbon .work-office-toolbar select {
+  min-width: 104px;
+}
+
+.work-office-ribbon-badge {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--a3s-panel-strong);
+  color: var(--a3s-faint);
+  font-size: 7px;
+  font-weight: 650;
+  line-height: 13px;
+  text-align: center;
+}
+
+.work-office-ribbon-message {
+  display: inline-flex;
+  max-width: 520px;
+  min-height: 36px;
+  align-items: center;
+  padding: 0 14px;
+  color: var(--a3s-faint);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.work-office-status {
+  z-index: 7;
+  display: flex;
+  min-width: 0;
+  height: 28px;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 9px 0 12px;
+  border-top: 1px solid var(--a3s-line);
+  background: var(--a3s-panel);
+  color: var(--a3s-muted);
+  font-size: 8px;
+}
+
+.work-office-status-info,
+.work-office-status-view,
+.work-office-save-status {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.work-office-status-info {
+  flex: 1;
+  gap: 14px;
+  overflow: hidden;
+}
+
+.work-office-status-info output {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-office-status-view {
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.work-office-status button {
+  display: grid;
+  width: 23px;
+  height: 22px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--a3s-muted);
+  cursor: pointer;
+}
+
+.work-office-status button:hover:not(:disabled),
+.work-office-status button[aria-pressed="true"] {
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-ink);
+}
+
+.work-office-status button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.work-office-status-view > output {
+  width: 35px;
+  text-align: center;
+}
+
+.work-office-status-view input[type="range"] {
+  width: 80px;
+  height: 3px;
+  margin: 0 2px;
+  accent-color: var(--a3s-blue);
+}
+
+.work-office-status-divider {
+  width: 1px;
+  height: 15px;
+  margin: 0 3px;
+  background: var(--a3s-line);
+}
+
+.work-office-save-status {
+  gap: 4px;
+  color: var(--a3s-faint);
+}

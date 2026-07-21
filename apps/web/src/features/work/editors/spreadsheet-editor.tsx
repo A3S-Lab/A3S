@@ -1,7 +1,17 @@
 import type { Hooks, Selection } from '@fortune-sheet/core';
 import { Workbook, type WorkbookInstance } from '@fortune-sheet/react';
 import '@fortune-sheet/react/dist/index.css';
-import { BarChart3, Bookmark, Calculator, Palette, Printer, ShieldCheck, TableProperties } from 'lucide-react';
+import {
+  BarChart3,
+  Bookmark,
+  Calculator,
+  Cloud,
+  Grid3X3,
+  Palette,
+  Printer,
+  ShieldCheck,
+  TableProperties,
+} from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { WorkspaceContextMenu } from '../../workspace/components/workspace-context-menu';
 import { spreadsheetAgentMenuItems } from '../components/work-editor-agent-menus';
@@ -32,10 +42,29 @@ import type { WorkSpreadsheetContent } from '../work-types';
 import { managedConditionalFormatCount } from './spreadsheet-conditional-format-panel';
 import { spreadsheetPrintSettingCount } from './spreadsheet-print-settings-panel';
 import { SpreadsheetWorkbookPanel, type SpreadsheetWorkbookPanelView } from './spreadsheet-workbook-panel';
+import {
+  WorkOfficeRibbon,
+  WorkOfficeRibbonButton,
+  WorkOfficeRibbonGroup,
+  WorkOfficeStatusBar,
+  WorkOfficeZoomControls,
+} from './work-office-chrome';
+
+const spreadsheetRibbonTabs = [
+  { id: 'home', label: '首页' },
+  { id: 'insert', label: '插入' },
+  { id: 'formulas', label: '公式' },
+  { id: 'data', label: '数据' },
+  { id: 'review', label: '审阅' },
+  { id: 'view', label: '视图' },
+] as const;
+
+type SpreadsheetRibbonTabId = (typeof spreadsheetRibbonTabs)[number]['id'];
 
 interface SpreadsheetEditorProps {
   content: WorkSpreadsheetContent;
   preview: boolean;
+  saveStatus?: string;
   onChange: (content: WorkSpreadsheetContent) => void;
   onAgentRequest?: (request: WorkEditorAgentRequest) => void | Promise<void>;
 }
@@ -51,10 +80,17 @@ interface SpreadsheetAgentMenuState {
   selection: WorkSpreadsheetAgentSelection;
 }
 
-export function SpreadsheetEditor({ content, preview, onChange, onAgentRequest }: SpreadsheetEditorProps) {
+export function SpreadsheetEditor({
+  content,
+  preview,
+  saveStatus = '已自动保存',
+  onChange,
+  onAgentRequest,
+}: SpreadsheetEditorProps) {
   const materializedContent = useMemo(() => refreshSpreadsheetPivotTables(content), [content]);
   const contentRef = useRef(materializedContent);
   const workbookRef = useRef<WorkbookInstance>(null);
+  const [ribbonTab, setRibbonTab] = useState<SpreadsheetRibbonTabId>('home');
   const [panel, setPanel] = useState<SpreadsheetWorkbookPanelView | null>(null);
   const [selectionState, setSelectionState] = useState<SpreadsheetSelectionState | null>(null);
   const [agentMenu, setAgentMenu] = useState<SpreadsheetAgentMenuState | null>(null);
@@ -152,6 +188,24 @@ export function SpreadsheetEditor({ content, preview, onChange, onAgentRequest }
     )
     .join('|');
   const panelSheetId = selectionState?.sheetId ?? activeSheetIdRef.current ?? activeSheetId;
+  const activeSheet = materializedContent.sheets.find((sheet) => sheet.id === activeSheetId);
+  const activeSheetIndex = Math.max(
+    0,
+    materializedContent.sheets.findIndex((sheet) => sheet.id === activeSheetId)
+  );
+  const zoom = Math.round((activeSheet?.zoomRatio ?? 1) * 100);
+  const gridLinesVisible = activeSheet?.showGridLines !== false && activeSheet?.showGridLines !== 0;
+  const updateActiveSheet = (
+    update: (sheet: WorkSpreadsheetContent['sheets'][number]) => WorkSpreadsheetContent['sheets'][number]
+  ) => {
+    if (!activeSheetId) return;
+    const next = {
+      ...contentRef.current,
+      sheets: contentRef.current.sheets.map((sheet) => (sheet.id === activeSheetId ? update(sheet) : sheet)),
+    };
+    contentRef.current = next;
+    onChange(next);
+  };
   const recalculate = (scope: 'workbook' | 'selection'): boolean => {
     const workbook = workbookRef.current;
     if (!workbook) return false;
@@ -175,78 +229,107 @@ export function SpreadsheetEditor({ content, preview, onChange, onAgentRequest }
     <section className={`work-spreadsheet-editor ${preview ? 'preview' : ''}`} aria-label='表格工作区'>
       {preview && <div className='work-preview-notice'>只读预览 · {content.sheets.length} 个工作表</div>}
       {!preview && (
-        <div className='work-spreadsheet-metadata-toolbar' role='toolbar' aria-label='工作簿工具'>
-          <button
-            type='button'
-            className={panel === 'names' ? 'active' : ''}
-            aria-pressed={panel === 'names'}
-            onClick={() => setPanel((value) => (value === 'names' ? null : 'names'))}
-          >
-            <Bookmark size={14} />
-            名称管理器
-            <span>{content.namedRanges?.length ?? 0}</span>
-          </button>
-          <button
-            type='button'
-            className={panel === 'print-area' ? 'active' : ''}
-            aria-pressed={panel === 'print-area'}
-            onClick={() => setPanel((value) => (value === 'print-area' ? null : 'print-area'))}
-          >
-            <Printer size={14} />
-            打印设置
-            <span>{printSettingCount}</span>
-          </button>
-          <button
-            type='button'
-            className={panel === 'conditional-formatting' ? 'active' : ''}
-            aria-pressed={panel === 'conditional-formatting'}
-            onClick={() => setPanel((value) => (value === 'conditional-formatting' ? null : 'conditional-formatting'))}
-          >
-            <Palette size={14} />
-            条件格式
-            <span>{managedConditionalFormatCount(content)}</span>
-          </button>
-          <button
-            type='button'
-            className={panel === 'formulas' ? 'active' : ''}
-            aria-pressed={panel === 'formulas'}
-            onClick={() => setPanel((value) => (value === 'formulas' ? null : 'formulas'))}
-          >
-            <Calculator size={14} />
-            公式与计算
-            <span>{formulaCount}</span>
-          </button>
-          <button
-            type='button'
-            className={panel === 'charts' ? 'active' : ''}
-            aria-pressed={panel === 'charts'}
-            onClick={() => setPanel((value) => (value === 'charts' ? null : 'charts'))}
-          >
-            <BarChart3 size={14} />
-            图表
-            <span>{spreadsheetChartCount(content)}</span>
-          </button>
-          <button
-            type='button'
-            className={panel === 'pivots' ? 'active' : ''}
-            aria-pressed={panel === 'pivots'}
-            onClick={() => setPanel((value) => (value === 'pivots' ? null : 'pivots'))}
-          >
-            <TableProperties size={14} />
-            数据透视表
-            <span>{pivotCount}</span>
-          </button>
-          <button
-            type='button'
-            className={panel === 'protection' ? 'active' : ''}
-            aria-pressed={panel === 'protection'}
-            onClick={() => setPanel((value) => (value === 'protection' ? null : 'protection'))}
-          >
-            <ShieldCheck size={14} />
-            工作表保护
-            <span>{protectedSheetCount(content.sheets)}</span>
-          </button>
-        </div>
+        <WorkOfficeRibbon
+          ariaLabel='表格功能区'
+          tabs={spreadsheetRibbonTabs}
+          defaultTab='home'
+          activeTab={ribbonTab}
+          onTabChange={setRibbonTab}
+          className='work-spreadsheet-ribbon'
+          toolbarClassName='work-spreadsheet-ribbon-toolbar'
+          panels={{
+            home: (
+              <WorkOfficeRibbonGroup label='样式'>
+                <SpreadsheetRibbonTool
+                  label='条件格式'
+                  count={managedConditionalFormatCount(content)}
+                  icon={<Palette size={19} />}
+                  active={panel === 'conditional-formatting'}
+                  onClick={() =>
+                    setPanel((value) => (value === 'conditional-formatting' ? null : 'conditional-formatting'))
+                  }
+                />
+              </WorkOfficeRibbonGroup>
+            ),
+            insert: (
+              <WorkOfficeRibbonGroup label='插入'>
+                <SpreadsheetRibbonTool
+                  label='图表'
+                  count={spreadsheetChartCount(content)}
+                  icon={<BarChart3 size={19} />}
+                  active={panel === 'charts'}
+                  onClick={() => setPanel((value) => (value === 'charts' ? null : 'charts'))}
+                />
+              </WorkOfficeRibbonGroup>
+            ),
+            formulas: (
+              <>
+                <WorkOfficeRibbonGroup label='定义的名称'>
+                  <SpreadsheetRibbonTool
+                    label='名称管理器'
+                    count={content.namedRanges?.length ?? 0}
+                    icon={<Bookmark size={19} />}
+                    active={panel === 'names'}
+                    onClick={() => setPanel((value) => (value === 'names' ? null : 'names'))}
+                  />
+                </WorkOfficeRibbonGroup>
+                <WorkOfficeRibbonGroup label='计算'>
+                  <SpreadsheetRibbonTool
+                    label='公式与计算'
+                    count={formulaCount}
+                    icon={<Calculator size={19} />}
+                    active={panel === 'formulas'}
+                    onClick={() => setPanel((value) => (value === 'formulas' ? null : 'formulas'))}
+                  />
+                </WorkOfficeRibbonGroup>
+              </>
+            ),
+            data: (
+              <WorkOfficeRibbonGroup label='分析'>
+                <SpreadsheetRibbonTool
+                  label='数据透视表'
+                  count={pivotCount}
+                  icon={<TableProperties size={19} />}
+                  active={panel === 'pivots'}
+                  onClick={() => setPanel((value) => (value === 'pivots' ? null : 'pivots'))}
+                />
+              </WorkOfficeRibbonGroup>
+            ),
+            review: (
+              <WorkOfficeRibbonGroup label='保护'>
+                <SpreadsheetRibbonTool
+                  label='工作表保护'
+                  count={protectedSheetCount(content.sheets)}
+                  icon={<ShieldCheck size={19} />}
+                  active={panel === 'protection'}
+                  onClick={() => setPanel((value) => (value === 'protection' ? null : 'protection'))}
+                />
+              </WorkOfficeRibbonGroup>
+            ),
+            view: (
+              <>
+                <WorkOfficeRibbonGroup label='工作簿视图'>
+                  <WorkOfficeRibbonButton
+                    label={gridLinesVisible ? '隐藏网格线' : '显示网格线'}
+                    active={gridLinesVisible}
+                    onClick={() => updateActiveSheet((sheet) => ({ ...sheet, showGridLines: !gridLinesVisible }))}
+                  >
+                    <Grid3X3 size={19} />
+                  </WorkOfficeRibbonButton>
+                </WorkOfficeRibbonGroup>
+                <WorkOfficeRibbonGroup label='打印'>
+                  <SpreadsheetRibbonTool
+                    label='打印设置'
+                    count={printSettingCount}
+                    icon={<Printer size={19} />}
+                    active={panel === 'print-area'}
+                    onClick={() => setPanel((value) => (value === 'print-area' ? null : 'print-area'))}
+                  />
+                </WorkOfficeRibbonGroup>
+              </>
+            ),
+          }}
+        />
       )}
       {!preview && panel && (
         <SpreadsheetWorkbookPanel
@@ -284,7 +367,7 @@ export function SpreadsheetEditor({ content, preview, onChange, onAgentRequest }
           data={workbookSheets}
           lang='zh'
           allowEdit={!preview}
-          showToolbar={!preview}
+          showToolbar={!preview && ribbonTab === 'home'}
           showFormulaBar
           showSheetTabs
           row={60}
@@ -300,6 +383,40 @@ export function SpreadsheetEditor({ content, preview, onChange, onAgentRequest }
           }}
         />
       </div>
+      <WorkOfficeStatusBar
+        className='work-spreadsheet-status'
+        controls={
+          !preview ? (
+            <>
+              <button type='button' aria-label='普通表格视图' title='普通表格视图' aria-pressed='true'>
+                <Grid3X3 size={13} />
+              </button>
+              <span className='work-office-status-divider' />
+              <WorkOfficeZoomControls
+                zoom={zoom}
+                decreaseLabel='缩小表格'
+                increaseLabel='放大表格'
+                outputLabel='表格缩放比例'
+                sliderLabel='表格缩放'
+                onChange={(nextZoom) => updateActiveSheet((sheet) => ({ ...sheet, zoomRatio: nextZoom / 100 }))}
+              />
+            </>
+          ) : undefined
+        }
+      >
+        <output aria-label='工作表状态'>
+          工作表 {activeSheetIndex + 1} / {materializedContent.sheets.length} · {activeSheet?.name ?? '未命名'}
+        </output>
+        <output aria-label='表格选区状态'>
+          {selectionState ? spreadsheetSelectionReference(selectionState.selection) : '未选择单元格'}
+        </output>
+        {!preview && (
+          <output aria-label='表格保存状态' className='work-office-save-status'>
+            <Cloud size={12} />
+            {saveStatus}
+          </output>
+        )}
+      </WorkOfficeStatusBar>
       {agentMenu && onAgentRequest && (
         <WorkspaceContextMenu
           label={`表格选区 ${agentMenu.selection.reference} AI 操作`}
@@ -319,4 +436,51 @@ export function SpreadsheetEditor({ content, preview, onChange, onAgentRequest }
       )}
     </section>
   );
+}
+
+function SpreadsheetRibbonTool({
+  label,
+  count,
+  icon,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  icon: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <WorkOfficeRibbonButton
+      label={`${label}（${count}）`}
+      visibleLabel={label}
+      badge={count}
+      active={active}
+      onClick={onClick}
+    >
+      {icon}
+    </WorkOfficeRibbonButton>
+  );
+}
+
+function spreadsheetSelectionReference(selection: Selection): string {
+  const rowStart = Math.min(selection.row[0] ?? 0, selection.row[1] ?? selection.row[0] ?? 0);
+  const rowEnd = Math.max(selection.row[0] ?? 0, selection.row[1] ?? selection.row[0] ?? 0);
+  const columnStart = Math.min(selection.column[0] ?? 0, selection.column[1] ?? selection.column[0] ?? 0);
+  const columnEnd = Math.max(selection.column[0] ?? 0, selection.column[1] ?? selection.column[0] ?? 0);
+  const start = `${spreadsheetColumnLabel(columnStart)}${rowStart + 1}`;
+  const end = `${spreadsheetColumnLabel(columnEnd)}${rowEnd + 1}`;
+  return start === end ? start : `${start}:${end}`;
+}
+
+function spreadsheetColumnLabel(column: number): string {
+  let value = Math.max(0, column) + 1;
+  let label = '';
+  while (value > 0) {
+    value -= 1;
+    label = String.fromCharCode(65 + (value % 26)) + label;
+    value = Math.floor(value / 26);
+  }
+  return label;
 }

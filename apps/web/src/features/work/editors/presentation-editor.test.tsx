@@ -14,12 +14,45 @@ describe('Work presentation editor transitions', () => {
     vi.useRealTimers();
   });
 
+  it('uses the presentation ribbon and shared view, save, and zoom status controls', async () => {
+    const artifact = createWorkArtifact('strategy-deck');
+    if (artifact.content.type !== 'presentation') return;
+
+    render(
+      <PresentationEditor content={artifact.content} preview={false} saveStatus='已保存到 A3S' onChange={vi.fn()} />
+    );
+
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      '首页',
+      '插入',
+      '设计',
+      '切换',
+      '动画',
+      '放映',
+      '审阅',
+      '视图',
+    ]);
+
+    fireEvent.click(screen.getByRole('tab', { name: '插入' }));
+    expect(screen.getByRole('button', { name: '图表' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '切换' }));
+    expect(screen.getByLabelText('幻灯片切换效果')).toBeInTheDocument();
+
+    expect(screen.getByLabelText('演示保存状态')).toHaveTextContent('已保存到 A3S');
+    expect(screen.getByLabelText('演示缩放比例')).toHaveTextContent('90%');
+    fireEvent.click(screen.getByRole('button', { name: '幻灯片浏览视图' }));
+    expect(screen.getByRole('region', { name: '幻灯片浏览视图' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '放大演示文稿' }));
+    await waitFor(() => expect(screen.getByLabelText('演示缩放比例')).toHaveTextContent('100%'));
+  });
+
   it('edits a slide transition and can apply it to every slide', async () => {
     const artifact = createWorkArtifact('strategy-deck');
     if (artifact.content.type !== 'presentation') return;
     const onChange = vi.fn();
     render(<PresentationHarness initial={artifact.content} onChange={onChange} />);
 
+    fireEvent.click(screen.getByRole('tab', { name: '切换' }));
     fireEvent.change(screen.getByLabelText('幻灯片切换效果'), { target: { value: 'push' } });
     fireEvent.change(screen.getByLabelText('切换方向'), { target: { value: 'right' } });
     fireEvent.change(screen.getByLabelText('切换速度'), { target: { value: 'slow' } });
@@ -162,6 +195,7 @@ describe('Work presentation editor transitions', () => {
     vi.spyOn(window, 'prompt').mockReturnValue('Add the launch owner.');
     render(<PresentationHarness initial={artifact.content} onChange={onChange} />);
 
+    fireEvent.click(screen.getByRole('tab', { name: '审阅' }));
     fireEvent.click(screen.getByRole('button', { name: '审阅演示批注（1）' }));
     expect(screen.getByRole('region', { name: '演示批注审阅' })).toHaveTextContent('Verify the supporting evidence.');
     fireEvent.click(screen.getByRole('button', { name: '定位演示批注 1' }));
@@ -264,6 +298,7 @@ describe('Work presentation editor transitions', () => {
     const onChange = vi.fn();
     render(<PresentationHarness initial={artifact.content} onChange={onChange} />);
 
+    fireEvent.click(screen.getByRole('tab', { name: '插入' }));
     fireEvent.click(screen.getByRole('button', { name: '图表' }));
     expect(screen.getByRole('region', { name: '演示图表数据' })).toBeInTheDocument();
 
@@ -311,6 +346,7 @@ describe('Work presentation editor transitions', () => {
     const onChange = vi.fn();
     render(<PresentationHarness initial={artifact.content} onChange={onChange} />);
 
+    fireEvent.click(screen.getByRole('tab', { name: '插入' }));
     fireEvent.click(screen.getByRole('button', { name: '图表' }));
     expect(screen.getByLabelText('显示演示图表图例')).toBeChecked();
     fireEvent.change(screen.getByLabelText('演示图表图例位置'), { target: { value: 'bottom' } });
@@ -366,6 +402,7 @@ describe('Work presentation editor transitions', () => {
     const onChange = vi.fn();
     render(<PresentationHarness initial={artifact.content} onChange={onChange} />);
 
+    fireEvent.click(screen.getByRole('tab', { name: '插入' }));
     fireEvent.click(screen.getByRole('button', { name: '图表' }));
     fireEvent.click(screen.getByLabelText('演示图表图例叠加在绘图区'));
     fireEvent.change(screen.getByLabelText('演示图表分组方式'), { target: { value: 'percentStacked' } });
@@ -407,6 +444,7 @@ describe('Work presentation editor transitions', () => {
     const onChange = vi.fn();
     render(<PresentationHarness initial={artifact.content} onChange={onChange} />);
 
+    fireEvent.click(screen.getByRole('tab', { name: '插入' }));
     fireEvent.click(screen.getByRole('button', { name: '图表' }));
     expect(screen.getByLabelText('显示演示图表数据标签')).not.toBeChecked();
     fireEvent.click(screen.getByLabelText('显示演示图表数据标签'));
@@ -434,6 +472,7 @@ describe('Work presentation editor transitions', () => {
     const onChange = vi.fn();
     render(<PresentationHarness initial={artifact.content} onChange={onChange} />);
 
+    fireEvent.click(screen.getByRole('tab', { name: '插入' }));
     fireEvent.click(screen.getByRole('button', { name: '图表' }));
     fireEvent.change(screen.getByLabelText('演示图表类型'), { target: { value: 'scatter' } });
     fireEvent.change(screen.getByLabelText('演示图表 X 值'), { target: { value: '1, 2, 4' } });
@@ -479,6 +518,7 @@ describe('Work presentation editor transitions', () => {
     const onChange = vi.fn();
     render(<PresentationHarness initial={artifact.content} onChange={onChange} />);
 
+    fireEvent.click(screen.getByRole('tab', { name: '插入' }));
     fireEvent.click(screen.getByRole('button', { name: '图表' }));
     expect(screen.getByRole('region', { name: '演示图表系列 1 高级分析' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '添加系列 1 趋势线' }));
@@ -534,6 +574,7 @@ describe('Work presentation editor transitions', () => {
     const onChange = vi.fn();
     render(<PresentationHarness initial={presentationWithLayouts()} onChange={onChange} />);
 
+    fireEvent.click(screen.getByRole('tab', { name: '设计' }));
     fireEvent.click(screen.getByRole('button', { name: '母版与布局' }));
     fireEvent.change(screen.getByLabelText('幻灯片布局'), {
       target: { value: 'layout-title' },
@@ -571,6 +612,7 @@ describe('Work presentation editor transitions', () => {
     fireEvent.input(screen.getByLabelText('母版背景颜色'), {
       target: { value: '#334455' },
     });
+    fireEvent.click(screen.getByRole('tab', { name: '插入' }));
     fireEvent.click(screen.getByRole('button', { name: '文本框' }));
     await waitFor(() => {
       const latest = onChange.mock.lastCall?.[0] as WorkPresentationContent;

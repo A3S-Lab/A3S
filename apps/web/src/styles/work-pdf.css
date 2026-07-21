@@ -4,85 +4,88 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
+  overflow: hidden;
   background: #32363f;
 }
 
-.work-pdf-toolbar {
-  color: var(--a3s-ink);
+.work-pdf-integration-bar {
+  display: flex;
+  min-width: 0;
+  min-height: 38px;
+  flex: 0 0 38px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 10px 0 13px;
+  border-bottom: 1px solid var(--a3s-line);
+  background: var(--a3s-panel);
+  color: var(--a3s-faint);
+  font-size: 8px;
 }
 
-.work-pdf-toolbar label {
+.work-pdf-integration-bar > span {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-pdf-integration-bar strong {
+  color: var(--a3s-ink);
+  font-size: 9px;
+}
+
+.work-pdf-integration-bar output {
   display: inline-flex;
-  height: 28px;
+  min-width: 94px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  color: var(--a3s-faint);
+}
+
+.work-pdf-integration-bar output.saved {
+  color: #17805c;
+}
+
+.work-pdf-integration-bar output.error {
+  color: var(--a3s-red);
+}
+
+.work-pdf-integration-bar > button,
+.work-pdf-state button {
+  display: inline-flex;
+  height: 27px;
   align-items: center;
   gap: 5px;
-  padding: 0 7px;
-  border: 1px solid var(--a3s-line);
+  padding: 0 9px;
+  border: 1px solid color-mix(in srgb, var(--a3s-blue) 45%, var(--a3s-line));
   border-radius: 6px;
-  color: var(--a3s-faint);
+  background: color-mix(in srgb, var(--a3s-blue) 7%, var(--a3s-panel));
+  color: var(--a3s-blue);
   font-size: 9px;
+  font-weight: 620;
+  cursor: pointer;
 }
 
-.work-pdf-toolbar label > span {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
+.work-pdf-integration-bar > button:disabled {
+  cursor: wait;
+  opacity: 0.5;
 }
 
-.work-pdf-toolbar input {
-  width: 34px;
-  padding: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--a3s-ink);
-  font: inherit;
-  text-align: right;
-}
-
-.work-pdf-toolbar label i,
-.work-pdf-toolbar output {
-  color: var(--a3s-muted);
-  font-size: 9px;
-  font-style: normal;
-}
-
-.work-pdf-pages {
+.work-pdf-embed,
+.work-pdf-native-viewer {
   min-width: 0;
   min-height: 0;
   flex: 1;
-  padding: 28px 28px 80px;
-  overflow: auto;
-  scroll-behavior: smooth;
 }
 
-.work-pdf-page {
+.work-pdf-embed {
   display: flex;
-  min-height: 280px;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  margin: 0 auto 28px;
-  scroll-margin-top: 24px;
-}
-
-.work-pdf-page canvas {
-  max-width: none;
-  background: #ffffff;
-  box-shadow: 0 14px 42px rgb(0 0 0 / 32%);
-}
-
-.work-pdf-page footer {
-  min-width: 30px;
-  margin-top: 9px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgb(0 0 0 / 25%);
-  color: rgb(255 255 255 / 72%);
-  font-size: 9px;
-  text-align: center;
+  overflow: hidden;
 }
 
 .work-pdf-state {
@@ -93,14 +96,25 @@
   place-items: center;
   align-content: center;
   gap: 10px;
+  padding: 24px;
   background: var(--a3s-bg);
   color: var(--a3s-muted);
   font-size: 11px;
+  text-align: center;
+}
+
+.work-pdf-state.error {
+  color: var(--a3s-red);
 }
 
 .work-pdf-state.error strong {
   color: var(--a3s-red);
   font-size: 13px;
+}
+
+.work-pdf-state.error span {
+  max-width: 520px;
+  color: var(--a3s-muted);
 }
 
 .work-pdf-state.error button {
@@ -861,29 +875,7 @@
   }
 
   .work-editor-header,
-  .work-pdf-toolbar,
-  .work-compatibility-banner,
-  .work-pdf-page footer {
+  .work-compatibility-banner {
     display: none !important;
-  }
-
-  .work-pdf-viewer,
-  .work-pdf-pages {
-    display: block;
-    padding: 0;
-    overflow: visible;
-    background: #ffffff;
-  }
-
-  .work-pdf-page {
-    min-height: 0;
-    margin: 0;
-    break-after: page;
-  }
-
-  .work-pdf-page canvas {
-    width: 100% !important;
-    height: auto !important;
-    box-shadow: none;
   }
 }

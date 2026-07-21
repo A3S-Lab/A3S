@@ -1,17 +1,18 @@
 import {
   BookOpen,
   BrainCircuit,
+  BriefcaseBusiness,
   ChartNoAxesCombined,
   Code2,
   Database,
   FileText,
   FlaskConical,
   Globe2,
+  type LucideIcon,
   Puzzle,
   Search,
   Settings,
   Store,
-  type LucideIcon,
 } from 'lucide-react';
 import { useSnapshot } from 'valtio';
 import {
@@ -19,6 +20,7 @@ import {
   navigateMemory,
   navigatePlugin,
   navigatePlugins,
+  navigateProduct,
   navigateSettings,
   navigateTask,
 } from '../state/app-state';
@@ -58,6 +60,13 @@ export function ActivityBar() {
             navigateTask('conversation');
           }}
         />
+        <ActivityButton
+          label='办公'
+          tooltip='办公'
+          active={state.activeProduct === 'work'}
+          icon={BriefcaseBusiness}
+          onClick={() => navigateProduct('work')}
+        />
         {plugins.map((plugin) => (
           <ActivityButton
             key={plugin.key}
@@ -68,7 +77,8 @@ export function ActivityBar() {
             onClick={() => navigatePlugin(plugin.key)}
           />
         ))}
-        <span className='activity-divider' aria-hidden='true' />
+      </div>
+      <div className='activity-system'>
         <ActivityButton
           label='记忆'
           tooltip='记忆'
@@ -76,8 +86,6 @@ export function ActivityBar() {
           icon={BrainCircuit}
           onClick={navigateMemory}
         />
-      </div>
-      <div className='activity-system'>
         <ActivityButton
           label='插件市场'
           tooltip='插件市场'

@@ -360,9 +360,10 @@ desktop and compact widths.
 
 ## Excluded from this release
 
-- hardcoded Science or Work Activity destinations; installed packages can
-  contribute sandboxed views under [PLUGINS.md](PLUGINS.md), while the owned
-  Work route is governed by [WORK_OFFICE.md](WORK_OFFICE.md);
+- hardcoded vertical-product Activity destinations such as Research or Finance;
+  installed packages can contribute sandboxed views under
+  [PLUGINS.md](PLUGINS.md), while the built-in Work route is governed by
+  [WORK_OFFICE.md](WORK_OFFICE.md);
 - task branching, archive/restore, and conversation clearing;
 - image attachments, direct shell-command Composer syntax, and input history;
 - memory deletion, manual forgetting or consolidation, context search, and

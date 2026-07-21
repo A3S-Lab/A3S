@@ -39,7 +39,7 @@ export async function createWorkLocalArtifact(
   dependencies: WorkLocalArtifactCreateDependencies = defaultDependencies
 ): Promise<WorkLocalArtifactCreateResult> {
   const draft = dependencies.createArtifact(templateId);
-  if (draft.kind === 'pdf') throw new Error('PDF 文件是只读的，不能新建为可编辑文件。');
+  if (draft.kind === 'pdf') throw new Error('PDF 需要从现有文件导入，当前不能直接新建空白 PDF。');
 
   const fileName = workLocalArtifactFileName(requestedName, draft.kind);
   const path = joinLocalPath(directory, fileName);

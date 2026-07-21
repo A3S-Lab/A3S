@@ -97,14 +97,14 @@ banner disappears. Unsaved client state remains available while disconnected.
 
 ### `ActivityBar`
 
-**Role:** open Code, verified plugin workbench views, Memory, Marketplace, and
-Settings.
+**Role:** open built-in Code and Work, verified plugin workbench views, Memory,
+Marketplace, and Settings.
 
-**Current behavior:** Code is always first and is the default. Enabled A3S Use
-`activity_bar` contributions follow in manifest order, with unsupported icon
-names using a neutral plugin glyph. Code Memory follows a divider. Marketplace
-and Settings are pinned to the system section. Work and Science are not
-hardcoded, and unknown or removed plugin hashes normalize to Code after the
+**Current behavior:** Code is always first and is the default; built-in Work is
+second. Enabled A3S Use `activity_bar` contributions follow in manifest order,
+with unsupported icon names using a neutral plugin glyph. Memory, Marketplace,
+and Settings share the pinned bottom system section. Research and Finance are
+not hardcoded, and unknown or removed plugin hashes normalize to Code after the
 catalog loads. Each icon exposes one concise tooltip.
 
 **Does not own:** tasks, artifacts, result modes, or feature commands.

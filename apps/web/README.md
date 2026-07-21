@@ -1,10 +1,10 @@
 # A3S Web
 
 A3S Web is a desktop super-app shell. Code is the first and default Activity
-Bar destination. Installed A3S Use packages can add reviewed workbench views;
-the existing Work filesystem surface remains available to owned routes but is
-no longer a hardcoded Activity entry. Code is a task workspace, not a
-slash-command launcher or a generic chat client.
+Bar destination, and Work is the second built-in product. Installed A3S Use
+packages can add reviewed workbench views for vertical capabilities such as
+Research and Finance. Code is a task workspace, not a slash-command launcher
+or a generic chat client.
 
 Product implementation is governed by the
 [super-app plan](docs/SUPER_APP.md),
@@ -21,9 +21,10 @@ sandbox, messaging, and review contracts are defined in
 
 ## Current product surface
 
-- A VS Code-style Activity Bar with Code first, enabled package contributions
-  ordered from the live A3S Use registry, a Code Memory shortcut, a signed
-  plugin Marketplace, and Settings. Work and Science are not hardcoded entries.
+- A VS Code-style Activity Bar with built-in Code and Work entries followed by
+  enabled package contributions ordered from the live A3S Use registry. Memory,
+  the signed plugin Marketplace, and Settings share the pinned bottom section.
+  Research and Finance are not hardcoded entries.
 - A Finder-inspired A3S Work local-files workspace backed by the real filesystem:
   it initially follows the default A3S Code workspace shown in Settings, while
   an explicit Work “Switch workspace” choice is persisted as a user override.
@@ -78,7 +79,9 @@ sandbox, messaging, and review contracts are defined in
   files, favorites, server-owned autosave, folders, move/copy/rename,
   recoverable trash, imported source-file recovery, version history,
   DOCX/XLSX/PPTX import and export,
-  progressive source-backed PDF preview, PDF export from every native editor,
+  source-backed PDF editing through EmbedPDF and a version-matched PDFium/WASM
+  asset bundled from the installed `@embedpdf/pdfium` dependency,
+  PDF export from every native editor,
   and compatibility review before degraded saves or exports. A shared
   print-preview workflow opens from the toolbar or Cmd/Ctrl+P, shows the actual
   document, worksheet, notes-page, slide, or handout pagination, supports page
@@ -110,6 +113,12 @@ sandbox, messaging, and review contracts are defined in
   source types, and additional simple metadata. Uncommon Word style paths are
   retained for DOCX output and reported while Work preview uses an APA
   fallback.
+  PDF files keep EmbedPDF's complete native interaction model for search,
+  thumbnails, annotations, forms, signatures, stamps, redaction, history,
+  printing, and modified-copy export. Saving asks PDFium for a real updated PDF
+  binary, replaces the managed A3S source, and writes the same bytes through the
+  verified local-file path when the artifact is bound; the header keeps original
+  source download explicitly separate from modified PDF export.
   Body-text revision mode records typed,
   pasted, replaced, and Backspace/Delete text as attributed insertions or
   deletions; a review panel can locate, accept, or reject one or all changes.

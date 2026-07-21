@@ -277,7 +277,7 @@ export function WorkEditorShell({
             {actions.exporting
               ? '正在导出…'
               : artifact.kind === 'pdf'
-                ? '下载 PDF'
+                ? '下载原始 PDF'
                 : `导出 ${workArtifactExtension(artifact.kind).toUpperCase()}`}
           </button>
         </div>
@@ -327,6 +327,7 @@ export function WorkEditorShell({
             <SpreadsheetEditor
               content={artifact.content}
               preview={preview}
+              saveStatus={workSaveStatusText(actions.saveState, actions.storageMode)}
               onChange={updateContent}
               onAgentRequest={onAgentRequest}
             />
@@ -336,13 +337,21 @@ export function WorkEditorShell({
           <PresentationEditor
             content={artifact.content}
             preview={preview}
+            saveStatus={workSaveStatusText(actions.saveState, actions.storageMode)}
             onChange={updateContent}
             onAgentRequest={onAgentRequest}
+            onStartSlideshow={() => setPreview(true)}
           />
         )}
         {artifact.content.type === 'pdf' && (
           <Suspense fallback={<output className='work-editor-loading'>正在准备 PDF 预览器…</output>}>
-            <PdfViewer loadSource={actions.sourceBlob} onDownload={() => void actions.downloadSource()} />
+            <PdfViewer
+              fileName={artifact.source?.name ?? `${artifact.title}.pdf`}
+              loadSource={actions.sourceBlob}
+              saveLabel={actions.activeLocalBinding ? '保存并写回本地' : '保存到 A3S'}
+              sourceKey={artifact.id}
+              onSave={actions.savePdfSource}
+            />
           </Suspense>
         )}
       </div>
