@@ -20,16 +20,15 @@ export function EvolutionWorkbench({ actions }: { actions: EvolutionActions }) {
   const [showAll, setShowAll] = useState(false);
   const [confirmation, setConfirmation] = useState<EvolutionConfirmation | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
-  const candidates = useMemo(() => {
-    if (!data) return [];
-    return showAll
-      ? data.candidates
-      : data.candidates.filter((candidate) => candidate.state === 'ready' || candidate.updateAvailable);
-  }, [data, showAll]);
-  const actionableCount = useMemo(
-    () => data?.candidates.filter((candidate) => candidate.state === 'ready' || candidate.updateAvailable).length ?? 0,
+  const actionableCandidates = useMemo(
+    () => data?.candidates.filter((candidate) => candidate.state === 'ready' || candidate.updateAvailable) ?? [],
     [data]
   );
+  const candidates = useMemo(
+    () => (showAll && data ? data.candidates : actionableCandidates),
+    [actionableCandidates, data, showAll]
+  );
+  const actionableCount = actionableCandidates.length;
   const selected = useMemo(
     () => candidates.find((candidate) => candidate.id === state.evolutionSelectedId) ?? candidates[0] ?? null,
     [candidates, state.evolutionSelectedId]
@@ -69,7 +68,17 @@ export function EvolutionWorkbench({ actions }: { actions: EvolutionActions }) {
                 <span>{candidates.length} 项</span>
               </div>
               {(showAll || candidates.length < data.candidates.length) && (
-                <button type='button' onClick={() => setShowAll((value) => !value)}>
+                <button
+                  type='button'
+                  onClick={() => {
+                    const nextShowAll = !showAll;
+                    const nextCandidates = nextShowAll ? data.candidates : actionableCandidates;
+                    const nextSelected =
+                      nextCandidates.find((candidate) => candidate.id === selected?.id) ?? nextCandidates[0];
+                    if (nextSelected) appState.evolutionSelectedId = nextSelected.id;
+                    setShowAll(nextShowAll);
+                  }}
+                >
                   {showAll ? `只看待处理 ${actionableCount}` : `查看全部 ${data.candidates.length}`}
                 </button>
               )}

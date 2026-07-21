@@ -98,6 +98,8 @@ describe('EvolutionWorkbench', () => {
     appState.evolutionSelectedId = skill.id;
     render(<EvolutionWorkbench actions={actions({ rollbackEvolution })} />);
     fireEvent.click(screen.getByRole('button', { name: /查看全部/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Focused verification/ }));
+    await screen.findByRole('heading', { name: 'Focused verification' });
 
     fireEvent.click(screen.getByText('历史记录'));
     fireEvent.click(screen.getByRole('button', { name: '撤销保存' }));
@@ -138,6 +140,22 @@ describe('EvolutionWorkbench', () => {
     expect(screen.getByLabelText('学习内容')).toHaveTextContent('全部内容3 项');
     expect(screen.getByRole('button', { name: /Obsolete library notes/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /只看待处理/ })).toBeInTheDocument();
+  });
+
+  it('keeps the visible selection when switching from pending content to all content', () => {
+    const data = evolutionTestData();
+    data.candidates[0].state = 'materialized';
+    data.candidates[1].updateAvailable = true;
+    appState.evolutionData = data;
+    appState.evolutionSelectedId = data.candidates[0].id;
+
+    render(<EvolutionWorkbench actions={actions()} />);
+
+    expect(screen.getByRole('heading', { name: 'Focused verification' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /查看全部/ }));
+
+    expect(screen.getByRole('heading', { name: 'Focused verification' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Focused verification/ })).toHaveClass('selected');
   });
 
   it('uses plain-language labels for internal source names', () => {
