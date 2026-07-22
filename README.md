@@ -349,7 +349,56 @@ Plan state, or untouched Lane ordering.
 Memory evolution accepts only validated, LLM-authored reuse signals rather
 than promoting ordinary memories through keyword matching. Repeated,
 conflict-free evidence can materialize a versioned local Preference, Skill, or
-OKF asset after strict maturity thresholds. Preferences enter bounded promp…787 tokens truncated…io and async-std"
+OKF asset after strict maturity thresholds. Preferences enter bounded prompt
+context, Skills enter the session registry, and affected TUI or Web sessions
+must all refresh before activation is acknowledged. Review surfaces expose the
+evidence, audit trail, immutable versions, rejection, reconsideration, version
+restore, and a recoverable return to the unmaterialized baseline. Local assets
+are never published automatically.
+`/checkup` first locks the composer and scans at most 128 persisted local
+sessions for actual `Skill` tool invocations. It suggests cleanup only after at
+least three sampled sessions, twelve completed turns, and a Skill age of 14
+days. Recently changed, disabled, managed, duplicate-name, and unknown-age
+Skills are excluded. Instruction and MCP counts remain footprint signals, not
+inferred usage. A strict read-only Plan turn presents each eligible Skill as a
+separate reversible disable choice; it never deletes files, and nothing changes
+before the user approves a selected action under normal HITL.
+`/tasks` or `Ctrl+B` opens live delegated-task control without interrupting the
+parent turn. It searches authoritative Core snapshots, keeps running and recent
+work visible across automatic refreshes, opens full progress/output details,
+and requires a second matching action before cancelling a running task.
+`/permissions` opens the exact grant catalog without interrupting a parent
+turn. It separates session and project grants, searches tool names and
+canonical arguments, opens full details, and requires a second matching action
+before revocation. Project changes atomically rewrite
+`.a3s/permissions.acl` through `a3s-acl`; revocation affects future checks and
+does not cancel tools already running.
+`/history` or `Ctrl+R` fuzzy-searches prompts from the current session while
+preserving the current draft. Results are relevance- and recency-ranked,
+bounded to 100 rows, keyboard/mouse navigable, and restored explicitly with
+Enter or Tab.
+`/copy` copies the latest assistant response as source Markdown, while
+`/copy transcript` copies the complete semantic conversation. `/export [path]`
+atomically creates a private Markdown snapshot inside the current workspace,
+uses a unique session-and-time filename by default, and never overwrites an
+existing file. Stable sharing includes user and assistant messages, visible
+tool calls, and delegated-task results while excluding private reasoning,
+transient terminal chrome, and hidden duplicate cells.
+`/relay` opens a workspace-scoped session dashboard with stable selection,
+per-source search, a compact task peek, wheel navigation, and bounded automatic
+refresh. Native sessions resume with their persisted model, effort, execution
+mode, theme, and paused goal; external transcript rows hand their latest task
+to the active session.
+The Web frontend does not receive A3S OS credentials; the CLI retains account
+and token handling. The CLI does not embed the frontend: it must discover an
+`index.html` in a supported build directory or receive `--web-dir`.
+`--api-only` starts the local API without this requirement.
+
+### Run research
+
+```bash
+# Use web and workspace evidence.
+a3s code research --web "Compare Tokio and async-std"
 
 # Enforce offline, workspace-only evidence.
 a3s code research --local-only "Map this repository's release process"

@@ -297,20 +297,18 @@ The CLI command palette delegates to the A3S Code TUI command registry:
 | Loops | `/loop init`, `/loop run`, `/loop audit`, `/loop logs`, `/loop <task>` |
 | Plugins and updates | `/plugin`, `/reload`, `/update`, `/help` |
 
-`/checkup` is an audit-first setup workflow rather than a passive status
-screen. It first locks the composer and collects a typed host snapshot of the
-installed-component set, active-executable and `PATH` shadowing, bounded ACL
-syntax and semantic validity, skill/plugin context size and duplicate names,
-indexed `AGENTS.md` size, and in-memory MCP connection/tool counts. The
-preflight does not start MCP servers and withholds raw component paths, MCP
-error text, ACL contents, and credentials. The host then forces a read-only
-Plan turn to audit applicable `AGENTS.md`, integrations, update state, and
-runtime policy. Findings and confirmation-sized remediations stop at the
-existing Approve / Revise / Abandon boundary; only an approved follow-up turn
-can make changes, and normal HITL remains authoritative. Auto mode is presented
-only as an optional saved-session preference; an exact read-only permission
-grant is offered only when the existing transcript proves repeated denial of
-the same canonical tool and arguments.
+`/checkup` is a context-hygiene review, not an installation or account health
+check. It locks the composer and scans at most 128 persisted local sessions for
+actual `Skill` tool invocations. A low-use suggestion is produced only after at
+least three sampled sessions, twelve completed turns, and a Skill age of 14
+days. Recently changed, disabled, managed, duplicate-name, and unknown-age
+Skills are excluded. The report shows invocation/session counts, context bytes,
+the bounded date window, and every protected category. “Not observed” means
+only that the Skill was absent from this sample. Instruction and MCP counts are
+context-footprint signals; they are never treated as usage telemetry. A strict
+read-only Plan turn offers each eligible Skill as a separate reversible
+`/plugin` disable choice and never proposes deletion. Nothing changes before
+the existing Approve / Revise / Abandon boundary and normal HITL.
 
 `/evolution` reviews reusable Preference, Skill, and OKF candidates emitted as
 validated LLM-authored memory signals. Ordinary memories are never promoted by
