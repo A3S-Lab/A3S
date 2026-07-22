@@ -42,6 +42,27 @@ param(
         Write-Warning "a3s installer: $Message"
     }
 
+    function Invoke-InstallerRequest {
+        param(
+            [Parameter(Mandatory = $true)][scriptblock]$Operation,
+            [Parameter(Mandatory = $true)][string]$Description,
+            [int]$MaximumAttempts = 4
+        )
+
+        for ($attempt = 1; $attempt -le $MaximumAttempts; $attempt++) {
+            try {
+                return & $Operation
+            } catch {
+                if ($attempt -eq $MaximumAttempts) {
+                    throw
+                }
+                $delaySeconds = [Math]::Pow(2, $attempt - 1)
+                Write-InstallerWarning "$Description failed on attempt $attempt of $MaximumAttempts; retrying in $delaySeconds second(s): $($_.Exception.Message)"
+                Start-Sleep -Seconds $delaySeconds
+            }
+        }
+    }
+
     function Remove-GeneratedDirectory {
         param(
             [string]$Path,
@@ -56,7 +77,7 @@ param(
         $parentWithSeparator = $fullParent + [IO.Path]::DirectorySeparatorChar
         $leaf = [IO.Path]::GetFileName($fullPath)
         if (-not $fullPath.StartsWith($parentWithSeparator, [StringComparison]::OrdinalIgnoreCase) -or
-            $leaf -notmatch '^\.a3s-web\.(new|backup|failed)\.[0-9a-f-]+$') {
+            $leaf -notmatch '^\.a3s-(?:web|support)\.(new|backup|failed)\.[0-9a-f-]+$') {
             throw "refusing to remove unexpected directory $fullPath"
         }
         Remove-Item -LiteralPath $fullPath -Recurse -Force
@@ -76,7 +97,7 @@ param(
         $parentWithSeparator = $fullParent + [IO.Path]::DirectorySeparatorChar
         $leaf = [IO.Path]::GetFileName($fullPath)
         if (-not $fullPath.StartsWith($parentWithSeparator, [StringComparison]::OrdinalIgnoreCase) -or
-            $leaf -notmatch '^\.a3s\.(new|backup|failed)\.[0-9a-f-]+\.exe$') {
+            $leaf -notmatch '^\.a3s(?:-webview)?\.(new|backup|failed)\.[0-9a-f-]+\.exe$') {
             throw "refusing to remove unexpected file $fullPath"
         }
         Remove-Item -LiteralPath $fullPath -Force
@@ -218,7 +239,9 @@ param(
     }
 
     Write-InstallerInfo "resolving $RequestedVersion release for $target"
-    $release = Invoke-RestMethod -Uri $releaseApi -Headers $apiHeaders
+    $release = Invoke-InstallerRequest -Description 'GitHub release lookup' -Operation {
+        Invoke-RestMethod -Uri $releaseApi -Headers $apiHeaders -TimeoutSec 60
+    }
     $releaseTag = [string]$release.tag_name
     if ($releaseTag -notmatch '^v\d+\.\d+\.\d+$') {
         throw 'GitHub returned an invalid stable release tag'
@@ -256,6 +279,8 @@ param(
     $archive = Join-Path $tempDir $assetName
     $extracted = Join-Path $tempDir 'extracted'
     $binaryPath = Join-Path $installDir 'a3s.exe'
+    $webviewPath = Join-Path $installDir 'a3s-webview.exe'
+    $supportPath = Join-Path $installDir 'support'
 
     $webParent = ''
     $webDir = ''
@@ -265,12 +290,26 @@ param(
     $stagedBinary = ''
     $backupBinary = ''
     $failedBinary = ''
+    $stagedWebview = ''
+    $backupWebview = ''
+    $failedWebview = ''
+    $stagedSupport = ''
+    $backupSupport = ''
+    $failedSupport = ''
     $webActive = $false
     $oldWebSaved = $false
     $binaryActive = $false
     $oldBinarySaved = $false
+    $webviewActive = $false
+    $oldWebviewSaved = $false
+    $supportActive = $false
+    $oldSupportSaved = $false
     $webActivationStarted = $false
     $binaryActivationStarted = $false
+    $webviewActivationStarted = $false
+    $supportActivationStarted = $false
+    $hasBundledWebview = $false
+    $hasBundledSupport = $false
     $committed = $false
     $installerMutex = $null
     $mutexAcquired = $false
@@ -294,9 +333,14 @@ param(
     try {
         [IO.Directory]::CreateDirectory($tempDir) | Out-Null
         Write-InstallerInfo "downloading $assetName"
-        Invoke-WebRequest -UseBasicParsing -Uri $expectedAssetUrl -OutFile $archive -Headers @{
-            'User-Agent' = 'a3s-installer'
-        }
+        Invoke-InstallerRequest -Description "download of $assetName" -Operation {
+            if (Test-Path -LiteralPath $archive) {
+                Remove-Item -LiteralPath $archive -Force
+            }
+            Invoke-WebRequest -UseBasicParsing -Uri $expectedAssetUrl -OutFile $archive -TimeoutSec 600 -Headers @{
+                'User-Agent' = 'a3s-installer'
+            }
+        } | Out-Null
 
         $actualSha = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($actualSha -ne $expectedSha) {
@@ -319,9 +363,28 @@ param(
                 }
             }
             $entryNames = @($entries | ForEach-Object { $_.FullName.Replace('\', '/') })
+            $webviewEntryCount = @($entryNames | Where-Object { $_ -ceq 'a3s-webview.exe' }).Count
             if (@($entryNames | Where-Object { $_ -ceq 'a3s.exe' }).Count -ne 1 -or
+                $webviewEntryCount -gt 1 -or
                 @($entryNames | Where-Object { $_ -ceq 'web/index.html' }).Count -ne 1) {
-                throw 'release archive must contain exactly one a3s.exe and web/index.html'
+                throw 'release archive must contain exactly one a3s.exe and web/index.html, and at most one a3s-webview.exe'
+            }
+            $hasBundledWebview = $webviewEntryCount -eq 1
+            $supportEntryCount = @($entryNames | Where-Object {
+                $_ -ceq 'support' -or $_.StartsWith('support/', [StringComparison]::Ordinal)
+            }).Count
+            if ($supportEntryCount -gt 0) {
+                foreach ($requiredSupportEntry in @(
+                    'support/managed-srt/package.json',
+                    'support/managed-srt/package-lock.json',
+                    'support/managed-srt/node_modules/@anthropic-ai/sandbox-runtime/dist/cli.js',
+                    'support/managed-srt.tree-sha256'
+                )) {
+                    if (@($entryNames | Where-Object { $_ -ceq $requiredSupportEntry }).Count -ne 1) {
+                        throw "release support payload must contain exactly one $requiredSupportEntry"
+                    }
+                }
+                $hasBundledSupport = $true
             }
             $entryKeys = @($entryNames | ForEach-Object { $_.TrimEnd('/') })
             if (@($entryKeys | Group-Object | Where-Object { $_.Count -ne 1 }).Count -ne 0) {
@@ -330,7 +393,7 @@ param(
             foreach ($entry in $entries) {
                 $entryName = $entry.FullName.Replace('\', '/')
                 $unixFileType = (($entry.ExternalAttributes -shr 16) -band 0xF000)
-                if ($entryName -notmatch '^(a3s\.exe|web/?|web/.+)$' -or
+                if ($entryName -notmatch '^(a3s\.exe|a3s-webview\.exe|web/?|web/.+|support/?|support/.+)$' -or
                     ('/' + $entryName + '/') -match '/(\.|\.\.)/' -or
                     $unixFileType -notin @(0, 0x4000, 0x8000) -or
                     ($entry.ExternalAttributes -band [int][IO.FileAttributes]::ReparsePoint) -ne 0) {
@@ -343,10 +406,25 @@ param(
 
         Expand-Archive -LiteralPath $archive -DestinationPath $extracted
         $extractedBinary = Join-Path $extracted 'a3s.exe'
+        $extractedWebview = Join-Path $extracted 'a3s-webview.exe'
         $extractedWeb = Join-Path $extracted 'web'
+        $extractedSupport = Join-Path $extracted 'support'
         if (-not (Test-Path -LiteralPath $extractedBinary -PathType Leaf) -or
+            ($hasBundledWebview -and -not (Test-Path -LiteralPath $extractedWebview -PathType Leaf)) -or
             -not (Test-Path -LiteralPath (Join-Path $extractedWeb 'index.html') -PathType Leaf)) {
             throw 'the extracted release layout is invalid'
+        }
+        if ($hasBundledSupport) {
+            foreach ($requiredSupportPath in @(
+                'managed-srt\package.json',
+                'managed-srt\package-lock.json',
+                'managed-srt\node_modules\@anthropic-ai\sandbox-runtime\dist\cli.js',
+                'managed-srt.tree-sha256'
+            )) {
+                if (-not (Test-Path -LiteralPath (Join-Path $extractedSupport $requiredSupportPath) -PathType Leaf)) {
+                    throw "the extracted managed sandbox support payload is missing $requiredSupportPath"
+                }
+            }
         }
         $reparseEntries = @(Get-ChildItem -LiteralPath $extracted -Recurse -Force |
             Where-Object { ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 })
@@ -391,10 +469,18 @@ param(
         $stagedBinary = Join-Path $installDir ".a3s.new.$activationId.exe"
         $backupBinary = Join-Path $installDir ".a3s.backup.$activationId.exe"
         $failedBinary = Join-Path $installDir ".a3s.failed.$activationId.exe"
+        $stagedWebview = Join-Path $installDir ".a3s-webview.new.$activationId.exe"
+        $backupWebview = Join-Path $installDir ".a3s-webview.backup.$activationId.exe"
+        $failedWebview = Join-Path $installDir ".a3s-webview.failed.$activationId.exe"
+        $stagedSupport = Join-Path $installDir ".a3s-support.new.$activationId"
+        $backupSupport = Join-Path $installDir ".a3s-support.backup.$activationId"
+        $failedSupport = Join-Path $installDir ".a3s-support.failed.$activationId"
 
         foreach ($generatedPath in @(
             $stagedWeb, $backupWeb, $failedWeb,
-            $stagedBinary, $backupBinary, $failedBinary
+            $stagedBinary, $backupBinary, $failedBinary,
+            $stagedWebview, $backupWebview, $failedWebview,
+            $stagedSupport, $backupSupport, $failedSupport
         )) {
             if (Test-Path -LiteralPath $generatedPath) {
                 throw "temporary activation path already exists: $generatedPath"
@@ -403,6 +489,12 @@ param(
 
         Move-Item -LiteralPath $extractedWeb -Destination $stagedWeb
         Copy-Item -LiteralPath $extractedBinary -Destination $stagedBinary
+        if ($hasBundledWebview) {
+            Copy-Item -LiteralPath $extractedWebview -Destination $stagedWebview
+        }
+        if ($hasBundledSupport) {
+            Move-Item -LiteralPath $extractedSupport -Destination $stagedSupport
+        }
         Assert-A3sVersion -Path $stagedBinary -ExpectedVersion $expectedVersion
 
         $webActivationStarted = $true
@@ -419,6 +511,56 @@ param(
         Move-Item -LiteralPath $stagedWeb -Destination $webDir
         $webActive = $true
         $stagedWeb = ''
+
+        if ($hasBundledSupport) {
+            $supportActivationStarted = $true
+            if (Test-Path -LiteralPath $supportPath) {
+                Assert-NoReparsePoint -Path $supportPath
+                $existingSupport = Get-Item -LiteralPath $supportPath -Force
+                if (-not $existingSupport.PSIsContainer) {
+                    throw "$supportPath is not a directory"
+                }
+                if (-not (Test-Path -LiteralPath (Join-Path $supportPath 'managed-srt\package.json') -PathType Leaf)) {
+                    throw "$supportPath is not an installer-managed support directory"
+                }
+                $supportReparseEntries = @(Get-ChildItem -LiteralPath $supportPath -Recurse -Force |
+                    Where-Object { ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 })
+                if ($supportReparseEntries.Count -ne 0) {
+                    throw "refusing to replace support assets containing a reparse point: $($supportReparseEntries[0].FullName)"
+                }
+                Move-Item -LiteralPath $supportPath -Destination $backupSupport
+                $oldSupportSaved = $true
+            }
+            Move-Item -LiteralPath $stagedSupport -Destination $supportPath
+            $supportActive = $true
+            $stagedSupport = ''
+        }
+
+        if ($hasBundledWebview) {
+            $webviewActivationStarted = $true
+            if (Test-Path -LiteralPath $webviewPath) {
+                $existingWebview = Get-Item -LiteralPath $webviewPath -Force
+                if (($existingWebview.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                    throw "refusing to replace reparse-point companion $webviewPath"
+                }
+                if (-not $existingWebview.PSIsContainer) {
+                    try {
+                        [IO.File]::Replace($stagedWebview, $webviewPath, $backupWebview, $true)
+                    } catch {
+                        throw "failed to replace $webviewPath; close Agent Island and all running a3s processes, then retry: $($_.Exception.Message)"
+                    }
+                    $oldWebviewSaved = $true
+                    $webviewActive = $true
+                    $stagedWebview = ''
+                } else {
+                    throw "$webviewPath is not a regular file"
+                }
+            } else {
+                Move-Item -LiteralPath $stagedWebview -Destination $webviewPath
+                $webviewActive = $true
+                $stagedWebview = ''
+            }
+        }
 
         $binaryActivationStarted = $true
         if (Test-Path -LiteralPath $binaryPath) {
@@ -459,6 +601,24 @@ param(
                 $backupBinary = ''
             } catch {
                 Write-InstallerWarning "could not remove the old binary backup at $backupBinary`: $($_.Exception.Message)"
+            }
+        }
+        if ($oldWebviewSaved) {
+            try {
+                Remove-GeneratedFile -Path $backupWebview -ExpectedParent $installDir
+                $oldWebviewSaved = $false
+                $backupWebview = ''
+            } catch {
+                Write-InstallerWarning "could not remove the old WebView helper backup at $backupWebview`: $($_.Exception.Message)"
+            }
+        }
+        if ($oldSupportSaved) {
+            try {
+                Remove-GeneratedDirectory -Path $backupSupport -ExpectedParent $installDir
+                $oldSupportSaved = $false
+                $backupSupport = ''
+            } catch {
+                Write-InstallerWarning "could not remove the old support payload backup at $backupSupport`: $($_.Exception.Message)"
             }
         }
 
@@ -507,6 +667,14 @@ param(
         }
 
         Write-InstallerInfo "installed a3s $expectedVersion to $binaryPath"
+        if ($hasBundledWebview) {
+            Write-InstallerInfo "installed a3s-webview to $webviewPath"
+        } else {
+            Write-InstallerInfo "release $releaseTag has no bundled a3s-webview; a3s code will install the verified component on first use"
+        }
+        if ($hasBundledSupport) {
+            Write-InstallerInfo "installed managed sandbox support to $supportPath"
+        }
         Write-InstallerInfo "installed Web assets to $webDir"
     } finally {
         if (-not $committed) {
@@ -547,6 +715,86 @@ param(
                     }
                 } else {
                     $oldBinarySaved = $false
+                }
+            }
+
+            if ($webviewActivationStarted) {
+                $stagedWebviewPresent = -not [string]::IsNullOrEmpty($stagedWebview) -and
+                    (Test-Path -LiteralPath $stagedWebview)
+                if (-not $stagedWebviewPresent) {
+                    if (Test-Path -LiteralPath $webviewPath) {
+                        try {
+                            Move-Item -LiteralPath $webviewPath -Destination $failedWebview
+                            $webviewActive = $false
+                        } catch {
+                            $webviewActive = $true
+                            Write-InstallerWarning "could not move the failed WebView helper; the previous helper is preserved at $backupWebview"
+                        }
+                    } else {
+                        $webviewActive = $false
+                    }
+                } else {
+                    $webviewActive = $false
+                }
+
+                if (Test-Path -LiteralPath $backupWebview) {
+                    if (-not (Test-Path -LiteralPath $webviewPath)) {
+                        try {
+                            Move-Item -LiteralPath $backupWebview -Destination $webviewPath
+                            $oldWebviewSaved = $false
+                        } catch {
+                            $oldWebviewSaved = $true
+                            Write-InstallerWarning "could not restore the previous WebView helper; its backup is preserved at $backupWebview"
+                        }
+                    } elseif ($stagedWebviewPresent) {
+                        # Activation did not consume the staged companion; the original is still active.
+                        $oldWebviewSaved = $false
+                    } else {
+                        $oldWebviewSaved = $true
+                        Write-InstallerWarning "could not restore the previous WebView helper; its backup is preserved at $backupWebview"
+                    }
+                } else {
+                    $oldWebviewSaved = $false
+                }
+            }
+
+            if ($supportActivationStarted) {
+                $stagedSupportPresent = -not [string]::IsNullOrEmpty($stagedSupport) -and
+                    (Test-Path -LiteralPath $stagedSupport)
+                if (-not $stagedSupportPresent) {
+                    if (Test-Path -LiteralPath $supportPath) {
+                        try {
+                            Move-Item -LiteralPath $supportPath -Destination $failedSupport
+                            $supportActive = $false
+                        } catch {
+                            $supportActive = $true
+                            Write-InstallerWarning "could not move the failed support payload; the previous payload is preserved at $backupSupport"
+                        }
+                    } else {
+                        $supportActive = $false
+                    }
+                } else {
+                    $supportActive = $false
+                }
+
+                if (Test-Path -LiteralPath $backupSupport) {
+                    if (-not (Test-Path -LiteralPath $supportPath)) {
+                        try {
+                            Move-Item -LiteralPath $backupSupport -Destination $supportPath
+                            $oldSupportSaved = $false
+                        } catch {
+                            $oldSupportSaved = $true
+                            Write-InstallerWarning "could not restore the previous support payload; its backup is preserved at $backupSupport"
+                        }
+                    } elseif ($stagedSupportPresent) {
+                        # Activation did not consume the staged payload; the original is still active.
+                        $oldSupportSaved = $false
+                    } else {
+                        $oldSupportSaved = $true
+                        Write-InstallerWarning "could not restore the previous support payload; its backup is preserved at $backupSupport"
+                    }
+                } else {
+                    $oldSupportSaved = $false
                 }
             }
 
@@ -613,6 +861,20 @@ param(
                 Write-InstallerWarning "cleanup failed for $path`: $($_.Exception.Message)"
             }
         }
+        foreach ($path in @($stagedWebview, $failedWebview)) {
+            try {
+                Remove-GeneratedFile -Path $path -ExpectedParent $installDir
+            } catch {
+                Write-InstallerWarning "cleanup failed for $path`: $($_.Exception.Message)"
+            }
+        }
+        foreach ($path in @($stagedSupport, $failedSupport)) {
+            try {
+                Remove-GeneratedDirectory -Path $path -ExpectedParent $installDir
+            } catch {
+                Write-InstallerWarning "cleanup failed for $path`: $($_.Exception.Message)"
+            }
+        }
         if ($oldBinarySaved) {
             Write-InstallerWarning "preserved the previous binary at $backupBinary"
         } else {
@@ -620,6 +882,24 @@ param(
                 Remove-GeneratedFile -Path $backupBinary -ExpectedParent $installDir
             } catch {
                 Write-InstallerWarning "cleanup failed for $backupBinary`: $($_.Exception.Message)"
+            }
+        }
+        if ($oldWebviewSaved) {
+            Write-InstallerWarning "preserved the previous WebView helper at $backupWebview"
+        } else {
+            try {
+                Remove-GeneratedFile -Path $backupWebview -ExpectedParent $installDir
+            } catch {
+                Write-InstallerWarning "cleanup failed for $backupWebview`: $($_.Exception.Message)"
+            }
+        }
+        if ($oldSupportSaved) {
+            Write-InstallerWarning "preserved the previous support payload at $backupSupport"
+        } else {
+            try {
+                Remove-GeneratedDirectory -Path $backupSupport -ExpectedParent $installDir
+            } catch {
+                Write-InstallerWarning "cleanup failed for $backupSupport`: $($_.Exception.Message)"
             }
         }
         try {

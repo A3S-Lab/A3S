@@ -33,7 +33,8 @@ assert_content() {
 assert_no_generated_paths() {
     local root=$1
     local leftovers
-    leftovers=$(find "$root" -name '.a3s.*' -o -name '.a3s-web.*')
+    leftovers=$(find "$root" -name '.a3s.*' -o -name '.a3s-web.*' -o \
+        -name '.a3s-webview.*' -o -name '.a3s-support.*')
     [[ -z "$leftovers" ]] || fail "installer left temporary paths: $leftovers"
 }
 
@@ -134,6 +135,16 @@ case "$MOCK_MV_FAULT" in
             .a3s.new.*:a3s) inject=1 ;;
         esac
         ;;
+    webview-activate)
+        case "$source_leaf:$destination_leaf" in
+            .a3s-webview.new.*:a3s-webview) inject=1 ;;
+        esac
+        ;;
+    support-activate)
+        case "$source_leaf:$destination_leaf" in
+            .a3s-support.new.*:support) inject=1 ;;
+        esac
+        ;;
 esac
 
 if [ "$inject" -eq 1 ]; then
@@ -162,9 +173,12 @@ sha256_file() {
 make_fixture() {
     local version=$1
     local target=$2
+    local include_webview=${3:-1}
+    local include_support=${4:-1}
     local payload="$fixture_root/payload"
     local archive="$fixture_root/a3s-v${version}-${target}.tar.gz"
     local asset_name="a3s-v${version}-${target}.tar.gz"
+    local archive_members=(a3s web)
     local digest
 
     rm -rf -- "$payload"
@@ -172,7 +186,25 @@ make_fixture() {
     printf '#!/bin/sh\nprintf "a3s %s\\n"\n' "$version" >"$payload/a3s"
     chmod +x "$payload/a3s"
     printf '<!doctype html><title>A3S %s</title>\n' "$version" >"$payload/web/index.html"
-    tar -czf "$archive" -C "$payload" a3s web
+    if [ "$include_webview" -eq 1 ]; then
+        printf '#!/bin/sh\nif [ "${1:-}" = "--agent-island" ]; then\n  printf "%%s\\n" "usage: a3s-webview --agent-island --snapshot <absolute-path> --lock-file <absolute-path>" >&2\n  exit 2\nfi\nprintf "a3s-webview %s\\n"\n' \
+            "$version" >"$payload/a3s-webview"
+        chmod +x "$payload/a3s-webview"
+        archive_members+=(a3s-webview)
+    fi
+    if [ "$include_support" -eq 1 ]; then
+        mkdir -p "$payload/support/managed-srt/node_modules/@anthropic-ai/sandbox-runtime/dist"
+        printf '{"name":"a3s-managed-srt-fixture","version":"%s"}\n' \
+            "$version" >"$payload/support/managed-srt/package.json"
+        printf '{"name":"a3s-managed-srt-fixture","lockfileVersion":3}\n' \
+            >"$payload/support/managed-srt/package-lock.json"
+        printf 'managed-srt %s\n' \
+            "$version" >"$payload/support/managed-srt/node_modules/@anthropic-ai/sandbox-runtime/dist/cli.js"
+        printf 'fixture-tree-sha256-%s\n' \
+            "$version" >"$payload/support/managed-srt.tree-sha256"
+        archive_members+=(support)
+    fi
+    tar -czf "$archive" -C "$payload" "${archive_members[@]}"
     digest=$(sha256_file "$archive")
 
     MOCK_ARCHIVE=$archive
@@ -197,6 +229,20 @@ run_install() {
 
 mkdir -p "$test_root/home"
 
+# Stable archives published before the companion bundle remain installable;
+# Code owns their verified WebView first-use setup.
+export MOCK_UNAME_S=Linux MOCK_UNAME_M=x86_64
+make_fixture 1.2.2 x86_64-unknown-linux-gnu 0 0
+legacy_root="$test_root/legacy-without-webview"
+run_install 1.2.2 "$legacy_root/bin" "$legacy_root/data"
+assert_file "$legacy_root/bin/a3s"
+assert_file "$legacy_root/data/web/1.2.2/index.html"
+[[ ! -e "$legacy_root/bin/a3s-webview" ]] \
+    || fail 'legacy release unexpectedly installed a WebView companion'
+[[ ! -e "$legacy_root/bin/support" ]] \
+    || fail 'legacy release unexpectedly installed a support payload'
+assert_no_generated_paths "$legacy_root"
+
 # Every published Unix target maps to the exact release asset name.
 for target_case in \
     'Linux x86_64 x86_64-unknown-linux-gnu' \
@@ -209,9 +255,15 @@ for target_case in \
     case_root="$test_root/targets/$target"
     run_install 1.2.3 "$case_root/bin" "$case_root/data"
     assert_file "$case_root/bin/a3s"
+    assert_file "$case_root/bin/a3s-webview"
+    assert_file "$case_root/bin/support/managed-srt/node_modules/@anthropic-ai/sandbox-runtime/dist/cli.js"
     assert_file "$case_root/data/web/1.2.3/index.html"
     [[ "$("$case_root/bin/a3s" --version)" == 'a3s 1.2.3' ]] \
         || fail "wrong installed version for $target"
+    [[ "$("$case_root/bin/a3s-webview")" == 'a3s-webview 1.2.3' ]] \
+        || fail "wrong installed WebView companion for $target"
+    assert_content 'managed-srt 1.2.3' \
+        "$case_root/bin/support/managed-srt/node_modules/@anthropic-ai/sandbox-runtime/dist/cli.js"
     assert_no_generated_paths "$case_root"
 done
 
@@ -223,6 +275,10 @@ run_install 1.2.3 "$upgrade_root/bin" "$upgrade_root/data"
 make_fixture 1.2.4 x86_64-unknown-linux-gnu
 run_install 1.2.4 "$upgrade_root/bin" "$upgrade_root/data"
 [[ "$("$upgrade_root/bin/a3s" --version)" == 'a3s 1.2.4' ]] || fail 'upgrade did not replace binary'
+[[ "$("$upgrade_root/bin/a3s-webview")" == 'a3s-webview 1.2.4' ]] \
+    || fail 'upgrade did not replace WebView companion'
+assert_content 'managed-srt 1.2.4' \
+    "$upgrade_root/bin/support/managed-srt/node_modules/@anthropic-ai/sandbox-runtime/dist/cli.js"
 assert_file "$upgrade_root/data/web/1.2.3/index.html"
 assert_file "$upgrade_root/data/web/1.2.4/index.html"
 assert_no_generated_paths "$upgrade_root"
@@ -235,6 +291,10 @@ MOCK_RELEASE_JSON="$fixture_root/bad-digest.json"
 export MOCK_RELEASE_JSON
 expect_failure 'digest mismatch' run_install 1.2.5 "$upgrade_root/bin" "$upgrade_root/data"
 [[ "$("$upgrade_root/bin/a3s" --version)" == 'a3s 1.2.4' ]] || fail 'digest failure changed old binary'
+[[ "$("$upgrade_root/bin/a3s-webview")" == 'a3s-webview 1.2.4' ]] \
+    || fail 'digest failure changed old WebView companion'
+assert_content 'managed-srt 1.2.4' \
+    "$upgrade_root/bin/support/managed-srt/node_modules/@anthropic-ai/sandbox-runtime/dist/cli.js"
 assert_file "$upgrade_root/data/web/1.2.4/index.html"
 
 # A missing target digest cannot borrow the following asset's digest.
@@ -254,10 +314,12 @@ rm -rf -- "$payload"
 mkdir -p "$payload/web"
 printf '#!/bin/sh\nprintf "a3s 1.2.7\\n"\n' >"$payload/a3s"
 chmod +x "$payload/a3s"
+printf '#!/bin/sh\nprintf "a3s-webview 1.2.7\\n"\n' >"$payload/a3s-webview"
+chmod +x "$payload/a3s-webview"
 printf '<!doctype html>\n' >"$payload/web/index.html"
 printf 'unexpected\n' >"$payload/escape"
 MOCK_ARCHIVE="$fixture_root/a3s-v1.2.7-x86_64-unknown-linux-gnu.tar.gz"
-tar -czf "$MOCK_ARCHIVE" -C "$payload" a3s web escape
+tar -czf "$MOCK_ARCHIVE" -C "$payload" a3s a3s-webview web escape
 export MOCK_ARCHIVE
 unsafe_digest=$(sha256_file "$MOCK_ARCHIVE")
 unsafe_asset=$(basename "$MOCK_ARCHIVE")
@@ -268,6 +330,10 @@ MOCK_RELEASE_JSON="$fixture_root/unsafe.json"
 export MOCK_RELEASE_JSON
 expect_failure 'unsafe archive member' run_install 1.2.7 "$upgrade_root/bin" "$upgrade_root/data"
 [[ "$("$upgrade_root/bin/a3s" --version)" == 'a3s 1.2.4' ]] || fail 'unsafe archive changed old binary'
+[[ "$("$upgrade_root/bin/a3s-webview")" == 'a3s-webview 1.2.4' ]] \
+    || fail 'unsafe archive changed old WebView companion'
+assert_content 'managed-srt 1.2.4' \
+    "$upgrade_root/bin/support/managed-srt/node_modules/@anthropic-ai/sandbox-runtime/dist/cli.js"
 
 # Unsupported and non-glibc hosts fail before making a network request.
 rm -f "$MOCK_CURL_CALLED"
@@ -303,6 +369,9 @@ fault_root="$test_root/fault-injection"
 make_fixture 4.0.0 x86_64-unknown-linux-gnu
 run_install 4.0.0 "$fault_root/bin" "$fault_root/data"
 printf 'old Web sentinel\n' >"$fault_root/data/web/4.0.0/index.html"
+support_cli="$fault_root/bin/support/managed-srt/node_modules/@anthropic-ai/sandbox-runtime/dist/cli.js"
+printf 'old support sentinel\n' >"$support_cli"
+old_webview_sha=$(sha256_file "$fault_root/bin/a3s-webview")
 
 export MOCK_MV_FAULT=web-backup MOCK_MV_FAULT_VERSION=4.0.0
 rm -f "$MOCK_MV_FAULT_MARKER"
@@ -310,8 +379,22 @@ expect_failure 'interruption after Web backup' \
     run_install 4.0.0 "$fault_root/bin" "$fault_root/data"
 [[ -e "$MOCK_MV_FAULT_MARKER" ]] || fail 'Web backup fault was not injected'
 assert_content 'old Web sentinel' "$fault_root/data/web/4.0.0/index.html"
+assert_content 'old support sentinel' "$support_cli"
 [[ "$("$fault_root/bin/a3s" --version)" == 'a3s 4.0.0' ]] \
     || fail 'Web backup interruption changed the installed binary'
+assert_no_generated_paths "$fault_root"
+
+export MOCK_MV_FAULT=webview-activate
+rm -f "$MOCK_MV_FAULT_MARKER"
+expect_failure 'interruption after WebView companion activation' \
+    run_install 4.0.0 "$fault_root/bin" "$fault_root/data"
+[[ -e "$MOCK_MV_FAULT_MARKER" ]] || fail 'WebView companion fault was not injected'
+assert_content 'old Web sentinel' "$fault_root/data/web/4.0.0/index.html"
+assert_content 'old support sentinel' "$support_cli"
+[[ "$(sha256_file "$fault_root/bin/a3s-webview")" == "$old_webview_sha" ]] \
+    || fail 'WebView activation interruption did not restore the previous companion'
+[[ "$("$fault_root/bin/a3s" --version)" == 'a3s 4.0.0' ]] \
+    || fail 'WebView activation interruption changed the installed binary'
 assert_no_generated_paths "$fault_root"
 
 export MOCK_MV_FAULT=web-activate
@@ -320,8 +403,20 @@ expect_failure 'interruption after Web activation' \
     run_install 4.0.0 "$fault_root/bin" "$fault_root/data"
 [[ -e "$MOCK_MV_FAULT_MARKER" ]] || fail 'Web activation fault was not injected'
 assert_content 'old Web sentinel' "$fault_root/data/web/4.0.0/index.html"
+assert_content 'old support sentinel' "$support_cli"
 [[ "$("$fault_root/bin/a3s" --version)" == 'a3s 4.0.0' ]] \
     || fail 'Web activation interruption changed the installed binary'
+assert_no_generated_paths "$fault_root"
+
+export MOCK_MV_FAULT=support-activate
+rm -f "$MOCK_MV_FAULT_MARKER"
+expect_failure 'interruption after support payload activation' \
+    run_install 4.0.0 "$fault_root/bin" "$fault_root/data"
+[[ -e "$MOCK_MV_FAULT_MARKER" ]] || fail 'support payload fault was not injected'
+assert_content 'old Web sentinel' "$fault_root/data/web/4.0.0/index.html"
+assert_content 'old support sentinel' "$support_cli"
+[[ "$("$fault_root/bin/a3s" --version)" == 'a3s 4.0.0' ]] \
+    || fail 'support activation interruption changed the installed binary'
 assert_no_generated_paths "$fault_root"
 
 make_fixture 4.0.1 x86_64-unknown-linux-gnu
@@ -332,6 +427,9 @@ expect_failure 'interruption after binary activation' \
 [[ -e "$MOCK_MV_FAULT_MARKER" ]] || fail 'binary activation fault was not injected'
 [[ "$("$fault_root/bin/a3s" --version)" == 'a3s 4.0.0' ]] \
     || fail 'binary activation interruption did not restore the previous binary'
+[[ "$(sha256_file "$fault_root/bin/a3s-webview")" == "$old_webview_sha" ]] \
+    || fail 'binary activation interruption did not restore the previous WebView companion'
+assert_content 'old support sentinel' "$support_cli"
 [[ ! -e "$fault_root/data/web/4.0.1" ]] \
     || fail 'binary activation interruption left the new Web cache active'
 assert_content 'old Web sentinel' "$fault_root/data/web/4.0.0/index.html"

@@ -296,12 +296,25 @@ failed_web=""
 staged_binary=""
 backup_binary=""
 failed_binary=""
+staged_webview=""
+backup_webview=""
+failed_webview=""
+support_dir=""
+staged_support=""
+backup_support=""
+failed_support=""
 web_active=0
 old_web_saved=0
 binary_active=0
 old_binary_saved=0
+webview_active=0
+old_webview_saved=0
+support_active=0
+old_support_saved=0
 web_activation_started=0
 binary_activation_started=0
+webview_activation_started=0
+support_activation_started=0
 committed=0
 
 remove_generated_web_tree() {
@@ -313,11 +326,20 @@ remove_generated_web_tree() {
     esac
 }
 
+remove_generated_support_tree() {
+    generated_path=${1:-}
+    [ -n "$generated_path" ] || return 0
+    case "$generated_path" in
+        "$install_dir"/.a3s-support.*) rm -rf -- "$generated_path" ;;
+        *) warn "refusing to remove unexpected support directory $generated_path" ;;
+    esac
+}
+
 remove_generated_binary() {
     generated_path=${1:-}
     [ -n "$generated_path" ] || return 0
     case "$generated_path" in
-        "$install_dir"/.a3s.*) rm -f -- "$generated_path" ;;
+        "$install_dir"/.a3s.*|"$install_dir"/.a3s-webview.*) rm -f -- "$generated_path" ;;
         *) warn "refusing to remove unexpected file $generated_path" ;;
     esac
 }
@@ -356,6 +378,78 @@ rollback_activation() {
             fi
         else
             old_binary_saved=0
+        fi
+    fi
+
+    if [ "$webview_activation_started" -eq 1 ]; then
+        if [ ! -e "$staged_webview" ] && [ ! -L "$staged_webview" ]; then
+            if [ -e "$install_dir/a3s-webview" ] || [ -L "$install_dir/a3s-webview" ]; then
+                if mv "$install_dir/a3s-webview" "$failed_webview"; then
+                    webview_active=0
+                else
+                    webview_active=1
+                    warn "could not move the failed WebView helper; the previous helper is preserved at $backup_webview"
+                fi
+            else
+                webview_active=0
+            fi
+        else
+            webview_active=0
+        fi
+
+        if [ -e "$backup_webview" ] || [ -L "$backup_webview" ]; then
+            if [ ! -e "$install_dir/a3s-webview" ] && [ ! -L "$install_dir/a3s-webview" ]; then
+                if mv "$backup_webview" "$install_dir/a3s-webview"; then
+                    old_webview_saved=0
+                else
+                    old_webview_saved=1
+                    warn "could not restore the previous WebView helper; its backup is preserved at $backup_webview"
+                fi
+            elif [ -e "$staged_webview" ] || [ -L "$staged_webview" ]; then
+                # Activation did not consume the staged helper; the original is still active.
+                old_webview_saved=0
+            else
+                old_webview_saved=1
+                warn "could not restore the previous WebView helper; its backup is preserved at $backup_webview"
+            fi
+        else
+            old_webview_saved=0
+        fi
+    fi
+
+    if [ "$support_activation_started" -eq 1 ]; then
+        if [ ! -e "$staged_support" ] && [ ! -L "$staged_support" ]; then
+            if [ -e "$support_dir" ] || [ -L "$support_dir" ]; then
+                if mv "$support_dir" "$failed_support"; then
+                    support_active=0
+                else
+                    support_active=1
+                    warn "could not move the failed support payload; the previous payload is preserved at $backup_support"
+                fi
+            else
+                support_active=0
+            fi
+        else
+            support_active=0
+        fi
+
+        if [ -e "$backup_support" ] || [ -L "$backup_support" ]; then
+            if [ ! -e "$support_dir" ] && [ ! -L "$support_dir" ]; then
+                if mv "$backup_support" "$support_dir"; then
+                    old_support_saved=0
+                else
+                    old_support_saved=1
+                    warn "could not restore the previous support payload; its backup is preserved at $backup_support"
+                fi
+            elif [ -e "$staged_support" ] || [ -L "$staged_support" ]; then
+                # Activation did not consume the staged payload; the original is still active.
+                old_support_saved=0
+            else
+                old_support_saved=1
+                warn "could not restore the previous support payload; its backup is preserved at $backup_support"
+            fi
+        else
+            old_support_saved=0
         fi
     fi
 
@@ -414,9 +508,26 @@ cleanup() {
         warn "preserved the previous binary at $backup_binary"
     fi
     remove_generated_binary "$failed_binary"
-    rm -f -- "$archive" "$archive_list" "$temp_dir/a3s"
+    remove_generated_binary "$staged_webview"
+    if [ "$old_webview_saved" -eq 0 ]; then
+        remove_generated_binary "$backup_webview"
+    elif [ -e "$backup_webview" ] || [ -L "$backup_webview" ]; then
+        warn "preserved the previous WebView helper at $backup_webview"
+    fi
+    remove_generated_binary "$failed_webview"
+    remove_generated_support_tree "$staged_support"
+    if [ "$old_support_saved" -eq 0 ]; then
+        remove_generated_support_tree "$backup_support"
+    elif [ -e "$backup_support" ] || [ -L "$backup_support" ]; then
+        warn "preserved the previous support payload at $backup_support"
+    fi
+    remove_generated_support_tree "$failed_support"
+    rm -f -- "$archive" "$archive_list" "$temp_dir/a3s" "$temp_dir/a3s-webview"
     if [ -d "$temp_dir/web" ]; then
         rm -rf -- "$temp_dir/web"
+    fi
+    if [ -d "$temp_dir/support" ]; then
+        rm -rf -- "$temp_dir/support"
     fi
     rmdir "$temp_dir" 2>/dev/null
     release_web_lock
@@ -449,6 +560,26 @@ info "verified SHA-256 $actual_sha"
 tar -tzf "$archive" >"$archive_list" || die "failed to inspect $asset_name"
 [ "$(grep -Fxc 'a3s' "$archive_list")" -eq 1 ] \
     || die "release archive must contain exactly one a3s binary"
+webview_entry_count=$(awk '$0 == "a3s-webview" { count += 1 } END { print count + 0 }' "$archive_list")
+[ "$webview_entry_count" -le 1 ] \
+    || die "release archive must contain at most one a3s-webview companion"
+has_bundled_webview=0
+if [ "$webview_entry_count" -eq 1 ]; then
+    has_bundled_webview=1
+fi
+support_entry_count=$(awk '$0 == "support" || index($0, "support/") == 1 { count += 1 } END { print count + 0 }' "$archive_list")
+has_bundled_support=0
+if [ "$support_entry_count" -gt 0 ]; then
+    for required_support_entry in \
+        support/managed-srt/package.json \
+        support/managed-srt/package-lock.json \
+        support/managed-srt/node_modules/@anthropic-ai/sandbox-runtime/dist/cli.js \
+        support/managed-srt.tree-sha256; do
+        [ "$(grep -Fxc "$required_support_entry" "$archive_list")" -eq 1 ] \
+            || die "release support payload must contain exactly one $required_support_entry"
+    done
+    has_bundled_support=1
+fi
 [ "$(grep -Fxc 'web/index.html' "$archive_list")" -eq 1 ] \
     || die "release archive must contain exactly one web/index.html"
 duplicate_entries=$(awk '{ sub(/\/$/, ""); print }' "$archive_list" | LC_ALL=C sort | uniq -d)
@@ -460,7 +591,7 @@ tar -tvzf "$archive" | awk '
 ' || die "release archive contains a link or special file"
 while IFS= read -r entry; do
     case "$entry" in
-        a3s|web|web/|web/*) ;;
+        a3s|a3s-webview|web|web/|web/*|support|support/|support/*) ;;
         *) die "release archive contains an unexpected path: $entry" ;;
     esac
     case "/$entry/" in
@@ -468,16 +599,43 @@ while IFS= read -r entry; do
     esac
 done <"$archive_list"
 
-tar --no-same-owner --no-same-permissions -xzf "$archive" -C "$temp_dir" a3s web \
+archive_members="a3s web"
+if [ "$has_bundled_webview" -eq 1 ]; then
+    archive_members="$archive_members a3s-webview"
+fi
+if [ "$has_bundled_support" -eq 1 ]; then
+    archive_members="$archive_members support"
+fi
+# The validated archive member names never contain whitespace.
+# shellcheck disable=SC2086
+tar --no-same-owner --no-same-permissions -xzf "$archive" -C "$temp_dir" $archive_members \
     || die "failed to extract $asset_name"
 [ -f "$temp_dir/a3s" ] && [ ! -L "$temp_dir/a3s" ] \
     || die "the extracted a3s binary is not a regular file"
+if [ "$has_bundled_webview" -eq 1 ]; then
+    [ -f "$temp_dir/a3s-webview" ] && [ ! -L "$temp_dir/a3s-webview" ] \
+        || die "the extracted a3s-webview companion is not a regular file"
+fi
+if [ "$has_bundled_support" -eq 1 ]; then
+    [ -f "$temp_dir/support/managed-srt/package.json" ] \
+        && [ -f "$temp_dir/support/managed-srt/package-lock.json" ] \
+        && [ -f "$temp_dir/support/managed-srt/node_modules/@anthropic-ai/sandbox-runtime/dist/cli.js" ] \
+        && [ -f "$temp_dir/support/managed-srt.tree-sha256" ] \
+        || die "the extracted managed sandbox support payload is invalid"
+    unsafe_support=$(find "$temp_dir/support" ! -type d ! -type f -print)
+    [ -z "$unsafe_support" ] \
+        || die "the extracted support payload contains a link or special file: $unsafe_support"
+fi
 [ -f "$temp_dir/web/index.html" ] && [ ! -L "$temp_dir/web/index.html" ] \
     || die "the extracted Web workspace is invalid"
 unsafe_extracted=$(find "$temp_dir/web" ! -type d ! -type f -print)
 [ -z "$unsafe_extracted" ] \
     || die "the extracted Web workspace contains a link or special file: $unsafe_extracted"
 chmod 755 "$temp_dir/a3s" || die "failed to make the staged a3s binary executable"
+if [ "$has_bundled_webview" -eq 1 ]; then
+    chmod 755 "$temp_dir/a3s-webview" \
+        || die "failed to make the staged a3s-webview companion executable"
+fi
 
 verify_binary_version() {
     candidate=$1
@@ -535,9 +693,22 @@ failed_web="$web_parent/.a3s-web.failed.$activation_id"
 staged_binary="$install_dir/.a3s.new.$activation_id"
 backup_binary="$install_dir/.a3s.backup.$activation_id"
 failed_binary="$install_dir/.a3s.failed.$activation_id"
+if [ "$has_bundled_webview" -eq 1 ]; then
+    staged_webview="$install_dir/.a3s-webview.new.$activation_id"
+    backup_webview="$install_dir/.a3s-webview.backup.$activation_id"
+    failed_webview="$install_dir/.a3s-webview.failed.$activation_id"
+fi
+if [ "$has_bundled_support" -eq 1 ]; then
+    support_dir="$install_dir/support"
+    staged_support="$install_dir/.a3s-support.new.$activation_id"
+    backup_support="$install_dir/.a3s-support.backup.$activation_id"
+    failed_support="$install_dir/.a3s-support.failed.$activation_id"
+fi
 
 for generated_path in "$staged_web" "$backup_web" "$failed_web" \
-    "$staged_binary" "$backup_binary" "$failed_binary"; do
+    "$staged_binary" "$backup_binary" "$failed_binary" \
+    "$staged_webview" "$backup_webview" "$failed_webview" \
+    "$staged_support" "$backup_support" "$failed_support"; do
     [ ! -e "$generated_path" ] && [ ! -L "$generated_path" ] \
         || die "temporary activation path already exists: $generated_path"
 done
@@ -545,6 +716,16 @@ done
 mv "$temp_dir/web" "$staged_web" || die "failed to stage Web assets"
 cp "$temp_dir/a3s" "$staged_binary" || die "failed to stage the a3s binary"
 chmod 755 "$staged_binary" || die "failed to make the a3s binary executable"
+if [ "$has_bundled_webview" -eq 1 ]; then
+    cp "$temp_dir/a3s-webview" "$staged_webview" \
+        || die "failed to stage the a3s-webview companion"
+    chmod 755 "$staged_webview" \
+        || die "failed to make the a3s-webview companion executable"
+fi
+if [ "$has_bundled_support" -eq 1 ]; then
+    mv "$temp_dir/support" "$staged_support" \
+        || die "failed to stage the managed sandbox support payload"
+fi
 verify_binary_version "$staged_binary" \
     || die "the staged a3s binary failed its version check"
 
@@ -560,6 +741,48 @@ fi
 mv "$staged_web" "$web_dir" || die "failed to activate the Web assets"
 web_active=1
 staged_web=""
+
+if [ "$has_bundled_support" -eq 1 ]; then
+    support_activation_started=1
+    if [ -L "$support_dir" ]; then
+        die "refusing to replace symlink $support_dir"
+    fi
+    if [ -e "$support_dir" ]; then
+        [ -d "$support_dir" ] || die "$support_dir is not a directory"
+        [ -f "$support_dir/managed-srt/package.json" ] \
+            || die "$support_dir is not an installer-managed support directory"
+        unsafe_existing_support=$(find "$support_dir" ! -type d ! -type f -print)
+        [ -z "$unsafe_existing_support" ] \
+            || die "refusing to replace support assets containing a link or special file: $unsafe_existing_support"
+        mv "$support_dir" "$backup_support" \
+            || die "failed to back up the existing support payload"
+        old_support_saved=1
+    fi
+    mv "$staged_support" "$support_dir" \
+        || die "failed to activate the managed sandbox support payload"
+    support_active=1
+    staged_support=""
+fi
+
+if [ "$has_bundled_webview" -eq 1 ]; then
+    webview_activation_started=1
+    if [ -L "$install_dir/a3s-webview" ]; then
+        die "refusing to replace symlink $install_dir/a3s-webview"
+    fi
+    if [ -e "$install_dir/a3s-webview" ]; then
+        [ -f "$install_dir/a3s-webview" ] \
+            || die "$install_dir/a3s-webview is not a regular file"
+        cp -p "$install_dir/a3s-webview" "$backup_webview" \
+            || die "failed to back up the existing a3s-webview companion"
+        old_webview_saved=1
+    fi
+    mv -f "$staged_webview" "$install_dir/a3s-webview" \
+        || die "failed to activate the a3s-webview companion"
+    webview_active=1
+    staged_webview=""
+    [ -x "$install_dir/a3s-webview" ] \
+        || die "the installed a3s-webview companion is not executable"
+fi
 
 binary_activation_started=1
 if [ -L "$install_dir/a3s" ]; then
@@ -590,6 +813,18 @@ if remove_generated_binary "$backup_binary"; then
     backup_binary=""
 else
     warn "could not remove the old binary backup at $backup_binary"
+fi
+if remove_generated_binary "$backup_webview"; then
+    old_webview_saved=0
+    backup_webview=""
+else
+    warn "could not remove the old WebView helper backup at $backup_webview"
+fi
+if remove_generated_support_tree "$backup_support"; then
+    old_support_saved=0
+    backup_support=""
+else
+    warn "could not remove the old support payload backup at $backup_support"
 fi
 
 path_is_ready=0
@@ -647,4 +882,12 @@ if [ -n "$active_a3s" ] && [ "$active_a3s" != "$install_dir/a3s" ]; then
 fi
 
 info "installed a3s $expected_version to $install_dir/a3s"
+if [ "$has_bundled_webview" -eq 1 ]; then
+    info "installed a3s-webview to $install_dir/a3s-webview"
+else
+    info "release $release_tag has no bundled a3s-webview; a3s code will install the verified component on first use"
+fi
+if [ "$has_bundled_support" -eq 1 ]; then
+    info "installed managed sandbox support to $support_dir"
+fi
 info "installed Web assets to $web_dir"

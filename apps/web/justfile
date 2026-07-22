@@ -4,20 +4,33 @@ port := env_var_or_default("A3S_PORT", "29653")
 default:
     @just --list
 
+[private]
+ensure-bun:
+    #!/usr/bin/env sh
+    if ! command -v bun >/dev/null 2>&1; then
+        echo "error: Bun is required to build A3S Web." >&2
+        echo "Install it from https://bun.sh/docs/installation and rerun this command." >&2
+        exit 127
+    fi
+
+[private]
+dependencies: ensure-bun
+    bun install --frozen-lockfile
+
 # Start the Rsbuild frontend with requests proxied to a running `a3s web`.
-dev:
-    A3S_CODE_API_ORIGIN=http://{{host}}:{{port}} npm run dev
+dev: dependencies
+    A3S_CODE_API_ORIGIN=http://{{host}}:{{port}} bun run dev
 
 # Build the production frontend consumed by `a3s web`.
-build:
-    npm run build
+build: dependencies
+    bun run build
 
 # Build and start the complete local A3S Code Web application.
 web: build
     cd ../.. && cargo run --manifest-path crates/cli/Cargo.toml -- web --host {{host}} --port {{port}} --web-dir apps/web/dist/workspace
 
-check:
-    npm run typecheck
-    npm run lint
-    npm test
-    npm run build
+check: dependencies
+    bun run typecheck
+    bun run lint:check
+    bun run test
+    bun run build
