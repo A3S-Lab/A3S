@@ -217,12 +217,15 @@ Both installers:
 
 - resolve `latest` or an exact stable `vX.Y.Z` release from
   [`A3S-Lab/CLI`](https://github.com/A3S-Lab/CLI/releases);
+- retry bounded transient GitHub metadata and asset-download failures;
 - require one exact asset for the detected operating system and architecture;
 - verify the asset against GitHub's SHA-256 release digest;
 - reject unexpected, duplicate, linked, or traversal archive entries;
 - verify the staged binary reports the requested version before activation;
-- install the bundled Web workspace into the CLI's versioned data cache; and
-- preserve the previous binary and Web cache if activation cannot complete.
+- install the bundled Web workspace plus matching `a3s-webview` and managed
+  sandbox support payloads when the selected release includes them; and
+- preserve the previous CLI, WebView companion, managed support payload, and
+  Web cache if any activation step cannot complete.
 
 The default installation paths require neither `sudo` nor an administrator
 session. Supported overrides are `A3S_VERSION`, `A3S_INSTALL_DIR`,
@@ -243,18 +246,21 @@ Homebrew remains available on macOS and Linux:
 brew install a3s-lab/tap/a3s
 ```
 
-Homebrew and the one-command installers include the matching Web workspace.
-`cargo install a3s` installs only the binary; the first allowed `a3s web`
-startup downloads and verifies its exact-version Web asset. On macOS and Linux,
-use `a3s self update` for a standalone CLI. On Windows, rerun the installer to
+Homebrew installs the matching Web workspace and WebView formula. The
+one-command installers support both older CLI archives and complete newer
+bundles; bundled helpers and managed support payloads activate transactionally.
+`cargo install a3s` installs only the main binary. The first allowed `a3s web`
+startup downloads and verifies its exact-version Web asset, and the first
+allowed `a3s code` startup similarly installs the verified WebView component
+before terminal takeover whenever no bundled helper is ready. Offline mode and
+`A3S_NO_AUTO_INSTALL=1` never perform these downloads; run `a3s install webview`
+while online to prepare it explicitly. On macOS and Linux, use
+`a3s self update` for a standalone CLI. On Windows, rerun the installer to
 upgrade because in-place self-update is not yet supported there.
 
-The release archives and Homebrew formula also install `a3s-webview` beside
-`a3s`, which provides RemoteUI windows and the native Agent Island. A repository
-checkout launched with `just code` builds the local WebView helper and injects
-its absolute path automatically. Other source installations must also build the
-helper from `crates/webview` or set `A3S_AGENT_ISLAND_BIN` to an installed
-helper.
+The WebView companion provides RemoteUI windows and the native Agent Island. A
+repository checkout launched with `just code` builds the local helper and
+injects its absolute path automatically.
 
 The Homebrew tap is released independently and can trail the CLI source tree.
 The command reference below follows the current CLI source; check
@@ -727,6 +733,12 @@ cd crates/gui
 cargo test
 ```
 
+The `just a3s`, `just code`, `just web`, and `just use-hotplug-e2e` recipes
+initialize only their missing required submodules. They never reset an already
+initialized submodule. If a required manifest was deleted from a dirty
+submodule, the recipe stops with recovery guidance instead of overwriting local
+work.
+
 If Git reports that a submodule path has no mapping, do not delete or re-add the
 component blindly. First check whether the root checkout mixes `.gitmodules`
 from one revision with gitlinks from another, or whether a submodule migration
@@ -744,7 +756,10 @@ just windhole # start the local A3S Bench visual laboratory
 just use-hotplug-e2e # verify real Use hot-plug plus release-shaped Code first-use
 ```
 
-Install app-local JavaScript dependencies before running application recipes.
+`just web` requires [Bun](https://bun.sh/docs/installation) and automatically
+runs `bun install --frozen-lockfile` from the checked-in `bun.lock`; it does not
+use npm. Install dependencies explicitly for other app-local recipes when their
+own README requires it.
 Platform-specific products may require additional toolchains, system libraries,
 container engines, brokers, databases, or virtualization support; follow the
 owning project's README.

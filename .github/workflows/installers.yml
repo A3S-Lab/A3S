@@ -8,6 +8,9 @@ on:
       - "install.ps1"
       - "scripts/test-install.sh"
       - "scripts/test-install.ps1"
+      - "scripts/ensure-dev-submodules.sh"
+      - "scripts/test-ensure-dev-submodules.sh"
+      - "justfile"
       - ".github/workflows/installers.yml"
       - "README.md"
   pull_request:
@@ -17,6 +20,9 @@ on:
       - "install.ps1"
       - "scripts/test-install.sh"
       - "scripts/test-install.ps1"
+      - "scripts/ensure-dev-submodules.sh"
+      - "scripts/test-ensure-dev-submodules.sh"
+      - "justfile"
       - ".github/workflows/installers.yml"
       - "README.md"
   workflow_dispatch:
@@ -36,10 +42,15 @@ jobs:
       - name: Check shell syntax
         run: |
           sh -n install.sh
+          sh -n scripts/ensure-dev-submodules.sh
           bash -n scripts/test-install.sh
+          bash -n scripts/test-ensure-dev-submodules.sh
 
       - name: Run installer fixtures
         run: bash scripts/test-install.sh
+
+      - name: Run development submodule preflight fixtures
+        run: bash scripts/test-ensure-dev-submodules.sh
 
   windows-tests:
     name: Windows fixtures
@@ -128,4 +139,26 @@ jobs:
           $index = Join-Path $env:A3S_DATA_HOME "web\$($Matches[1])\index.html"
           if (-not (Test-Path -LiteralPath $index -PathType Leaf)) {
             throw "missing Web workspace: $index"
+          }
+          $supportManifest = Join-Path $installDir 'support\managed-srt\package.json'
+          if (Test-Path -LiteralPath $supportManifest -PathType Leaf) {
+            $supportCli = Join-Path $installDir 'support\managed-srt\node_modules\@anthropic-ai\sandbox-runtime\dist\cli.js'
+            if (-not (Test-Path -LiteralPath $supportCli -PathType Leaf)) {
+              throw "managed sandbox support is incomplete: $supportCli"
+            }
+          }
+          $env:A3S_STATE_HOME = Join-Path $env:RUNNER_TEMP 'a3s-smoke\state'
+          $env:A3S_CACHE_HOME = Join-Path $env:RUNNER_TEMP 'a3s-smoke\cache'
+          $env:A3S_RUNTIME_HOME = Join-Path $env:RUNNER_TEMP 'a3s-smoke\runtime'
+          $env:A3S_WEBVIEW_INSTALL_DIR = Join-Path $env:RUNNER_TEMP 'a3s-smoke\components\webview'
+          $siblingWebview = Join-Path $installDir 'a3s-webview.exe'
+          if (-not (Test-Path -LiteralPath $siblingWebview -PathType Leaf)) {
+            & $binary --no-progress install webview
+            if ($LASTEXITCODE -ne 0) {
+              throw "WebView first-use installation failed with exit code $LASTEXITCODE"
+            }
+          }
+          & $binary --no-progress doctor webview
+          if ($LASTEXITCODE -ne 0) {
+            throw "WebView doctor failed with exit code $LASTEXITCODE"
           }

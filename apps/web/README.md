@@ -565,10 +565,11 @@ SHA-256 is `72b94cf69a95dc6153f865c4f8742c0f67079caa876f35f8b2b5f970ea795a2d`.
 
 ## Development
 
-Install dependencies once:
+Install [Bun](https://bun.sh/docs/installation), then install the exact locked
+dependencies for direct app-local commands:
 
 ```sh
-bun install
+bun install --frozen-lockfile
 ```
 
 Start the CLI API from the monorepo root:
@@ -592,9 +593,10 @@ bun run build
 ```
 
 The production output is `dist/workspace`. From the monorepo root, `just web`
-builds this application and starts the complete local service. If port `29653`
-is already in use, stop the existing local server or set `A3S_PORT` to another
-port before starting a second instance.
+checks for Bun, runs the frozen dependency install, builds this application, and
+starts the complete local service. If port `29653` is already in use, stop the
+existing local server or set `A3S_PORT` to another port before starting a second
+instance.
 
 ## Validation
 
