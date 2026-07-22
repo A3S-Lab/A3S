@@ -1,7 +1,7 @@
 import { CheckCircle2, ChevronRight, CirclePause, CircleStop, LoaderCircle, UsersRound } from 'lucide-react';
 import { useId, useMemo, useState } from 'react';
 import type { SubagentProjection, SubagentState } from './task-runtime-projection';
-import { formatElapsedDuration } from './task-runtime-projection';
+import { formatElapsedDuration, formatSubagentIdentity, formatSubagentStatus } from './task-runtime-projection';
 import { formatSubagentCountSummary, prioritizeSubagents } from './task-runtime-presentation';
 import { TaskRuntimeSubagentEvidence } from './task-runtime-subagent-evidence';
 
@@ -61,6 +61,8 @@ function SubagentRow({
   const startedAt = agent.startedAt ?? fallbackStartedAt;
   const elapsed = startedAt ? formatElapsedDuration((agent.completedAt ?? now) - startedAt) : '--:--';
   const hasEvidence = Boolean(agent.output || agent.progress.length > 0);
+  const identity = formatSubagentIdentity(agent);
+  const status = formatSubagentStatus(agent);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const evidenceId = useId();
   const summary = <SubagentRowSummary agent={agent} elapsed={elapsed} hasEvidence={hasEvidence} />;
@@ -72,7 +74,7 @@ function SubagentRow({
           <button
             type='button'
             className='task-runtime-agent-trigger'
-            aria-label={`${agent.description || agent.agent}，${agent.status}，查看结果与记录`}
+            aria-label={`${agent.description || identity}，${status}，查看结果与记录`}
             aria-expanded={evidenceOpen}
             aria-controls={evidenceId}
             onClick={() => setEvidenceOpen((value) => !value)}
@@ -97,16 +99,18 @@ function SubagentRowSummary({
   elapsed: string;
   hasEvidence: boolean;
 }) {
+  const identity = formatSubagentIdentity(agent);
+  const status = formatSubagentStatus(agent);
   return (
     <>
       <span className={`task-runtime-agent-state ${agent.state}`} aria-hidden='true'>
         <SubagentStateIcon state={agent.state} />
       </span>
       <span className='task-runtime-agent-copy'>
-        <strong>{agent.description || agent.agent}</strong>
+        <strong>{agent.description || identity}</strong>
         <small>
           <span>
-            {agent.agent} · {agent.status}
+            {identity} · {status}
           </span>
           {hasEvidence && (
             <span className='task-runtime-agent-disclosure'>

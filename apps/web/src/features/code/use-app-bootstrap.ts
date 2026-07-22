@@ -5,15 +5,26 @@ import type { LlmSettings, ModelCatalog } from '../../types/api';
 import {
   appState,
   applyTheme,
+  captureWorkspaceContext,
   formatApiError,
+  isWorkspaceContextCurrent,
+  replaceActiveWorkspace,
   reportTaskPersistenceResult,
   showToast,
   switchActiveTask,
 } from '../../state/app-state';
+import {
+  beginSessionControlsRequest,
+  beginSessionMessagesRequest,
+  isSessionControlsRequestCurrent,
+  isSessionMessagesRequestCurrent,
+  type SessionResourceRequest,
+} from '../tasks/session-resource-order';
 import { persistNewTaskConfig } from '../tasks/task-state';
 import { applyTurnQueueSnapshot } from '../tasks/turn-queue-state';
 
 interface BootstrapResult {
+  activeSessionId: string | null;
   health: Awaited<ReturnType<typeof codeApi.health>>;
   osAccount: Awaited<ReturnType<typeof codeApi.osAccount>>;
   llm: Awaited<ReturnType<typeof codeApi.llmSettings>>;
@@ -24,12 +35,15 @@ interface BootstrapResult {
   activeMessages?: Awaited<ReturnType<typeof codeApi.messages>>;
   activeControls?: Awaited<ReturnType<typeof codeApi.sessionControls>>;
   activeTurnQueue?: Awaited<ReturnType<typeof codeApi.turnQueue>>;
+  activeMessagesRequest?: SessionResourceRequest;
+  activeControlsRequest?: SessionResourceRequest;
   activeMessagesError?: string;
   activeControlsError?: string;
   activeTurnQueueError?: string;
 }
 
 async function loadBootstrapResult(): Promise<BootstrapResult> {
+  const activeSessionId = appState.activeSessionId;
   const health = await codeApi.health();
   const [osAccount, llm, modelCatalogResult, sessionList, effortLevels, rootFiles] = await Promise.all([
     codeApi.osAccount(),
@@ -43,14 +57,17 @@ async function loadBootstrapResult(): Promise<BootstrapResult> {
     codeApi.readDir(health.workspace),
   ]);
   const modelCatalog = modelCatalogResult.value ?? fallbackModelCatalog(llm);
-  const activeSessionId = appState.activeSessionId;
   let activeMessages: BootstrapResult['activeMessages'];
   let activeControls: BootstrapResult['activeControls'];
   let activeTurnQueue: BootstrapResult['activeTurnQueue'];
+  let activeMessagesRequest: SessionResourceRequest | undefined;
+  let activeControlsRequest: SessionResourceRequest | undefined;
   let activeMessagesError: string | undefined;
   let activeControlsError: string | undefined;
   let activeTurnQueueError: string | undefined;
   if (activeSessionId && sessionList.items.some((session) => session.sessionId === activeSessionId)) {
+    activeMessagesRequest = beginSessionMessagesRequest(activeSessionId);
+    activeControlsRequest = beginSessionControlsRequest(activeSessionId);
     const [messages, controls, turnQueue] = await Promise.allSettled([
       codeApi.messages(activeSessionId),
       codeApi.sessionControls(activeSessionId),
@@ -64,6 +81,7 @@ async function loadBootstrapResult(): Promise<BootstrapResult> {
     else activeTurnQueueError = formatApiError(turnQueue.reason);
   }
   return {
+    activeSessionId,
     health,
     osAccount,
     llm,
@@ -74,6 +92,8 @@ async function loadBootstrapResult(): Promise<BootstrapResult> {
     activeMessages,
     activeControls,
     activeTurnQueue,
+    activeMessagesRequest,
+    activeControlsRequest,
     activeMessagesError,
     activeControlsError,
     activeTurnQueueError,
@@ -107,33 +127,40 @@ function applyBootstrapResult(result: BootstrapResult) {
     appState.newTaskConfig.model = appState.selectedModel || '';
   }
   appState.sessions = result.sessionList.items;
-  if (appState.activeSessionId) {
-    const active = result.sessionList.items.find((session) => session.sessionId === appState.activeSessionId);
+  if (appState.activeSessionId === result.activeSessionId && result.activeSessionId) {
+    const active = result.sessionList.items.find((session) => session.sessionId === result.activeSessionId);
     const correctProduct = appState.activeProduct === 'work' ? active?.agentId === 'work' : active?.agentId !== 'work';
     if (!active || !correctProduct) switchActiveTask(null);
   }
-  if (appState.activeSessionId && result.activeMessages)
-    appState.messagesBySession[appState.activeSessionId] = result.activeMessages.items;
-  if (appState.activeSessionId) {
-    appState.messagesLoading[appState.activeSessionId] = false;
-    if (result.activeMessagesError) appState.messageErrors[appState.activeSessionId] = result.activeMessagesError;
-    else delete appState.messageErrors[appState.activeSessionId];
+  const messagesCurrent = Boolean(
+    result.activeMessagesRequest && isSessionMessagesRequestCurrent(result.activeMessagesRequest)
+  );
+  const controlsCurrent = Boolean(
+    result.activeControlsRequest && isSessionControlsRequestCurrent(result.activeControlsRequest)
+  );
+  if (result.activeSessionId && messagesCurrent && result.activeMessages) {
+    appState.messagesBySession[result.activeSessionId] = result.activeMessages.items;
   }
-  if (appState.activeSessionId && result.activeControls) {
-    appState.sessionControls[appState.activeSessionId] = result.activeControls;
-    appState.activeEffort = result.activeControls.effort;
+  if (result.activeSessionId && messagesCurrent) {
+    appState.messagesLoading[result.activeSessionId] = false;
+    if (result.activeMessagesError) appState.messageErrors[result.activeSessionId] = result.activeMessagesError;
+    else delete appState.messageErrors[result.activeSessionId];
   }
-  if (appState.activeSessionId && result.activeTurnQueue) applyTurnQueueSnapshot(result.activeTurnQueue);
-  if (appState.activeSessionId) {
-    appState.turnQueueLoading[appState.activeSessionId] = false;
-    if (result.activeTurnQueueError) appState.turnQueueErrors[appState.activeSessionId] = result.activeTurnQueueError;
-    else delete appState.turnQueueErrors[appState.activeSessionId];
+  if (result.activeSessionId && controlsCurrent && result.activeControls) {
+    appState.sessionControls[result.activeSessionId] = result.activeControls;
   }
-  if (appState.activeSessionId) {
-    appState.sessionControlsLoading[appState.activeSessionId] = false;
-    if (result.activeControlsError)
-      appState.sessionControlsErrors[appState.activeSessionId] = result.activeControlsError;
-    else delete appState.sessionControlsErrors[appState.activeSessionId];
+  if (appState.activeSessionId === result.activeSessionId && result.activeSessionId && result.activeTurnQueue) {
+    applyTurnQueueSnapshot(result.activeTurnQueue);
+  }
+  if (appState.activeSessionId === result.activeSessionId && result.activeSessionId) {
+    appState.turnQueueLoading[result.activeSessionId] = false;
+    if (result.activeTurnQueueError) appState.turnQueueErrors[result.activeSessionId] = result.activeTurnQueueError;
+    else delete appState.turnQueueErrors[result.activeSessionId];
+  }
+  if (result.activeSessionId && controlsCurrent) {
+    appState.sessionControlsLoading[result.activeSessionId] = false;
+    if (result.activeControlsError) appState.sessionControlsErrors[result.activeSessionId] = result.activeControlsError;
+    else delete appState.sessionControlsErrors[result.activeSessionId];
   }
   appState.effortLevels = result.effortLevels.items;
   if (!result.effortLevels.items.some((effort) => effort.id === appState.newTaskConfig.effort)) {
@@ -146,26 +173,34 @@ function applyBootstrapResult(result: BootstrapResult) {
   const activeWorkspace = result.sessionList.items.find(
     (session) => session.sessionId === appState.activeSessionId
   )?.workspace;
-  const workspaceRoot = activeWorkspace || appState.newTaskConfig.workspace || result.health.workspace;
-  appState.workspaceRoot = workspaceRoot;
+  const workspaceRoot =
+    activeWorkspace ||
+    (appState.activeProduct === 'work'
+      ? appState.workspaceRoot || appState.newTaskConfig.workspace
+      : appState.newTaskConfig.workspace) ||
+    result.health.workspace;
+  replaceActiveWorkspace(workspaceRoot);
   appState.filesByDirectory[result.health.workspace] = result.rootFiles;
   appState.expandedDirectories[result.health.workspace] = true;
   appState.directoryLoading[result.health.workspace] = false;
   delete appState.directoryErrors[result.health.workspace];
   if (workspaceRoot !== result.health.workspace) {
+    const context = captureWorkspaceContext();
     appState.directoryLoading[workspaceRoot] = true;
     delete appState.directoryErrors[workspaceRoot];
     void codeApi
       .readDir(workspaceRoot)
       .then((entries) => {
+        if (!isWorkspaceContextCurrent(context)) return;
         appState.filesByDirectory[workspaceRoot] = entries;
         appState.expandedDirectories[workspaceRoot] = true;
       })
       .catch((error: unknown) => {
+        if (!isWorkspaceContextCurrent(context)) return;
         appState.directoryErrors[workspaceRoot] = formatApiError(error);
       })
       .finally(() => {
-        appState.directoryLoading[workspaceRoot] = false;
+        if (isWorkspaceContextCurrent(context)) appState.directoryLoading[workspaceRoot] = false;
       });
   }
   appState.bootPhase = 'ready';

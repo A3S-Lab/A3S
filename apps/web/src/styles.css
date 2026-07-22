@@ -5,6 +5,7 @@
 @import "./styles/workspace-editor.css";
 @import "./styles/workspace-changes.css";
 @import "./styles/workspace-search.css";
+@import "./styles/workspace-quick-open.css";
 @import "./styles/settings.css";
 @import "./styles/settings-config.css";
 @import "./styles/settings-models.css";
@@ -55,6 +56,7 @@
 @import "./styles/work-presentation-content.css";
 @import "./styles/work-presentation-player.css";
 @import "./styles/work-pdf.css";
+@import "./styles/work-office-chrome.css";
 @import "./styles/work-presentation-print.css";
 @import "./styles/memory-filters-graph.css";
 @import "./styles/memory-details.css";

@@ -1,0 +1,105 @@
+---
+title: Workload Policy Envelope
+description: Canonical ACL policy bytes, immutable workload identity binding, exact trusted-state verification, and enforcement boundaries.
+---
+
+# Workload Policy Envelope
+
+`PolicyEnvelope` is Sentry's immutable admission contract for assigning one
+native ACL policy to one workload instance. It binds the policy to:
+
+- workload ID;
+- immutable workload revision ID;
+- durable replica ID;
+- node ID;
+- a positive policy generation; and
+- the lowercase SHA-256 digest of the canonical policy payload.
+
+The API is currently exposed by the Rust crate. It uses `a3s-acl` `0.3.0` for
+bounded parsing, canonical bytes, and digest generation.
+
+## Canonical Wire Form
+
+An envelope is one `policy_envelope` root object followed by one or more
+block-based policy items:
+
+```text
+policy_envelope = {generation = 7, node_id = "node-01", policy_digest = "sha256:fedb025bd0e08c2a9975ac38ce1522613ba2b51b0070acfac84031938fe72cbc", replica_id = "replica-01", revision_id = "revision-sha256-abc", version = 1, workload_id = "workload-01"}
+runtime_policy "sentry-v1" {
+  default = "deny"
+  egress {
+    mode = "allowlist"
+  }
+}
+```
+
+The digest covers only the canonical policy blocks after the header.
+`PolicyEnvelope::from_policy_acl` accepts ordinary native ACL formatting and
+emits the exact canonical wire form. `PolicyEnvelope::parse` admits only those
+canonical bytes, removing comment, whitespace, line-ending, and duplicate-field
+ambiguities at the node boundary.
+
+## Produce And Verify
+
+```rust
+use a3s_sentry::{PolicyBinding, PolicyEnvelope, PolicyExpectation};
+
+let binding = PolicyBinding::new(
+    "workload-01",
+    "revision-sha256-abc",
+    "replica-01",
+    "node-01",
+)?;
+let envelope = PolicyEnvelope::from_policy_acl(
+    binding.clone(),
+    7,
+    r#"
+runtime_policy "sentry-v1" {
+  default = "deny"
+  egress { mode = "allowlist" }
+}
+"#,
+)?;
+
+let received = PolicyEnvelope::parse(envelope.canonical_acl())?;
+let expected = PolicyExpectation::new(binding, 7, envelope.policy_digest())?;
+received.verify(&expected)?;
+```
+
+The expected binding, generation, and digest must come from trusted desired
+state, not from the received envelope. Verification rejects each identity
+dimension independently, lower and higher generations, and every digest
+mismatch.
+
+## Admission Invariants
+
+| Invariant | Required behavior |
+| --- | --- |
+| Header | Exactly one `policy_envelope` object, first in the document. |
+| Version | Exactly `1`. |
+| Identity | Nonempty, at most 256 UTF-8 bytes, with no whitespace or control characters. |
+| Generation | `1..=2^53-1`, matching trusted desired state exactly. |
+| Digest | `sha256:` plus 64 lowercase hexadecimal digits, recomputed from canonical policy bytes. |
+| Payload | Nonempty top-level blocks; root attributes and another `policy_envelope` are rejected. |
+| Wire bytes | Native ACL canonical UTF-8, LF line endings, and one final newline. |
+| Resource budget | Producer output and parser input at 1 MiB; depth 32; collection 10,000; token 64 KiB; 20 diagnostics. |
+
+Schema and contract errors do not echo policy or identity values. Policies must
+not contain secret plaintext; reference secret material through a separately
+authorized delivery mechanism.
+
+## Enforcement And Readiness Boundary
+
+Successful verification does not prove that egress, exec, or file controls
+reached a Linux backend. The payload blocks remain opaque until a
+capability-specific closed schema admits their semantics.
+
+The current deny-file `Enforcer` is node-global and identity-blind. It does not
+consume `PolicyEnvelope`, apply workload-scoped capabilities atomically,
+reconstruct applied state after restart, or report digest-bound readiness
+evidence. A workload must not become ready merely because envelope verification
+succeeds.
+
+Typed enforcement, restart-safe replacement, readiness gating, redacted audit
+evidence, and Linux fault fixtures remain tracked by
+[`A3S-Lab/Sentry#2`](https://github.com/A3S-Lab/Sentry/issues/2).

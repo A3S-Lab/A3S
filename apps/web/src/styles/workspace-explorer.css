@@ -114,9 +114,14 @@
 }
 
 .explorer-row:hover,
-.explorer-row.contextual {
+.explorer-row.contextual,
+.explorer-row:focus-visible {
   background: color-mix(in srgb, var(--a3s-panel-strong) 66%, transparent);
   color: var(--a3s-ink);
+}
+
+.explorer-row:focus-visible {
+  outline-offset: -2px;
 }
 
 .explorer-row.active {
@@ -404,9 +409,23 @@
   stroke-width: 1.8;
 }
 
+.workspace-context-menu-item > button kbd {
+  color: var(--a3s-faint);
+  font: 9px/1.4 "SFMono-Regular", Consolas, monospace;
+  white-space: nowrap;
+}
+
 .workspace-context-menu-item > button:hover,
 .workspace-context-menu-item > button:focus-visible {
   background: var(--a3s-panel-strong);
+}
+
+.workspace-context-menu-item > button[role="menuitemradio"][aria-checked="true"] {
+  background: color-mix(in srgb, var(--a3s-blue) 8%, transparent);
+}
+
+.workspace-context-menu-item > button[role="menuitemradio"][aria-checked="true"] svg {
+  color: var(--a3s-blue);
 }
 
 .workspace-context-menu-item > button.danger,

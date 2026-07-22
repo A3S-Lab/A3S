@@ -5,6 +5,7 @@
     "pipeline",
     "inline-gate",
     "configuration",
+    "policy-envelope",
     "operations",
     "deployment-runbook",
     "sae-evaluation",

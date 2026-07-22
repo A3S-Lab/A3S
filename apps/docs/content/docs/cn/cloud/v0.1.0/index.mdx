@@ -1,0 +1,54 @@
+---
+title: Cloud 0.1.0 状态与兼容性
+description: E0 的精确证据状态、组件 revision、协议级别和能力标签。
+---
+
+# Cloud 0.1.0 状态与兼容性
+
+Status: **Verified**
+
+Snapshot: `cloud-0.1.0`
+
+这是 E0 集成快照的版本化文档，不是生产支持声明，目前也没有发布对应的 GitHub
+release。证据边界是固定 Cloud revision 的
+[开发计划](https://github.com/A3S-Lab/Cloud/blob/5d7307cc7bf5b155f708ca9f5bd3e5d06745b68d/docs/development-plan.md)
+中定义的 clean-host E0 gate。
+
+## 能力状态
+
+| 标签 | 在此快照中的含义 |
+| --- | --- |
+| **Verified** | 精确锁定的 revision 已通过对应可执行 gate。E0 覆盖一个向外连接的 Linux/Docker 节点、部署 A、托管 TLS、有序日志、更新到 B、克隆 A 回滚、持久化停止和清理。 |
+| **Experimental** | 已实现或记录并带测试，但尚未通过已发布 Cloud 运维界面或生产 gate 接入。节点/Gateway 签名升级器属于此类。 |
+| **Optional** | 本地 profile 不强制要求的受支持 provider 选择，例如 NATS 和 S3-compatible 日志存储。 |
+| **Planned** | 不得推断存在已发布契约。Cloud CLI、管理 MCP、托管备份、多节点疏散、HA 和生产灾难恢复目标仍在规划中。 |
+
+## 精确兼容锁
+
+机器可读的权威来源是根仓库的 `compat/cloud-stack.acl`。文档 gate 会在本表、
+release manifest 或兼容锁发生漂移时失败。
+
+| 组件 | 版本 | Revision |
+| --- | --- | --- |
+| ACL | `0.3.0` | `5317e166222495585909d81f2caffdca90273c99` |
+| Boot | `0.1.2` | `3029e7eda4832c26c6d4dfa8578049e65de8dfbd` |
+| Cloud | `0.1.0` | `5d7307cc7bf5b155f708ca9f5bd3e5d06745b68d` |
+| Event | `0.3.0` | `6df3d6551a2a3ab68b2f8271d33a87b078fc8151` |
+| Flow | `0.4.2` | `ca17ae78968370eacd97992d9202dabf1cd82a2e` |
+| Gateway | `1.0.12` | `f8500b89284e75342dd0286a0200b3a6e3f51e32` |
+| ORM | `0.1.0` | `6fdeae38032a5134e858cf3985f47d60cb5180ac` |
+| Runtime | `0.2.0` | `cfaac63af6f76beebdc64a1ec228cedc42bb98ec` |
+| Sentry | `0.7.0` | `c1b45120662224fe1f3065d6888da0d291b4ff07` |
+| Updater | `0.3.0` | 根仓库 workspace |
+
+协议级别分别是 Gateway snapshot `2`、node command `1`、Flow native
+TypeScript `1`、Runtime capabilities `3`、Runtime observation `2` 和 Runtime
+unit spec `2`。
+
+## 运维主题
+
+- [安装、升级与回滚](./install-upgrade)
+- [备份、恢复与灾难恢复](./recovery)
+- [节点 drain 与证书故障](./node-operations)
+- [REST、OpenAPI、CLI、MCP、事件与 ACL](./interfaces)
+- [依赖与进程角色 runbook](./runbooks)

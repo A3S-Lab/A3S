@@ -1,6 +1,6 @@
 ---
 title: Pipeline
-description: L1 rules, L2 LLM, L3 A3S Code investigation, SAE signals, fail posture, and speculative parallelism.
+description: L1 rules, L2 LLM, staged L3 dispatch, incomplete-evidence safeguards, SAE signals, fail posture, and speculation.
 ---
 
 # Sentry Pipeline
@@ -38,6 +38,12 @@ rules can be provided through an ACL policy file and are hot-reloaded.
 L1 is a fast triage layer, not a sandbox. It is intentionally conservative: if a
 case is ambiguous, it escalates rather than guessing.
 
+For `ToolExec`, Observer reports `argv_truncated` and `argv_incomplete` when it
+could not capture the complete command. A dangerous captured prefix can still
+block, but an otherwise ambiguous incomplete command remains an L1 escalation.
+The in-process L2/L3 judges are not asked to infer that a missing suffix was
+benign.
+
 ## L2 And L3
 
 L2 is a classifier over the event. It is useful for false-positive reduction and
@@ -46,6 +52,13 @@ quick semantic judgment.
 L3 is an actual A3S Code agent. It loads security skills, considers the actor,
 the observed event, the possible attack chain, and the blast radius, then
 returns a structured verdict. It is slower but deeper.
+
+Products that separate fast judgment from deep investigation can call
+`Pipeline::evaluate_through_l2`. It returns the L1 decision, optional L2
+decision, effective decision, stage status, and escalation cause without
+invoking L3, applying `fail_closed`, or starting speculative L3. An
+`Escalated` result is work to persist and dispatch to a durable external L3
+worker, not an allow.
 
 ## Speculation
 
@@ -61,4 +74,6 @@ fail-closed only when the deployment has enough L2/L3 capacity or an allow-list
 posture that can tolerate blocking unknowns.
 
 Rules-only fail-open mode catches direct `block` rules but does not enforce
-rules that only escalate.
+rules that only escalate. Incomplete `ToolExec` evidence is the exception: it
+remains an unresolved L1 escalation regardless of fail mode. The bundled daemon
+audits that result but does not provide a durable external L3 queue.

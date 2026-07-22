@@ -1,6 +1,6 @@
 ---
 title: Node SDK
-description: JavaScript and TypeScript parsing, generation, builders, lexer/parser classes, and HCL output in @a3s-lab/acl.
+description: JavaScript and TypeScript bounded parsing, schema admission, multi-diagnostics, native generation, schema-aware canonical digests, and builders in @a3s-lab/acl.
 ---
 
 # Node SDK
@@ -11,7 +11,9 @@ Install the Node package:
 npm install @a3s-lab/acl
 ```
 
-The current package version in this repository is `0.2.1`.
+The checked-in package source is `0.3.0`. Its npm publication is still tracked
+by [`A3S-Lab/ACL#13`](https://github.com/A3S-Lab/ACL/issues/13), so use the
+checked-in source for these `0.3.0` APIs until that registry release succeeds.
 
 ## Parse And Generate
 
@@ -43,29 +45,152 @@ const generated = generate(new DocumentBuilder().block(provider).build());
 
 | API | Role |
 | --- | --- |
-| `parse(input)` | Parse ACL text into a `Document`. |
-| `generate(doc)` | Generate ACL-style text. |
-| `generateHCL(doc)` | Generate label-as-attribute HCL-shaped text. |
+| `parse(input, limits?)` | Parse ACL text into a `Document` with default or explicit resource limits. |
+| `collectDiagnostics(input, limits?)` | Collect bounded diagnostics without constructing a partial AST. |
+| `DEFAULT_PARSE_LIMITS` | Shared immutable defaults for document bytes, nesting, collection items, token bytes, and diagnostic count. |
+| `ParseError`, `DIAGNOSTIC_CODES`, `DiagnosticReport` | Stable codes, complete spans, UTF-8 byte offsets, redacted messages, and explicit truncation state. |
+| `validateDocument(document, schema, limits?)` | Validate a parsed `Document` against a declarative schema with a bounded report. |
+| `SCHEMA_DIAGNOSTIC_CODES`, `SchemaDiagnostic`, `SchemaReport` | Stable schema codes, logical paths, redacted messages, and explicit truncation state. |
+| `Schema`, `AttributeSchema`, `BlockSchema`, `ValueSchema` | TypeScript definitions for closed-by-default document, block, and recursive value rules. |
+| `generate(doc)` | Generate native ACL text with labels in block headers. |
+| `canonicalBytes(doc)`, `canonicalDigest(doc)` | Produce stable cross-SDK bytes and an algorithm-prefixed SHA-256 digest. |
+| `canonicalBytesWithSchema(doc, schema)`, `canonicalDigestWithSchema(doc, schema)` | Recursively normalize schema-declared unordered block occurrences before producing bytes or a digest. |
+| `CanonicalError` | Report non-finite numbers, non-scalar strings, and non-portable identifiers without echoing values. |
 | `string`, `number`, `boolean`, `bool`, `nullValue`, `list`, `call` | Value constructors. |
 | `BlockBuilder`, `DocumentBuilder` | Structured document builders. |
 | `Lexer`, `Parser` | Advanced tokenization/parsing classes. |
 
 The package ships TypeScript definitions in `src/index.d.ts`.
 
-## HCL Output Mode
+## Bounded Admission
 
-The Node generator has a `generateHCL` helper. It writes labels as attributes
-inside the generated block. For `models` blocks, the label attribute is named
-`id`; for other blocks it is named `name`.
+Pass explicit limits at an API boundary:
 
 ```typescript
-import {generateHCL} from '@a3s-lab/acl';
+import {ParseError, parse} from '@a3s-lab/acl';
 
-const hcl = generateHCL(doc);
+const source = 'limits { max_tasks = 10 }';
+
+try {
+  const document = parse(source, {
+    maxDocumentBytes: 64 * 1024,
+    maxNestingDepth: 32,
+    maxCollectionItems: 1_000,
+    maxTokenBytes: 16 * 1024,
+    maxDiagnostics: 20,
+  });
+} catch (error) {
+  if (error instanceof ParseError) {
+    console.error(error.code, error.span);
+  }
+}
 ```
+
+Document and token sizes count UTF-8 bytes. Diagnostic messages identify token
+kinds but never include source token values or snippets.
+
+The parse API remains fail-fast. CLI and editor integrations can collect
+multiple errors with a bounded budget:
+
+```typescript
+import {collectDiagnostics} from '@a3s-lab/acl';
+
+const report = collectDiagnostics('first = ]\nsecond = ]', {
+  maxDiagnostics: 20,
+});
+```
+
+After a syntax error, collection resumes at the next source line.
+Resource-limit diagnostics remain fatal. A report stores at most
+`maxDiagnostics` errors and sets `truncated` only after observing another error
+beyond that budget.
+
+## Schema Admission
+
+Parse untrusted text with explicit limits, then validate the resulting
+document before activating it:
+
+```typescript
+import {parse, validateDocument, type Schema} from '@a3s-lab/acl';
+
+const limits = {maxDiagnostics: 20};
+const document = parse('version = 1', limits);
+const schema: Schema = {
+  attributes: {
+    version: {required: true, value: {kind: 'Number'}},
+  },
+};
+const report = validateDocument(document, schema, limits);
+```
+
+Schemas reject undeclared attributes, blocks, and object fields by default.
+They can declare required or optional attributes, block occurrence and label
+cardinalities, and recursive `Any`, `String`, `Number`, `Bool`, `Null`, `List`,
+`Object`, `Call`, and `OneOf` rules. Extension points require the corresponding
+explicit allow flag. A block rule's `unordered: true` metadata affects only
+schema-aware canonicalization, not validation.
+
+Schema reports use stable `acl.schema.*` codes and logical paths such as
+`$.blocks.provider[0].attributes.api_key`. Messages and paths never include
+attribute values, call arguments, or block labels. Reports use
+`maxDiagnostics` and set `truncated` only after observing an additional schema
+error beyond that budget.
+
+Malformed or cyclic programmatic documents, invalid cardinality ranges, empty
+unions, unknown schema fields, and schema cycles fail with `TypeError` before
+validation. Schema admission validates document shape; host components still
+own numeric ranges, secret resolution, provider credentials, and other product
+semantics.
+
+## Native And Canonical Output
+
+`generate` has one native ACL output contract. Labels remain in block headers;
+alternate generator modes and generator options are not supported.
+
+Use `canonicalBytes` or `canonicalDigest` for signatures, durable identity, and
+cross-SDK comparisons. Canonical bytes preserve ordered ACL constructs while
+sorting semantically unordered attribute and object keys.
+
+After schema admission, use the schema-aware APIs when a trusted schema
+declares repeatable block occurrences as unordered:
+
+```typescript
+import {
+  canonicalBytes,
+  canonicalBytesWithSchema,
+  canonicalDigestWithSchema,
+  parse,
+  validateDocument,
+  type Schema,
+} from '@a3s-lab/acl';
+
+const document = parse('provider "z" {}\nprovider "a" {}');
+const schema: Schema = {
+  blocks: {
+    provider: {
+      labels: {min: 1, max: 1},
+      unordered: true,
+    },
+  },
+};
+const report = validateDocument(document, schema);
+if (report.diagnostics.length > 0 || report.truncated) {
+  throw new Error('document failed schema admission');
+}
+
+const orderedBytes = canonicalBytes(document);
+const normalizedBytes = canonicalBytesWithSchema(document, schema);
+const digest = canonicalDigestWithSchema(document, schema);
+```
+
+For each body, normalization recursively sorts occurrences of each same
+declared block name by canonical UTF-8 bytes while retaining their existing
+positions. Other block types, unknown blocks, labels, lists, calls, and
+unmarked blocks remain ordered. The schema-aware APIs use the schema only as
+normalization metadata and do not perform admission themselves.
 
 ## Boundary
 
-The SDK is a parser/generator and AST builder. It does not load environment
-variables, fetch remote configuration, validate provider credentials, or execute
-functions such as `env(...)`.
+The SDK parses, generates, builds, and validates declarative ACL document
+shapes. It does not load environment variables, fetch remote configuration,
+validate provider credentials, or execute functions such as `env(...)`.

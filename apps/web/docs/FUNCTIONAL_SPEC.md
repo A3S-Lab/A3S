@@ -99,17 +99,25 @@ does not create a disabled Browser mode.
 - Present new-task preparation as a focused Composer with concise guidance and
   editable Code scenario starters.
 - Hide task identity, result actions, and operational status until a task exists.
-- Create a task from the current new-task draft on first send.
+- Create a task from the current new-task draft on first send, promote the
+  prepared Composer and Result Workspace state into that task, and leave the
+  next new-task slot empty.
 - Search and select tasks; rename and delete directly inside the affected row
   with keyboard save/cancel and inline failure recovery.
 - Persist active task, titles, drafts, queues, and task-scoped Result Workspace
-  state on a best-effort basis.
+  state across a normal browser refresh on a best-effort basis. Flush the active
+  snapshot on `pagehide`, reject malformed stored state, and prioritize dirty
+  drafts over rebuildable caches if browser capacity is constrained.
 - Keep running status scoped to the real running task.
 - Preserve the current draft when switching tasks.
 
 Acceptance: opening another task while one runs offers a direct return to the
-running task and never marks the selected idle task as running. An unresolved
-dirty artifact blocks the task switch before selection changes.
+running task and never marks the selected idle task as running. Switching tasks
+captures and restores dirty drafts inside the originating task, including when
+both tasks use the same workspace, so selection changes without a destructive
+prompt. Close, reload, replace, or overwrite still requires explicit resolution
+when it would discard unsaved content. Refresh restores the active task's dirty
+tabs without writing them to disk.
 
 ## F3 — Compose and execute
 
@@ -201,6 +209,13 @@ entry cannot open an unrelated task's state.
 
 - Keep the Result Workspace closed until a task action opens a meaningful result.
 - Provide one shared header with artifact tabs, full-screen, and close actions.
+- Remove the Conversation header's context launchers while the shared workspace
+  header owns navigation, presentation, and close, including at overlay widths.
+- Expand the mounted workspace in place, keep the obscured Conversation out of
+  the focus order, persist presentation per task, and let Escape restore the
+  docked layout.
+- Move keyboard focus into the active workspace mode when it opens unless its
+  mounted content already owns a more specific focus target.
 - Provide one compact mode switcher for Overview, Files, Browser, and Changes.
 - Give each mode a mode-specific navigator and a dominant artifact viewport.
 - Focus an existing tab when the same artifact is opened twice.
@@ -212,39 +227,147 @@ entry cannot open an unrelated task's state.
 
 Acceptance: a task with no artifacts shows no empty Result Workspace; close and
 full-screen are reversible; switching modes never discards unrelated open tabs
-or unsaved edits; keyboard focus returns to the opening control on close.
+or unsaved edits; keyboard focus enters the opened workspace and returns to the
+opening control on close.
 
 ## F6 — Overview and Files
 
 - Group task results by files, changes, previews, and verification in Overview.
 - Browse directories and open text files in Files.
+- Open a keyboard-first file picker with `Cmd/Ctrl+P` from Monaco or the task
+  surface. Rank exact filenames, path fragments, and fuzzy subsequences; place
+  already-open tabs first before a query and reuse their browser-local drafts.
+  Bound every response, report truncation, ignore repository metadata,
+  dependency caches, and common build outputs, and let a failed lookup retry
+  without replacing the active editor.
 - Use a locally bundled, lazy-loaded Monaco editor with syntax highlighting,
   folding, exact line/column reveal, and per-document view state.
+- Keep the editor activation graph scoped to Monaco's complete standalone
+  editor/diff surface, the existing JSON/CSS/HTML/TypeScript language services,
+  and tokenizers for product-supported source files. Do not import the broad
+  package entry or ship unused bundled language registrations and protocol
+  clients as part of editor activation.
+- Keep one mounted code editor while file tabs switch between task-isolated
+  Monaco models. Within a live page, retain each referenced model's undo/redo
+  stack, cursor and selections, folding, and scroll state across file and task
+  switches. Consume an explicit navigation location once so a later tab return
+  restores model view state instead of repeating an old jump.
+- Before rebasing an open tab for a successful file or parent-directory rename,
+  bind its new logical path to the same immutable Monaco model URI. Preserve
+  editor readiness, live status, undo/redo, cursor and selections, folding, and
+  scroll state. If the old path is opened again while that model is retained,
+  allocate a distinct model URI so the two documents cannot share state.
+- Retain a model only while an active-task tab or inactive-task snapshot owns
+  it. Cancelling a dirty-close guard keeps that ownership; confirmed close,
+  task-snapshot removal, or workspace replacement must dispose every orphaned
+  model without affecting another task that opened the same path. Browser
+  refresh restores persisted drafts, not the previous in-memory undo stack.
+- Expose saved-document definition, declaration, references, implementations,
+  and file outline from one visible editor-toolbar menu while retaining Monaco
+  shortcuts and context-menu actions.
+- Keep a bounded location history for normal file selection, exact search
+  matches, and semantic targets. Toolbar controls and `Ctrl+-` / `Ctrl+Shift+-`
+  move backward and forward to the exact saved caret without rereading an open
+  draft. A new navigation clears the forward branch; rename rebases stored
+  paths, delete prunes them, and an unreadable closed target never replaces the
+  active editor.
+- Fall back to Monaco-local language features when native Code Intelligence has
+  no profile for the selected file, without presenting the unsupported response
+  as a runtime failure or hiding genuine service failures.
 - Open files and Git comparisons in one multi-tab strip; preserve independent
-  drafts while switching and guard only dirty tab closure.
+  drafts while switching tabs or tasks, and require explicit resolution only
+  when an operation would discard or overwrite a dirty draft.
 - Localize Monaco's built-in editor menu and A3S semantic navigation actions in
   Simplified Chinese.
 - Open a tab menu through pointer right-click, the Context Menu key, or
   `Shift+F10`; offer close, close others, close right, close all, copy path, and
   copy relative path in Chinese. Batch close requests must resolve every dirty
   tab in order rather than silently skipping protected documents.
-- Search workspace text and open an exact line and column.
+- Keep unique filenames compact, but add the shortest unique workspace-parent
+  suffix when two open tabs have the same visible name. Apply the same
+  disambiguation to the tab, its accessible name, and its close action.
+- Keep the tab and close actions as separate semantic buttons. Use one roving
+  tab stop with automatic Arrow Left/Right, Home, and End activation; let Delete
+  follow the normal close guard. When closing removes the focused document,
+  move focus to the surviving active tab or the empty editor's Quick Open
+  action. Never steal focus from a still-connected Explorer or dialog control.
+- Apply save, close-tab, and tab-switch keyboard commands only while focus is
+  inside the Result Workspace so the Conversation composer keeps its own input
+  behavior. When `Ctrl+Tab` or `Ctrl+Shift+Tab` starts in Monaco, move focus
+  into the newly active file or diff editor after that editor mounts. Preserve
+  a still-connected workspace control instead; if switching replaces that
+  control, fall back to the newly active tab rather than the document body.
+- Let `Cmd/Ctrl+B` collapse or restore the task sidebar while Monaco owns focus,
+  while preserving the same chord for editable Conversation content.
+- Reserve `Cmd/Ctrl+P` for file quick open only when an active task and
+  workspace exist; otherwise preserve the browser's print shortcut.
+- Report the active Monaco cursor, selected-character count, multiple cursors,
+  and actual model line ending in the editor status bar. Do not claim text
+  encoding or line-ending metadata before a text model exists.
+- Let an editable text tab convert between LF and CRLF from the status bar.
+  Conversion must use Monaco's undo history, update the browser-local draft,
+  and follow normal dirty/save guards; read-only review keeps the control
+  visible but disabled.
+- Search workspace text and open an exact line and column. Exclude repository
+  metadata, dependency caches, and common build outputs by default; expose one
+  explicit control that includes them and reruns the current query. Search
+  responses use bounded match context and Monaco-compatible UTF-16 columns so
+  generated single-line files cannot inflate the result payload without bound.
 - Open file and directory operations from a VS Code-style pointer or keyboard
   context menu rather than hover-revealed row buttons. Keep create, rename,
   copy, delete confirmation, busy state, and recoverable errors at the affected
-  tree location after an operation is chosen.
-- Edit and save text with dirty-state protection.
-- Detect external changes and let the user reload or overwrite explicitly.
-- Render binary files as non-editable metadata.
+  tree location after an operation is chosen. Rename every loaded descendant
+  and preserve expanded state; delete every cached descendant immediately.
+  Ignore superseded directory reads so late responses cannot restore stale
+  paths after a successful mutation.
+- Give the Explorer tree one roving tab stop. Move through rendered rows with
+  Arrow Up/Down and Home/End; use Arrow Right to expand or enter the first child
+  and Arrow Left to collapse or return to the parent. Navigation must not open
+  files or persist filter-only expansion. Keep focus inside the inline flow and
+  return it to the originating or nearest surviving row after completion.
+- Create files with an atomic create-only backend operation. If the path already
+  exists, retain its bytes, keep the inline operation retryable, and report the
+  conflict instead of routing creation through the destructive save endpoint.
+- Edit and save text with dirty-state protection. Track the content revision
+  returned by every read and successful write; normal saves submit it as a
+  server-side precondition without a read-before-write round trip. Restored
+  legacy tabs submit their last saved content as the compatibility precondition.
+- Treat HTTP 412 as an external-change conflict, preserve the local draft, fetch
+  the latest disk content for comparison, and let the user reload or overwrite
+  explicitly. Only the explicit overwrite action may issue an unconditional
+  write.
+- Render binary files as non-editable metadata. Explorer directory entries and
+  quick-open results must use the same backend classification contract.
+- Keep common source, configuration, module, and lockfile formats on the text
+  path. Use known binary extensions as fast hints and sample unfamiliar
+  extensions instead of treating every unlisted extension as binary.
 - Validate supported configuration files and invalidate validation after edit.
 - Confirm replacement scope and use the displayed result set's searched query.
+- Render no more than 300 search matches; when an additional match proves the
+  result set is truncated, show a narrowing prompt and prohibit replacement.
 
 Acceptance: file read failure preserves the previous artifact; same-file
 selection does not reread a dirty draft; Save and Close, Don't Save, and Cancel
 protect dirty tab closure, including batch-close operations; pointer and
 keyboard menus stay within the viewport and restore focus after dismissal;
-parent rename rebases all affected tabs; Replace is disabled for stale results
-or affected unsaved content.
+semantic navigation always has a visible entry and
+labels dirty-buffer results as saved-document results; an unsupported native
+language leaves local editing and file outline usable without raw backend text;
+editor shortcuts never consume Conversation keystrokes; parent rename rebases
+all affected tabs and navigation locations while each open text document keeps
+its immutable model identity, live editor status, undo/redo history, selections,
+folding, and scroll; reopening the former path creates a non-colliding model;
+backward and forward navigation restores the exact caret without discarding
+drafts; cursor and line-ending status follows the active Monaco model;
+same-named tabs remain distinguishable without hover; normal edits, undo/redo
+history, selections, folding, and scroll survive live file and task switches
+without leaking between tasks; stale navigation locations are not replayed;
+closing the last owner releases its model; line-ending conversion is undoable and
+makes the tab dirty; only the latest search response may update results;
+Replace is disabled when the query, directory scope, or workspace differs from
+the successful result set, while search is running, or when affected content is
+unsaved; a result set with more than 300 matches renders only the first 300 and
+cannot be replaced.
 
 ## F7 — Browser preview
 

@@ -1,0 +1,58 @@
+---
+title: 集群升级
+description: 签名目标、有界主机操作、持久化收据、健康门禁、回滚和重启恢复。
+---
+
+# 集群升级
+
+状态：当前 `a3s-updater` 主分支中为 **Experimental**。升级生命周期和 Linux
+集成测试已经实现；Cloud 的集群调度与节点代理接入尚未发布。
+
+`FleetUpdater` 每次只管理一个 `ManagedComponent`：`node-agent` 或
+`gateway`。它不接受任意服务名，也不会开放入站管理通道。
+
+## 签名目标
+
+Ed25519 签名的 JSON 目标绑定以下内容：
+
+- schema 与 release 身份；
+- 组件和精确语义版本；
+- 不含凭据的 HTTPS artifact URL 与小写 SHA-256 摘要；
+- 兼容协议范围与发布通道；
+- 是否允许降级，以及可恢复旧版本的最低版本。
+
+未知字段、不受信任的 key ID、无效签名、不兼容协议、通道不匹配和违反回滚策略，
+都会在激活前失败。
+
+## 持久化生命周期
+
+机器可读收据记录以下状态：
+
+```text
+received -> downloaded -> verified -> staged -> drained -> stopped
+         -> activated -> healthy
+                      \-> rolled-back | failed
+```
+
+每次转换都原子持久化，并在 Linux 上同步目录。旧二进制保留在 `previous`，直到
+新进程同时通过健康检查和精确实际版本检查。重复执行同一个签名目标是幂等的。
+进程退出、断电或重启后，`recover()` 会继续任何未终止的收据。
+
+## 主机边界
+
+`FleetUpgradeHost` 提供有界的向外下载、drain、stop、start、health 和
+applied-version 操作。每次网络或生命周期调用都会收到 timeout；下载还会收到
+最大字节数。实现方必须执行这两个限制。
+
+收据只包含签名的公开 release 元数据与稳定失败码。主机错误字符串、环境变量值、
+bearer token 和凭据永不持久化。包含 user info、query 或 fragment 的 artifact URL
+会被拒绝。
+
+## systemd 暂存
+
+`SystemdUnitSpec` 只渲染受管单元 `a3s-cloud-node.service` 和
+`a3s-gateway.service`。可执行文件与环境文件路径使用明确的 POSIX 校验。
+`stage_systemd_unit` 写入并同步完整候选单元；`activate_systemd_unit` 在原子替换期间
+保留旧单元。
+
+嵌入节点的主机实现仍负责 `daemon-reload`、启动服务，并通过类型化接口报告实际版本。

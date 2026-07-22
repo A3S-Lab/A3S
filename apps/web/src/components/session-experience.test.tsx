@@ -48,6 +48,7 @@ describe('Web-native session experiences', () => {
     appState.sessionControlsLoading = {};
     appState.sessionControlsErrors = {};
     appState.contextCompacting = {};
+    appState.messagesBySession = {};
     appState.messagesLoading = {};
     appState.messageErrors = {};
     appState.modelCatalog = {
@@ -56,7 +57,6 @@ describe('Web-native session experiences', () => {
       items: [{ id: 'codex/gpt', name: 'gpt', source: 'Codex', reasoning: true, toolCall: true }],
     };
     appState.effortLevels = [{ id: 'medium', label: 'Medium' }];
-    appState.activeEffort = 'medium';
     appState.newTaskConfig = {
       workspace: '/repo',
       model: 'codex/gpt',
@@ -79,6 +79,7 @@ describe('Web-native session experiences', () => {
     appState.sessionOutputError = null;
     appState.sessionOutputErrorSessionId = null;
     appState.workspaceRoot = '/repo';
+    appState.workspacePresentation = 'docked';
     appState.editorTabs = [];
     appState.activeEditorTabId = null;
     appState.gitStatus = null;
@@ -195,6 +196,30 @@ describe('Web-native session experiences', () => {
     expect(modeTrigger).toHaveFocus();
   });
 
+  it('keeps effort unavailable until the selected task controls finish loading', async () => {
+    appState.effortLevels = [
+      { id: 'medium', label: 'Medium' },
+      { id: 'high', label: 'High' },
+    ];
+    appState.sessionControls = {};
+    appState.sessionControlsLoading = { [session.sessionId]: true };
+    render(<TaskComposer actions={{} as CodeActions} />);
+
+    expect(screen.getByRole('button', { name: 'Effort：Medium' })).toBeDisabled();
+
+    act(() => {
+      appState.sessionControls[session.sessionId] = {
+        sessionId: session.sessionId,
+        effort: 'high',
+        planningMode: 'disabled',
+        goalTracking: false,
+      };
+      appState.sessionControlsLoading[session.sessionId] = false;
+    });
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Effort：High' })).toBeEnabled());
+  });
+
   it('keeps new-task parameters in the composer before a session exists', () => {
     appState.activeSessionId = null;
     appState.newTaskConfig = {
@@ -264,7 +289,7 @@ describe('Web-native session experiences', () => {
     expect(screen.getByRole('region', { name: '任务规划与执行' })).toHaveTextContent('正在启动任务会话');
   });
 
-  it('opens task context panels without changing task identity', () => {
+  it('opens task context panels without changing task identity', async () => {
     appState.reviewSourceTaskId = 'older-task';
     render(<TaskHeader />);
     expect(screen.queryByRole('button', { name: '任务详情' })).not.toBeInTheDocument();
@@ -273,10 +298,97 @@ describe('Web-native session experiences', () => {
     expect(appState.activeSessionId).toBe('session-1');
     expect(appState.reviewSourceTaskId).toBe('session-1');
     expect(screen.getByText('Main task')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: '关闭工作区' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '打开任务活动' })).not.toBeInTheDocument();
+    });
 
-    fireEvent.click(screen.getByRole('button', { name: '打开任务活动' }));
+    act(() => {
+      appState.taskView = 'conversation';
+    });
+    fireEvent.click(await screen.findByRole('button', { name: '打开任务活动' }));
     expect(appState.taskView).toBe('activity');
     expect(appState.activeSessionId).toBe('session-1');
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: '关闭任务活动' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '打开工作区' })).not.toBeInTheDocument();
+    });
+  });
+
+  it('moves focus into task context and returns it to the control that opened the panel', async () => {
+    appState.filesByDirectory = { '/repo': [] };
+    appState.gitStatus = { isGitRepo: true, branch: 'main', files: [] };
+    const actions = {
+      refreshGitStatus: vi.fn(),
+      openSessionOutput: vi.fn(async () => undefined),
+    } as unknown as CodeActions;
+
+    render(<TasksPage actions={actions} />);
+    const workspaceLauncher = screen.getByRole('button', { name: '打开工作区' });
+    workspaceLauncher.focus();
+    fireEvent.click(workspaceLauncher);
+    await waitFor(() => expect(screen.getByRole('tab', { name: '工作区' })).toHaveFocus());
+    fireEvent.click(await screen.findByRole('tab', { name: '活动' }));
+
+    const closeFromActivity = screen.getByRole('button', { name: '关闭任务上下文面板' });
+    closeFromActivity.focus();
+    fireEvent.click(closeFromActivity);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: '打开工作区' })).toHaveFocus());
+
+    const activityLauncher = screen.getByRole('button', { name: '打开任务活动' });
+    activityLauncher.focus();
+    fireEvent.click(activityLauncher);
+    await waitFor(() => expect(screen.getByRole('tab', { name: '活动' })).toHaveFocus());
+    const closeActivity = await screen.findByRole('button', { name: '关闭任务上下文面板' });
+    closeActivity.focus();
+    fireEvent.click(closeActivity);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: '打开任务活动' })).toHaveFocus());
+  });
+
+  it('returns focus to a persistent result handoff instead of the header fallback', async () => {
+    appState.filesByDirectory = { '/repo': [] };
+    appState.gitStatus = { isGitRepo: true, branch: 'main', files: [] };
+    appState.messagesBySession = {
+      'session-1': [
+        {
+          id: 'assistant-delivery',
+          sessionId: 'session-1',
+          role: 'assistant',
+          content: 'Implementation complete.',
+          createdAt: new Date().toISOString(),
+          events: [
+            {
+              type: 'agent_end',
+              verification_summary: {
+                status: 'passed',
+                report_count: 1,
+                required_check_count: 1,
+                pending_required_check_count: 0,
+                failed_check_count: 0,
+                residual_risk_count: 0,
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const actions = {
+      refreshGitStatus: vi.fn(),
+      openSessionOutput: vi.fn(async () => undefined),
+    } as unknown as CodeActions;
+
+    render(<TasksPage actions={actions} />);
+    const resultHandoff = screen.getByRole('button', { name: '审阅变更' });
+    resultHandoff.focus();
+    fireEvent.click(resultHandoff);
+    await waitFor(() => expect(screen.getByRole('tab', { name: '工作区' })).toHaveFocus());
+    const close = await screen.findByRole('button', { name: '关闭任务上下文面板' });
+    close.focus();
+    fireEvent.click(close);
+
+    await waitFor(() => expect(resultHandoff).toHaveFocus());
   });
 
   it('keeps the active header synchronized with an inline task rename', async () => {
@@ -298,11 +410,16 @@ describe('Web-native session experiences', () => {
       openSessionOutput: vi.fn(async () => undefined),
     } as unknown as CodeActions;
 
-    render(<TasksPage actions={actions} />);
+    const { container } = render(<TasksPage actions={actions} />);
     fireEvent.click(screen.getByRole('button', { name: '打开工作区' }));
 
     expect(screen.getByRole('textbox', { name: '任务指令' })).toBeInTheDocument();
     expect(await screen.findByRole('tablist', { name: '任务上下文面板' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '全屏显示任务工作区' }));
+    await waitFor(() => expect(container.querySelector('.task-conversation-pane')).toHaveAttribute('inert'));
+    expect(container.querySelector('.task-conversation-pane')).toHaveAttribute('aria-hidden', 'true');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => expect(container.querySelector('.task-conversation-pane')).not.toHaveAttribute('inert'));
     fireEvent.click(screen.getByRole('button', { name: '工作区变更' }));
     expect(screen.getByRole('complementary', { name: '变更与 Git' })).toHaveClass('compact-open');
     fireEvent.click(screen.getByRole('button', { name: '全局搜索' }));

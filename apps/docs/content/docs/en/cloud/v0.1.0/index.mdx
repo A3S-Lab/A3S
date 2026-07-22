@@ -1,0 +1,55 @@
+---
+title: Cloud 0.1.0 Status and Compatibility
+description: Exact E0 evidence status, component revisions, protocol levels, and capability labels.
+---
+
+# Cloud 0.1.0 Status and Compatibility
+
+Status: **Verified**
+
+Snapshot: `cloud-0.1.0`
+
+This is versioned documentation for the E0 integration snapshot. It is not a
+production support declaration and no matching GitHub release has been
+published. The evidence boundary is the clean-host E0 gate described in the
+[pinned Cloud development plan](https://github.com/A3S-Lab/Cloud/blob/5d7307cc7bf5b155f708ca9f5bd3e5d06745b68d/docs/development-plan.md).
+
+## Capability status
+
+| Label | Meaning in this snapshot |
+| --- | --- |
+| **Verified** | The exact locked revisions passed the named executable gate. E0 covers one outbound Linux/Docker node, deployment A, managed TLS, ordered logs, update to B, cloned-A rollback, durable stop, and cleanup. |
+| **Experimental** | Implemented or documented with tests, but not wired through a released Cloud operator surface or production gate. The signed node/Gateway updater is in this category. |
+| **Optional** | A supported provider choice that is not required by the local profile. NATS and S3-compatible log storage are examples. |
+| **Planned** | No shipped contract may be inferred. Cloud CLI, management MCP, managed backups, multi-node evacuation, HA, and production disaster-recovery objectives remain planned. |
+
+## Exact compatibility lock
+
+The authoritative machine-readable source is `compat/cloud-stack.acl` in the
+root repository. The docs gate fails if this table or its release manifest
+drifts from that lock.
+
+| Component | Version | Revision |
+| --- | --- | --- |
+| ACL | `0.3.0` | `5317e166222495585909d81f2caffdca90273c99` |
+| Boot | `0.1.2` | `3029e7eda4832c26c6d4dfa8578049e65de8dfbd` |
+| Cloud | `0.1.0` | `5d7307cc7bf5b155f708ca9f5bd3e5d06745b68d` |
+| Event | `0.3.0` | `6df3d6551a2a3ab68b2f8271d33a87b078fc8151` |
+| Flow | `0.4.2` | `ca17ae78968370eacd97992d9202dabf1cd82a2e` |
+| Gateway | `1.0.12` | `f8500b89284e75342dd0286a0200b3a6e3f51e32` |
+| ORM | `0.1.0` | `6fdeae38032a5134e858cf3985f47d60cb5180ac` |
+| Runtime | `0.2.0` | `cfaac63af6f76beebdc64a1ec228cedc42bb98ec` |
+| Sentry | `0.7.0` | `c1b45120662224fe1f3065d6888da0d291b4ff07` |
+| Updater | `0.3.0` | root workspace |
+
+Protocol levels are Gateway snapshot `2`, node command `1`, Flow native
+TypeScript `1`, Runtime capabilities `3`, Runtime observation `2`, and Runtime
+unit spec `2`.
+
+## Operator topics
+
+- [Install, upgrade, and rollback](./install-upgrade)
+- [Backup, restore, and disaster recovery](./recovery)
+- [Node drain and certificate failure](./node-operations)
+- [REST, OpenAPI, CLI, MCP, events, and ACL](./interfaces)
+- [Dependency and process-role runbooks](./runbooks)

@@ -205,14 +205,14 @@ export function useWorkFilesController(defaultRootPath = '') {
 
   const pickRoot = useCallback(async (): Promise<string | null> => {
     try {
-      const selection = await codeApi.pickWorkspaceDirectory();
+      const selection = await codeApi.pickWorkspaceDirectory(rootPath || normalizedDefaultRoot || undefined);
       if (selection.cancelled || !selection.path) return null;
       return await selectRoot(selection.path);
     } catch (pickError) {
       showToast(formatApiError(pickError), 'error');
       return null;
     }
-  }, [selectRoot]);
+  }, [normalizedDefaultRoot, rootPath, selectRoot]);
 
   const navigateTo = useCallback(
     (path: string) => {

@@ -76,16 +76,16 @@ windhole-check:
     cd apps/windhole && just check
 
 # ============================================================================
-# A3S Box Desktop
+# A3S Desktop
 # ============================================================================
 
-# Start the native A3S Box desktop client
-box:
-    cd apps/box && cargo run --locked
+# Start the native A3S Code desktop app
+desktop:
+    cd apps/desktop && cargo run --locked
 
-# Test the native A3S Box desktop client
-box-check:
-    cd apps/box && cargo test --locked --all-targets
+# Test the native A3S Code desktop app
+desktop-check:
+    cd apps/desktop && cargo test --locked --all-targets
 
 # ============================================================================
 # A3S Flow
@@ -98,6 +98,19 @@ flow-check:
 # Test the A3S Flow Rust SDK
 flow-test:
     cd crates/flow && cargo test --all-targets
+
+# ============================================================================
+# A3S Cloud Compatibility
+# ============================================================================
+
+# Verify the exact Cloud stack, resolve it, and run its cross-repository gates
+cloud-stack-check:
+    node --test scripts/verify-cloud-stack.test.mjs
+    node scripts/verify-cloud-stack.mjs
+    cargo metadata --manifest-path apps/cloud/Cargo.toml --locked --format-version 1 > /dev/null
+    cargo check --manifest-path apps/cloud/Cargo.toml --workspace --all-targets --locked
+    cargo test --manifest-path apps/cloud/Cargo.toml --locked -p a3s-cloud-contracts
+    cargo check --manifest-path crates/gateway/Cargo.toml --locked --all-targets --features wire
 
 # ============================================================================
 # Maintenance

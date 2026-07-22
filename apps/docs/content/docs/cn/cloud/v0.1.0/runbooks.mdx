@@ -1,0 +1,76 @@
+---
+title: 依赖与进程 Runbook
+description: 当前 Cloud 每项依赖的角色、前置条件、验证、恢复和回滚。
+---
+
+# 依赖与进程 Runbook
+
+Status: **Experimental**
+
+Snapshot: `cloud-0.1.0`
+
+这些 runbook 描述当前集成快照。在 H0 验证前，provider-specific HA topology、
+retention、RPO 和 RTO 仍由 operator policy 决定。
+
+## 进程角色
+
+| Role | 职责 | 必需依赖 | 安全验证 |
+| --- | --- | --- | --- |
+| `api` | REST、OpenAPI、认证和已接受 intent | PostgreSQL、配置的 security provider | live/ready endpoint 和有 scope 的只读 query |
+| `worker` | 持久 operation、deployment、build、edge/certificate convergence、retention | PostgreSQL、Flow、node control、Runtime node、Gateway；按配置使用 object storage | lease age、operation progress、node observation、Gateway acknowledgement |
+| `relay` | PostgreSQL outbox publication | PostgreSQL；选择 NATS 时还需要 NATS | outbox watermark、publish latency、NATS stream health |
+| `all` | 单进程承担全部三种角色 | 上述依赖的并集 | 适合开发，不代表 HA |
+
+先启动 data service，再启动 relay/worker，最后开放 API ingress。停止时先关闭 ingress，
+等待 mutation，再停止 worker/relay。在没有证明 fencing 前，不得让两个恢复站点同时运行 worker。
+
+## PostgreSQL
+
+前置条件：受支持 PostgreSQL、TLS/network policy、备份，以及 migration 和 outbox 增长空间。
+监控 ready-health failure、连接耗尽、长事务、过期 worker lease 与 outbox lag。
+
+故障时关闭 mutation ingress，保留数据库与日志，通过 provider 执行恢复或 failover，
+再在 worker 暂停时启动 Cloud。migration level 和权威 query 通过后才能恢复 worker。
+回滚必须回到最后一个已验证数据库权威；绝不能合并两个可写历史。
+
+## NATS JetStream
+
+Status: **Optional**；选择 memory event provider 时不需要。PostgreSQL 始终是权威来源。
+验证 stream、retention、consumer health 与 Cloud outbox watermark。故障时保留 PostgreSQL
+中的已接受 intent，停止或退避 relay publication，按 provider 恢复 NATS，再恢复幂等发布。
+consumer 必须容忍 redelivery。不能仅因派生 event relay 暂时不可用就把 operation 标为失败。
+
+## Object storage
+
+Status: **Optional**；本地 profile 可不用，但选择 S3-compatible 日志、artifact、backup、
+SBOM 或 provenance 的生产策略必须提供。要求 TLS、符合策略的 bucket versioning/retention、
+最小权限凭据与 digest verification。对象损坏或缺失时必须保持元数据真实并报告明确 gap，
+不得替换成未验证 bytes。回滚存储迁移时，要先恢复原 endpoint 与 version ID，再恢复 worker 写入。
+
+## Gateway
+
+Gateway 负责 ingress、complete route snapshot、托管公开证书与精确 reload acknowledgement。
+验证 management authentication、service health、installed revision/digest、route、证书 SAN/expiry
+和 routed probe。reload 失败时保持旧 complete snapshot 活动。回滚要用新 command 安装旧的
+已验证 snapshot；不能绕过 Cloud revision authority 只修改一个 route。
+
+## Runtime 节点
+
+节点建立向外 mTLS，持久化 command journal，执行 provider-neutral Runtime unit，并上传
+observation/log。验证证书有效期、heartbeat freshness、capability set、可用资源、Runtime state、
+command receipt 与 log watermark。维护前 drain。修复时保留 state directory，确保幂等 command
+可重放。identity 丢失时重新注册并 reconcile；不得复制其他节点的 private key。
+
+## Flow worker
+
+Flow 推进持久化 deployment、build、cleanup 和 recovery operation。验证 worker lease age、
+run/event sequence、retry backoff、command TTL 与 terminal cleanup。进程崩溃后连接同一个
+PostgreSQL authority 重启，由持久化 run 恢复。idempotency 和 resource receipt 未证明旧
+operation 终止前，不得手工跳过失败 step 或发起新的逻辑 operation。
+
+## Control-plane 恢复 gate
+
+任何依赖故障后，重新开放 mutation 前必须同时通过：live/ready health、PostgreSQL authority、
+有界 outbox lag、非过期 worker lease、最新 node observation、精确 Gateway acknowledgement、
+已验证 object digest，且没有无法解释的非终止 operation。任何检查失败，都应保持 ingress
+关闭，并恢复前一个已验证依赖或 snapshot。

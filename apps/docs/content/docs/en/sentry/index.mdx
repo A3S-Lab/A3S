@@ -23,6 +23,7 @@ observer NDJSON -> L1 rules -> L2 LLM -> L3 A3S Code agent
 | L3 judge | Deep A3S Code agent investigation with security skills for events that need contextual reasoning. |
 | SAE tier | Sparse-autoencoder signal path for model-output activations emitted by A3S Power. |
 | Inline gate | `inspect_wire` can judge decoded LLM/MCP wire content and mask concrete secret/PII spans before forwarding. |
+| Policy admission | Canonical native-ACL envelopes bind policy bytes to an exact workload, revision, replica, node, generation, and SHA-256 digest. |
 | Enforcement | Writes egress, exec, or file deny records consumed by Observer guards. |
 | Operation modes | Rules-only, dry-run, fail-closed, hot-reloaded policy, speculative parallel L2/L3 on high-risk events. |
 | SDKs | Native Python and TypeScript SDKs expose in-process evaluation over the same Rust engine. |
@@ -32,6 +33,7 @@ observer NDJSON -> L1 rules -> L2 LLM -> L3 A3S Code agent
 - [Pipeline](/docs/sentry/pipeline) explains L1 rules, L2 LLM, L3 agent investigation, SAE signals, speculation, and fail posture.
 - [Inline Gate](/docs/sentry/inline-gate) documents pre-forward wire inspection and secret/PII masking.
 - [Configuration](/docs/sentry/configuration) lists daemon environment variables, SDK ACL config, site rules, fail posture, and deny sinks.
+- [Workload Policy Envelope](/docs/sentry/policy-envelope) defines canonical bytes, exact trusted-state verification, and the current enforcement boundary.
 - [Operations](/docs/sentry/operations) covers deployment, dry-run rollout, metrics, queues, and deny-file behavior.
 - [Deployment Runbook](/docs/sentry/deployment-runbook) expands the Kubernetes DaemonSet, rollout, alerting, restart, and outage procedures.
 - [SAE And Evaluation](/docs/sentry/sae-evaluation) documents the model-output activation tier, explainability payload, tests, soaks, and accuracy corpus.
@@ -46,4 +48,5 @@ continue even when an enforcement policy is disabled or being tuned.
 ## Boundary
 
 Sentry does not enforce by itself. It emits decisions and deny records; Observer
-guards perform the kernel-level block.
+guards perform the kernel-level block. A verified workload policy envelope is
+admission evidence only, not proof that a workload-scoped backend applied it.

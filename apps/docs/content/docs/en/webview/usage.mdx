@@ -11,6 +11,9 @@ creates a native window, builds a WebView, and exits when the window is closed.
 ```text
 a3s-webview --url <http(s)://URL> [--width N] [--height N] [--title T]
             [--header 'Name: Value']... [--token-env NAME] [--no-auth]
+
+a3s-webview --agent-island --snapshot <absolute-path>
+            --lock-file <absolute-path>
 ```
 
 ## Arguments
@@ -25,6 +28,9 @@ a3s-webview --url <http(s)://URL> [--width N] [--height N] [--title T]
 | `--token-env` | No | Environment variable name used for access-token auth seeding. |
 | `--no-auth` | No | Disables all browser-storage auth seeding. |
 | `--help` | No | Prints usage and exits. |
+
+The Agent Island mode is host-managed. Both paths must be absolute, and the
+snapshot must conform to the `a3s.system_agent_snapshot.v1` contract.
 
 Unknown arguments or missing flag values return a usage error and exit with
 status `2`.
@@ -47,12 +53,15 @@ for session credentials.
 ## Install
 
 ```bash
+a3s install webview
 brew install a3s-lab/tap/a3s-webview
 cargo install --git https://github.com/A3S-Lab/WebView
 ```
 
-On macOS, the Homebrew `a3s` formula can install the helper alongside the
-umbrella CLI.
+On normal online `a3s code` startup, the CLI automatically prepares the
+verified release when the helper is missing. Offline mode and
+`A3S_NO_AUTO_INSTALL=1` leave installation explicit. On macOS, the Homebrew
+`a3s` formula can install the helper alongside the umbrella CLI.
 
 ## Process Model
 

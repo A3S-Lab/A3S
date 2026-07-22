@@ -9,7 +9,7 @@ description: Umbrella command for the A3S stack and the entry point for the a3s 
 coding-agent terminal experience and delegates product commands to the matching
 component binary.
 
-The current crate version is `a3s` `0.7.7`. Its repository metadata points to
+The current crate version is `a3s` `0.9.1`. Its repository metadata points to
 [`A3S-Lab/Cli`](https://github.com/A3S-Lab/Cli).
 
 ## What It Does
@@ -19,13 +19,13 @@ The current crate version is `a3s` `0.7.7`. Its repository metadata points to
 | `a3s code` | Launches the interactive coding-agent TUI backed by `a3s-code-core` and rendered with `a3s-tui`. |
 | `a3s code resume <id>` | Resumes a saved TUI session from the current workspace. |
 | `a3s web` / `a3s web -d` | Starts local A3S Web in the foreground or background, reuses a healthy repeat start, and only replaces a managed instance with `--replace`. |
-| `a3s box ...` | Proxies to `a3s-box ...` and can bootstrap the Box runtime on first use. |
-| `a3s use ...` | Proxies to the typed Browser, native Office, OCR, and installed external domains in `a3s-use`. |
-| `a3s list` | Reports registered components, delegated Use capabilities, and unregistered local tools without network access by default. |
-| `a3s install` / `a3s uninstall` | Manages catalog components through verified artifacts and ownership receipts. |
+| `a3s box ...`, `a3s bench ...`, `a3s search ...` | Run registered product components through the typed catalog; Box can bootstrap on first supported use. |
+| `a3s use ...` | Routes Browser, Office, and installed external Use domains. |
+| `a3s list` | Reports registered state, ownership, delegated Use capabilities, and separately discovered external tools without network access by default. |
+| `a3s install`, `a3s upgrade`, `a3s uninstall` | Apply ownership-safe lifecycle operations to registered A3S components. |
 | `a3s top` | Opens the live process/container/agent monitor. |
-| `a3s update` | Checks the latest CLI release and upgrades through Homebrew or a standalone release asset. |
-| `a3s <tool> --help` | Passes help through to the selected tool. |
+| `a3s self update` | Updates the umbrella executable through Homebrew or a verified standalone release asset. |
+| `a3s <command> --help` | Shows typed help for the selected command path. |
 | `/update` in the TUI | Updates the installed CLI from Homebrew or release assets, then verifies the reported target version. |
 
 ## Start Here
@@ -36,8 +36,8 @@ The current crate version is `a3s` `0.7.7`. Its repository metadata points to
   slash commands, first-launch config, and headless smoke mode.
 - [Box And Tools](/docs/cli/box-and-tools) explains `a3s box ...`, tool
   discovery, and Box bootstrap behavior.
-- [Updates](/docs/cli/updates) explains `a3s update`, TUI `/update`, Homebrew,
-  standalone release assets, and verification.
+- [Updates](/docs/cli/updates) explains `a3s self update`, component upgrades,
+  TUI `/update`, Homebrew, standalone release assets, and verification.
 
 ## Install
 
@@ -60,7 +60,11 @@ path rather than handing arbitrary tool execution to another runtime.
 
 ## Boundaries
 
-- The CLI is packaging and UX glue; the agent loop lives in A3S Code.
+- The CLI owns the root grammar, trusted component catalog, lifecycle policy,
+  common output, packaging, and UX glue; the agent loop lives in A3S Code.
 - `a3s-box`, `a3s-webview`, and other helpers are separate binaries.
+- `a3s install` manages only registered A3S components. macOS and Linux are
+  the broad runtime/install targets; WebView also has a verified Windows x86_64
+  managed release.
 - Local credentials and account state are local runtime state; they should not be
   committed into repository docs or examples.

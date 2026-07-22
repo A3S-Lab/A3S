@@ -125,9 +125,14 @@ the row action saves and Escape cancels. Delete replaces the same row with a
 compact confirmation and keeps recoverable errors there. No centered dialog or
 success toast interrupts either operation.
 
-**Continuity:** selecting another task saves the current draft and safe Result
-Workspace state. A running task retains its own status. An unresolved dirty
-artifact blocks selection before the active task changes.
+**Continuity:** selecting another task snapshots the complete task-scoped
+Composer and Result Workspace state, including dirty drafts, then restores the
+destination task. A running task retains its own status. Task switching is
+non-destructive and does not require a dirty-file prompt; close, reload,
+replace, and overwrite retain their explicit discard guards. A debounced,
+versioned browser-local snapshot plus a synchronous `pagehide` flush provides
+the same restoration across refresh; malformed state is discarded and a
+capacity fallback retains dirty drafts before rebuildable content.
 
 **Next action:** a selected task opens its Conversation; a new task focuses the
 preparation Composer.
@@ -182,17 +187,23 @@ itself.
 
 ### `TaskHeader`
 
-**Role:** show task identity, workspace, execution state, and the action that
-reopens the task's last Result Workspace state.
+**Role:** show task identity, workspace, execution state, and conversation-only
+launch actions for the task's Workspace and Activity context.
 
 **Contract:** the active header is 44 px high, keeps title and workspace on one
 line, and subscribes to the same persisted title source as the Task Library so
 an inline rename updates both surfaces immediately.
 
-**Actions:** reopen Results and task activity.
+**Actions:** open Workspace or Activity while Conversation owns the foreground.
+Once either context panel is mounted, its header exclusively owns mode
+switching, full-screen presentation, and close. The task header removes its
+redundant launchers so responsive overlays cannot cover focusable background
+controls. Opening moves keyboard focus to the active panel mode unless mounted
+content already established a more specific focus target. Closing returns
+focus to the original launcher even after switching modes inside the panel.
 
-**Guards:** rendered only for an existing task. It does not expose a separate
-Activity right panel; operational detail stays in the execution stream.
+**Guards:** rendered only for an existing task. It never duplicates context
+navigation while a context panel is open.
 
 ### `ExecutionStream`
 
@@ -206,10 +217,11 @@ entries.
 **Contracts:**
 
 - assistant Markdown uses Streamdown streaming mode while pending and static
-  mode after completion, with refined heading, paragraph, nested-list,
-  task-list, quote, table, link, image, and inline-code treatments. Shiki code
-  blocks use light/dark themes, line numbers, bounded scrolling, and Chinese
-  control text;
+  mode after completion, with Chinese control text, light/dark Shiki themes,
+  line-numbered code blocks, bounded scrolling, normalized embedded-HTML
+  indentation, and
+  document typography for headings, paragraphs, nested lists, task lists,
+  quotations, tables, links, images, footnotes, and inline code;
 - `InstructionMessage` removes transport wrappers while retaining selected
   Skills and workspace files as typed resource chips; its Continue editing
   action restores both content and resources to the current draft;
@@ -244,16 +256,20 @@ completion, denial, timeout, confirmation, and persisted content blocks into one
 stable Web interaction per tool identity.
 
 **Contract:** successful calls default to collapsed; running, failed, and HITL
-calls remain open. Shell calls expose a copyable command preview with semantic
-program, flag, string, path, variable, keyword, operator, redirection, number,
-and comment tokens plus the working directory when available. Generic calls
-use the same grammar with a compact typed-argument signature. Running calls
-show execution state and live output line count; collapsed completed calls keep
-the most recent output excerpt and disclose omitted lines. Full output stays
-available in a scrollable disclosure and is never permanently sliced.
-File-editing calls hand off to the Monaco review surface, with raw tool output
-remaining available as a secondary disclosure. Running output follows its own
-bottom only until the reader scrolls away.
+calls remain open. Full output stays available in a scrollable disclosure and
+is never permanently sliced. File-editing calls hand off to the Monaco review
+surface, with raw tool output remaining available as a secondary disclosure.
+Running output follows its own bottom only until the reader scrolls away.
+Shell calls expose an exact, copyable command with semantic program, flag,
+string, path, variable, keyword, operator, redirection, number, and comment
+tokens plus the working directory when supplied. Detection accepts plain and
+provider-qualified names such as `bash`, `shell_command`, and
+`functions.shell_command`. Other tools use the same grammar for a compact
+highlighted `tool(key=value)` signature with the highest-signal arguments
+first. Preparing and running calls publish live state; output reports its line
+count, offers copying, and follows the tail until the reader scrolls away. A
+collapsed completed call retains the final two output lines with explicit
+omission and truncation labels instead of hiding all execution evidence.
 Output copy, permission outcomes, and safe recovery belong to the same tool
 block. A global recovery card is omitted only when its normalized error message
 explicitly repeats failed-tool output or typed error evidence, or is the exact
@@ -543,7 +559,12 @@ workspace.
 **Actions:** select tab, close tab, toggle full screen, and close workspace.
 
 **Contract:** mode selection does not live as four permanent header buttons.
-In-progress destructive mutations can guard close.
+In-progress destructive mutations can guard close. Full screen expands the
+same mounted workspace, marks the obscured Conversation inert, persists in the
+task-scoped snapshot, and exits through the header action or Escape. Closing
+returns presentation to docked before restoring Conversation and keyboard
+focus to the control that opened the workspace. Opening establishes focus
+inside the workspace without overriding a child editor's own mounted focus.
 
 ### `ArtifactTabs`
 
@@ -640,11 +661,72 @@ pointer context-menu gesture or `Shift+F10` opens one viewport-bounded,
 keyboard-operable menu at the row; tree whitespace opens root create and refresh
 actions. Menu selection moves create, rename, copy, or delete into the affected
 tree location's in-place editor or confirmation state. Escape restores focus to
-the invoking row, and outside click dismisses without changing selection.
+the invoking row, and outside click dismisses without changing selection. With
+a row focused, `F2` enters the same in-place rename flow and `Delete` enters the
+same explicit confirmation state; neither shortcut bypasses validation or the
+destructive-action guard. Rename focuses its name input; delete focuses the safe
+Cancel action. Cancelling either operation restores the originating row, while
+a successful mutation falls back to the rebased active path or nearest
+surviving row instead of the document body.
+
+**Keyboard navigation contract:** expose exactly one tree-row tab stop. Arrow
+Up/Down move through the currently rendered rows without opening a file;
+Home/End reach the first and last row. Arrow Right expands a closed directory
+or enters its first child, while Arrow Left collapses an open directory or
+returns to its parent. Filter-matched ancestors participate in the same visual
+order but navigation does not persist their temporary expansion. Every move
+scrolls the focused row into view and keeps focus distinct from editor
+selection.
+
+**File-type contract:** directory rows receive authoritative binary status from
+the workspace service and pass it unchanged through pointer, keyboard, and
+context-menu selection. Explorer and quick open use the same extension hints
+and bounded content sampling, so choosing the same path cannot alternate
+between text loading and binary metadata.
+
+**Tree-state contract:** a successful rename rebases loaded directory keys,
+entry paths, expanded nodes, loading flags, and retryable errors for the whole
+subtree. A successful delete removes the target from parent rows and evicts all
+descendant caches before the parent refresh returns. Only the newest read for a
+directory may publish state, so an older response cannot recreate a renamed or
+deleted path; confirmed mutations remain visible even when the parent refresh
+fails.
 
 **Guards:** unchanged rename is rejected; in-tree confirmation cannot be
-resubmitted while a mutation runs; rename and delete rebase or close every
-affected editor tab.
+resubmitted while a mutation runs; rename and delete reconcile both the cached
+tree and every affected editor tab. File creation uses a create-only backend
+operation; an existing path remains byte-for-byte unchanged and the inline form
+retains the recoverable conflict.
+
+### `WorkspaceQuickOpen`
+
+**Role:** provide keyboard-first file navigation without requiring the
+workspace tree to be expanded or loaded.
+
+**Entry points:** `Cmd/Ctrl+P`, the Explorer toolbar, the empty editor action,
+and the command palette. The shortcut is captured before Monaco stops keydown
+propagation, but only while an active task has a workspace.
+
+**Behavior:** query the local workspace catalog after a short input debounce;
+rank exact filenames, path matches, and fuzzy subsequences. Before a query,
+show open file tabs first and mark them without duplicating catalog rows. Keep
+only the newest request authoritative, expose loading, empty, retryable error,
+binary, and truncated states, and close only after the selected file opens
+successfully. A selected open tab reuses its draft through normal workspace
+selection.
+
+**Keyboard and accessibility contract:** focus the combobox on open; expose a
+listbox with `aria-activedescendant`; wrap Arrow Up/Down selection; support
+Home, End, Enter, repeated `Cmd/Ctrl+P`, Escape, and a trapped Tab cycle; scroll
+the active option into view and restore prior focus when that element still
+exists.
+
+**Catalog contract:** return absolute and workspace-relative paths, basename,
+binary status, total count, and truncation. Skip symlink traversal, repository
+metadata, dependency caches, and common generated output directories. Limit a
+response to 500 files server-side even if a larger value is requested. Preserve
+common source, configuration, module, and lockfile formats as text; classify
+known binary extensions directly and content-sample unfamiliar extensions.
 
 ### `EditorTabStrip`
 
@@ -657,22 +739,90 @@ per-file loading and dirty state. Pointer right-click, the Context Menu key, or
 all, copy path, and copy relative path.
 
 **Contract:** opening another file never discards a draft. A dirty close offers
-Save and Close, Don't Save, and Cancel. A multi-tab close resolves dirty
-documents in tab order and stops when the user cancels; it never skips a
-protected draft. `Cmd/Ctrl+W` follows the same guard. Context menus stay within
-the viewport, support keyboard navigation and Escape, and restore focus to the
-invoking tab.
+Save and Close, Don't Save, and Cancel. `Cmd/Ctrl+W` follows the same guard.
+Unique filenames stay compact; collisions add the shortest unique parent-path
+suffix, including in the tab and close-action accessible names, so monorepo
+files never depend on hover text for identity. Each tab is a real
+`button[role="tab"]`; its close button is a sibling rather than an interactive
+descendant. Exactly one selected tab participates in the tab order. Arrow
+Left/Right wrap and activate, Home/End reach the boundary tabs, and Delete uses
+the same guarded close path. If removal disconnects the current focus, focus
+moves to the surviving active tab or the empty editor's Quick Open action; a
+still-connected control elsewhere keeps focus. Any active-tab change that
+disconnects its invoking control falls back to the newly active tab.
+The viewport-bounded Chinese context menu closes the selected tab, all other
+tabs, tabs to its right, or all tabs, and copies either the absolute or
+workspace-relative path. It supports keyboard navigation and Escape, and
+restores focus to the invoking tab after dismissal. Multi-tab close processes
+dirty documents in tab order through the existing Save/Don't Save/Cancel guard.
+Cancelling stops the remaining close queue, and a workspace-generation change
+invalidates it so an old task cannot close tabs in the newly selected workspace.
 
 ### `MonacoFileEditor`
 
 **Role:** provide the local VS Code editing engine for the active text tab,
 including syntax highlighting, folding, indentation, exact line/column reveal,
-and model view state.
+model view state, saved-document diagnostics, and semantic navigation.
 
-**Contract:** Monaco, its Simplified Chinese language resources, and its
-language workers are bundled locally and loaded on demand. Built-in and A3S
-semantic-navigation context-menu commands are Chinese. `Cmd/Ctrl+S` saves the
-active tab. Binary files never create a Monaco text model.
+**Actions:** one visible file-toolbar menu exposes definition, declaration,
+references, implementations, and file outline. Monaco shortcuts and its editor
+context menu invoke the same navigation boundary.
+
+**Contract:** Monaco, its Simplified Chinese NLS catalog, and its language
+workers are bundled locally and loaded on demand. The NLS catalog loads before
+any editor module, so
+Monaco's native context menu, command palette, and built-in editing actions
+match the Chinese A3S navigation commands. The shared editor/diff runtime keeps
+Monaco's complete standalone contribution surface, four worker-backed
+language-service families (JSON, CSS, HTML, and TypeScript/JavaScript), and
+only the tokenizers needed by the product's ACL/HCL, shell, C/C++,
+JavaScript/TypeScript, CSS, Go, HTML, JSON, Markdown, Python, Rust, SQL,
+INI/TOML, XML, and YAML mappings. It starts from the scoped editor API rather
+than the package-wide entry, so unsupported language tokenizers and unused
+protocol code are not part of editor activation. Semantic targets reuse normal
+workspace file selection; dirty buffers remain local and navigation labels
+results that come from the saved document.
+One mounted editor switches between models whose virtual URI combines task
+scope and the normalized path first assigned to the document. A referenced
+model owns its live undo/redo stack, cursor and selections, folding, scroll,
+readiness, and editor status. File switches and task switches save and restore
+that state without copying it into another task that opened the same path.
+Before a successful file or parent-directory rename mutates an open tab, the
+model registry rebinds the new logical path to the document's existing
+immutable URI. Reopening the old path while that document remains retained
+allocates a distinct URI, preventing model and history collisions. Search or
+semantic line/column input is applied and consumed once; subsequent activation
+restores the model-owned view. The model registry retains exactly the models
+referenced by active-task tabs or inactive task snapshots. Cancelling a dirty
+close keeps the reference; confirmed close, workspace replacement, and
+task-snapshot removal dispose orphaned models.
+Browser-local snapshot restoration recreates drafts after refresh but does not
+claim to serialize Monaco's in-memory undo history.
+The document-symbol provider registers against the mounted model's concrete
+language identifier, never an optional path mapping; modern JavaScript and
+TypeScript module extensions map to their native Monaco languages and unknown
+extensions use the model's plaintext fallback without corrupting the provider
+registry.
+An unsupported native language clears only native diagnostics and returns no
+native symbols so Monaco-local providers can continue. Unsupported responses
+stay out of the status bar, and a missing document language profile is retained
+for the active editor session to avoid repeated native queries. Genuine service
+failures use concise labels. Save, close-tab, and tab-switch shortcuts are
+scoped to focus within the workspace and never intercept Conversation input.
+`Ctrl+Tab` and `Ctrl+Shift+Tab` preserve continuous editing by handing focus to
+the target file or modified diff editor only when the shortcut originated in
+an editor surface. The handoff waits for the keyed Monaco instance to mount and
+does not let a diff editor steal focus from a connected toolbar or tab control.
+`Cmd/Ctrl+B` remains available while Monaco owns focus so compact desktop users
+can reclaim the task-sidebar width; the same chord remains untouched in the
+Conversation Composer and other editable text surfaces.
+The status observer reads cursor, selections, and line endings from the active
+Monaco model and updates only when that compact status changes. The line-ending
+status opens an accessible radio menu and converts through Monaco's undoable
+`pushEOL` operation; the resulting model change follows the normal draft and
+save path. Read-only context review disables conversion. `Cmd/Ctrl+S` saves the
+active tab. Binary files never create a Monaco text model or expose text-model
+metadata in the status bar.
 
 ### `FileArtifactView`
 
@@ -684,21 +834,53 @@ binary state, load failure, and editor status bar.
 - selecting the same dirty file activates its existing model without rereading;
 - read failure remains attached to the failed tab with a retry;
 - binary files cannot enter the text save path;
-- disk changes trigger an explicit reload or overwrite decision;
+- every text read and successful write refreshes the tab's content revision;
+- normal saves send that revision, or legacy saved content, as a server-side
+  precondition without first rereading the file;
+- HTTP 412 preserves the draft, reads the current disk version, and triggers an
+  explicit reload or overwrite decision; only overwrite is unconditional;
 - editing a validated configuration invalidates stale validation.
 
 **Navigation input:** optional line and column from Search.
+
+**Location-history contract:** the workspace controller records the live caret
+before file, search-result, or semantic navigation and exposes toolbar Back and
+Forward actions. History is bounded and workspace-scoped. Restoring an open tab
+reuses its draft, a new navigation clears the forward branch, rename and delete
+reconcile paths, and a closed target is activated only after it loads
+successfully. `Ctrl+-` and `Ctrl+Shift+-` are consumed only while focus is
+inside the workspace editor.
+
+**Status contract:** show the active line and column, selected characters or
+multiple cursors, model-reported `LF` or `CRLF`, encoding, dirty
+state, and native-navigation state. Hide model-derived fields while Monaco is
+not mounted. Selecting another line ending returns focus to Monaco and marks
+the tab dirty; Escape from the menu returns focus to the status trigger.
 
 ### `WorkspaceSearch`
 
 **Role:** search text, group matches by file, open exact results, and perform
 bounded replacement inside Files mode.
 
-**State:** typed query, searched query, result set, replacement, searching, and
-replacing are separate values.
+**State:** typed query, searched query, selected directory scope, successful
+result scope and workspace, result set, replacement, searching, and replacing
+are separate values. The selected scope survives closing and reopening the
+panel.
 
-**Guards:** stale results disable Replace. Replacement uses the displayed result
-set's query and is blocked by affected unsaved content.
+**Behavior:** source scope excludes repository metadata, dependency caches, and
+common build outputs. Including those directories reruns a non-empty query;
+only the newest in-flight request may publish results. Each match carries
+bounded context, UTF-16 offsets within that context, and a one-based UTF-16
+column that can be passed directly to Monaco. The client also bounds legacy
+full-line responses before rendering and highlights the selected occurrence.
+Search requests one sentinel beyond the 300-match presentation limit, renders
+at most 300 matches, and marks the result set as truncated when the sentinel is
+present.
+
+**Guards:** a changed query, scope, or workspace and an in-flight search disable
+Replace. Replacement uses the displayed result set's query and is blocked by
+affected unsaved content. A truncated result set displays an explicit narrowing
+prompt and cannot be replaced, including through a direct controller call.
 
 ## Browser mode
 

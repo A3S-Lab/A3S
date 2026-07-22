@@ -34,6 +34,21 @@
   background: var(--a3s-panel);
 }
 
+.task-context-panel.fullscreen {
+  position: absolute;
+  z-index: 50;
+  inset: 0;
+  width: 100%;
+  min-width: 0;
+  flex-basis: auto;
+  border-left: 0;
+  box-shadow: none;
+}
+
+.task-context-panel.fullscreen .task-context-resizer {
+  display: none;
+}
+
 .task-context-resizer {
   position: absolute;
   z-index: 4;

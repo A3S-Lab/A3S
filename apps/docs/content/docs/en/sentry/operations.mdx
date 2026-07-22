@@ -29,13 +29,14 @@ most important counters to alert on are:
 
 | Metric | Meaning |
 | --- | --- |
-| `sentry_overload_degraded_total` | An escalation could not be processed and fell through to the configured fail mode. |
+| `sentry_overload_degraded_total` | An escalation was rejected by the full worker queue. Complete evidence uses the fail mode; incomplete command evidence remains unresolved. |
 | `sentry_enforce_failed_total` | A decision wanted to enforce, but writing the deny record failed. |
 | `sentry_blocked_total` | Blocks by tier and event family. |
 | `sentry_events_total` | Total events judged. |
 
-In fail-open deployments, overload degradation or enforce failure means a block
-may not have landed.
+Any non-zero overload rate means the worker pool is under-provisioned. In
+fail-open deployments, a complete-evidence overflow or enforce failure means a
+block may not have landed.
 
 ## Queue And Timeout Tuning
 
@@ -47,10 +48,20 @@ L2 and L3 run in worker pools away from the ingest thread. Tune:
 - L3 timeout for deeper A3S Code investigation.
 - Speculation threshold when high-severity events deserve L2/L3 in parallel.
 
+Complete-evidence queue overflow resolves through the configured fail mode.
+Incomplete `ToolExec` evidence remains an audited L1 escalation, even during
+overload.
+
 ## Boundaries
 
 - Observer-event Sentry is reactive; it may block the next action rather than the
   action that produced the event.
+- The bundled daemon audits incomplete-evidence escalations but does not provide
+  a durable external L3 queue. A staged SDK consumer must persist and dispatch
+  them when deeper work is required.
+- `PolicyEnvelope::verify` proves canonical policy bytes and exact desired-state
+  binding. The current daemon does not apply envelopes, restore them after
+  restart, or gate workload readiness on an applied digest.
 - Denies can be coarse: binary path and IP-based enforcement may affect more
   than one process on the same node.
 - L2/L3 read attacker-influenced content. The deterministic L1 floor and

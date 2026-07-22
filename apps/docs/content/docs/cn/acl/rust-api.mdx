@@ -1,6 +1,6 @@
 ---
 title: Rust API
-description: a3s-acl 的 Rust parser、generator、AST、builders、value helpers 和 generator configuration。
+description: a3s-acl 的 Rust bounded parsing、schema admission、multi-diagnostics、schema-aware canonical digests、native ACL generation、AST 和 builders。
 ---
 
 # Rust API
@@ -9,7 +9,7 @@ description: a3s-acl 的 Rust parser、generator、AST、builders、value helper
 
 ```toml
 [dependencies]
-a3s-acl = "0.2.1"
+a3s-acl = "0.3.0"
 ```
 
 ## Parse And Generate
@@ -34,10 +34,103 @@ Public crate exports：
 | API | 作用 |
 | --- | --- |
 | `parse` / `parse_acl` | 把 ACL text 解析成 `Document`。 |
+| `parse_with_limits`、`ParseLimits` | 使用显式 document、nesting、collection、token 和 diagnostic limits 解析 untrusted input。 |
+| `collect_diagnostics`、`collect_diagnostics_with_limits` | 在不构造 partial AST 的前提下收集 bounded diagnostics。 |
+| `DiagnosticCode`、`ParseError`、`DiagnosticReport` | 返回 stable codes、UTF-8 byte spans、redacted messages 和明确的 truncation state。 |
+| `validate_document`、`validate_document_with_limits` | 使用 declarative schema 验证 parsed `Document`，并返回 bounded report。 |
+| `Schema`、`AttributeSchema`、`BlockSchema`、`ValueSchema` | 定义 closed-by-default document、block 和 recursive value rules。 |
+| `SchemaDiagnosticCode`、`SchemaDiagnostic`、`SchemaReport` | 返回 stable schema codes、logical paths、redacted messages 和明确的 truncation state。 |
 | `generate` / `generate_acl` | 从 `Document` 生成 ACL text。 |
 | `generate_from_map` | 从 `HashMap<String, Value>` 生成 ACL text。 |
+| `canonical_bytes`、`canonical_digest` | 生成 stable cross-SDK bytes 和带 algorithm prefix 的 SHA-256 digest。 |
+| `canonical_bytes_with_schema`、`canonical_digest_with_schema` | 生成 bytes 或 digest 前，递归规范化 schema-declared unordered block occurrences。 |
+| `CanonicalError` | 拒绝 unsupported programmatic values 且不回显值。 |
 | `Lexer` / `Parser` | 高级 tokenization 和 parsing entry points。 |
-| `ParseError` | 带 message、line、column 的错误。 |
+
+## Bounded Admission
+
+```rust
+use a3s_acl::{parse_with_limits, ParseLimits};
+
+let input = "limits { max_tasks = 10 }";
+let document = parse_with_limits(
+    input,
+    ParseLimits {
+        max_document_bytes: 64 * 1024,
+        max_nesting_depth: 32,
+        max_collection_items: 1_000,
+        max_token_bytes: 16 * 1024,
+        max_diagnostics: 20,
+    },
+)?;
+```
+
+Document 和 token sizes 使用 UTF-8 bytes。`ParseError` 提供 stable
+`DiagnosticCode`、带 UTF-8 byte offsets 的 complete source span，以及
+compatibility `line` / `column` fields。Messages 只标识 token kinds，不包含
+source token values 或 snippets。
+
+Parse APIs 仍然是 fail-fast。CLI 和 editor integrations 可以使用 bounded
+budget 收集多个错误：
+
+```rust
+use a3s_acl::{collect_diagnostics_with_limits, ParseLimits};
+
+let report = collect_diagnostics_with_limits(
+    "first = ]\nsecond = ]",
+    ParseLimits {
+        max_diagnostics: 20,
+        ..ParseLimits::default()
+    },
+);
+```
+
+发生 syntax error 后，collection 会从下一 source line 继续。
+Resource-limit diagnostics 仍然是 fatal。Report 最多保存
+`max_diagnostics` 个 errors，只有在继续观察到超出 budget 的 error 后才会把
+`truncated` 设为 true。
+
+## Schema Admission
+
+使用显式 limits 解析 untrusted text，然后在 activation 前验证得到的
+document：
+
+```rust
+use a3s_acl::{
+    parse_with_limits, validate_document_with_limits, AttributeSchema,
+    ParseLimits, Schema, ValueSchema,
+};
+
+let limits = ParseLimits {
+    max_diagnostics: 20,
+    ..ParseLimits::default()
+};
+let document = parse_with_limits("version = 1", limits)?;
+let schema = Schema::new().attribute(
+    "version",
+    AttributeSchema::required(ValueSchema::number()),
+);
+let report = validate_document_with_limits(&document, &schema, limits);
+assert!(report.is_empty());
+```
+
+Schemas 默认拒绝 undeclared attributes、blocks 和 object fields。它们可以声明
+required/optional attributes、block occurrence 和 label cardinalities，以及
+recursive `Any`、`String`、`Number`、`Bool`、`Null`、`List`、`Object`、
+`Call` 和 `OneOf` rules。Extension points 必须使用相应的显式 allow flag。
+`BlockSchema::unordered(true)` 会把 matching occurrences 标记为 schema-aware
+canonicalization 中的 semantically unordered；它不会改变 validation。
+
+Schema reports 使用 stable `acl.schema.*` codes 和
+`$.blocks.provider[0].attributes.api_key` 这样的 logical paths。Messages 和
+paths 不包含 attribute values、call arguments 或 block labels。Report 使用
+`ParseLimits::max_diagnostics`，只有在继续观察到超出 budget 的 schema error
+后才会把 `truncated` 设为 true。
+
+构造 trusted schema 时，invalid cardinality ranges 和 empty unions 会返回
+`SchemaDefinitionError`。Schema admission 只验证 document shape；numeric
+ranges、secret resolution、provider credentials 和其它 product semantics 仍由
+host component 负责。
 
 ## AST
 
@@ -65,20 +158,57 @@ let doc = DocumentBuilder::new().block(provider).build();
 
 Builder helpers 包括 `string`、`number`、`integer`、`boolean`、`null`、`list`、`call`。
 
-## GeneratorConfig
+## Native Generation
 
 ```rust
 use a3s_acl::{Generator, GeneratorConfig};
 
 let generator = Generator::with_config(GeneratorConfig {
-    indent: "  ",
+    indent: "    ",
     comments: false,
-    labels_as_attrs: true,
 });
+let text = generator.generate(&doc);
 ```
 
-`labels_as_attrs` 会把 block labels 写成 block 内部 attributes，而不是写在 block header 中。
-当 integration 更偏向 attribute-oriented HCL shape 时可以使用。
+Generation 只有一个 native ACL contract：block labels 保留在 block headers。
+不存在 label-as-attribute compatibility mode。
+
+## Canonical Bytes And Digests
+
+```rust
+use a3s_acl::{
+    canonical_bytes, canonical_bytes_with_schema, canonical_digest_with_schema,
+    parse, validate_document, BlockSchema, Cardinality, Schema,
+};
+
+let document = parse(
+    "provider \"z\" {}\nprovider \"a\" {}",
+)?;
+let schema = Schema::new().block(
+    "provider",
+    BlockSchema::new(Schema::new())
+        .labels(Cardinality::exactly(1))
+        .unordered(true),
+);
+assert!(validate_document(&document, &schema).is_empty());
+
+let ordered_bytes = canonical_bytes(&document)?;
+let normalized_bytes = canonical_bytes_with_schema(&document, &schema)?;
+let digest = canonical_digest_with_schema(&document, &schema)?;
+assert_ne!(ordered_bytes, normalized_bytes);
+assert!(digest.starts_with("sha256:"));
+```
+
+签名、durable identity 和 cross-SDK comparisons 应使用 canonical APIs。
+Canonical bytes 会保留 ordered ACL constructs，同时对 semantically
+unordered attribute 和 object keys 排序。完成 schema admission 后，
+schema-aware APIs 还会对 rule 设置了 `unordered` 的每一种 declared block
+name 的 occurrences 排序。Normalization 会递归执行并比较 canonical UTF-8
+bytes，但保留 occurrences 的原有 positions，因此其它 block types 和 unknown
+blocks 不会移动。Labels、lists、calls 和 unmarked blocks 仍然保持顺序。
+
+Schema-aware canonicalization 不会执行 schema admission。把 trusted schema
+用作 normalization metadata 前，需要单独验证 document。
 
 ## Notes
 

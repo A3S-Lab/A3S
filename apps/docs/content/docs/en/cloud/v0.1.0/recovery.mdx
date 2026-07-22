@@ -1,0 +1,84 @@
+---
+title: Backup, Restore, and Disaster Recovery
+description: Manual infrastructure recovery boundaries while managed Cloud backup and restore remain planned.
+---
+
+# Backup, Restore, and Disaster Recovery
+
+Status: **Planned**
+
+Snapshot: `cloud-0.1.0`
+
+Managed database, volume, backup, restore, and production disaster-recovery
+workflows belong to S0/H0 and are not shipped. This page is the manual
+infrastructure runbook for the current snapshot; it does not create an A3S
+Cloud `Backup` resource or promise an RPO/RTO.
+
+## Recovery set
+
+Capture these as one named, access-controlled recovery set:
+
+- PostgreSQL, the authority for desired state, operations, outbox facts, and
+  projections;
+- configured artifact and log object stores, including object digests and
+  provider version IDs where available;
+- NATS JetStream state when the NATS provider is enabled;
+- control-plane ACL files without secret values;
+- external Vault/KMS/PKI policies and recoverable key material under their own
+  provider procedures; and
+- node-local Runtime state, Gateway snapshot/certificate state, and updater
+  receipts. Node private keys must never be copied into PostgreSQL.
+
+## PostgreSQL backup
+
+Prerequisites: a terminal-operation window, a known migration revision,
+sufficient encrypted storage, and credentials supplied outside command
+history. Pause mutations and workers that can create new operations, then:
+
+```bash
+export BACKUP_DIR="/secure/a3s-cloud-backups/2026-07-22T000000Z"
+mkdir -p "$BACKUP_DIR"
+pg_dump --format=custom --serializable-deferrable \
+  --file="$BACKUP_DIR/control-plane.dump" "$PGDATABASE"
+pg_restore --list "$BACKUP_DIR/control-plane.dump" > "$BACKUP_DIR/control-plane.list"
+sha256sum "$BACKUP_DIR/control-plane.dump" > "$BACKUP_DIR/SHA256SUMS"
+```
+
+Record the root revision and `compat/cloud-stack.acl` beside the digest. Resume
+workers only after the dump and storage snapshots are complete.
+
+## Isolated restore drill
+
+Prerequisites: a clean database name, isolated object-store prefixes, disabled
+outbound notifications, and no production Gateway or node credentials.
+
+```bash
+export RESTORE_DATABASE="a3s_cloud_restore_drill"
+createdb "$RESTORE_DATABASE"
+pg_restore --exit-on-error --no-owner \
+  --dbname="$RESTORE_DATABASE" "$BACKUP_DIR/control-plane.dump"
+```
+
+Start the exact recorded binaries against the isolated database and stores.
+Verify migration level, organization/project/environment counts, non-terminal
+operations, outbox watermarks, active workload revisions, Gateway snapshot
+digests, and object SHA-256 values. Exercise one read-only API query. Do not
+connect restored workers to production nodes.
+
+## Disaster recovery and promotion
+
+1. Establish replacement PostgreSQL, NATS, and object storage in an isolated
+   network and restore the complete recovery set.
+2. Restore provider keys through Vault/KMS/PKI procedures; rotate any secret
+   whose confidentiality is uncertain.
+3. Start the control plane with API ingress closed. Start relay and worker
+   roles only after PostgreSQL and storage checks pass.
+4. Re-enroll or reconnect nodes through outbound mTLS. Reject stale node or
+   Gateway acknowledgements whose command/revision/digest does not match.
+5. Open read-only traffic, then mutation traffic, only after ready health,
+   operation convergence, Gateway routing, logs, and a restore query pass.
+
+Promotion changes authority and may be irreversible for clients. Preserve the
+failed site and recovery set until the replacement passes the full gate. To
+roll back the promotion, close replacement ingress, stop its workers, restore
+the previous authoritative endpoints, and re-verify fencing before reopening.

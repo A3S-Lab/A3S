@@ -71,6 +71,39 @@
   gap: 6px;
 }
 
+.workspace-search-scope {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  color: var(--a3s-muted);
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.workspace-search-scope input {
+  width: 13px;
+  height: 13px;
+  margin: 1px 0 0;
+  accent-color: var(--a3s-blue);
+}
+
+.workspace-search-scope input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--a3s-blue) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.workspace-search-scope span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.workspace-search-scope small {
+  color: var(--a3s-faint);
+  font-size: 9px;
+}
+
 .workspace-search-form .ds-button {
   min-height: 30px;
   font-size: 11px;
@@ -105,7 +138,7 @@
   overflow: hidden;
   font-size: 10px;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: pre;
 }
 
 .workspace-search-match {
@@ -135,6 +168,12 @@
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.workspace-search-match mark {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--a3s-blue) 18%, transparent);
+  color: var(--a3s-ink);
 }
 
 .workspace-search-state.ds-state-view {

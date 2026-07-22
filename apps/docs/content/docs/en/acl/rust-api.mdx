@@ -1,6 +1,6 @@
 ---
 title: Rust API
-description: Rust parser, generator, AST, builders, value helpers, and generator configuration for a3s-acl.
+description: Rust bounded parsing, schema admission, multi-diagnostics, schema-aware canonical digests, native ACL generation, AST, and builders for a3s-acl.
 ---
 
 # Rust API
@@ -9,7 +9,7 @@ Install the Rust crate:
 
 ```toml
 [dependencies]
-a3s-acl = "0.2.1"
+a3s-acl = "0.3.0"
 ```
 
 ## Parse And Generate
@@ -34,10 +34,104 @@ The public crate exports:
 | API | Role |
 | --- | --- |
 | `parse` / `parse_acl` | Parse ACL text into a `Document`. |
+| `parse_with_limits`, `ParseLimits` | Parse untrusted input with explicit document, nesting, collection, token, and diagnostic limits. |
+| `collect_diagnostics`, `collect_diagnostics_with_limits` | Collect bounded diagnostics without constructing a partial AST. |
+| `DiagnosticCode`, `ParseError`, `DiagnosticReport` | Return stable codes, UTF-8 byte spans, redacted messages, and explicit truncation state. |
+| `validate_document`, `validate_document_with_limits` | Validate a parsed `Document` against a declarative schema with a bounded report. |
+| `Schema`, `AttributeSchema`, `BlockSchema`, `ValueSchema` | Define closed-by-default document, block, and recursive value rules. |
+| `SchemaDiagnosticCode`, `SchemaDiagnostic`, `SchemaReport` | Return stable schema codes, logical paths, redacted messages, and explicit truncation state. |
 | `generate` / `generate_acl` | Generate ACL text from a `Document`. |
 | `generate_from_map` | Build ACL text from a `HashMap<String, Value>`. |
+| `canonical_bytes`, `canonical_digest` | Produce stable cross-SDK bytes and an algorithm-prefixed SHA-256 digest. |
+| `canonical_bytes_with_schema`, `canonical_digest_with_schema` | Recursively normalize schema-declared unordered block occurrences before producing bytes or a digest. |
+| `CanonicalError` | Reject unsupported programmatic values without echoing them. |
 | `Lexer` / `Parser` | Advanced tokenization and parsing entry points. |
-| `ParseError` | Error with message, line, and column. |
+
+## Bounded Admission
+
+```rust
+use a3s_acl::{parse_with_limits, ParseLimits};
+
+let input = "limits { max_tasks = 10 }";
+let document = parse_with_limits(
+    input,
+    ParseLimits {
+        max_document_bytes: 64 * 1024,
+        max_nesting_depth: 32,
+        max_collection_items: 1_000,
+        max_token_bytes: 16 * 1024,
+        max_diagnostics: 20,
+    },
+)?;
+```
+
+Document and token sizes count UTF-8 bytes. `ParseError` exposes a stable
+`DiagnosticCode`, a complete source span with UTF-8 byte offsets, and
+compatibility `line` / `column` fields. Messages identify token kinds without
+including source token values or snippets.
+
+The parse APIs remain fail-fast. CLI and editor integrations can collect
+multiple errors with a bounded budget:
+
+```rust
+use a3s_acl::{collect_diagnostics_with_limits, ParseLimits};
+
+let report = collect_diagnostics_with_limits(
+    "first = ]\nsecond = ]",
+    ParseLimits {
+        max_diagnostics: 20,
+        ..ParseLimits::default()
+    },
+);
+```
+
+After a syntax error, collection resumes at the next source line.
+Resource-limit diagnostics remain fatal. A report stores at most
+`max_diagnostics` errors and sets `truncated` only after observing another
+error beyond that budget.
+
+## Schema Admission
+
+Parse untrusted text with explicit limits, then validate the resulting
+document before activating it:
+
+```rust
+use a3s_acl::{
+    parse_with_limits, validate_document_with_limits, AttributeSchema,
+    ParseLimits, Schema, ValueSchema,
+};
+
+let limits = ParseLimits {
+    max_diagnostics: 20,
+    ..ParseLimits::default()
+};
+let document = parse_with_limits("version = 1", limits)?;
+let schema = Schema::new().attribute(
+    "version",
+    AttributeSchema::required(ValueSchema::number()),
+);
+let report = validate_document_with_limits(&document, &schema, limits);
+assert!(report.is_empty());
+```
+
+Schemas reject undeclared attributes, blocks, and object fields by default.
+They can declare required or optional attributes, block occurrence and label
+cardinalities, and recursive `Any`, `String`, `Number`, `Bool`, `Null`, `List`,
+`Object`, `Call`, and `OneOf` rules. Extension points require the corresponding
+explicit allow flag. `BlockSchema::unordered(true)` marks matching occurrences
+as semantically unordered for schema-aware canonicalization; it does not change
+validation.
+
+Schema reports use stable `acl.schema.*` codes and logical paths such as
+`$.blocks.provider[0].attributes.api_key`. Messages and paths never include
+attribute values, call arguments, or block labels. The report uses
+`ParseLimits::max_diagnostics` and sets `truncated` only after observing an
+additional schema error beyond that budget.
+
+Invalid cardinality ranges and empty unions return `SchemaDefinitionError`
+while constructing the trusted schema. Schema admission validates document
+shape; host components still own numeric ranges, secret resolution, provider
+credentials, and other product semantics.
 
 ## AST
 
@@ -67,21 +161,58 @@ let doc = DocumentBuilder::new().block(provider).build();
 Builder helpers include `string`, `number`, `integer`, `boolean`, `null`,
 `list`, and `call`.
 
-## GeneratorConfig
+## Native Generation
 
 ```rust
 use a3s_acl::{Generator, GeneratorConfig};
 
 let generator = Generator::with_config(GeneratorConfig {
-    indent: "  ",
+    indent: "    ",
     comments: false,
-    labels_as_attrs: true,
 });
+let text = generator.generate(&doc);
 ```
 
-`labels_as_attrs` writes block labels as attributes inside the block instead of
-in the block header. This is useful when an integration prefers an
-attribute-oriented HCL shape.
+Generation has one native ACL contract: block labels remain in block headers.
+There is no label-as-attribute compatibility mode.
+
+## Canonical Bytes And Digests
+
+```rust
+use a3s_acl::{
+    canonical_bytes, canonical_bytes_with_schema, canonical_digest_with_schema,
+    parse, validate_document, BlockSchema, Cardinality, Schema,
+};
+
+let document = parse(
+    "provider \"z\" {}\nprovider \"a\" {}",
+)?;
+let schema = Schema::new().block(
+    "provider",
+    BlockSchema::new(Schema::new())
+        .labels(Cardinality::exactly(1))
+        .unordered(true),
+);
+assert!(validate_document(&document, &schema).is_empty());
+
+let ordered_bytes = canonical_bytes(&document)?;
+let normalized_bytes = canonical_bytes_with_schema(&document, &schema)?;
+let digest = canonical_digest_with_schema(&document, &schema)?;
+assert_ne!(ordered_bytes, normalized_bytes);
+assert!(digest.starts_with("sha256:"));
+```
+
+Use canonical APIs for signatures, durable identity, and cross-SDK
+comparisons. Canonical bytes preserve ordered ACL constructs while sorting
+semantically unordered attribute and object keys. After schema admission, the
+schema-aware APIs additionally sort occurrences of each same declared block
+name whose rule sets `unordered`. Normalization is recursive and compares
+canonical UTF-8 bytes, but retains the occurrences' existing positions, so
+other block types and unknown blocks do not move. Labels, lists, calls, and
+unmarked blocks remain ordered.
+
+Schema-aware canonicalization does not perform schema admission. Validate the
+document separately before using a trusted schema as normalization metadata.
 
 ## Notes
 

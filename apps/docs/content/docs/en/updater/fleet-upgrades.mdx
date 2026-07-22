@@ -1,0 +1,66 @@
+---
+title: Fleet Upgrades
+description: Signed targets, bounded host operations, durable receipts, health gating, rollback, and reboot recovery.
+---
+
+# Fleet Upgrades
+
+Status: **Experimental** on the current `a3s-updater` main branch. The lifecycle and Linux
+integration tests are implemented; Cloud fleet scheduling and node-agent
+wiring are not yet shipped.
+
+`FleetUpdater` manages exactly one `ManagedComponent`: `node-agent` or
+`gateway`. It never accepts an arbitrary service name and never opens an
+inbound management channel.
+
+## Signed target
+
+The Ed25519-signed JSON target binds:
+
+- schema and release identity;
+- component and exact semantic version;
+- a credential-free HTTPS artifact URL and lowercase SHA-256 digest;
+- the compatible protocol range and release channel; and
+- downgrade permission plus the minimum recoverable prior version.
+
+Unknown fields, untrusted key IDs, invalid signatures, incompatible protocols,
+channel mismatches, and rollback-policy violations fail before activation.
+
+## Durable lifecycle
+
+The machine-readable receipt records these states:
+
+```text
+received -> downloaded -> verified -> staged -> drained -> stopped
+         -> activated -> healthy
+                      \-> rolled-back | failed
+```
+
+Every transition is atomically persisted and directory-synced on Linux. The
+old binary remains at `previous` until the new process passes both the health
+probe and the exact applied-version check. Replaying the same signed target is
+idempotent. `recover()` resumes any non-terminal receipt after process death,
+power loss, or reboot.
+
+## Host boundary
+
+`FleetUpgradeHost` supplies bounded outbound download, drain, stop, start,
+health, and applied-version operations. Every network or lifecycle call
+receives a timeout; downloads also receive a maximum byte count. Implementors
+must enforce both limits.
+
+Receipts contain signed public release metadata and stable failure codes only.
+Host error strings, environment values, bearer tokens, and credentials are
+never persisted. Artifact URLs containing user info, query strings, or
+fragments are rejected.
+
+## systemd staging
+
+`SystemdUnitSpec` renders only the managed unit names
+`a3s-cloud-node.service` and `a3s-gateway.service`. Executable and environment
+file paths use explicit POSIX validation. `stage_systemd_unit` writes and syncs
+a complete candidate, while `activate_systemd_unit` preserves the prior unit
+during the atomic replacement.
+
+The embedding node host remains responsible for `daemon-reload`, starting the
+service, and reporting the applied version through the typed interface.

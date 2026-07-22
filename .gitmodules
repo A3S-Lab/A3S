@@ -52,6 +52,9 @@
 [submodule "crates/gui"]
 	path = crates/gui
 	url = git@github.com:A3S-Lab/GUI.git
+[submodule "apps/desktop"]
+	path = apps/desktop
+	url = git@github.com:A3S-Lab/Desktop.git
 [submodule "crates/flow"]
 	path = crates/flow
 	url = git@github.com:A3S-Lab/Flow.git
@@ -73,3 +76,6 @@
 [submodule "crates/use"]
 	path = crates/use
 	url = git@github.com:A3S-Lab/Use.git
+[submodule "packages/science"]
+	path = packages/science
+	url = git@github.com:A3S-Lab/Science.git

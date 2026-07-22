@@ -1,0 +1,54 @@
+{
+  "schema": "a3s.cloud.docs-release.v1",
+  "id": "cloud-0.1.0",
+  "releaseKind": "integration-snapshot",
+  "milestone": "E0",
+  "milestoneStatus": "verified",
+  "cloudRevision": "5d7307cc7bf5b155f708ca9f5bd3e5d06745b68d",
+  "compatibilityLock": "compat/cloud-stack.acl",
+  "documents": {
+    "en": "/docs/cloud/v0.1.0",
+    "cn": "/cn/docs/cloud/v0.1.0"
+  },
+  "components": {
+    "acl": { "version": "0.3.0", "revision": "5317e166222495585909d81f2caffdca90273c99" },
+    "boot": { "version": "0.1.2", "revision": "3029e7eda4832c26c6d4dfa8578049e65de8dfbd" },
+    "cloud": { "version": "0.1.0", "revision": "5d7307cc7bf5b155f708ca9f5bd3e5d06745b68d" },
+    "event": { "version": "0.3.0", "revision": "6df3d6551a2a3ab68b2f8271d33a87b078fc8151" },
+    "flow": { "version": "0.4.2", "revision": "ca17ae78968370eacd97992d9202dabf1cd82a2e" },
+    "gateway": { "version": "1.0.12", "revision": "f8500b89284e75342dd0286a0200b3a6e3f51e32" },
+    "orm": { "version": "0.1.0", "revision": "6fdeae38032a5134e858cf3985f47d60cb5180ac" },
+    "runtime": { "version": "0.2.0", "revision": "cfaac63af6f76beebdc64a1ec228cedc42bb98ec" },
+    "sentry": { "version": "0.7.0", "revision": "c1b45120662224fe1f3065d6888da0d291b4ff07" },
+    "updater": { "version": "0.3.0", "source": "workspace" }
+  },
+  "protocols": {
+    "cloud-gateway-snapshot": { "level": 2, "schema": "a3s.cloud.gateway-snapshot.v2" },
+    "cloud-node-command": { "level": 1, "schema": "a3s.cloud.node-command.v1" },
+    "flow-native-typescript": { "level": 1, "schema": "a3s.flow.native_ts.v1" },
+    "runtime-capabilities": { "level": 3, "schema": "a3s.runtime.capabilities.v3" },
+    "runtime-observation": { "level": 2, "schema": "a3s.runtime.observation.v2" },
+    "runtime-unit-spec": { "level": 2, "schema": "a3s.runtime.unit-spec.v2" }
+  },
+  "surfaces": {
+    "rest": { "status": "experimental", "version": "v1" },
+    "openapi": { "status": "experimental", "version": "0.1.0" },
+    "cli": { "status": "planned" },
+    "managementMcp": { "status": "planned" },
+    "events": { "status": "experimental", "version": 1 },
+    "acl": { "status": "verified", "version": "0.3.0" }
+  },
+  "apiSchemas": [
+    {
+      "id": "cloud-rest-v1",
+      "status": "experimental",
+      "source": "apps/cloud/crates/control-plane/src/app.rs",
+      "marker": "serve_openapi(\"/openapi.json\", OpenApiInfo::new(\"A3S Cloud\", \"0.1.0\"))"
+    }
+  ],
+  "commandHelp": [],
+  "configFiles": [
+    "apps/cloud/config/cloud.acl",
+    "apps/cloud/config/node.example.acl"
+  ]
+}

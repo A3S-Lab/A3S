@@ -23,10 +23,12 @@
 ## Overview
 
 **A3S** is the integration repository for a set of Rust-first agent products,
-runtimes, and infrastructure libraries. The `a3s` command is the primary user
-entry point: it runs the A3S Code terminal, hosts the local Code API and supplied
-Web assets, manages local configuration and accounts, and discovers or delegates
-to separately distributed products such as A3S Box, Bench, Search, and Use.
+runtimes, infrastructure libraries, and first-party capability packages. The
+`a3s` command is the primary user entry point: it runs the A3S Code terminal,
+hosts the local Code API and supplied Web assets, manages local configuration
+and accounts, and discovers or delegates to separately distributed products
+such as A3S Box, Bench, Search, and Use. A3S Science is maintained as an
+independently versioned package under `packages/science`.
 
 The repository also contains independently usable building blocks. A3S Code Core
 provides governed agent sessions and tools; Runtime defines provider-neutral Task
@@ -34,17 +36,39 @@ and Service lifecycles; Flow, Event, Lane, Memory, Search, and ORM supply durabl
 coordination and data capabilities; Boot, Gateway, Cloud, and Power address
 service and workload infrastructure.
 
+The `a3s` command is the unified product entrypoint: `a3s code` launches the
+interactive coding agent, `a3s box` manages isolated runtimes, `a3s bench` runs
+reproducible evaluations, and `a3s use` exposes Browser, native Office, OCR,
+and installed Use extensions. `a3s list`, `a3s install`, `a3s upgrade`, and
+`a3s uninstall` provide one typed component lifecycle. Local Code, Runtime,
+provider/model, and Bench workflows do not require an A3S OS login unless the
+selected remote capability requires one.
+
 A3S is not one root Cargo workspace, one monolithic binary, or a hosted service.
-Many projects under `crates/` and `apps/` are independent repositories with their
-own release and support boundaries, while shared crates and applications are
-maintained directly in this repository. Run build and test commands from the
-project that owns the change.
+Many projects under `crates/`, `apps/`, and `packages/` are independent
+repositories with their own release and support boundaries, while shared crates
+and applications are maintained directly in this repository. Run build and test
+commands from the project that owns the change.
 
 Local A3S Code, Web, configuration, component management, and Bench workflows do
 not require an A3S OS account. A model-backed agent still needs a configured
 provider or compatible local account. A3S OS login is optional and enables
 remote asset, Runtime, workflow, knowledge, and RemoteUI operations where the
 selected product exposes them.
+
+## Repository Map
+
+| Area | Paths | Purpose |
+| --- | --- | --- |
+| Product surfaces | `crates/cli`, `crates/bench`, `apps/web`, `apps/desktop`, `apps/cloud`, `apps/docs` | CLI, browser workspace, benchmark control component, native app, Cloud control plane, and documentation site. |
+| Capability packages | `packages/science` | First-party scientific Skills, MCP data services, compute workflows, and research tooling. |
+| Agent runtime | `crates/code`, `crates/ahp`, `crates/acl`, `crates/common` | Sessions, tools, policy, protocol, config, and shared types. |
+| UI systems | `crates/tui`, `crates/gui`, `crates/webview` | Terminal UI, native RSX UI, and trusted WebView helpers. |
+| Use and retrieval | `crates/use`, `crates/search` | Browser, native Office, and OCR capability surfaces, external Use extensions, and search through the shared Browser runtime. |
+| State and coordination | `crates/memory`, `crates/event`, `crates/flow`, `crates/lane`, `crates/orm` | Memory, events, workflows, queues, and typed persistence. |
+| Runtime safety and operations | `crates/runtime`, `crates/box`, `crates/observer`, `crates/sentry` | Provider-neutral execution, isolation, observability, and runtime control. |
+| Services | `crates/boot`, `crates/gateway`, `crates/power` | Service framework, ingress, and model serving. |
+| Distribution | `crates/updater`, `homebrew-tap` | Verified CLI updates, signed health-gated fleet lifecycle primitives, and Homebrew formulae. |
 
 ### Basic usage
 
@@ -100,6 +124,9 @@ to loopback by default.
   without later recenter or expand/collapse snap-back.
 - **Evidence-First Research**: Gather bounded local evidence and materialize
   source-backed Markdown and HTML reports
+- **Scientific Capability Packages**: Reuse the independently versioned A3S
+  Science catalog of scientific Skills, MCP data services, compute workflows,
+  and research tooling
 - **Isolated Workloads**: Run Linux OCI workloads through A3S Box's Docker-like
   MicroVM CLI on supported virtualization hosts
 - **Reproducible Evaluation**: Bind a Task, packaged Candidate adapter, and
@@ -111,6 +138,9 @@ to loopback by default.
 - **Service Infrastructure**: Build modular async services with Boot, route AI
   traffic with Gateway, and operate the implemented portions of the self-hosted
   Cloud control plane
+- **Signed Fleet Upgrade Primitives**: Admit Ed25519-signed node-agent and Gateway
+  targets, bound retrieval and service operations, gate activation on health and
+  version checks, recover durable receipts after reboot, and roll back failures
 - **Safety and Observability Components**: Add eBPF-backed observation on
   supported Linux hosts and tiered runtime policy through Observer and Sentry
 - **Native SDK and UI Components**: Embed A3S Code from Rust, Node.js, or Python,
@@ -124,12 +154,13 @@ to loopback by default.
 | Browser workspace | A3S CLI, Code Web | Local task conversations, tool approval, context, configuration, Monaco editing, Git review, and session persistence | Requires a compatible built frontend; binds to `127.0.0.1` by default; do not expose workspace APIs without an authenticated gateway |
 | Local command isolation | A3S CLI, Code | Managed SRT provider for routine workspace commands, with network denial, bounded filesystem access, scrubbed environment, timeout, streaming, and cancellation | Official CLI archives include the fixed support payload and require Node.js 20.11 or newer; source and Cargo installs may also need npm for development bootstrap |
 | Research | A3S CLI, Code, Flow | `a3s code research` runs a bounded local retrieval-summary workflow and writes Markdown and HTML report artifacts | The explicit OS research mode is reserved but currently disabled; signed-in Runtime remains available to ordinary Code workflows |
+| Scientific packages | A3S Science | First-party scientific Skills, MCP data services, compute workflows, and research tooling | Package contracts and release cadence are owned by the independent Science repository |
 | Isolation | A3S Box | Docker-like lifecycle for Linux OCI workloads in per-workload MicroVMs | Requires a supported host and virtualization backend; CRI, TEE, and Windows paths retain platform-specific validation requirements |
 | Evaluation | A3S Bench | Local Task/Candidate/Judge execution with immutable locks and results | The current local path requires Docker and produces `local_unofficial` results; official evaluation requires signed admission and matching Runtime evidence |
 | Application automation | A3S Use | Built-in Browser, native Office, and local PP-OCRv6 domains plus ACL-declared external domains | Domain availability depends on installed runtime/model assets; external packages keep their native CLI, standard MCP, or Skill contracts |
 | Search | A3S Search | Multi-engine aggregation, deduplication, consensus ranking, CLI output, and optional A3S Use browser rendering | Engines, proxies, and browser providers depend on network and local runtime availability |
 | General execution | A3S Runtime | Immutable finite Task and long-running Service generations with capabilities, idempotent lifecycle, observations, logs, and exec contracts | Runtime defines contracts and managed durability; callers still choose and supply a concrete provider |
-| Cloud control plane | A3S Cloud | Tenancy, PostgreSQL state, durable operations, node enrollment/control, observations, SSE, and a Web console | Foundation, node control, and digest-pinned OCI deployment are complete; reachability is in progress, while source workflows, control surfaces, assets, stateful resources, and multi-node scale remain planned |
+| Cloud control plane | A3S Cloud | Tenancy, PostgreSQL state, durable operations, node enrollment/control, observations, SSE, and a Web console | The [versioned Cloud 0.1.0 docs](apps/docs/content/docs/en/cloud/v0.1.0/) separate verified E0 behavior from experimental updater wiring and planned C0/S0/H0 work; `compat/cloud-stack.acl` is authoritative. |
 | Services | A3S Boot, Gateway | Modular async services, typed providers, protocol pipelines, reverse proxying, streaming, middleware, and AI traffic controls | Optional transports, brokers, scaling executors, certificates, and external backends must be supplied and operated separately |
 | Coordination and data | Flow, Event, Lane, Memory, ORM | Durable workflows, pluggable events, priority scheduling, agent memory, and typed SQL | Distributed stores and database drivers are feature- and backend-specific; an abstraction is not a claim that every backend is bundled |
 | Privacy and safety | Power, Observer, Sentry | TEE-oriented inference, agent observability, and tiered runtime security controls | Hardware attestation, eBPF collection, and enforcement depend on host capabilities and explicit deployment configuration |
@@ -143,24 +174,96 @@ and hardware still have to be available.
 
 ### Install the CLI
 
-```bash
-# Install the published Rust CLI from crates.io.
-cargo install a3s
+Install the latest stable release on macOS or glibc Linux:
 
-# Or install the independently released Homebrew formula.
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://raw.githubusercontent.com/A3S-Lab/a3s/main/install.sh | sh
+```
+
+The Unix installer writes `a3s` to `~/.local/bin` by default. It does not edit
+a shell profile unless explicitly requested. If that directory is not already
+on `PATH`, follow the command printed by the installer or run:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+a3s --version
+```
+
+Install on Windows x64 from PowerShell 5.1 or newer. The TLS setting also
+protects the initial script download on older Windows PowerShell installations:
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+irm https://raw.githubusercontent.com/A3S-Lab/a3s/main/install.ps1 | iex
+```
+
+The Windows installer writes to `%LOCALAPPDATA%\Programs\a3s\bin` by default
+and prints the exact `PATH` instruction when needed. Persisting `PATH` is opt-in
+on both platforms:
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://raw.githubusercontent.com/A3S-Lab/a3s/main/install.sh | A3S_MODIFY_PATH=1 sh
+```
+
+```powershell
+$env:A3S_MODIFY_PATH = '1'
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+irm https://raw.githubusercontent.com/A3S-Lab/a3s/main/install.ps1 | iex
+```
+
+Both installers:
+
+- resolve `latest` or an exact stable `vX.Y.Z` release from
+  [`A3S-Lab/CLI`](https://github.com/A3S-Lab/CLI/releases);
+- require one exact asset for the detected operating system and architecture;
+- verify the asset against GitHub's SHA-256 release digest;
+- reject unexpected, duplicate, linked, or traversal archive entries;
+- verify the staged binary reports the requested version before activation;
+- install the bundled Web workspace into the CLI's versioned data cache; and
+- preserve the previous binary and Web cache if activation cannot complete.
+
+The default installation paths require neither `sudo` nor an administrator
+session. Supported overrides are `A3S_VERSION`, `A3S_INSTALL_DIR`,
+`A3S_DATA_HOME`, `A3S_MODIFY_PATH`, and `A3S_GITHUB_TOKEN`. Downloaded scripts
+also accept normal arguments:
+
+```bash
+sh install.sh --version v0.9.8 --install-dir /absolute/path/to/bin
+```
+
+```powershell
+.\install.ps1 -Version v0.9.8 -InstallDir C:\Tools\A3S\bin -ModifyPath
+```
+
+Homebrew remains available on macOS and Linux:
+
+```bash
 brew install a3s-lab/tap/a3s
 ```
 
-The published CLI release archives and Homebrew formula install `a3s-webview`
-beside `a3s`, which provides RemoteUI windows and the native Agent Island.
-A repository checkout launched with `just code` builds the local WebView helper
-and injects its absolute path automatically. Other source or `cargo install a3s`
-installations must also build the helper from `crates/webview` (or set
-`A3S_AGENT_ISLAND_BIN` to an installed helper).
+Homebrew and the one-command installers include the matching Web workspace.
+`cargo install a3s` installs only the binary; the first allowed `a3s web`
+startup downloads and verifies its exact-version Web asset. On macOS and Linux,
+use `a3s self update` for a standalone CLI. On Windows, rerun the installer to
+upgrade because in-place self-update is not yet supported there.
+
+The release archives and Homebrew formula also install `a3s-webview` beside
+`a3s`, which provides RemoteUI windows and the native Agent Island. A repository
+checkout launched with `just code` builds the local WebView helper and injects
+its absolute path automatically. Other source installations must also build the
+helper from `crates/webview` or set `A3S_AGENT_ISLAND_BIN` to an installed
+helper.
 
 The Homebrew tap is released independently and can trail the CLI source tree.
 The command reference below follows the current CLI source; check
-`a3s --version` before relying on a newer command surface.
+`a3s --version` before relying on a newer command surface. A crates.io install
+remains available for users who intentionally want the binary-only package:
+
+```bash
+cargo install a3s
+```
 
 Inspect the active paths and create a starter ACL configuration when needed:
 
@@ -252,15 +355,14 @@ must all refresh before activation is acknowledged. Review surfaces expose the
 evidence, audit trail, immutable versions, rejection, reconsideration, version
 restore, and a recoverable return to the unmaterialized baseline. Local assets
 are never published automatically.
-`/checkup` first locks the composer and collects a typed, secret-free host
-snapshot of installed components, executable/PATH shadowing, bounded ACL
-validity, skill/plugin and `AGENTS.md` context size, and in-memory MCP status
-without starting servers. A strict read-only Plan turn then audits applicable
-`AGENTS.md`, integrations, update state, and runtime policy. It reports
-findings before presenting confirmation-sized fixes for Approve, Revise, or
-Abandon. Optional Auto-mode and evidence-backed exact read-only grant offers
-remain separate from health findings; an approved implementation still passes
-through normal HITL.
+`/checkup` first locks the composer and scans at most 128 persisted local
+sessions for actual `Skill` tool invocations. It suggests cleanup only after at
+least three sampled sessions, twelve completed turns, and a Skill age of 14
+days. Recently changed, disabled, managed, duplicate-name, and unknown-age
+Skills are excluded. Instruction and MCP counts remain footprint signals, not
+inferred usage. A strict read-only Plan turn presents each eligible Skill as a
+separate reversible disable choice; it never deletes files, and nothing changes
+before the user approves a selected action under normal HITL.
 `/tasks` or `Ctrl+B` opens live delegated-task control without interrupting the
 parent turn. It searches authoritative Core snapshots, keeps running and recent
 work visible across automatic refreshes, opens full progress/output details,
@@ -287,10 +389,10 @@ per-source search, a compact task peek, wheel navigation, and bounded automatic
 refresh. Native sessions resume with their persisted model, effort, execution
 mode, theme, and paused goal; external transcript rows hand their latest task
 to the active session.
-The Web frontend does not receive A3S OS
-credentials; the CLI retains account and token handling. The CLI does not embed
-the frontend: it must discover an `index.html` in a supported build directory or
-receive `--web-dir`. `--api-only` starts the local API without this requirement.
+The Web frontend does not receive A3S OS credentials; the CLI retains account
+and token handling. The CLI does not embed the frontend: it must discover an
+`index.html` in a supported build directory or receive `--web-dir`.
+`--api-only` starts the local API without this requirement.
 
 ### Run research
 
@@ -324,6 +426,14 @@ a3s box ps
 # Bench and Search require an explicit install.
 a3s install bench
 a3s install search
+
+# Run the browser Code workspace when compatible assets are available.
+a3s web
+
+# Manage the A3S Use parent or one delegated domain explicitly.
+a3s install use
+a3s upgrade use
+a3s uninstall use/office
 
 # Bench runs the short conformance Task through a packaged Candidate adapter.
 a3s bench list
@@ -378,6 +488,14 @@ a3s upgrade --all --yes
 a3s self update --check
 ```
 
+`a3s list` is read-only. Mutation commands resolve typed component IDs from
+trusted catalogs, verify provenance, and modify only component-owned files;
+they are not general package managers for arbitrary macOS, Linux, or Windows
+ecosystems. Use `a3s self update` for the umbrella CLI itself. Managed component
+installation and runtime support currently target macOS and Linux; Windows
+remains a compile/package preview until its lifecycle and persistent Browser
+session gates pass.
+
 The catalog marks Box and Use for first-use installation, but this is an install
 attempt rather than an availability guarantee. Component releases and matching
 host assets must exist. A Homebrew-managed umbrella CLI selects a catalogued
@@ -387,6 +505,22 @@ does not contain an `a3s-use` formula. Until one is published, request
 or follow that project's installation instructions. Set `A3S_NO_AUTO_INSTALL=1`
 or `A3S_OFFLINE=1` to prevent product proxy commands from attempting a first-use
 install.
+
+Browser, native Office, and OCR are built-in A3S Use domains. Before terminal
+takeover, `a3s code` reuses a healthy Use installation or installs its verified
+release when networking and automatic setup are allowed. `--offline`,
+`A3S_OFFLINE=1`, and `A3S_NO_AUTO_INSTALL=1` remain strict zero-network,
+zero-receipt boundaries, and setup failure never prevents Code from starting.
+External domains retain ACL-declared native CLI, standard MCP, and/or `SKILL.md`
+surfaces; Use does not introduce a custom extension protocol. Search depends on
+the typed `a3s-use-browser` library instead of owning another browser runtime.
+
+When Code delegates to the restricted `use` worker, TUI and Web project standard
+child-tool metadata into a first-class capability identity. A Browser route
+appears as `Using Browser` / `Used Browser` in the terminal and `Use · Browser`
+in Web; multiple routes stay ordered and deduplicated, and restored task
+snapshots preserve the same identity. This is presentation over the existing
+subagent event stream, not another transport.
 
 A component install prepares the product binary or delegates to the owning
 component. It does not make external services, browser engines, Office runtimes,
@@ -514,14 +648,15 @@ version or release channel.
 | --- | --- |
 | [A3S CLI](crates/cli/) | Umbrella `a3s` command, A3S Code TUI host, local Web API, account/model configuration, and component lifecycle |
 | [A3S Code](crates/code/) | Governed async agent runtime with Rust Core plus Node.js and Python native SDKs |
-| A3S Code Web (`apps/web/` when present) | Local React and Monaco task workspace served from a compatible build; the current working tree contains its source, but that directory is not part of the current root Git index |
+| [A3S Web](apps/web/) | Local Code and Work browser products with task conversations, Monaco editing, file management, AI-assisted Office editors, and locally supplied assets |
 | [A3S Windhole](apps/windhole/) | Local React and Three.js wind-tunnel laboratory covering the complete A3S Bench catalog, run, result, validation, Doctor, and lock workflows through a loopback CLI bridge |
 | [A3S Box](crates/box/) | Docker-like MicroVM runtime for Linux OCI workloads, with host-specific isolation and integration paths |
 | [A3S Bench](crates/bench/) | Reproducible evaluation of packaged Candidates against immutable Tasks and task-owned Judges |
 | [A3S Search](crates/search/) | Embeddable and command-line meta-search with ranking, deduplication, proxies, and optional browser rendering |
 | [A3S Use](crates/use/) | Typed Browser, native Office, OCR, external application, and standard MCP capability host |
-| [A3S Cloud](apps/cloud/) | Self-hosted control plane for desired state, durable operations, outbound-managed Runtime nodes, and verified OCI deployment; reachability is in progress, with source delivery, developer workflows, automation surfaces, assets, stateful resources, and multi-node scale planned |
-| [Documentation](apps/docs/) | Next.js documentation, tutorials, and project reference site |
+| [A3S Science](packages/science/) | Independently versioned scientific Skills, MCP data services, compute workflows, and research tooling |
+| [A3S Cloud](apps/cloud/) | Self-hosted control plane for desired state, durable operations, outbound-managed Runtime nodes, and verified OCI deployment; the [versioned Cloud 0.1.0 reference](apps/docs/content/docs/en/cloud/v0.1.0/) records exact compatibility and maturity boundaries |
+| [Documentation](apps/docs/) | Next.js documentation, tutorials, project references, and versioned bilingual Cloud operations guidance |
 
 ### Runtime, coordination, and data
 
@@ -554,7 +689,7 @@ version or release channel.
 | [A3S WebView](crates/webview/) | Native helper for authenticated RemoteUI windows and the always-on-top Agent Island, with platform WebView dependencies |
 | [A3S Observer](crates/observer/) | Language-neutral observation model plus Linux eBPF collector components for agent activity |
 | [A3S Sentry](crates/sentry/) | Tiered rule, model, and agent runtime security control built around observed activity |
-| [A3S Updater](crates/updater/) | GitHub Releases self-update support used by A3S CLI binaries |
+| [A3S Updater](crates/updater/) | GitHub Releases self-update support plus signed, health-gated node-agent and Gateway lifecycle primitives |
 | [Homebrew Tap](homebrew-tap/) | Formulae for published A3S command-line products and helpers |
 
 ## Architecture
@@ -566,7 +701,7 @@ stack:
 terminal / browser / Rust SDK / Node.js / Python
                        |
           product hosts and control planes
-       (CLI, Code Web, Bench, Cloud, services)
+   (CLI, Code Web, Bench, Science, Cloud, services)
                        |
        +---------------+----------------+
        |               |                |
@@ -617,6 +752,28 @@ cd a3s
 
 # For an existing checkout.
 git submodule update --init --recursive
+
+# Verify the exact Cloud integration stack and contract fixtures.
+just cloud-stack-check
+
+# Run A3S Code from source.
+just code
+
+# Run the default development surface.
+just dev
+
+# Build and run the browser Code workspace.
+just web
+
+# Exercise real Use hot-plug and release-shaped Code first-use.
+just use-hotplug-e2e
+
+# Run the native A3S Code desktop app.
+just desktop
+
+# Test the GUI runtime and RSX support.
+cd crates/gui
+cargo test
 ```
 
 If Git reports that a submodule path has no mapping, do not delete or re-add the
@@ -653,11 +810,8 @@ cargo clippy --all-targets -- -D warnings
 ```
 
 Use the project's documented feature flags and platform checks where they differ.
-The current working tree also contains an `apps/web/` development project, but
-that directory is not tracked by the current root Git index or registered in
-`.gitmodules`. Do not infer from the clone command above that every committed
-snapshot contains its source. When your snapshot intentionally includes it, use
-its package scripts or, when that directory is present, the root recipe:
+The root repository directly tracks the `apps/web/` development project. Use its
+package scripts, or the root recipe, for Web changes:
 
 ```bash
 cd apps/web
@@ -677,6 +831,25 @@ then update the corresponding gitlink in this repository. Shared crates and
 applications tracked directly by the root repository do not use that two-commit
 flow. In either case, do not combine unrelated component changes into a root
 documentation update.
+
+Applications under `apps/` use app-local workflows. The root `justfile` only
+orchestrates common entry points such as `just code`, `just dev`, `just web`,
+`just use-hotplug-e2e`, and `just cloud-stack-check`.
+
+Installer validation is self-contained and does not build the Rust stack:
+
+```bash
+bash scripts/test-install.sh
+```
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-install.ps1
+```
+
+Cloud integration revisions and protocol levels are recorded in
+`compat/cloud-stack.acl`. Update a component gitlink, its exact Cargo dependency,
+and the ACL lock entry together; its verifier rejects missing, dirty, or
+mismatched inputs before the cross-repository contract gate runs.
 
 ## Documentation
 

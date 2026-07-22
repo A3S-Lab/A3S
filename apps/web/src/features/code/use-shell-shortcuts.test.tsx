@@ -9,12 +9,14 @@ describe('shell location synchronization', () => {
     appState.settingsOpen = false;
     appState.updateInstalling = false;
     appState.commandPaletteOpen = false;
+    appState.fileQuickOpenOpen = false;
     appState.sidebarOpen = true;
     appState.activeProduct = 'code';
     appState.codeSurface = 'tasks';
     appState.settingsChannel = 'weixin';
     appState.activeSessionId = null;
     appState.composerValue = '';
+    appState.workspaceRoot = '';
     window.history.replaceState(null, '', '#code/conversation');
   });
 
@@ -144,5 +146,65 @@ describe('shell location synchronization', () => {
 
     expect(appState.sidebarOpen).toBe(true);
     editor.remove();
+  });
+
+  it('lets the Monaco editor toggle the task sidebar with the shell shortcut', () => {
+    appState.sidebarOpen = true;
+    renderHook(() => useShellShortcuts(() => undefined));
+    const monaco = document.createElement('div');
+    monaco.className = 'monaco-editor';
+    const input = document.createElement('div');
+    input.contentEditable = 'true';
+    input.addEventListener('keydown', (event) => event.stopPropagation());
+    monaco.append(input);
+    document.body.append(monaco);
+    const event = new KeyboardEvent('keydown', {
+      key: 'b',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+
+    input.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(appState.sidebarOpen).toBe(false);
+    monaco.remove();
+  });
+
+  it('opens file quick open from Monaco before its key handler stops propagation', () => {
+    appState.activeSessionId = 'task-1';
+    appState.workspaceRoot = '/repo';
+    appState.commandPaletteOpen = true;
+    renderHook(() => useShellShortcuts(() => undefined));
+    const monaco = document.createElement('div');
+    monaco.className = 'monaco-editor';
+    const input = document.createElement('textarea');
+    input.addEventListener('keydown', (event) => event.stopPropagation());
+    monaco.append(input);
+    document.body.append(monaco);
+    const event = new KeyboardEvent('keydown', {
+      key: 'p',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+
+    input.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(appState.commandPaletteOpen).toBe(false);
+    expect(appState.fileQuickOpenOpen).toBe(true);
+    monaco.remove();
+  });
+
+  it('preserves the browser print shortcut when no active workspace can open a file', () => {
+    renderHook(() => useShellShortcuts(() => undefined));
+    const event = new KeyboardEvent('keydown', { key: 'p', ctrlKey: true, cancelable: true });
+
+    window.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(appState.fileQuickOpenOpen).toBe(false);
   });
 });

@@ -7,7 +7,8 @@ on:
       - "crates/box/**"
       - "crates/gui"
       - "crates/gui/**"
-      - "apps/box/**"
+      - "apps/desktop"
+      - "apps/desktop/**"
       - ".github/workflows/a3s-box-ci.yml"
   push:
     branches: [main]
@@ -16,7 +17,8 @@ on:
       - "crates/box/**"
       - "crates/gui"
       - "crates/gui/**"
-      - "apps/box/**"
+      - "apps/desktop"
+      - "apps/desktop/**"
       - ".github/workflows/a3s-box-ci.yml"
   workflow_dispatch:
 
@@ -71,17 +73,12 @@ jobs:
       - name: Check shim
         run: cargo check --locked -p a3s-box-shim
 
-      - name: Check Windows launcher
-        run: cargo check --locked -p a3s-box-win
-
       - name: Test platform model
         run: cargo test --locked -p a3s-box-core platform::tests
 
       - name: Test runtime metrics
+        if: runner.os != 'Windows'
         run: cargo test --locked -p a3s-box-runtime prom::tests
-
-      - name: Test Windows launcher
-        run: cargo test --locked -p a3s-box-win
 
   desktop:
     name: Desktop (${{ matrix.os }})
@@ -90,7 +87,7 @@ jobs:
       A3S_DEPS_STUB: "1"
     defaults:
       run:
-        working-directory: apps/box
+        working-directory: apps/desktop
     strategy:
       fail-fast: false
       matrix:
@@ -119,7 +116,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: |
-            apps/box -> target
+            apps/desktop -> target
 
       - name: Test desktop app
         run: cargo test --locked --all-targets

@@ -1,6 +1,7 @@
 import 'monaco-editor/esm/nls.messages.zh-cn.js';
 import { loader } from '@monaco-editor/react';
-import * as monaco from 'monaco-editor';
+import type * as MonacoNamespace from 'monaco-editor';
+import { monaco } from './monaco-runtime';
 
 type MonacoGlobal = typeof globalThis & {
   MonacoEnvironment?: {
@@ -44,9 +45,13 @@ loader.config({ monaco });
 
 let configured = false;
 
-export function configureMonaco(instance: typeof monaco): void {
+export function configureMonaco(instance: typeof MonacoNamespace): void {
   if (configured) return;
   configured = true;
+
+  for (const defaults of [instance.typescript.typescriptDefaults, instance.typescript.javascriptDefaults]) {
+    defaults.setModeConfiguration({ ...defaults.modeConfiguration, documentSymbols: false });
+  }
 
   instance.editor.defineTheme('a3s-light', {
     base: 'vs',
@@ -123,8 +128,10 @@ export function languageForPath(path: string): string | undefined {
     bash: 'shell',
     c: 'c',
     cc: 'cpp',
+    cjs: 'javascript',
     cpp: 'cpp',
     css: 'css',
+    cts: 'typescript',
     go: 'go',
     h: 'c',
     hcl: 'a3s-acl',
@@ -134,6 +141,8 @@ export function languageForPath(path: string): string | undefined {
     jsx: 'javascript',
     md: 'markdown',
     mdx: 'markdown',
+    mjs: 'javascript',
+    mts: 'typescript',
     py: 'python',
     rs: 'rust',
     sh: 'shell',

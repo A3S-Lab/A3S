@@ -1,14 +1,24 @@
 ---
 title: Updates
-description: CLI self-update behavior through a3s update, TUI /update, Homebrew refresh, direct release assets, version comparison, and verification.
+description: CLI self-update, registered component upgrades, Homebrew refresh, verified release assets, and TUI restart behavior.
 ---
 
 # Updates
 
-A3S CLI has one update implementation shared by `a3s update`, `a3s code update`,
-and TUI `/update`.
+A3S separates the umbrella executable from optional components:
 
-## Flow
+```bash
+a3s self update          # update the executable and bundled Code surface
+a3s upgrade              # list component upgrades without mutation
+a3s upgrade use --yes    # upgrade one installed component
+```
+
+`a3s code update` and TUI `/update` enter the same self-update implementation.
+The former overloaded `a3s update` route is hidden transition compatibility,
+not the command for new scripts. Component upgrades use the verified component
+transaction engine and never install a missing component implicitly.
+
+## Self-Update Flow
 
 1. Read the current compiled CLI version.
 2. Resolve the latest release from GitHub release redirects.
@@ -31,6 +41,20 @@ Standalone direct-download update targets:
 
 Unsupported targets are pointed at the latest release page instead of attempting
 an unsafe in-place update.
+
+These self-update targets are macOS and Linux. Native Windows self-update
+remains roadmap work, while the registered WebView component has a verified
+Windows x86_64 release and managed first-use lifecycle. WSL follows the Linux
+contract.
+
+## Component Upgrades
+
+`a3s upgrade` with no IDs is read-only. Select IDs explicitly, or use `--all`
+for an intentional bulk operation. `--dry-run` prints the resolved plan,
+`--offline` permits only cached material, and `--non-interactive` prevents
+prompts. Each component transaction verifies provenance, stages files before
+activation, records ownership, and preserves the prior healthy version when an
+upgrade cannot commit.
 
 ## TUI Restart
 

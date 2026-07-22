@@ -1,6 +1,6 @@
 import Editor, { type Monaco, type OnMount } from '@monaco-editor/react';
 import type { CancellationToken, editor, IDisposable, languages } from 'monaco-editor';
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import { codeApi } from '../../../lib/api';
 import type {
   CodeDiagnosticSeverity,
@@ -17,7 +17,13 @@ import {
   workspaceSelection,
 } from '../code-intelligence';
 import type { WorkspaceFileSelection } from '../workspace-state';
+import {
+  isUnsupportedCodeIntelligenceError,
+  isUnsupportedCodeIntelligenceLanguageError,
+} from './code-intelligence-error';
 import { type NavigationCandidate, type NavigationPickerState, NavigationResultPicker } from './code-navigation-picker';
+import { type MonacoEditorStatus, type MonacoLineEnding, observeMonacoEditorStatus } from './monaco-editor-status';
+import { attachWorkspaceEditorModel, saveWorkspaceEditorModel } from './monaco-editor-model-store';
 import { configureMonaco, languageForPath, monacoTheme } from './monaco-environment';
 
 const markerOwner = 'a3s-code-intelligence';
@@ -27,41 +33,66 @@ export interface MonacoAssistantRequest {
   selection?: string;
 }
 
-export function MonacoCodeEditor({
-  path,
-  value,
-  location,
-  readOnly,
-  dark,
-  workspaceRoot,
-  sessionId,
-  savedDocument,
-  onChange,
-  onSave,
-  onClose,
-  onNavigate,
-  onStatusChange,
-  onAssistantRequest,
-}: {
-  path: string;
-  value: string;
-  location: { line: number; column: number } | null;
-  readOnly: boolean;
-  dark: boolean;
-  workspaceRoot: string;
-  sessionId: string | null;
-  savedDocument: boolean;
-  onChange: (value: string) => void;
-  onSave: () => void;
-  onClose: () => void;
-  onNavigate: (selection: WorkspaceFileSelection) => Promise<boolean>;
-  onStatusChange: (label: string) => void;
-  onAssistantRequest?: (request: MonacoAssistantRequest) => void | Promise<void>;
-}) {
+export interface MonacoCodeEditorHandle {
+  focus: () => boolean;
+  navigate: (kind: CodeNavigationKind) => void;
+  setLineEnding: (lineEnding: MonacoLineEnding) => void;
+  showOutline: () => void;
+}
+
+export const MonacoCodeEditor = forwardRef<
+  MonacoCodeEditorHandle,
+  {
+    path: string;
+    modelPath: string;
+    value: string;
+    location: { line: number; column: number } | null;
+    readOnly: boolean;
+    dark: boolean;
+    workspaceRoot: string;
+    sessionId: string | null;
+    savedDocument: boolean;
+    onChange: (value: string) => void;
+    onSave: () => void;
+    onClose: () => void;
+    onNavigate: (selection: WorkspaceFileSelection) => Promise<boolean>;
+    onStatusChange: (label: string) => void;
+    onEditorStatusChange: (status: MonacoEditorStatus | null) => void;
+    onAssistantRequest?: (request: MonacoAssistantRequest) => void | Promise<void>;
+    onLocationApplied?: () => void;
+    onReadyChange?: (ready: boolean) => void;
+  }
+>(function MonacoCodeEditor(
+  {
+    path,
+    modelPath,
+    value,
+    location,
+    readOnly,
+    dark,
+    workspaceRoot,
+    sessionId,
+    savedDocument,
+    onChange,
+    onSave,
+    onClose,
+    onNavigate,
+    onStatusChange,
+    onEditorStatusChange,
+    onAssistantRequest,
+    onLocationApplied,
+    onReadyChange,
+  },
+  ref
+) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
-  const actionDisposablesRef = useRef<IDisposable[]>([]);
+  const editorDisposablesRef = useRef<IDisposable[]>([]);
+  const documentSymbolDisposableRef = useRef<IDisposable | null>(null);
+  const activeModelPathRef = useRef(modelPath);
+  const modelPathRef = useRef(modelPath);
   const statusRef = useRef<CodeIntelligenceStatus | null>(null);
+  const unsupportedDocumentsRef = useRef(new Set<string>());
   const diagnosticCountRef = useRef<number | undefined>(undefined);
   const diagnosticStaleRef = useRef(false);
   const navigationAbortRef = useRef<AbortController | null>(null);
@@ -74,12 +105,19 @@ export function MonacoCodeEditor({
     onStatusChange,
     onAssistantRequest,
   });
+  const editorStatusChangeRef = useRef(onEditorStatusChange);
+  const locationAppliedRef = useRef(onLocationApplied);
+  const readyChangeRef = useRef(onReadyChange);
   const [mounted, setMounted] = useState(false);
   const [navigationPicker, setNavigationPicker] = useState<NavigationPickerState | null>(null);
+  const editorLanguage = languageForPath(path);
   const saveRef = useRef(onSave);
   const closeRef = useRef(onClose);
   saveRef.current = onSave;
   closeRef.current = onClose;
+  readyChangeRef.current = onReadyChange;
+  editorStatusChangeRef.current = onEditorStatusChange;
+  locationAppliedRef.current = onLocationApplied;
   propsRef.current = {
     path,
     workspaceRoot,
@@ -89,6 +127,45 @@ export function MonacoCodeEditor({
     onStatusChange,
     onAssistantRequest,
   };
+  modelPathRef.current = modelPath;
+
+  const saveCurrentEditorModel = (): void => {
+    const editor = editorRef.current;
+    const model = editor?.getModel();
+    if (!editor || !model || model.isDisposed()) return;
+    saveWorkspaceEditorModel(activeModelPathRef.current, model, editor.saveViewState());
+  };
+
+  const refreshDocumentSymbolProvider = (): void => {
+    documentSymbolDisposableRef.current?.dispose();
+    documentSymbolDisposableRef.current = null;
+    const editor = editorRef.current;
+    const monaco = monacoRef.current;
+    const languageSelector = editor?.getModel()?.getLanguageId();
+    if (!editor || !monaco || !languageSelector) return;
+    documentSymbolDisposableRef.current = monaco.languages.registerDocumentSymbolProvider(languageSelector, {
+      displayName: 'Code Intelligence',
+      provideDocumentSymbols: runDocumentSymbols,
+    });
+  };
+
+  const activateCurrentEditorModel = (): void => {
+    const editor = editorRef.current;
+    const model = editor?.getModel();
+    if (!editor || !model) return;
+    const nextModelPath = modelPathRef.current;
+    const viewState = attachWorkspaceEditorModel(nextModelPath, model);
+    activeModelPathRef.current = nextModelPath;
+    if (viewState) editor.restoreViewState(viewState);
+    refreshDocumentSymbolProvider();
+    readyChangeRef.current?.(true);
+  };
+
+  useLayoutEffect(() => {
+    if (!mounted || activeModelPathRef.current === modelPath) return;
+    readyChangeRef.current?.(false);
+    saveCurrentEditorModel();
+  }, [modelPath, mounted]);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -103,11 +180,18 @@ export function MonacoCodeEditor({
       return;
     }
 
-    const controller = new AbortController();
-    let active = true;
+    const documentKey = codeIntelligenceDocumentKey(path, workspaceRoot, sessionId);
     statusRef.current = null;
     diagnosticCountRef.current = undefined;
     diagnosticStaleRef.current = false;
+    if (unsupportedDocumentsRef.current.has(documentKey)) {
+      monaco.editor.setModelMarkers(model, markerOwner, []);
+      onStatusChange('本地编辑功能可用');
+      return;
+    }
+
+    const controller = new AbortController();
+    let active = true;
     onStatusChange('代码导航连接中');
 
     void (async () => {
@@ -143,8 +227,11 @@ export function MonacoCodeEditor({
         onStatusChange(statusLabel(negotiatedStatus, savedDocument, diagnostics.length, diagnosticStaleRef.current));
       } catch (error) {
         if (!active || controller.signal.aborted) return;
+        if (isUnsupportedCodeIntelligenceLanguageError(error)) {
+          unsupportedDocumentsRef.current.add(documentKey);
+        }
         monaco.editor.setModelMarkers(model, markerOwner, []);
-        onStatusChange(error instanceof Error ? `代码诊断不可用：${error.message}` : '代码诊断不可用');
+        onStatusChange(isUnsupportedCodeIntelligenceError(error) ? '本地编辑功能可用' : '代码诊断暂时不可用');
       }
     })();
 
@@ -161,13 +248,18 @@ export function MonacoCodeEditor({
     editor.setPosition(position);
     editor.revealPositionInCenterIfOutsideViewport(position);
     editor.focus();
+    locationAppliedRef.current?.();
   }, [location]);
 
   useEffect(
     () => () => {
+      saveCurrentEditorModel();
+      readyChangeRef.current?.(false);
       navigationAbortRef.current?.abort();
-      for (const disposable of actionDisposablesRef.current) disposable.dispose();
-      actionDisposablesRef.current = [];
+      documentSymbolDisposableRef.current?.dispose();
+      documentSymbolDisposableRef.current = null;
+      for (const disposable of editorDisposablesRef.current) disposable.dispose();
+      editorDisposablesRef.current = [];
       const model = editorRef.current?.getModel();
       if (model && monacoRef.current) monacoRef.current.editor.setModelMarkers(model, markerOwner, []);
     },
@@ -178,27 +270,24 @@ export function MonacoCodeEditor({
     setNavigationPicker(null);
   }, [path, sessionId, workspaceRoot]);
 
+  useEffect(() => {
+    if (mounted) refreshDocumentSymbolProvider();
+  }, [editorLanguage, mounted]);
+
   const mount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => saveRef.current());
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyW, () => closeRef.current());
-    for (const disposable of actionDisposablesRef.current) disposable.dispose();
-    actionDisposablesRef.current = [
+    for (const disposable of editorDisposablesRef.current) disposable.dispose();
+    editorDisposablesRef.current = [
+      observeMonacoEditorStatus(editor, (status) => editorStatusChangeRef.current(status)),
       ...navigationActions(editor, monaco, runNavigation),
       ...assistantActions(editor, () => propsRef.current.onAssistantRequest),
-      monaco.languages.registerDocumentSymbolProvider(languageForPath(path), {
-        displayName: 'Code Intelligence',
-        provideDocumentSymbols: runDocumentSymbols,
-      }),
+      editor.onDidChangeModel(activateCurrentEditorModel),
     ];
+    activateCurrentEditorModel();
     setMounted(true);
-    if (location) {
-      const position = { lineNumber: location.line, column: location.column };
-      editor.setPosition(position);
-      editor.revealPositionInCenterIfOutsideViewport(position);
-      editor.focus();
-    }
   };
 
   const runNavigation = async (kind: CodeNavigationKind): Promise<void> => {
@@ -209,10 +298,17 @@ export function MonacoCodeEditor({
     if (!editor || !relativePath || !position) return;
 
     navigationAbortRef.current?.abort();
-    const controller = new AbortController();
-    navigationAbortRef.current = controller;
+    navigationAbortRef.current = null;
     setNavigationPicker(null);
     const label = navigationLabel(kind);
+    const documentKey = codeIntelligenceDocumentKey(current.path, current.workspaceRoot, current.sessionId);
+    if (unsupportedDocumentsRef.current.has(documentKey)) {
+      current.onStatusChange(`此文件类型不支持${label}导航`);
+      return;
+    }
+
+    const controller = new AbortController();
+    navigationAbortRef.current = controller;
     current.onStatusChange(`正在查找${label}`);
     try {
       const status =
@@ -251,7 +347,12 @@ export function MonacoCodeEditor({
       current.onStatusChange(`找到 ${candidates.length} 处${label}，请选择目标${resultSuffix}`);
     } catch (error) {
       if (controller.signal.aborted) return;
-      current.onStatusChange(error instanceof Error ? `${label}导航失败：${error.message}` : `${label}导航失败`);
+      if (isUnsupportedCodeIntelligenceLanguageError(error)) {
+        unsupportedDocumentsRef.current.add(documentKey);
+      }
+      current.onStatusChange(
+        isUnsupportedCodeIntelligenceError(error) ? `此文件类型不支持${label}导航` : `${label}导航暂时不可用`
+      );
     } finally {
       if (navigationAbortRef.current === controller) navigationAbortRef.current = null;
     }
@@ -274,6 +375,39 @@ export function MonacoCodeEditor({
     editorRef.current?.focus();
   };
 
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      const editor = editorRef.current;
+      if (!editor) return false;
+      editor.focus();
+      return true;
+    },
+    navigate: (kind) => {
+      editorRef.current?.focus();
+      void runNavigation(kind);
+    },
+    setLineEnding: (lineEnding) => {
+      const editor = editorRef.current;
+      const model = editor?.getModel();
+      const monaco = monacoRef.current;
+      if (readOnly || !editor || !model || !monaco) return;
+      const sequence =
+        lineEnding === 'CRLF' ? monaco.editor.EndOfLineSequence.CRLF : monaco.editor.EndOfLineSequence.LF;
+      if (model.getEndOfLineSequence() !== sequence) model.pushEOL(sequence);
+      editor.focus();
+    },
+    showOutline: () => {
+      const editor = editorRef.current;
+      const action = editor?.getAction('editor.action.quickOutline');
+      if (!editor || !action) {
+        propsRef.current.onStatusChange('文件符号大纲不可用');
+        return;
+      }
+      editor.focus();
+      void action.run();
+    },
+  }));
+
   const runDocumentSymbols = async (
     model: editor.ITextModel,
     token: CancellationToken
@@ -283,6 +417,9 @@ export function MonacoCodeEditor({
     const current = propsRef.current;
     const relativePath = workspaceCodePath(current.path, current.workspaceRoot);
     if (!editor || !monaco || model !== editor.getModel() || !relativePath) return [];
+
+    const documentKey = codeIntelligenceDocumentKey(current.path, current.workspaceRoot, current.sessionId);
+    if (unsupportedDocumentsRef.current.has(documentKey)) return [];
 
     const controller = new AbortController();
     const cancellation = token.onCancellationRequested(() => controller.abort());
@@ -313,10 +450,11 @@ export function MonacoCodeEditor({
       );
       return result.items.map((symbol) => monacoDocumentSymbol(monaco, symbol));
     } catch (error) {
-      if (!controller.signal.aborted) {
-        current.onStatusChange(
-          error instanceof Error ? `Code Intelligence 大纲不可用：${error.message}` : 'Code Intelligence 大纲不可用'
-        );
+      if (isUnsupportedCodeIntelligenceLanguageError(error)) {
+        unsupportedDocumentsRef.current.add(documentKey);
+      }
+      if (!controller.signal.aborted && !isUnsupportedCodeIntelligenceError(error)) {
+        current.onStatusChange('文件符号暂时不可用');
       }
       return [];
     } finally {
@@ -327,13 +465,15 @@ export function MonacoCodeEditor({
   return (
     <section className='monaco-editor-surface' aria-label={`编辑 ${basename(path)}`}>
       <Editor
-        path={path}
-        language={languageForPath(path)}
+        path={modelPath}
+        language={editorLanguage}
         value={value}
         theme={monacoTheme(dark)}
         beforeMount={configureMonaco as (monaco: Monaco) => void}
         onMount={mount}
         onChange={(nextValue) => onChange(nextValue ?? '')}
+        saveViewState={false}
+        keepCurrentModel
         loading={<span className='monaco-loading'>正在加载编辑器…</span>}
         options={{
           ariaLabel: `编辑 ${basename(path)}`,
@@ -371,7 +511,7 @@ export function MonacoCodeEditor({
       )}
     </section>
   );
-}
+});
 
 function navigationActions(
   editor: editor.IStandaloneCodeEditor,
@@ -548,4 +688,8 @@ function runtimeUnavailableSuffix(status: CodeIntelligenceStatus): string {
 
 function basename(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() || path;
+}
+
+function codeIntelligenceDocumentKey(path: string, workspaceRoot: string, sessionId: string | null): string {
+  return JSON.stringify([workspaceRoot, sessionId, path]);
 }

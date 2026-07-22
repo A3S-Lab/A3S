@@ -40,6 +40,24 @@ const entries = [
     description: '浏览、创建、复制、重命名、删除、搜索和编辑项目文件。',
     keys: [],
   },
+  {
+    group: '工作区',
+    title: '快速打开文件',
+    description: '按文件名或路径模糊查找工作区文件，并直接复用已打开的编辑标签。',
+    keys: ['⌘/Ctrl', 'P'],
+  },
+  {
+    group: '工作区',
+    title: '专注编辑',
+    description: '在工作区或编辑器内收起或展开任务列表，为代码留出更多空间。',
+    keys: ['⌘/Ctrl', 'B'],
+  },
+  {
+    group: '工作区',
+    title: '全屏工作区',
+    description: '从任务上下文标题栏展开同一编辑器；按 Escape 或再次点击即可还原。',
+    keys: [],
+  },
   { group: '工作区', title: 'Git 工作流', description: '查看差异、暂存更改并在确认后创建提交。', keys: [] },
   {
     group: '安全',

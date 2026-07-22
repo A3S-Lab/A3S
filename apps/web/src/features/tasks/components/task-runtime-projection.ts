@@ -14,6 +14,7 @@ export interface SubagentProgressProjection {
   label: string;
   metadata: Record<string, unknown>;
   completionTokens: number;
+  useCapability?: string;
 }
 
 export interface SubagentProjection {
@@ -27,6 +28,8 @@ export interface SubagentProjection {
   output?: string;
   completionTokens: number;
   progress: SubagentProgressProjection[];
+  useCapabilities: string[];
+  currentUseCapability?: string;
   startedAt?: number;
   completedAt?: number;
 }
@@ -113,6 +116,7 @@ export function projectSubagents(
         state: 'running',
         completionTokens: 0,
         progress: [],
+        useCapabilities: [],
       };
       agents.set(id, agent);
       order.push(id);
@@ -133,6 +137,8 @@ export function projectSubagents(
         agent.output = undefined;
         agent.completionTokens = 0;
         agent.progress = [];
+        agent.useCapabilities = [];
+        agent.currentUseCapability = undefined;
       }
       agent.status = '执行中';
       agent.state = 'running';
@@ -175,7 +181,21 @@ export function projectSubagents(
     }
   }
 
+  for (const agent of agents.values()) projectUseCapabilities(agent);
+
   return order.map((id) => agents.get(id)).filter((agent): agent is SubagentProjection => Boolean(agent));
+}
+
+export function formatSubagentIdentity(agent: SubagentProjection): string {
+  if (!isUseAgent(agent.agent)) return agent.agent;
+  if (agent.useCapabilities.length === 0) return 'Use';
+  return `Use · ${agent.useCapabilities.join(' + ')}`;
+}
+
+export function formatSubagentStatus(agent: SubagentProjection): string {
+  if (!isUseAgent(agent.agent) || !agent.currentUseCapability) return agent.status;
+  const capabilityPrefix = `${agent.currentUseCapability} · `;
+  return agent.status.startsWith(capabilityPrefix) ? agent.status.slice(capabilityPrefix.length) : agent.status;
 }
 
 export function completedStepCount(steps: readonly ExecutionPlanTask[]): number {
@@ -232,7 +252,7 @@ function normalizeStepStatus(status?: string) {
       : status || 'pending';
 }
 
-function subagentProgressLabel(status: string, metadata: Record<string, unknown>): string {
+function subagentProgressLabel(status: string, metadata: Record<string, unknown>, useTool?: UseToolProjection): string {
   if (status === 'turn_completed') {
     const turn = positiveInteger(metadata.turn);
     return turn > 0 ? `第 ${turn} 轮完成` : '完成一轮处理';
@@ -240,9 +260,68 @@ function subagentProgressLabel(status: string, metadata: Record<string, unknown>
   if (status === 'tool_completed') {
     const tool = text(metadata.tool) ?? '工具';
     const exitCode = finiteNumber(metadata.exit_code);
-    return exitCode !== undefined && exitCode !== 0 ? `${tool} 执行失败` : `${tool} 已完成`;
+    const action = useTool ? `${useTool.capability} · ${useTool.action}` : tool;
+    return exitCode !== undefined && exitCode !== 0 ? `${action} 执行失败` : `${action} 已完成`;
   }
   return status;
+}
+
+interface UseToolProjection {
+  capability: string;
+  action: string;
+}
+
+function projectUseCapabilities(agent: SubagentProjection): void {
+  if (!isUseAgent(agent.agent)) {
+    agent.useCapabilities = [];
+    agent.currentUseCapability = undefined;
+    return;
+  }
+
+  const capabilities: string[] = [];
+  agent.currentUseCapability = undefined;
+  for (const entry of agent.progress) {
+    const useTool = parseUseToolProjection(entry.metadata);
+    if (!useTool) continue;
+    entry.useCapability = useTool.capability;
+    entry.label = subagentProgressLabel(entry.status, entry.metadata, useTool);
+    if (!capabilities.includes(useTool.capability)) capabilities.push(useTool.capability);
+    agent.currentUseCapability = useTool.capability;
+  }
+  agent.useCapabilities = capabilities;
+  const latestProgress = agent.progress.at(-1);
+  if (agent.state === 'running' && latestProgress?.useCapability) agent.status = latestProgress.label;
+}
+
+function parseUseToolProjection(metadata: Record<string, unknown>): UseToolProjection | undefined {
+  const tool = text(metadata.tool);
+  if (!tool?.startsWith('mcp__use_')) return undefined;
+  const separator = tool.indexOf('__', 'mcp__use_'.length);
+  if (separator < 0) return undefined;
+
+  const component = tool.slice('mcp__use_'.length, separator);
+  let operation = tool.slice(separator + 2);
+  if (!/^[a-z0-9][a-z0-9_-]*$/i.test(component) || !operation) return undefined;
+  for (const prefix of [`agent_${component}_`, `${component}_`, `${component}-`]) {
+    if (!operation.startsWith(prefix)) continue;
+    operation = operation.slice(prefix.length);
+    break;
+  }
+
+  return {
+    capability: humanizeIdentifier(component),
+    action: humanizeIdentifier(operation),
+  };
+}
+
+function isUseAgent(agent: string): boolean {
+  return agent.trim().toLowerCase() === 'use';
+}
+
+function humanizeIdentifier(value: string): string {
+  const words = value.split(/[_-]+/).filter(Boolean);
+  if (words.length === 0) return value;
+  return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
 function pad(value: number) {

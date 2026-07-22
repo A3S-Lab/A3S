@@ -13,7 +13,7 @@ sized popup instead of a full browser tab.
 It opens one native window, loads one `http://` or `https://` URL, and exits
 when the window is closed.
 
-The current crate version is `a3s-webview` `0.1.1`. Its repository metadata
+The current crate version is `a3s-webview` `0.1.3`. Its repository metadata
 points to [`A3S-Lab/WebView`](https://github.com/A3S-Lab/WebView).
 
 ## Capability Map
@@ -21,6 +21,7 @@ points to [`A3S-Lab/WebView`](https://github.com/A3S-Lab/WebView).
 | Area | Current capability |
 | --- | --- |
 | Window helper | Opens one focused native window at a requested logical size and title. |
+| Agent Island | Reads the private system-agent snapshot and owns the per-user native island singleton. |
 | URL policy | Requires `--url`, accepts only `http://` and `https://`, and exits with usage errors for unsupported schemes or unknown arguments. |
 | Size guardrails | Width is clamped to `240..4000`; height is clamped to `180..3000`. Defaults are `900 x 680`. |
 | Auth seeding | Reads an access token from an environment variable before navigation and seeds browser storage without putting the token in argv. |
@@ -45,6 +46,9 @@ points to [`A3S-Lab/WebView`](https://github.com/A3S-Lab/WebView).
 ```text
 a3s-webview --url <http(s)://URL> [--width N] [--height N] [--title T]
             [--header 'Name: Value']... [--token-env NAME] [--no-auth]
+
+a3s-webview --agent-island --snapshot <absolute-path>
+            --lock-file <absolute-path>
 ```
 
 | Flag | Behavior |
@@ -77,12 +81,16 @@ without auth seeding.
 ## Install
 
 ```bash
+a3s install webview
 brew install a3s-lab/tap/a3s-webview
 cargo install --git https://github.com/A3S-Lab/WebView
 ```
 
-On macOS, the Homebrew `a3s` formula can install `a3s-webview` alongside the
-umbrella CLI.
+`a3s code` reuses a healthy helper or installs its verified platform release
+before terminal takeover when networking and automatic setup are allowed.
+`--offline`, `A3S_OFFLINE=1`, and `A3S_NO_AUTO_INSTALL=1` disable that
+first-use mutation. On macOS, the Homebrew `a3s` formula can install
+`a3s-webview` alongside the umbrella CLI.
 
 ## Platform Notes
 
@@ -92,9 +100,9 @@ umbrella CLI.
 | Linux | WebKitGTK | Requires WebKitGTK development/runtime packages when building from source. |
 | Windows | WebView2 | Uses the WebView2 runtime that ships with modern Windows. |
 
-If the helper is not installed, `a3s code` can fall back to opening normal links
-in the system browser. That fallback is owned by the TUI host, not by the helper
-process itself.
+If first-use setup fails, `a3s code` continues and can fall back to opening
+normal links in the system browser. That fallback is owned by the TUI host, not
+by the helper process itself.
 
 ## Boundaries
 

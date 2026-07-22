@@ -70,7 +70,9 @@ describe('Work local file controller', () => {
 
   it('keeps a user-selected Work workspace when the Code default changes', async () => {
     vi.spyOn(codeApi, 'readDir').mockResolvedValue([]);
-    vi.spyOn(codeApi, 'pickWorkspaceDirectory').mockResolvedValue({ cancelled: false, path: '/work-choice' });
+    const pickWorkspaceDirectory = vi
+      .spyOn(codeApi, 'pickWorkspaceDirectory')
+      .mockResolvedValue({ cancelled: false, path: '/work-choice' });
     const { result, rerender } = renderHook(({ defaultRoot }) => useWorkFilesController(defaultRoot), {
       initialProps: { defaultRoot: '/code-default' },
     });
@@ -78,6 +80,7 @@ describe('Work local file controller', () => {
     await act(async () => {
       await result.current.pickRoot();
     });
+    expect(pickWorkspaceDirectory).toHaveBeenCalledWith('/code-default');
     expect(result.current.rootPath).toBe('/work-choice');
 
     rerender({ defaultRoot: '/next-code-default' });

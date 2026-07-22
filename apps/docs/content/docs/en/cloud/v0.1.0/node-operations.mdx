@@ -1,0 +1,73 @@
+---
+title: Node Drain and Certificate Failure
+description: Verified node-state operations and bounded node and Gateway certificate recovery.
+---
+
+# Node Drain and Certificate Failure
+
+Status: **Verified**
+
+Snapshot: `cloud-0.1.0`
+
+The Fleet API can mark a node ready, draining, or revoked with optimistic
+version checks and idempotency. Nodes use outbound mTLS; no inbound SSH or
+remote-login credential is required.
+
+## Drain a node
+
+Prerequisites: `node:write`, the organization and node IDs, the current node
+aggregate version, and a stable idempotency key.
+
+```bash
+curl --fail-with-body --request POST \
+  "$A3S_CLOUD_URL/api/v1/organizations/$ORGANIZATION_ID/nodes/$NODE_ID/actions/drain" \
+  --header "authorization: Bearer $A3S_CLOUD_ADMIN_TOKEN" \
+  --header "content-type: application/json" \
+  --header "idempotency-key: drain-$NODE_ID-$EXPECTED_VERSION" \
+  --data "{\"expectedVersion\":$EXPECTED_VERSION}"
+```
+
+Verify the response state is `draining`, repeat the GET until availability and
+heartbeat evidence are current, and confirm no new work is assigned. In this
+snapshot drain is an admission-state transition; automatic multi-node workload
+evacuation is **Planned** for H0.3. Do not stop a node merely because its state
+changed.
+
+After maintenance, inspect Runtime units and Gateway state, then call the
+corresponding `/actions/ready` endpoint with the new expected version. Revoking
+a node disables its certificate authority and is not an undrain shortcut.
+
+## Node certificate failure
+
+The agent rotates its certificate through the authenticated node-control
+endpoint before expiry. On authentication or rotation failure:
+
+1. Keep the node out of new scheduling and preserve its state directory.
+2. Compare system time, server CA, server name, certificate validity, node ID,
+   and agent-instance ID. Inspect structured logs without printing private
+   keys or enrollment tokens.
+3. Check control-plane live/ready health and the node-control TLS listener.
+4. Retry only bounded outbound rotation. If the node identity was revoked or
+   its private key is lost, issue a one-use enrollment token and re-enroll
+   under an operator-approved identity-replacement procedure.
+5. Mark ready only after a fresh heartbeat and Runtime capability observation.
+
+Revocation and identity replacement can strand assignments. Record current
+workloads and recovery evidence first; retain the old record for audit.
+
+## Gateway certificate failure
+
+Gateway private keys and CSRs are node-local. The control plane receives only
+the CSR and public certificate material. A failed renewal or reload must leave
+the previously acknowledged routes and certificate authoritative.
+
+Check, in order, domain-claim state, certificate expiry window, CA/provider
+health, CSR SANs, Gateway management authentication, candidate snapshot digest,
+and exact reload acknowledgement. Do not publish a route from a merely issued
+certificate. A certificate is ready only after the matching Gateway command,
+revision, digest, and public chain are acknowledged.
+
+If rollback is needed, retain the old certificate and complete snapshot,
+reject the candidate convergence, and retry with a new command identity.
+Provider serial revocation happens only after no active route references the
+old certificate.

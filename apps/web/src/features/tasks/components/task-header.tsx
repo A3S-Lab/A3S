@@ -2,6 +2,7 @@ import { Files, History, PanelLeftOpen } from 'lucide-react';
 import { useSnapshot } from 'valtio';
 import { IconButton, StatusBadge } from '../../../design-system/primitives';
 import { appState, navigateTask, sessionTitle } from '../../../state/app-state';
+import { taskContextLauncherIds } from '../task-context-focus';
 
 export function TaskHeader() {
   const state = useSnapshot(appState);
@@ -36,28 +37,28 @@ export function TaskHeader() {
         ) : (
           task && state.streamingSessionId === task.sessionId && <StatusBadge tone='info'>运行中</StatusBadge>
         )}
-        <IconButton
-          label={state.taskView === 'review' ? '关闭工作区' : '打开工作区'}
-          selected={state.taskView === 'review'}
-          onClick={() => {
-            if (state.taskView === 'review') {
-              navigateTask('conversation');
-              return;
-            }
-            appState.reviewIntent = 'review';
-            appState.reviewSourceTaskId = state.activeSessionId;
-            navigateTask('review');
-          }}
-        >
-          <Files size={17} />
-        </IconButton>
-        <IconButton
-          label={state.taskView === 'activity' ? '关闭任务活动' : '打开任务活动'}
-          selected={state.taskView === 'activity'}
-          onClick={() => navigateTask(state.taskView === 'activity' ? 'conversation' : 'activity')}
-        >
-          <History size={17} />
-        </IconButton>
+        {state.taskView === 'conversation' && (
+          <>
+            <IconButton
+              id={taskContextLauncherIds.review}
+              label='打开工作区'
+              onClick={() => {
+                appState.reviewIntent = 'review';
+                appState.reviewSourceTaskId = state.activeSessionId;
+                navigateTask('review');
+              }}
+            >
+              <Files size={17} />
+            </IconButton>
+            <IconButton
+              id={taskContextLauncherIds.activity}
+              label='打开任务活动'
+              onClick={() => navigateTask('activity')}
+            >
+              <History size={17} />
+            </IconButton>
+          </>
+        )}
       </div>
     </header>
   );

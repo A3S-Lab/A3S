@@ -41,7 +41,18 @@ interface ShellToken {
   text: string;
 }
 
-const shellToolNames = new Set(['bash', 'shell', 'run', 'exec', 'git']);
+const shellToolNames = new Set([
+  'bash',
+  'exec',
+  'execute',
+  'execute_command',
+  'git',
+  'run',
+  'run_command',
+  'shell',
+  'shell_command',
+  'terminal',
+]);
 const shellKeywords = new Set([
   '!',
   'case',

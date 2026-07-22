@@ -11,7 +11,8 @@ export function TaskComposerEffortControl({ actions }: { actions: TaskActions })
   const task = state.sessions.find((item) => item.sessionId === state.activeSessionId);
   const controls = task ? state.sessionControls[task.sessionId] : undefined;
   const controlsError = task ? state.sessionControlsErrors[task.sessionId] : undefined;
-  const value = task ? controls?.effort || state.activeEffort : state.newTaskConfig.effort;
+  const controlsLoading = task ? state.sessionControlsLoading[task.sessionId] || !controls : false;
+  const value = controls?.effort || state.newTaskConfig.effort;
   const levels = state.effortLevels;
   const selectedIndex = Math.max(
     0,
@@ -23,7 +24,7 @@ export function TaskComposerEffortControl({ actions }: { actions: TaskActions })
   const preview = levels[Math.min(previewIndex, Math.max(0, levels.length - 1))] ?? selected;
   const label = effortLabel(value, selected?.label ?? value);
   const busy = Boolean(state.streamingSessionId || state.taskConfigSaving || state.taskSubmissionState);
-  const disabled = Boolean(!levels.length || controlsError || busy);
+  const disabled = Boolean(!levels.length || controlsError || controlsLoading || busy);
 
   useEffect(() => {
     setPreviewIndex(selectedIndex);
@@ -36,7 +37,7 @@ export function TaskComposerEffortControl({ actions }: { actions: TaskActions })
     committedValue.current = level.id;
     if (task) {
       void actions.updateEffort(level.id).finally(() => {
-        const current = appState.sessionControls[task.sessionId]?.effort || appState.activeEffort;
+        const current = appState.sessionControls[task.sessionId]?.effort || appState.newTaskConfig.effort;
         committedValue.current = current;
         setPreviewIndex(
           Math.max(

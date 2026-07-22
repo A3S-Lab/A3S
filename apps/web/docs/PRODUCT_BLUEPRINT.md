@@ -290,10 +290,13 @@ workspace, including its useful clean state.
   useful empty state.
 - Changed-file entries show status and additions/deletions without claiming
   task provenance.
-- Dirty file tabs cannot close, switch task, or reload destructively without an
-  explicit resolution.
-- A task switch restores that task's last safe workspace state and never
-  transfers another task's selected artifact.
+- Dirty file tabs cannot close, reload, replace, or overwrite destructively
+  without an explicit resolution.
+- A task switch snapshots dirty drafts with the originating task, restores that
+  task's complete workspace state on return, and never transfers another task's
+  selected artifact.
+- A normal browser refresh restores the active task and its unsaved editor
+  drafts from a versioned local snapshot without writing those drafts to disk.
 
 ## Functional modules and delivery order
 

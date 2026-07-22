@@ -239,6 +239,46 @@ automatically.
 For the complete route, artifact, OCR model, and safety contract, see
 [Browser, Office, And OCR Through A3S Use](/docs/code/tui#browser-office-and-ocr-through-a3s-use).
 
+## Use Workers
+
+Before terminal takeover, Code reuses a healthy A3S Use installation or installs
+its verified release when networking and automatic setup are allowed.
+`--offline`, `A3S_OFFLINE=1`, and `A3S_NO_AUTO_INSTALL=1` remain strict
+zero-network, zero-receipt boundaries. Setup failure is non-fatal and Code
+continues without application routes.
+
+When Use is ready, Code gives initial registry discovery one second and initial
+MCP projection a separate five-second budget. Ready Browser, native Office, OCR,
+and installed extension routes are advertised before the first model turn;
+slower routes continue converging in the background.
+
+Code registers one restricted `use` worker in the live `task` and
+`parallel_task` agent catalogs. It can call only `mcp__use_*` tools: it cannot
+use the workspace, shell, unrelated MCP servers, or recursive delegation. The
+primary model never receives the raw application tools.
+
+The TUI projects standard child progress into a capability-oriented lifecycle.
+For example, `mcp__use_browser__browser_open` appears as `Using Browser` while
+live and `Used Browser` after completion. Terminal outcomes remain explicit, so
+a failed Office run renders as `Agent failed: Used Office`. Multiple capability
+routes are deduplicated, and a restored tracker snapshot reconstructs the same
+identity. This presentation uses the existing subagent events and does not add
+a private RPC protocol.
+
+## WebView First Use
+
+Before terminal takeover, Code also reuses a healthy `webview` component or
+installs its checksum-verified platform release. The resolved absolute path is
+passed directly to RemoteUI and Agent Island, so a managed install does not
+depend on PATH refresh. Setup failure is non-fatal and emits recovery commands:
+`a3s doctor webview` and `a3s install webview`.
+
+Offline mode and `A3S_NO_AUTO_INSTALL=1` remain strict no-network, no-receipt
+boundaries. macOS and Linux are the broad managed-component targets; WebView
+also has a verified Windows x86_64 release and first-use lifecycle. Broader
+native Windows component support remains on the roadmap, and WSL follows the
+Linux contract.
+
 ## Slash Command Families
 
 The CLI command palette delegates to the A3S Code TUI command registry:
@@ -257,20 +297,18 @@ The CLI command palette delegates to the A3S Code TUI command registry:
 | Loops | `/loop init`, `/loop run`, `/loop audit`, `/loop logs`, `/loop <task>` |
 | Plugins and updates | `/plugin`, `/reload`, `/update`, `/help` |
 
-`/checkup` is an audit-first setup workflow rather than a passive status
-screen. It first locks the composer and collects a typed host snapshot of the
-installed-component set, active-executable and `PATH` shadowing, bounded ACL
-syntax and semantic validity, skill/plugin context size and duplicate names,
-indexed `AGENTS.md` size, and in-memory MCP connection/tool counts. The
-preflight does not start MCP servers and withholds raw component paths, MCP
-error text, ACL contents, and credentials. The host then forces a read-only
-Plan turn to audit applicable `AGENTS.md`, integrations, update state, and
-runtime policy. Findings and confirmation-sized remediations stop at the
-existing Approve / Revise / Abandon boundary; only an approved follow-up turn
-can make changes, and normal HITL remains authoritative. Auto mode is presented
-only as an optional saved-session preference; an exact read-only permission
-grant is offered only when the existing transcript proves repeated denial of
-the same canonical tool and arguments.
+`/checkup` is a context-hygiene review, not an installation or account health
+check. It locks the composer and scans at most 128 persisted local sessions for
+actual `Skill` tool invocations. A low-use suggestion is produced only after at
+least three sampled sessions, twelve completed turns, and a Skill age of 14
+days. Recently changed, disabled, managed, duplicate-name, and unknown-age
+Skills are excluded. The report shows invocation/session counts, context bytes,
+the bounded date window, and every protected category. “Not observed” means
+only that the Skill was absent from this sample. Instruction and MCP counts are
+context-footprint signals; they are never treated as usage telemetry. A strict
+read-only Plan turn offers each eligible Skill as a separate reversible
+`/plugin` disable choice and never proposes deletion. Nothing changes before
+the existing Approve / Revise / Abandon boundary and normal HITL.
 
 `/evolution` reviews reusable Preference, Skill, and OKF candidates emitted as
 validated LLM-authored memory signals. Ordinary memories are never promoted by
@@ -537,7 +575,9 @@ terminal `completed`, `qualified`, or `degraded` outcome explicitly.
 
 ## Updates
 
-`/update`, `a3s update`, and `a3s code update` use the same update machinery.
+`/update`, `a3s code update`, and `a3s self update` use the same self-update
+machinery. The hidden legacy `a3s update` route exists only for transition
+compatibility; optional components use `a3s upgrade`.
 Homebrew installs refresh the tap and upgrade the formula. Standalone installs
 download the matching release asset, swap the `a3s` binary, and verify the
 target version before treating the update as successful. If restart fails after

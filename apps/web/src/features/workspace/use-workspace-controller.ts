@@ -1,8 +1,23 @@
 import { useMemoizedFn } from 'ahooks';
 import { useEffect, useRef } from 'react';
 import { useSnapshot } from 'valtio';
-import { codeApi } from '../../lib/api';
-import { appState, formatApiError, navigateTask, showToast } from '../../state/app-state';
+import { ApiError, codeApi } from '../../lib/api';
+import {
+  appState,
+  captureWorkspaceContext,
+  formatApiError,
+  isWorkspaceContextCurrent,
+  navigateTask,
+  showToast,
+} from '../../state/app-state';
+import { rebaseWorkspaceEditorModelPath } from './components/monaco-editor-model-store';
+import { useEditorNavigationHistory } from './use-editor-navigation-history';
+import {
+  DEFAULT_WORKSPACE_SEARCH_EXCLUDE_PATTERN,
+  limitWorkspaceSearchResults,
+  WORKSPACE_SEARCH_RESULT_LIMIT,
+  type WorkspaceSearchOptions,
+} from './workspace-search';
 import {
   diffEditorTabId,
   fileEditorTabId,
@@ -41,11 +56,59 @@ function pathInside(parent: string, candidate: string): boolean {
   return value === base || value.startsWith(`${base}/`);
 }
 
+function samePath(left: string, right: string): boolean {
+  return pathInside(left, right) && pathInside(right, left);
+}
+
 function rebasePath(candidate: string, source: string, destination: string): string {
   const normalizedCandidate = normalizePath(candidate);
   const normalizedSource = normalizePath(source);
   const suffix = normalizedCandidate.slice(normalizedSource.length);
   return pathInside(source, candidate) ? `${normalizePath(destination)}${suffix}` : candidate;
+}
+
+function rebaseWorkspaceDirectoryState(source: string, destination: string): void {
+  for (const entries of Object.values(appState.filesByDirectory)) {
+    for (const entry of entries) {
+      const previousPath = entry.path;
+      if (!pathInside(source, previousPath)) continue;
+      entry.path = rebasePath(previousPath, source, destination);
+      if (samePath(previousPath, source)) entry.name = basename(destination);
+    }
+  }
+  rebaseRecordSubtree(appState.filesByDirectory, source, destination);
+  rebaseRecordSubtree(appState.expandedDirectories, source, destination);
+  rebaseRecordSubtree(appState.directoryLoading, source, destination);
+  rebaseRecordSubtree(appState.directoryErrors, source, destination);
+  for (const path of Object.keys(appState.directoryLoading)) {
+    if (pathInside(destination, path)) appState.directoryLoading[path] = false;
+  }
+}
+
+function removeWorkspaceDirectoryState(path: string): void {
+  for (const [directory, entries] of Object.entries(appState.filesByDirectory)) {
+    if (pathInside(path, directory)) {
+      delete appState.filesByDirectory[directory];
+      continue;
+    }
+    const remaining = entries.filter((entry) => !pathInside(path, entry.path));
+    if (remaining.length !== entries.length) appState.filesByDirectory[directory] = remaining;
+  }
+  removeRecordSubtree(appState.expandedDirectories, path);
+  removeRecordSubtree(appState.directoryLoading, path);
+  removeRecordSubtree(appState.directoryErrors, path);
+}
+
+function rebaseRecordSubtree<T>(record: Record<string, T>, source: string, destination: string): void {
+  const moved = Object.entries(record).filter(([path]) => pathInside(source, path));
+  for (const [path] of moved) delete record[path];
+  for (const [path, value] of moved) record[rebasePath(path, source, destination)] = value;
+}
+
+function removeRecordSubtree<T>(record: Record<string, T>, path: string): void {
+  for (const key of Object.keys(record)) {
+    if (pathInside(path, key)) delete record[key];
+  }
 }
 
 function absoluteWorkspacePath(path: string): string {
@@ -61,6 +124,10 @@ function fileTab(path: string): WorkspaceFileEditorTab | null {
 function activeFileTab(): WorkspaceFileEditorTab | null {
   const tab = appState.editorTabs.find((candidate) => candidate.id === appState.activeEditorTabId);
   return tab?.kind === 'file' ? tab : null;
+}
+
+function isOpenFileTab(tab: WorkspaceFileEditorTab): boolean {
+  return appState.editorTabs.some((candidate) => candidate === tab);
 }
 
 function removeEditorTabs(predicate: (tab: WorkspaceEditorTab) => boolean): void {
@@ -92,18 +159,39 @@ function updateDiffTab(tabId: string, update: (tab: WorkspaceDiffEditorTab) => v
 export function useWorkspaceController() {
   const state = useSnapshot(appState);
   const watchedWorkspaceRoot = state.workspaceRoot;
-  const pendingCloseQueueRef = useRef<string[]>([]);
+  const pendingCloseQueueRef = useRef<{ generation: number; ids: string[] }>({
+    generation: appState.workspaceGeneration,
+    ids: [],
+  });
+  const workspaceSearchRequestId = useRef(0);
+  const directoryRequestIds = useRef(new Map<string, number>());
+  const fileLoadOperations = useRef(new WeakMap<WorkspaceFileEditorTab, symbol>());
+  const fileWriteOperations = useRef(new WeakMap<WorkspaceFileEditorTab, Promise<unknown>>());
+  const pathMutationBarriers = useRef(new Map<string, Promise<void>>());
+  const invalidateDirectoryRequests = useMemoizedFn((path: string) => {
+    for (const [candidate, requestId] of directoryRequestIds.current) {
+      if (pathInside(path, candidate)) directoryRequestIds.current.set(candidate, requestId + 1);
+    }
+  });
   const refreshDirectory = useMemoizedFn(async (path = appState.workspaceRoot) => {
+    const context = captureWorkspaceContext();
+    const requestId = (directoryRequestIds.current.get(path) ?? 0) + 1;
+    directoryRequestIds.current.set(path, requestId);
     appState.directoryLoading[path] = true;
     delete appState.directoryErrors[path];
     try {
-      appState.filesByDirectory[path] = await codeApi.readDir(path);
+      const entries = await codeApi.readDir(path);
+      if (!isWorkspaceContextCurrent(context) || directoryRequestIds.current.get(path) !== requestId) return;
+      appState.filesByDirectory[path] = entries;
     } catch (error) {
+      if (!isWorkspaceContextCurrent(context) || directoryRequestIds.current.get(path) !== requestId) return;
       const message = formatApiError(error);
       appState.directoryErrors[path] = message;
       showToast(message, 'error');
     } finally {
-      appState.directoryLoading[path] = false;
+      if (isWorkspaceContextCurrent(context) && directoryRequestIds.current.get(path) === requestId) {
+        appState.directoryLoading[path] = false;
+      }
     }
   });
 
@@ -209,14 +297,63 @@ export function useWorkspaceController() {
     if (next && !appState.filesByDirectory[path]) await refreshDirectory(path);
   });
 
+  const findWorkspaceFiles = useMemoizedFn((query: string, maxResults = 120) => {
+    const workspaceRoot = appState.workspaceRoot;
+    return codeApi.workspaceFiles(workspaceRoot, query, maxResults);
+  });
+
+  const pendingFileMutations = useMemoizedFn((path: string): Promise<void>[] => {
+    const barriers = new Set<Promise<void>>();
+    for (const [mutationPath, barrier] of pathMutationBarriers.current) {
+      if (pathInside(mutationPath, path)) barriers.add(barrier);
+    }
+    return [...barriers];
+  });
+
+  const runWithFileMutationBarrier = useMemoizedFn(
+    async (paths: readonly string[], operation: () => Promise<void>): Promise<void> => {
+      const mutationPaths = [...new Set(paths.map(normalizePath))];
+      const overlapsMutation = (candidate: string) =>
+        mutationPaths.some((path) => pathInside(path, candidate) || pathInside(candidate, path));
+      const affectedTabs = appState.editorTabs.filter(
+        (tab): tab is WorkspaceFileEditorTab => tab.kind === 'file' && overlapsMutation(tab.path)
+      );
+      const precedingOperations = new Set<Promise<unknown>>();
+      for (const [path, mutation] of pathMutationBarriers.current) {
+        if (overlapsMutation(path)) precedingOperations.add(mutation);
+      }
+      for (const tab of affectedTabs) {
+        const write = fileWriteOperations.current.get(tab);
+        if (write) precedingOperations.add(write);
+      }
+
+      let releaseBarrier!: () => void;
+      const barrier = new Promise<void>((resolve) => {
+        releaseBarrier = resolve;
+      });
+      for (const path of mutationPaths) pathMutationBarriers.current.set(path, barrier);
+
+      try {
+        await Promise.all(precedingOperations);
+        await operation();
+      } finally {
+        releaseBarrier();
+        for (const path of mutationPaths) {
+          if (pathMutationBarriers.current.get(path) === barrier) pathMutationBarriers.current.delete(path);
+        }
+      }
+    }
+  );
+
   const openFile = useMemoizedFn(
     async (
       file: WorkspaceFileSelection,
       options: { forceReload?: boolean; activate?: boolean } = {}
-    ): Promise<boolean> => {
+    ): Promise<WorkspaceFileSelection | null> => {
+      const context = captureWorkspaceContext();
       const id = fileEditorTabId(file.path);
       const location = file.line == null ? null : { line: file.line, column: Math.max(1, file.column ?? 1) };
-      const existing = fileTab(file.path);
+      let tab = fileTab(file.path);
       const activate = options.activate ?? true;
       if (activate) {
         appState.activeEditorTabId = id;
@@ -224,18 +361,19 @@ export function useWorkspaceController() {
       }
       appState.fileLoadError = null;
 
-      if (existing && !options.forceReload && !existing.loadError) {
-        existing.location = location;
-        return true;
+      if (tab && !options.forceReload && !tab.loadError) {
+        tab.location = location;
+        return { ...file, path: tab.path, isBinary: tab.isBinary };
       }
 
-      if (!existing) {
+      if (!tab) {
         appState.editorTabs.push({
           id,
           kind: 'file',
           path: file.path,
           content: '',
           draft: '',
+          revision: null,
           isBinary: file.isBinary,
           location,
           loading: !file.isBinary,
@@ -243,43 +381,63 @@ export function useWorkspaceController() {
           saving: false,
           configValidation: null,
         });
+        tab = fileTab(file.path);
       } else {
-        existing.location = location;
-        existing.loadError = null;
-        existing.loading = !file.isBinary;
-        existing.isBinary = file.isBinary;
+        tab.location = location;
+        tab.loadError = null;
+        tab.loading = !file.isBinary;
+        tab.isBinary = file.isBinary;
       }
 
-      if (file.isBinary) return true;
+      if (!tab) return null;
+      if (file.isBinary) {
+        fileLoadOperations.current.delete(tab);
+        return { ...file, path: tab.path, isBinary: true };
+      }
 
+      const loadOperation = Symbol('file-load');
+      fileLoadOperations.current.set(tab, loadOperation);
+      const isCurrentLoad = () =>
+        isWorkspaceContextCurrent(context) &&
+        isOpenFileTab(tab) &&
+        fileLoadOperations.current.get(tab) === loadOperation;
       try {
-        const result = await codeApi.readFile(file.path);
-        updateFileTab(id, (tab) => {
+        let readPath = file.path;
+        for (;;) {
+          let result: Awaited<ReturnType<typeof codeApi.readFile>>;
+          try {
+            result = await codeApi.readFile(readPath);
+          } catch (error) {
+            if (!isCurrentLoad()) return null;
+            if (!samePath(readPath, tab.path)) {
+              readPath = tab.path;
+              continue;
+            }
+            const message = formatApiError(error);
+            tab.loadError = message;
+            appState.fileLoadError = { selection: { ...file, path: tab.path }, message };
+            showToast(message, 'error');
+            return null;
+          }
+          if (!isCurrentLoad()) return null;
           tab.content = result.content;
           tab.draft = result.content;
+          tab.revision = result.revision ?? null;
           tab.isBinary = false;
-          tab.location = location;
           tab.loadError = null;
           tab.configValidation = null;
-        });
-        return true;
-      } catch (error) {
-        const message = formatApiError(error);
-        updateFileTab(id, (tab) => {
-          tab.loadError = message;
-        });
-        appState.fileLoadError = { selection: file, message };
-        showToast(message, 'error');
-        return false;
+          return { ...file, path: tab.path, isBinary: false };
+        }
       } finally {
-        updateFileTab(id, (tab) => {
+        if (isCurrentLoad()) {
           tab.loading = false;
-        });
+          fileLoadOperations.current.delete(tab);
+        }
       }
     }
   );
-
-  const selectFile = useMemoizedFn(async (file: WorkspaceFileSelection) => openFile(file));
+  const editorNavigation = useEditorNavigationHistory(openFile);
+  const selectFile = editorNavigation.selectFile;
 
   const activateEditorTab = useMemoizedFn((tabId: string) => {
     if (!appState.editorTabs.some((tab) => tab.id === tabId)) return;
@@ -289,8 +447,13 @@ export function useWorkspaceController() {
   });
 
   const continueEditorTabClose = useMemoizedFn(() => {
-    while (pendingCloseQueueRef.current.length > 0) {
-      const tabId = pendingCloseQueueRef.current.shift();
+    const queue = pendingCloseQueueRef.current;
+    if (queue.generation !== appState.workspaceGeneration) {
+      pendingCloseQueueRef.current = { generation: appState.workspaceGeneration, ids: [] };
+      return;
+    }
+    while (queue.ids.length > 0) {
+      const tabId = queue.ids.shift();
       if (!tabId) continue;
       const tab = appState.editorTabs.find((candidate) => candidate.id === tabId);
       if (!tab) continue;
@@ -305,9 +468,10 @@ export function useWorkspaceController() {
   const closeEditorTabs = useMemoizedFn((tabIds: readonly string[]) => {
     const requestedIds = new Set(tabIds);
     const requestedTabs = appState.editorTabs.filter((tab) => requestedIds.has(tab.id));
-    pendingCloseQueueRef.current = requestedTabs
-      .filter((tab) => tab.kind === 'file' && isFileEditorTabDirty(tab))
-      .map((tab) => tab.id);
+    pendingCloseQueueRef.current = {
+      generation: appState.workspaceGeneration,
+      ids: requestedTabs.filter((tab) => tab.kind === 'file' && isFileEditorTabDirty(tab)).map((tab) => tab.id),
+    };
     appState.pendingEditorTabCloseId = null;
     removeEditorTabs((tab) => requestedIds.has(tab.id) && !(tab.kind === 'file' && isFileEditorTabDirty(tab)));
     continueEditorTabClose();
@@ -327,7 +491,7 @@ export function useWorkspaceController() {
   });
 
   const cancelEditorTabClose = useMemoizedFn(() => {
-    pendingCloseQueueRef.current = [];
+    pendingCloseQueueRef.current = { generation: appState.workspaceGeneration, ids: [] };
     appState.pendingEditorTabCloseId = null;
   });
 
@@ -339,74 +503,131 @@ export function useWorkspaceController() {
     });
   });
 
+  const consumeEditorLocation = useMemoizedFn((tabId: string) => {
+    updateFileTab(tabId, (tab) => {
+      tab.location = null;
+    });
+  });
+
   const saveEditorTab = useMemoizedFn(async (requestedTabId?: string): Promise<boolean> => {
+    const context = captureWorkspaceContext();
     const requestedTab = requestedTabId
       ? appState.editorTabs.find((candidate) => candidate.id === requestedTabId)
       : activeFileTab();
     const tab = requestedTab?.kind === 'file' ? requestedTab : null;
     if (!tab || tab.isBinary || tab.loading || tab.saving) return false;
+    for (;;) {
+      const mutations = pendingFileMutations(tab.path);
+      if (mutations.length === 0) break;
+      await Promise.all(mutations);
+      if (!isWorkspaceContextCurrent(context) || !isOpenFileTab(tab)) return false;
+    }
+    if (!isWorkspaceContextCurrent(context) || !isOpenFileTab(tab) || tab.isBinary || tab.loading || tab.saving) {
+      return false;
+    }
     if (!isFileEditorTabDirty(tab)) return true;
     const tabId = tab.id;
     const path = tab.path;
     const baseContent = tab.content;
+    const baseRevision = tab.revision;
     const draftToSave = tab.draft;
     tab.saving = true;
-    try {
-      const disk = await codeApi.readFile(path);
-      if (disk.content !== baseContent) {
-        appState.fileConflict = { tabId, path, diskContent: disk.content };
-        showToast('文件已在外部修改，请选择保留版本', 'info');
+    const operation = (async (): Promise<boolean> => {
+      try {
+        const saved = await codeApi.writeFile(
+          path,
+          draftToSave,
+          baseRevision ? { expectedRevision: baseRevision } : { expectedContent: baseContent }
+        );
+        if (!isWorkspaceContextCurrent(context) || !isOpenFileTab(tab)) return false;
+        tab.content = draftToSave;
+        tab.revision = saved.revision ?? null;
+        showToast('文件已保存', 'success');
+        return true;
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 412) {
+          try {
+            const disk = await codeApi.readFile(path);
+            if (!isWorkspaceContextCurrent(context) || !isOpenFileTab(tab)) return false;
+            appState.fileConflict = {
+              tabId,
+              path,
+              diskContent: disk.content,
+              diskRevision: disk.revision ?? null,
+            };
+            showToast('文件已在外部修改，请选择保留版本', 'info');
+          } catch (readError) {
+            if (isWorkspaceContextCurrent(context)) showToast(formatApiError(readError), 'error');
+          }
+          return false;
+        }
+        if (isWorkspaceContextCurrent(context)) showToast(formatApiError(error), 'error');
         return false;
+      } finally {
+        if (isWorkspaceContextCurrent(context) && isOpenFileTab(tab)) tab.saving = false;
       }
-      await codeApi.writeFile(path, draftToSave);
-      updateFileTab(tabId, (current) => {
-        current.content = draftToSave;
-      });
-      showToast('文件已保存', 'success');
-      return true;
-    } catch (error) {
-      showToast(formatApiError(error), 'error');
-      return false;
+    })();
+    fileWriteOperations.current.set(tab, operation);
+    try {
+      return await operation;
     } finally {
-      updateFileTab(tabId, (current) => {
-        current.saving = false;
-      });
+      if (fileWriteOperations.current.get(tab) === operation) fileWriteOperations.current.delete(tab);
     }
   });
 
   const resolveFileConflict = useMemoizedFn(async (resolution: 'reload' | 'overwrite') => {
-    const conflict = appState.fileConflict;
-    if (!conflict) return;
-    const tab = appState.editorTabs.find((candidate) => candidate.id === conflict.tabId);
+    const context = captureWorkspaceContext();
+    const initialConflict = appState.fileConflict;
+    if (!initialConflict) return;
+    const tab = appState.editorTabs.find((candidate) => candidate.id === initialConflict.tabId);
     if (tab?.kind !== 'file') {
       appState.fileConflict = null;
       return;
     }
+    if (tab.saving) return;
+    for (;;) {
+      const mutations = pendingFileMutations(tab.path);
+      if (mutations.length === 0) break;
+      await Promise.all(mutations);
+      if (!isWorkspaceContextCurrent(context) || !isOpenFileTab(tab)) return;
+    }
+    if (!isWorkspaceContextCurrent(context) || !isOpenFileTab(tab) || tab.saving) return;
+    const conflict = appState.fileConflict;
+    if (!conflict || conflict.tabId !== tab.id) return;
+
     tab.saving = true;
-    try {
-      if (resolution === 'reload') {
-        const disk = await codeApi.readFile(conflict.path);
-        updateFileTab(conflict.tabId, (current) => {
-          current.content = disk.content;
-          current.draft = disk.content;
-          current.configValidation = null;
-        });
-        showToast('已重新加载最新磁盘版本', 'success');
-      } else {
-        const draftToSave = tab.draft;
-        await codeApi.writeFile(conflict.path, draftToSave);
-        updateFileTab(conflict.tabId, (current) => {
-          current.content = draftToSave;
-        });
-        showToast('已用当前编辑覆盖磁盘版本', 'success');
+    const operation = (async (): Promise<void> => {
+      try {
+        if (resolution === 'reload') {
+          const disk = await codeApi.readFile(conflict.path);
+          if (!isWorkspaceContextCurrent(context) || !isOpenFileTab(tab)) return;
+          tab.content = disk.content;
+          tab.draft = disk.content;
+          tab.revision = disk.revision ?? null;
+          tab.configValidation = null;
+          showToast('已重新加载最新磁盘版本', 'success');
+        } else {
+          const draftToSave = tab.draft;
+          const saved = await codeApi.writeFile(conflict.path, draftToSave);
+          if (!isWorkspaceContextCurrent(context) || !isOpenFileTab(tab)) return;
+          tab.content = draftToSave;
+          tab.revision = saved.revision ?? null;
+          showToast('已用当前编辑覆盖磁盘版本', 'success');
+        }
+        if (appState.fileConflict?.tabId === tab.id && samePath(appState.fileConflict.path, conflict.path)) {
+          appState.fileConflict = null;
+        }
+      } catch (error) {
+        if (isWorkspaceContextCurrent(context)) showToast(formatApiError(error), 'error');
+      } finally {
+        if (isWorkspaceContextCurrent(context) && isOpenFileTab(tab)) tab.saving = false;
       }
-      appState.fileConflict = null;
-    } catch (error) {
-      showToast(formatApiError(error), 'error');
+    })();
+    fileWriteOperations.current.set(tab, operation);
+    try {
+      await operation;
     } finally {
-      updateFileTab(conflict.tabId, (current) => {
-        current.saving = false;
-      });
+      if (fileWriteOperations.current.get(tab) === operation) fileWriteOperations.current.delete(tab);
     }
   });
 
@@ -415,12 +636,14 @@ export function useWorkspaceController() {
   });
 
   const validateActiveConfig = useMemoizedFn(async () => {
+    const context = captureWorkspaceContext();
     const tab = activeFileTab();
     if (!tab || tab.isBinary || basename(tab.path) !== 'config.acl') return;
     const tabId = tab.id;
     const content = tab.draft;
     try {
       const validation = await codeApi.validateConfig(content);
+      if (!isWorkspaceContextCurrent(context)) return;
       const current = appState.editorTabs.find((candidate) => candidate.id === tabId);
       if (current?.kind !== 'file' || current.draft !== content) {
         showToast('配置在验证期间已修改，请重新验证', 'info');
@@ -429,112 +652,162 @@ export function useWorkspaceController() {
       current.configValidation = validation;
       showToast(validation.valid ? '配置语法有效' : '配置存在问题', validation.valid ? 'success' : 'error');
     } catch (error) {
-      showToast(formatApiError(error), 'error');
+      if (isWorkspaceContextCurrent(context)) showToast(formatApiError(error), 'error');
     }
   });
 
   const createWorkspaceEntry = useMemoizedFn(async (parent: string, name: string, kind: 'file' | 'directory') => {
+    const context = captureWorkspaceContext();
     const path = childPath(parent, name.trim());
     try {
       if (kind === 'directory') await codeApi.createDirectory(path);
       else await codeApi.createFile(path);
+      if (!isWorkspaceContextCurrent(context)) return;
       await refreshDirectory(parent);
+      if (!isWorkspaceContextCurrent(context)) return;
       appState.expandedDirectories[parent] = true;
       if (kind === 'file') await selectFile({ path, isBinary: false });
     } catch (error) {
-      showToast(formatApiError(error), 'error');
+      if (isWorkspaceContextCurrent(context)) showToast(formatApiError(error), 'error');
       throw error;
     }
   });
 
   const renameWorkspaceEntry = useMemoizedFn(async (path: string, name: string) => {
+    const context = captureWorkspaceContext();
     const destination = siblingPath(path, name.trim());
     try {
-      await codeApi.renamePath(path, destination);
-      await refreshDirectory(parentPath(path));
-      const rebasedIds = new Map<string, string>();
-      for (const tab of appState.editorTabs) {
-        const absolutePath = tab.kind === 'file' ? tab.path : absoluteWorkspacePath(tab.path);
-        if (!pathInside(path, absolutePath)) continue;
-        const nextAbsolutePath = rebasePath(absolutePath, path, destination);
-        const previousId = tab.id;
-        if (tab.kind === 'file') {
-          tab.path = nextAbsolutePath;
-          tab.id = fileEditorTabId(nextAbsolutePath);
-        } else {
-          tab.path = workspaceRelativePath(nextAbsolutePath, appState.workspaceRoot);
-          tab.id = diffEditorTabId(tab.path, tab.staged);
+      await runWithFileMutationBarrier([path, destination], async () => {
+        await codeApi.renamePath(path, destination);
+        if (!isWorkspaceContextCurrent(context)) return;
+        invalidateDirectoryRequests(path);
+        rebaseWorkspaceDirectoryState(path, destination);
+        const rebasedIds = new Map<string, string>();
+        for (const tab of appState.editorTabs) {
+          const absolutePath = tab.kind === 'file' ? tab.path : absoluteWorkspacePath(tab.path);
+          if (!pathInside(path, absolutePath)) continue;
+          const nextAbsolutePath = rebasePath(absolutePath, path, destination);
+          const previousId = tab.id;
+          if (tab.kind === 'file') {
+            rebaseWorkspaceEditorModelPath(appState.editorModelScope, tab.path, nextAbsolutePath);
+            tab.path = nextAbsolutePath;
+            tab.id = fileEditorTabId(nextAbsolutePath);
+          } else {
+            tab.path = workspaceRelativePath(nextAbsolutePath, appState.workspaceRoot);
+            tab.id = diffEditorTabId(tab.path, tab.staged);
+          }
+          rebasedIds.set(previousId, tab.id);
         }
-        rebasedIds.set(previousId, tab.id);
-      }
-      if (appState.activeEditorTabId) {
-        appState.activeEditorTabId = rebasedIds.get(appState.activeEditorTabId) ?? appState.activeEditorTabId;
-      }
-      if (appState.pendingEditorTabCloseId) {
-        appState.pendingEditorTabCloseId =
-          rebasedIds.get(appState.pendingEditorTabCloseId) ?? appState.pendingEditorTabCloseId;
-      }
-      if (appState.fileConflict) {
-        appState.fileConflict.tabId = rebasedIds.get(appState.fileConflict.tabId) ?? appState.fileConflict.tabId;
-        appState.fileConflict.path = rebasePath(appState.fileConflict.path, path, destination);
-      }
-      if (appState.fileLoadError) {
-        appState.fileLoadError.selection.path = rebasePath(appState.fileLoadError.selection.path, path, destination);
-      }
+        if (appState.activeEditorTabId) {
+          appState.activeEditorTabId = rebasedIds.get(appState.activeEditorTabId) ?? appState.activeEditorTabId;
+        }
+        if (appState.pendingEditorTabCloseId) {
+          appState.pendingEditorTabCloseId =
+            rebasedIds.get(appState.pendingEditorTabCloseId) ?? appState.pendingEditorTabCloseId;
+        }
+        if (appState.fileConflict) {
+          appState.fileConflict.tabId = rebasedIds.get(appState.fileConflict.tabId) ?? appState.fileConflict.tabId;
+          appState.fileConflict.path = rebasePath(appState.fileConflict.path, path, destination);
+        }
+        if (appState.fileLoadError) {
+          appState.fileLoadError.selection.path = rebasePath(appState.fileLoadError.selection.path, path, destination);
+        }
+        editorNavigation.rebasePaths((candidate) => rebasePath(candidate, path, destination), rebasedIds);
+        await refreshDirectory(parentPath(path));
+      });
     } catch (error) {
-      showToast(formatApiError(error), 'error');
+      if (isWorkspaceContextCurrent(context)) showToast(formatApiError(error), 'error');
       throw error;
     }
   });
 
   const copyWorkspaceEntry = useMemoizedFn(async (path: string, name: string) => {
+    const context = captureWorkspaceContext();
     const destination = siblingPath(path, name.trim());
     try {
       await codeApi.copyPath(path, destination);
+      if (!isWorkspaceContextCurrent(context)) return;
       await refreshDirectory(parentPath(path));
     } catch (error) {
-      showToast(formatApiError(error), 'error');
+      if (isWorkspaceContextCurrent(context)) showToast(formatApiError(error), 'error');
       throw error;
     }
   });
 
   const deleteWorkspaceEntry = useMemoizedFn(async (path: string) => {
+    const context = captureWorkspaceContext();
     try {
-      await codeApi.deletePath(path);
-      await refreshDirectory(parentPath(path));
-      removeEditorTabs((tab) => pathInside(path, tab.kind === 'file' ? tab.path : absoluteWorkspacePath(tab.path)));
-      if (appState.fileConflict && pathInside(path, appState.fileConflict.path)) appState.fileConflict = null;
-      if (appState.fileLoadError && pathInside(path, appState.fileLoadError.selection.path))
-        appState.fileLoadError = null;
+      await runWithFileMutationBarrier([path], async () => {
+        await codeApi.deletePath(path);
+        if (!isWorkspaceContextCurrent(context)) return;
+        invalidateDirectoryRequests(path);
+        removeWorkspaceDirectoryState(path);
+        const removedFileIds = appState.editorTabs
+          .filter((tab) => tab.kind === 'file' && pathInside(path, tab.path))
+          .map((tab) => tab.id);
+        removeEditorTabs((tab) => pathInside(path, tab.kind === 'file' ? tab.path : absoluteWorkspacePath(tab.path)));
+        editorNavigation.removePaths((candidate) => pathInside(path, candidate), removedFileIds);
+        if (appState.fileConflict && pathInside(path, appState.fileConflict.path)) appState.fileConflict = null;
+        if (appState.fileLoadError && pathInside(path, appState.fileLoadError.selection.path))
+          appState.fileLoadError = null;
+        await refreshDirectory(parentPath(path));
+      });
     } catch (error) {
-      showToast(formatApiError(error), 'error');
+      if (isWorkspaceContextCurrent(context)) showToast(formatApiError(error), 'error');
       throw error;
     }
   });
 
-  const searchWorkspace = useMemoizedFn(async (query: string) => {
-    if (!query.trim()) {
+  const searchWorkspace = useMemoizedFn(async (query: string, options: WorkspaceSearchOptions) => {
+    const context = captureWorkspaceContext();
+    const requestId = ++workspaceSearchRequestId.current;
+    const normalized = query.trim();
+    const workspaceRoot = appState.workspaceRoot;
+    appState.workspaceSearchScope = options.scope;
+    if (!normalized) {
       appState.workspaceSearchResults = [];
       appState.workspaceSearchQuery = '';
+      appState.workspaceSearchResultScope = null;
+      appState.workspaceSearchResultRoot = null;
+      appState.workspaceSearchResultsTruncated = false;
+      appState.workspaceSearchLoading = false;
       appState.workspaceSearchError = null;
       return;
     }
     appState.workspaceSearchLoading = true;
     appState.workspaceSearchError = null;
     try {
-      const normalized = query.trim();
-      appState.workspaceSearchResults = await codeApi.searchWorkspace(appState.workspaceRoot, normalized);
+      const results = await codeApi.searchWorkspace(workspaceRoot, normalized, {
+        ...(options.scope === 'source' ? { excludePattern: DEFAULT_WORKSPACE_SEARCH_EXCLUDE_PATTERN } : {}),
+        maxResults: WORKSPACE_SEARCH_RESULT_LIMIT + 1,
+      });
+      if (requestId !== workspaceSearchRequestId.current || !isWorkspaceContextCurrent(context)) return;
+      const bounded = limitWorkspaceSearchResults(results);
+      appState.workspaceSearchResults = bounded.results;
+      appState.workspaceSearchResultsTruncated = bounded.truncated;
       appState.workspaceSearchQuery = normalized;
+      appState.workspaceSearchResultScope = options.scope;
+      appState.workspaceSearchResultRoot = workspaceRoot;
     } catch (error) {
+      if (requestId !== workspaceSearchRequestId.current || !isWorkspaceContextCurrent(context)) return;
       const message = formatApiError(error);
       appState.workspaceSearchError = message;
       showToast(message, 'error');
     } finally {
-      appState.workspaceSearchLoading = false;
+      if (requestId === workspaceSearchRequestId.current && isWorkspaceContextCurrent(context)) {
+        appState.workspaceSearchLoading = false;
+      }
     }
   });
 
   const replaceWorkspace = useMemoizedFn(async (query: string, replacement: string, filePaths: string[]) => {
+    const context = captureWorkspaceContext();
+    const workspaceRoot = appState.workspaceRoot;
+    if (appState.workspaceSearchResultsTruncated) {
+      const error = new Error('搜索结果超过安全展示上限，请缩小搜索范围后再替换。');
+      showToast(error.message, 'error');
+      throw error;
+    }
     const dirtyTab = appState.editorTabs.find(
       (tab) => tab.kind === 'file' && filePaths.includes(tab.path) && isFileEditorTabDirty(tab)
     );
@@ -546,13 +819,14 @@ export function useWorkspaceController() {
     appState.workspaceReplaceLoading = true;
     try {
       const result = await codeApi.replaceWorkspace({
-        rootPath: appState.workspaceRoot,
+        rootPath: workspaceRoot,
         query,
         replacement,
         filePaths,
       });
+      if (!isWorkspaceContextCurrent(context)) return;
       showToast(`已在 ${result.filesModified} 个文件中完成 ${result.totalReplacements} 处替换`, 'success');
-      await searchWorkspace(query);
+      await searchWorkspace(query, { scope: appState.workspaceSearchResultScope ?? appState.workspaceSearchScope });
       const openPaths = appState.editorTabs
         .filter((tab): tab is WorkspaceFileEditorTab => tab.kind === 'file' && filePaths.includes(tab.path))
         .map((tab) => tab.path);
@@ -560,28 +834,35 @@ export function useWorkspaceController() {
         openPaths.map((path) => openFile({ path, isBinary: false }, { forceReload: true, activate: false }))
       );
     } catch (error) {
-      showToast(formatApiError(error), 'error');
+      if (isWorkspaceContextCurrent(context)) showToast(formatApiError(error), 'error');
       throw error;
     } finally {
-      appState.workspaceReplaceLoading = false;
+      if (isWorkspaceContextCurrent(context)) appState.workspaceReplaceLoading = false;
     }
   });
 
   const refreshGitStatus = useMemoizedFn(async () => {
+    const context = captureWorkspaceContext();
+    const workspaceRoot = appState.workspaceRoot;
     appState.gitStatusLoading = true;
     appState.gitStatusError = null;
     try {
-      appState.gitStatus = await codeApi.gitStatus(appState.workspaceRoot);
+      const status = await codeApi.gitStatus(workspaceRoot);
+      if (!isWorkspaceContextCurrent(context)) return;
+      appState.gitStatus = status;
     } catch (error) {
+      if (!isWorkspaceContextCurrent(context)) return;
       const message = formatApiError(error);
       appState.gitStatusError = message;
       showToast(message, 'error');
     } finally {
-      appState.gitStatusLoading = false;
+      if (isWorkspaceContextCurrent(context)) appState.gitStatusLoading = false;
     }
   });
 
   const loadGitDiff = useMemoizedFn(async (path: string, staged = false) => {
+    const context = captureWorkspaceContext();
+    const workspaceRoot = appState.workspaceRoot;
     const id = diffEditorTabId(path, staged);
     const existing = appState.editorTabs.find((tab) => tab.id === id);
     if (existing?.kind === 'diff') {
@@ -605,7 +886,8 @@ export function useWorkspaceController() {
     appState.gitDiffError = null;
     navigateTask('review');
     try {
-      const diff = await codeApi.gitDiff(appState.workspaceRoot, path, staged);
+      const diff = await codeApi.gitDiff(workspaceRoot, path, staged);
+      if (!isWorkspaceContextCurrent(context)) return;
       updateDiffTab(id, (tab) => {
         tab.path = diff.path || path;
         tab.original = diff.original;
@@ -615,6 +897,7 @@ export function useWorkspaceController() {
         tab.loadError = null;
       });
     } catch (error) {
+      if (!isWorkspaceContextCurrent(context)) return;
       const message = formatApiError(error);
       updateDiffTab(id, (tab) => {
         tab.loadError = message;
@@ -622,33 +905,42 @@ export function useWorkspaceController() {
       appState.gitDiffError = { path, staged, message };
       showToast(message, 'error');
     } finally {
-      updateDiffTab(id, (tab) => {
-        tab.loading = false;
-      });
+      if (isWorkspaceContextCurrent(context)) {
+        updateDiffTab(id, (tab) => {
+          tab.loading = false;
+        });
+      }
     }
   });
 
   const setGitStaged = useMemoizedFn(async (paths: string[], staged: boolean) => {
+    const context = captureWorkspaceContext();
+    const workspaceRoot = appState.workspaceRoot;
     appState.gitActionLoading = true;
     appState.lastCommitReceipt = null;
     try {
-      appState.gitStatus = staged
-        ? await codeApi.gitStage(appState.workspaceRoot, paths)
-        : await codeApi.gitUnstage(appState.workspaceRoot, paths);
+      const status = staged
+        ? await codeApi.gitStage(workspaceRoot, paths)
+        : await codeApi.gitUnstage(workspaceRoot, paths);
+      if (!isWorkspaceContextCurrent(context)) return;
+      appState.gitStatus = status;
       removeEditorTabs((tab) => tab.kind === 'diff');
       appState.gitDiffError = null;
       showToast(staged ? '已加入暂存区' : '已移出暂存区', 'success');
     } catch (error) {
-      showToast(formatApiError(error), 'error');
+      if (isWorkspaceContextCurrent(context)) showToast(formatApiError(error), 'error');
     } finally {
-      appState.gitActionLoading = false;
+      if (isWorkspaceContextCurrent(context)) appState.gitActionLoading = false;
     }
   });
 
   const commitGitChanges = useMemoizedFn(async (message: string) => {
+    const context = captureWorkspaceContext();
+    const workspaceRoot = appState.workspaceRoot;
     appState.gitActionLoading = true;
     try {
-      const result = await codeApi.gitCommit(appState.workspaceRoot, message);
+      const result = await codeApi.gitCommit(workspaceRoot, message);
+      if (!isWorkspaceContextCurrent(context)) return;
       appState.gitStatus = result.status;
       removeEditorTabs((tab) => tab.kind === 'diff');
       appState.gitDiffError = null;
@@ -659,17 +951,24 @@ export function useWorkspaceController() {
       };
       showToast(result.summary.split('\n')[0] || '提交已创建', 'success');
     } catch (error) {
-      showToast(formatApiError(error), 'error');
+      if (isWorkspaceContextCurrent(context)) showToast(formatApiError(error), 'error');
       throw error;
     } finally {
-      appState.gitActionLoading = false;
+      if (isWorkspaceContextCurrent(context)) appState.gitActionLoading = false;
     }
   });
 
   return {
+    canNavigateEditorBack: editorNavigation.canNavigateBack,
+    canNavigateEditorForward: editorNavigation.canNavigateForward,
     refreshDirectory,
     toggleDirectory,
+    findWorkspaceFiles,
     selectFile,
+    navigateEditorBack: editorNavigation.navigateBack,
+    navigateEditorForward: editorNavigation.navigateForward,
+    updateEditorPosition: editorNavigation.updatePosition,
+    consumeEditorLocation,
     activateEditorTab,
     closeEditorTab,
     closeEditorTabs,

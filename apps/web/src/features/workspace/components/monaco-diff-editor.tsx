@@ -6,15 +6,21 @@ export function MonacoDiffEditor({
   original,
   modified,
   dark,
+  focusOnMount = false,
+  onFocusOnMount,
 }: {
   path: string;
   original: string;
   modified: string;
   dark: boolean;
+  focusOnMount?: boolean;
+  onFocusOnMount?: () => void;
 }) {
   const language = languageForPath(path);
   const mount: DiffOnMount = (editor) => {
+    if (!focusOnMount) return;
     editor.getModifiedEditor().focus();
+    onFocusOnMount?.();
   };
   return (
     <section className='monaco-editor-surface monaco-diff-surface' aria-label={`比较 ${basename(path)}`}>

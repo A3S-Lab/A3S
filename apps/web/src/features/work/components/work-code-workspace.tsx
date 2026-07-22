@@ -1,13 +1,17 @@
-import { ArrowLeft, FileCode2, LoaderCircle, RefreshCw, Save, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, Braces, LoaderCircle, MessageSquareText, RefreshCw, Save, Sparkles, X } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useSnapshot } from 'valtio';
-import { Button, Dialog, IconButton, InlineNotice, StateView } from '../../../design-system/primitives';
+import { Button, Dialog, InlineNotice } from '../../../design-system/primitives';
 import { appState } from '../../../state/app-state';
+import type { WorkspaceEntry } from '../../../types/api';
 import { MonacoCodeEditor } from '../../workspace/components/monaco-code-editor';
+import { workspaceEditorModelPath } from '../../workspace/components/monaco-editor-model-store';
+import type { MonacoEditorStatus } from '../../workspace/components/monaco-editor-status';
 import type { WorkCodeActions } from '../use-work-code-controller';
 import type { WorkAgentRequest } from '../work-agent-request';
-import { localPathBasename, workFileExtension } from '../work-local-files';
+import { localPathBasename, relativeLocalPath, workFileExtension } from '../work-local-files';
 import { WorkFileIcon } from './work-file-icon';
+import { WorkIdeExplorer } from './work-ide-explorer';
 
 const StreamingMarkdown = lazy(() => import('../../tasks/components/streaming-markdown'));
 
@@ -16,6 +20,7 @@ export function WorkCodeWorkspace({
   rootPath,
   assistantOpen,
   onBack,
+  onOpenEntry,
   onToggleAssistant,
   onAgentRequest,
 }: {
@@ -23,173 +28,214 @@ export function WorkCodeWorkspace({
   rootPath: string;
   assistantOpen: boolean;
   onBack: () => void;
+  onOpenEntry: (entry: WorkspaceEntry) => void | Promise<void>;
   onToggleAssistant: () => void;
   onAgentRequest: (request: WorkAgentRequest) => void | Promise<void>;
 }) {
   const state = useSnapshot(appState);
   const [intelligenceStatus, setIntelligenceStatus] = useState('代码导航连接中');
+  const [editorStatus, setEditorStatus] = useState<MonacoEditorStatus | null>(null);
   const tab = actions.activeTab;
   const dark =
     state.theme === 'dark' || (state.theme === 'system' && document.documentElement.dataset.theme === 'dark');
-  const dirty = Boolean(tab && tab.content !== tab.draft);
-  const fileStatus = !tab
-    ? '未打开文件'
-    : tab.loading
-      ? '正在读取'
-      : tab.loadError
-        ? '读取失败'
-        : tab.saving
-          ? '正在保存'
-          : dirty
-            ? '未保存'
-            : '已保存';
 
-  useEffect(() => setIntelligenceStatus('代码导航连接中'), [tab?.path]);
+  useEffect(() => {
+    setIntelligenceStatus('代码导航连接中');
+    setEditorStatus(null);
+  }, [tab?.path]);
 
   return (
-    <section className='work-code-workspace work-editor-shell' aria-label='代码文件详情'>
-      <header className='work-editor-header work-code-detail-header'>
-        <IconButton className='work-editor-back' label='返回办公文件' onClick={onBack}>
+    <section className='work-code-workspace' aria-label='Work WebIDE'>
+      <header className='work-code-header'>
+        <button type='button' className='work-code-back' aria-label='返回 Work 文件管理器' onClick={onBack}>
           <ArrowLeft size={17} />
-        </IconButton>
-        <span className='work-code-detail-icon'>
-          <WorkFileIcon path={tab?.path ?? ''} size={17} />
+        </button>
+        <span className='work-code-brand-mark'>
+          <Braces size={17} />
         </span>
-        <div className='work-editor-identity work-code-detail-identity'>
-          <strong title={tab?.path}>{tab ? localPathBasename(tab.path) : '代码文件'}</strong>
-          <span title={tab?.path}>
-            {tab ? workFileExtension(tab.path).toLocaleUpperCase() || 'TEXT' : 'TEXT'}
-            <i aria-hidden='true'>·</i>
-            <span>{fileStatus}</span>
-          </span>
+        <div className='work-code-identity'>
+          <strong>Work WebIDE</strong>
+          <span title={rootPath}>{localPathBasename(rootPath)}</span>
         </div>
-        <div className='work-editor-header-actions'>
+        <div className='work-code-header-actions'>
           {tab && (
-            <Button
-              className='work-local-save-button'
-              aria-label={tab.saving ? '正在保存代码文件' : '保存代码文件'}
-              disabled={tab.loading || tab.saving || !dirty}
-              loading={tab.saving}
-              onClick={() => void actions.saveFile(tab.path)}
+            <button
+              type='button'
+              disabled={tab.loading}
+              onClick={() =>
+                void onAgentRequest({
+                  workspaceRoot: rootPath,
+                  paths: [tab.path],
+                  instruction: '请查看当前代码文件，并回答我的问题：',
+                })
+              }
             >
-              {!tab.saving && <Save size={15} />}
-              保存
-            </Button>
+              <MessageSquareText size={15} />
+              询问 AI 助手
+            </button>
           )}
-          <Button
-            className={`work-editor-ai-button ${assistantOpen ? 'active' : ''}`}
-            aria-label={assistantOpen ? '关闭 AI 助手' : '打开 AI 助手'}
+          <button
+            type='button'
+            className={assistantOpen ? 'active' : ''}
+            aria-label={assistantOpen ? '关闭 Work AI 助手' : '打开 Work AI 助手'}
             aria-pressed={assistantOpen}
             onClick={onToggleAssistant}
           >
             <Sparkles size={15} />
             AI 助手
-          </Button>
+          </button>
         </div>
       </header>
-      <main className='work-code-detail-body'>
-        {!tab ? (
-          <StateView
-            className='work-code-state'
-            size='compact'
-            icon={<FileCode2 size={22} />}
-            title='没有打开的文件'
-            description='返回办公文件后选择一个代码或文本文件。'
-          />
-        ) : (
-          <section className='work-code-panel' aria-label={`编辑 ${localPathBasename(tab.path)}`}>
-            {tab.loading ? (
-              <EditorState icon={<LoaderCircle className='spin' size={18} />} title='正在读取文件…' />
-            ) : tab.loadError ? (
-              <EditorState
-                icon={<RefreshCw size={18} />}
-                title='无法读取文件'
-                description={tab.loadError}
-                action={() => void actions.openFile({ path: tab.path, isBinary: false })}
-              />
-            ) : (
-              <div className={`work-code-surface ${isMarkdown(tab.path) ? 'markdown-split' : ''}`}>
-                <section
-                  className='work-code-source-pane'
-                  aria-label={isMarkdown(tab.path) ? 'Markdown 编辑区' : '代码编辑区'}
+      <div className='work-code-layout'>
+        <WorkIdeExplorer rootPath={rootPath} activePath={actions.activePath} onOpenFile={onOpenEntry} />
+        <main className='work-code-editor'>
+          <nav className='work-code-tabs' aria-label='WebIDE 编辑器标签'>
+            {actions.tabs.map((candidate) => {
+              const dirty = candidate.content !== candidate.draft;
+              return (
+                <div className={candidate.path === actions.activePath ? 'active' : ''} key={candidate.path}>
+                  <button
+                    type='button'
+                    role='tab'
+                    aria-selected={candidate.path === actions.activePath}
+                    onClick={() => actions.activateTab(candidate.path)}
+                  >
+                    <WorkFileIcon path={candidate.path} size={14} />
+                    <span title={candidate.path}>{localPathBasename(candidate.path)}</span>
+                    {dirty && (
+                      <>
+                        <i aria-hidden='true' />
+                        <span className='sr-only'>未保存</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type='button'
+                    aria-label={`关闭 ${localPathBasename(candidate.path)}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      actions.closeTab(candidate.path);
+                    }}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              );
+            })}
+          </nav>
+          {!tab ? (
+            <section className='work-code-empty'>
+              <Braces size={32} />
+              <strong>打开一个代码或文本文件</strong>
+              <p>支持多标签、语法高亮、代码导航、诊断、保存冲突保护，以及 Markdown 实时预览。</p>
+            </section>
+          ) : (
+            <section className='work-code-panel' aria-label={`编辑 ${localPathBasename(tab.path)}`}>
+              <header className='work-code-toolbar'>
+                <span title={tab.path}>{relativeLocalPath(tab.path, rootPath)}</span>
+                <button
+                  type='button'
+                  aria-label={tab.saving ? '正在保存代码文件' : '保存代码文件'}
+                  disabled={tab.loading || tab.saving || tab.content === tab.draft}
+                  onClick={() => void actions.saveFile(tab.path)}
                 >
-                  <MonacoCodeEditor
-                    key={tab.path}
-                    path={tab.path}
-                    value={tab.draft}
-                    location={tab.location}
-                    readOnly={false}
-                    dark={dark}
-                    workspaceRoot={rootPath}
-                    sessionId={state.activeSessionId}
-                    savedDocument={tab.content === tab.draft}
-                    onChange={(value) => actions.updateDraft(tab.path, value)}
-                    onSave={() => void actions.saveFile(tab.path)}
-                    onClose={() => actions.closeTab(tab.path)}
-                    onNavigate={actions.openFile}
-                    onStatusChange={setIntelligenceStatus}
-                    onAssistantRequest={(request) =>
-                      onAgentRequest({
-                        workspaceRoot: rootPath,
-                        paths: [tab.path],
-                        instruction: request.instruction,
-                        selection: request.selection,
-                      })
-                    }
-                  />
-                </section>
-                {isMarkdown(tab.path) && (
-                  <section className='work-markdown-preview' aria-label='Markdown 实时预览'>
-                    <header>实时预览</header>
-                    <div className='execution-markdown'>
-                      <Suspense fallback={<p>{tab.draft}</p>}>
-                        <StreamingMarkdown content={tab.draft} streaming={false} />
-                      </Suspense>
-                    </div>
+                  {tab.saving ? <LoaderCircle className='spin' size={14} /> : <Save size={14} />}
+                  {tab.saving ? '保存中' : '保存'}
+                </button>
+              </header>
+              {tab.loading ? (
+                <EditorState icon={<LoaderCircle className='spin' size={18} />} text='正在读取文件…' />
+              ) : tab.loadError ? (
+                <EditorState
+                  icon={<RefreshCw size={18} />}
+                  text={tab.loadError}
+                  action={() => void actions.openFile({ path: tab.path, isBinary: false })}
+                />
+              ) : (
+                <div className={`work-code-surface ${isMarkdown(tab.path) ? 'markdown-split' : ''}`}>
+                  <section
+                    className='work-code-source-pane'
+                    aria-label={isMarkdown(tab.path) ? 'Markdown 编辑区' : '代码编辑区'}
+                  >
+                    <MonacoCodeEditor
+                      path={tab.path}
+                      modelPath={workspaceEditorModelPath('work', tab.path)}
+                      value={tab.draft}
+                      location={tab.location}
+                      readOnly={false}
+                      dark={dark}
+                      workspaceRoot={rootPath}
+                      sessionId={state.activeSessionId}
+                      savedDocument={tab.content === tab.draft}
+                      onChange={(value) => actions.updateDraft(tab.path, value)}
+                      onSave={() => void actions.saveFile(tab.path)}
+                      onClose={() => actions.closeTab(tab.path)}
+                      onNavigate={actions.openFile}
+                      onStatusChange={setIntelligenceStatus}
+                      onEditorStatusChange={setEditorStatus}
+                      onAssistantRequest={(request) =>
+                        onAgentRequest({
+                          workspaceRoot: rootPath,
+                          paths: [tab.path],
+                          instruction: request.instruction,
+                          selection: request.selection,
+                        })
+                      }
+                    />
                   </section>
-                )}
-              </div>
-            )}
-            <output className='work-code-statusbar' aria-label='编辑器状态'>
-              <span className='work-code-statusbar-group'>
-                <span>
-                  {isMarkdown(tab.path) ? 'Markdown' : workFileExtension(tab.path).toLocaleUpperCase() || 'Plain Text'}
+                  {isMarkdown(tab.path) && (
+                    <section className='work-markdown-preview' aria-label='Markdown 实时预览'>
+                      <header>实时预览</header>
+                      <div className='execution-markdown'>
+                        <Suspense fallback={<p>{tab.draft}</p>}>
+                          <StreamingMarkdown content={tab.draft} streaming={false} />
+                        </Suspense>
+                      </div>
+                    </section>
+                  )}
+                </div>
+              )}
+              <output className='work-code-statusbar' aria-label='编辑器状态'>
+                <span className='work-code-statusbar-group'>
+                  <span>
+                    {isMarkdown(tab.path)
+                      ? 'Markdown'
+                      : workFileExtension(tab.path).toLocaleUpperCase() || 'Plain Text'}
+                  </span>
+                  <span>{tab.draft.split(/\r?\n/).length} 行</span>
+                  {editorStatus && <span>{`行 ${editorStatus.lineNumber}，列 ${editorStatus.column}`}</span>}
+                  {editorStatus && editorStatus.selectedCharacters > 0 && (
+                    <span>{`已选择 ${editorStatus.selectedCharacters} 个字符`}</span>
+                  )}
+                  {isMarkdown(tab.path) && <span>左侧编辑 · 右侧实时预览</span>}
                 </span>
-                <span>{tab.draft.split(/\r?\n/).length} 行</span>
-                {isMarkdown(tab.path) && <span>左侧编辑 · 右侧实时预览</span>}
-              </span>
-              <span className='work-code-statusbar-group'>
-                <span>{tab.content === tab.draft ? '已保存' : '未保存'}</span>
-                <span>UTF-8</span>
-                <span>LF</span>
-                {!tab.loading && !tab.loadError && <span>{intelligenceStatus}</span>}
-              </span>
-            </output>
-          </section>
-        )}
-      </main>
+                <span className='work-code-statusbar-group'>
+                  <span>{tab.content === tab.draft ? '已保存' : '未保存'}</span>
+                  <span>UTF-8</span>
+                  <span>{editorStatus?.lineEnding ?? 'LF'}</span>
+                  {!tab.loading && !tab.loadError && <span>{intelligenceStatus}</span>}
+                </span>
+              </output>
+            </section>
+          )}
+        </main>
+      </div>
       {actions.conflict && (
-        <InlineNotice
-          className='work-code-conflict'
-          tone='warning'
-          role='alert'
-          title='文件已在其他应用中修改'
-          actions={
-            <>
-              <Button tone='quiet' onClick={() => void actions.resolveConflict('reload')}>
-                载入磁盘版本
-              </Button>
-              <Button tone='primary' onClick={() => void actions.resolveConflict('overwrite')}>
-                保留当前编辑
-              </Button>
-              <IconButton label='关闭保存冲突提示' onClick={actions.dismissConflict}>
-                <X size={14} />
-              </IconButton>
-            </>
-          }
-        >
-          <code>{actions.conflict.path}</code>
-        </InlineNotice>
+        <section className='work-code-conflict' role='alert' aria-label='代码文件保存冲突'>
+          <div>
+            <strong>文件已在其他应用中修改</strong>
+            <span>{actions.conflict.path}</span>
+          </div>
+          <button type='button' onClick={() => void actions.resolveConflict('reload')}>
+            载入磁盘版本
+          </button>
+          <button type='button' className='primary' onClick={() => void actions.resolveConflict('overwrite')}>
+            保留当前编辑
+          </button>
+          <button type='button' aria-label='关闭保存冲突提示' onClick={actions.dismissConflict}>
+            <X size={14} />
+          </button>
+        </section>
       )}
       {actions.closeRequest && (
         <Dialog
@@ -216,28 +262,17 @@ export function WorkCodeWorkspace({
   );
 }
 
-function EditorState({
-  icon,
-  title,
-  description,
-  action,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description?: string;
-  action?: () => void;
-}) {
+function EditorState({ icon, text, action }: { icon: React.ReactNode; text: string; action?: () => void }) {
   return (
-    <StateView
-      className='work-code-state'
-      size='compact'
-      tone={action ? 'danger' : 'neutral'}
-      role={action ? 'alert' : 'status'}
-      icon={icon}
-      title={title}
-      description={description}
-      actions={action && <Button onClick={action}>重试</Button>}
-    />
+    <output className='work-code-editor-state'>
+      {icon}
+      <strong>{text}</strong>
+      {action && (
+        <button type='button' onClick={action}>
+          重试
+        </button>
+      )}
+    </output>
   );
 }
 

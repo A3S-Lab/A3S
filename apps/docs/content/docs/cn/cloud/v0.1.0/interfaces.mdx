@@ -1,0 +1,54 @@
+---
+title: 版本化接口
+description: Cloud 0.1.0 的 REST、OpenAPI、CLI、管理 MCP、事件、节点协议和 ACL 状态。
+---
+
+# 版本化接口
+
+Status: **Experimental**
+
+Snapshot: `cloud-0.1.0`
+
+稳定公共控制面属于 C0。当前 E0 接口只能与精确快照配套使用；除非下表中的 schema
+明确声明，否则不承诺向前兼容。
+
+| Surface | 版本 | 状态 | 权威来源 |
+| --- | --- | --- | --- |
+| REST | `/api/v1` | **Experimental** | 从类型化 controller 组合出的运行时 route |
+| OpenAPI | `/api/v1/openapi.json` 上的 `0.1.0` | **Experimental** | 由运行中的 control-plane binary 生成 |
+| Cloud CLI | 无 | **Planned** | C0；本文档不发布 `a3s cloud` 命令 |
+| Management MCP | 无 | **Planned** | C0 Streamable HTTP surface |
+| Domain-event envelope | schema version `1` | **Experimental** | PostgreSQL outbox 与可选 NATS relay |
+| Node command | `a3s.cloud.node-command.v1` | **Verified** | 私有向外 mTLS node control |
+| Gateway snapshot | `a3s.cloud.gateway-snapshot.v2` | **Verified** | 完整且 digest-bound 的 Gateway command |
+| ACL | parser `0.3.0` | **Verified** | 封闭的 control-plane 与 node 配置 |
+
+## REST 与 OpenAPI
+
+成功和错误响应使用共享 A3S response envelope：HTTP `code`；错误时的业务
+`statusCode`；`message`；`data` 或 `details`；`requestId` 和 `timestamp`。mutation
+需要稳定的 `idempotency-key`；tenant route 需要具备声明 scope 的 API token。
+
+不要把生成 schema 手工复制进源码文档。启动精确二进制并读取
+`/api/v1/openapi.json`。注册位置固定在
+[application source](https://github.com/A3S-Lab/Cloud/blob/5d7307cc7bf5b155f708ca9f5bd3e5d06745b68d/crates/control-plane/src/app.rs)；
+该 source marker 改变时文档 gate 会失败。
+
+## 事件与节点协议
+
+Event key 使用小写点分格式。envelope 携带 event ID、key、schema version、organization、
+aggregate identity/version、timestamp、correlation/causation ID 与 JSON payload；参见
+[固定 contract](https://github.com/A3S-Lab/Cloud/blob/5d7307cc7bf5b155f708ca9f5bd3e5d06745b68d/crates/contracts/src/event.rs)。
+NATS 是 PostgreSQL outbox 的 relay，不是第二个业务权威来源。
+
+Node request/response schema 位于
+[固定 contracts 目录](https://github.com/A3S-Lab/Cloud/tree/5d7307cc7bf5b155f708ca9f5bd3e5d06745b68d/crates/contracts/src/node)。
+它们是由节点 identity 认证的私有基础设施 contract，不得作为未认证公共 REST 暴露。
+
+## ACL
+
+ACL 指 A3S Agent Configuration Language，不是 HCL。完整发布参考是
+[`cloud.acl`](https://github.com/A3S-Lab/Cloud/blob/5d7307cc7bf5b155f708ca9f5bd3e5d06745b68d/config/cloud.acl)
+和
+[`node.example.acl`](https://github.com/A3S-Lab/Cloud/blob/5d7307cc7bf5b155f708ca9f5bd3e5d06745b68d/config/node.example.acl)。
+未知 block 与字段会 fail closed。ACL 只引用环境变量名，不能包含 secret value。

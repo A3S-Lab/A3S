@@ -468,6 +468,46 @@ describe('TaskRuntimeFloatingPanel', () => {
     expect(screen.getByText('确认组件边界清晰。')).toBeInTheDocument();
   });
 
+  it('renders Use workers by capability without exposing raw MCP tool names', () => {
+    setEvents([
+      {
+        type: 'subagent_start',
+        task_id: 'use-1',
+        session_id: 'use-session-1',
+        parent_session_id: 'task-1',
+        agent: 'use',
+        description: '浏览页面并提取证据',
+        started_ms: 7_000,
+      },
+      {
+        type: 'subagent_progress',
+        task_id: 'use-1',
+        session_id: 'use-session-1',
+        status: 'tool_completed',
+        metadata: { tool: 'mcp__use_browser__agent_browser_open', exit_code: 0 },
+      },
+      {
+        type: 'subagent_end',
+        task_id: 'use-1',
+        session_id: 'use-session-1',
+        agent: 'use',
+        output: '页面证据已提取。',
+        success: true,
+        finished_ms: 9_000,
+      },
+    ]);
+
+    render(<TaskRuntimeFloatingPanel />);
+
+    const region = screen.getByRole('region', { name: '并行执行详情' });
+    expect(region).toHaveTextContent('Use · Browser · 已完成');
+    expect(region).not.toHaveTextContent('mcp__use_browser__agent_browser_open');
+
+    fireEvent.click(screen.getByRole('button', { name: '浏览页面并提取证据，已完成，查看结果与记录' }));
+    expect(screen.getByText('Browser · Open 已完成')).toBeInTheDocument();
+    expect(screen.queryByText('mcp__use_browser__agent_browser_open 已完成')).not.toBeInTheDocument();
+  });
+
   it('settles an orphaned subagent when the parent execution fails', () => {
     setEvents([
       {

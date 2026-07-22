@@ -75,6 +75,7 @@ function agent(id: string, state: SubagentState, completedAt?: number): Subagent
     state,
     completionTokens: 0,
     progress: [],
+    useCapabilities: [],
     completedAt,
   };
 }

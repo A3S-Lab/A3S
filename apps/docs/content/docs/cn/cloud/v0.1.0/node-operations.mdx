@@ -1,0 +1,62 @@
+---
+title: 节点 Drain 与证书故障
+description: 已验证的节点状态操作，以及有界的节点和 Gateway 证书恢复。
+---
+
+# 节点 Drain 与证书故障
+
+Status: **Verified**
+
+Snapshot: `cloud-0.1.0`
+
+Fleet API 通过 optimistic version 与 idempotency 把节点标为 ready、draining 或
+revoked。节点使用向外 mTLS，不需要入站 SSH 或远程登录凭据。
+
+## Drain 节点
+
+前置条件：`node:write`、组织和节点 ID、当前节点 aggregate version，以及稳定的
+idempotency key。
+
+```bash
+curl --fail-with-body --request POST \
+  "$A3S_CLOUD_URL/api/v1/organizations/$ORGANIZATION_ID/nodes/$NODE_ID/actions/drain" \
+  --header "authorization: Bearer $A3S_CLOUD_ADMIN_TOKEN" \
+  --header "content-type: application/json" \
+  --header "idempotency-key: drain-$NODE_ID-$EXPECTED_VERSION" \
+  --data "{\"expectedVersion\":$EXPECTED_VERSION}"
+```
+
+确认响应 state 为 `draining`，重复 GET 直到 availability 与 heartbeat 证据为最新，
+并确认不再分配新工作。此快照中的 drain 是 admission state transition；自动多节点
+workload evacuation 是 H0.3 的 **Planned** 能力。不能仅因 state 已改变就停止节点。
+
+维护后检查 Runtime unit 与 Gateway state，再用新的 expected version 调用对应的
+`/actions/ready` endpoint。revoke 会禁用节点证书权威，不是 undrain 的快捷方式。
+
+## 节点证书故障
+
+Agent 在过期前通过认证的 node-control endpoint 轮换证书。认证或轮换失败时：
+
+1. 禁止节点接收新调度并保留 state directory。
+2. 比较系统时间、server CA、server name、证书有效期、node ID 和 agent-instance ID。
+   检查结构化日志时不得输出 private key 或 enrollment token。
+3. 检查 control-plane live/ready health 与 node-control TLS listener。
+4. 只重试有界的向外轮换。若节点 identity 已 revoke 或 private key 丢失，签发一次性
+   enrollment token，并按经批准的 identity replacement 流程重新注册。
+5. 收到新 heartbeat 与 Runtime capability observation 后才能恢复 ready。
+
+Revoke 和 identity replacement 可能留下 assignment。操作前记录当前 workload 与恢复证据，
+并保留旧记录供审计。
+
+## Gateway 证书故障
+
+Gateway private key 与 CSR 保留在节点本地。control plane 只接收 CSR 和公开证书材料。
+renewal 或 reload 失败时，之前已 acknowledgement 的 route 与证书必须继续保持权威。
+
+按顺序检查 domain claim state、证书 expiry window、CA/provider health、CSR SAN、
+Gateway management authentication、候选 snapshot digest 和精确 reload acknowledgement。
+不能因为证书已 issued 就发布 route；只有匹配的 Gateway command、revision、digest 与
+public chain 都 acknowledgement 后，证书才是 ready。
+
+需要回滚时，保留旧证书和 complete snapshot，拒绝候选 convergence，并用新的 command
+identity 重试。只有没有活动 route 引用旧证书时，才能 revoke provider serial。

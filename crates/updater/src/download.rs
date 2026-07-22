@@ -89,14 +89,16 @@ pub fn extract_tar_gz_archive(data: &[u8], dest_dir: &Path) -> anyhow::Result<Ve
     let mut extracted = Vec::new();
     let mut seen = BTreeSet::new();
     let mut extracted_bytes = 0_u64;
-    let mut entry_count = 0_usize;
 
-    for entry in archive.entries().context("failed to read tar entries")? {
+    for (entry_count, entry) in archive
+        .entries()
+        .context("failed to read tar entries")?
+        .enumerate()
+    {
         let mut entry = entry.context("failed to read tar entry")?;
         if entry_count >= MAX_EXTRACTED_ENTRIES {
             bail!("archive exceeds the {MAX_EXTRACTED_ENTRIES} entry limit");
         }
-        entry_count += 1;
         let entry_path = entry.path().context("failed to read tar entry path")?;
         let entry_type = entry.header().entry_type();
         let Some(relative) = sanitized_relative_path(&entry_path)? else {

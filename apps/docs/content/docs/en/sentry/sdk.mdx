@@ -24,14 +24,27 @@ enforced = sentry.evaluate_and_enforce(tool_exec(2, ["/usr/bin/ncat", "host", "4
 
 ## TypeScript
 
-The TypeScript SDK exposes the same judge through a native package:
+The TypeScript SDK exposes the same judge through a native package. Its staged
+method runs on the N-API worker pool and returns a typed promise:
 
 ```ts
-import { Sentry, egress } from '@a3s-lab/sentry';
+import { Sentry, egress, fileAccess } from '@a3s-lab/sentry';
 
 const sentry = Sentry.create('sentry.acl');
 const decision = sentry.evaluate(egress(1, '169.254.169.254', 80));
+
+const fast = await sentry.evaluateThroughL2(
+  fileAccess(2, '/home/agent/.aws/credentials', false),
+);
+if (fast.stageStatus === 'escalated') {
+  await durableL3Queue.send(fast);
+}
 ```
+
+`evaluateThroughL2` never invokes L3 or resolves an outstanding escalation
+through `fail_closed`. Its `ThroughL2Result` includes `l1Decision`, optional
+`l2Decision`, `effectiveDecision`, `stageStatus`, and optional
+`escalationCause`.
 
 ## Unified ACL Config
 
@@ -51,3 +64,8 @@ environment variables or deployment secrets.
 Rust hosts can build the pipeline directly from `LiveRules`, `Pipeline`, and
 judge implementations. This is the lowest-level integration path when a product
 already owns the event source and enforcement sinks.
+
+Use `Pipeline::evaluate_through_l2` when that product also owns a durable L3
+queue. The method stops after the fast tiers and preserves an unresolved
+escalation; callers must persist and dispatch that result rather than treating
+it as an allow.

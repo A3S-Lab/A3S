@@ -20,10 +20,17 @@ export function TasksPage({ actions }: { actions: CodeActions }) {
     );
   }
 
+  const contextFullscreen = state.taskView !== 'conversation' && state.workspacePresentation === 'fullscreen';
   return (
     <section className='code-page task-product active-task-product'>
-      <div className={`active-task-layout ${state.taskView !== 'conversation' ? 'with-context' : ''}`}>
-        <section className='task-conversation-pane'>
+      <div
+        className={`active-task-layout ${state.taskView !== 'conversation' ? 'with-context' : ''} ${contextFullscreen ? 'context-fullscreen' : ''}`}
+      >
+        <section
+          className='task-conversation-pane'
+          aria-hidden={contextFullscreen || undefined}
+          inert={contextFullscreen || undefined}
+        >
           <TaskHeader />
           <TaskRuntimeFloatingPanel />
           <main className='task-workspace'>

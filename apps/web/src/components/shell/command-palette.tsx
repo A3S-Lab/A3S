@@ -1,4 +1,14 @@
-import { BrainCircuit, CircleHelp, FileDiff, History, ListChecks, Settings } from 'lucide-react';
+import {
+  BrainCircuit,
+  CircleHelp,
+  FileDiff,
+  FileSearch,
+  History,
+  ListChecks,
+  Maximize2,
+  Minimize2,
+  Settings,
+} from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
 import { CollectionState, SearchField, useDialogFocusScope } from '../../design-system/primitives';
@@ -13,13 +23,37 @@ export function CommandPalette({ actions }: { actions: CodeActions }) {
   const resultId = useId();
   const commands = useMemo(
     () => [
-      ...(state.activeSessionId
+      ...(state.activeSessionId && state.workspaceRoot
         ? [
             {
               label: '当前任务',
               description: '继续对话、计划和执行',
               icon: ListChecks,
               run: () => navigateTask('conversation'),
+            },
+            {
+              label: '快速打开文件',
+              description: '按文件名或路径查找工作区文件',
+              icon: FileSearch,
+              run: () => {
+                appState.fileQuickOpenOpen = true;
+              },
+            },
+          ]
+        : []),
+      ...(state.activeSessionId && state.taskView !== 'conversation'
+        ? [
+            {
+              label: state.workspacePresentation === 'fullscreen' ? '退出工作区全屏' : '全屏显示工作区',
+              description:
+                state.workspacePresentation === 'fullscreen'
+                  ? '恢复对话与任务上下文的并排布局'
+                  : '让当前任务工作区占满可用内容区域',
+              icon: state.workspacePresentation === 'fullscreen' ? Minimize2 : Maximize2,
+              run: () => {
+                appState.workspacePresentation =
+                  appState.workspacePresentation === 'fullscreen' ? 'docked' : 'fullscreen';
+              },
             },
           ]
         : []),
@@ -71,7 +105,7 @@ export function CommandPalette({ actions }: { actions: CodeActions }) {
         run: () => navigateSettings('help'),
       },
     ],
-    [actions, state.activeSessionId]
+    [actions, state.activeSessionId, state.taskView, state.workspacePresentation, state.workspaceRoot]
   );
   const visible = useMemo(
     () =>

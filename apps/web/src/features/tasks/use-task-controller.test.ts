@@ -2,12 +2,21 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { codeApi } from '../../lib/api';
 import { appState, reportTaskPersistenceResult, setTheme } from '../../state/app-state';
-import { createTaskState, persistTaskDrafts } from './task-state';
+import { fileEditorTabId, type WorkspaceFileEditorTab } from '../workspace/workspace-state';
+import { createTaskState, newTaskDraftKey, persistTaskDrafts } from './task-state';
 import { applyAssistantStreamEvent, composeTaskPrompt, useTaskController } from './use-task-controller';
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  appState.workspaceSnapshotsByTask = {};
+  appState.workspaceGeneration = 0;
+  appState.editorTabs = [];
+  appState.activeEditorTabId = null;
+  appState.workspaceSearchResults = [];
+  appState.workspaceSearchQuery = '';
+  appState.gitStatus = null;
+  appState.taskView = 'conversation';
   localStorage.removeItem('a3s-code-web.active-task');
   localStorage.removeItem('a3s-work.ai-assistant.active-session');
   localStorage.removeItem('a3s-code-web.task-drafts');
@@ -87,6 +96,187 @@ describe('task-scoped draft recovery', () => {
     hook.unmount();
   });
 
+  it('ignores a late controls response from the previously selected task', async () => {
+    const taskA = codeSession('task-a', '/repo');
+    const taskB = codeSession('task-b', '/repo');
+    const controlsA = deferred<Awaited<ReturnType<typeof codeApi.sessionControls>>>();
+    const controlsB = deferred<Awaited<ReturnType<typeof codeApi.sessionControls>>>();
+    appState.sessions = [taskA, taskB];
+    appState.activeSessionId = taskA.sessionId;
+    appState.messagesBySession = { 'task-a': [], 'task-b': [] };
+    appState.filesByDirectory = { '/repo': [] };
+    vi.spyOn(codeApi, 'sessionControls').mockImplementation((sessionId) =>
+      sessionId === taskA.sessionId ? controlsA.promise : controlsB.promise
+    );
+    const hook = renderHook(() => useTaskController());
+    let pendingA!: Promise<void>;
+    let pendingB!: Promise<void>;
+
+    act(() => {
+      pendingA = hook.result.current.selectSession(taskA.sessionId);
+    });
+    act(() => {
+      pendingB = hook.result.current.selectSession(taskB.sessionId);
+    });
+    await act(async () => {
+      controlsB.resolve({
+        sessionId: taskB.sessionId,
+        effort: 'high',
+        planningMode: 'disabled',
+        goalTracking: false,
+      });
+      await pendingB;
+    });
+
+    expect(appState.activeSessionId).toBe(taskB.sessionId);
+
+    await act(async () => {
+      controlsA.resolve({
+        sessionId: taskA.sessionId,
+        effort: 'low',
+        planningMode: 'disabled',
+        goalTracking: false,
+      });
+      await pendingA;
+    });
+
+    expect(appState.sessionControls[taskA.sessionId]?.effort).toBe('low');
+    expect(appState.sessionControls[taskB.sessionId]?.effort).toBe('high');
+    expect(appState.activeSessionId).toBe(taskB.sessionId);
+    hook.unmount();
+  });
+
+  it('keeps the newest message load when the same task is selected twice', async () => {
+    const task = codeSession('task-a', '/repo');
+    const firstMessages = deferred<Awaited<ReturnType<typeof codeApi.messages>>>();
+    const secondMessages = deferred<Awaited<ReturnType<typeof codeApi.messages>>>();
+    appState.sessions = [task];
+    appState.activeSessionId = task.sessionId;
+    appState.messagesBySession = {};
+    appState.filesByDirectory = { '/repo': [] };
+    vi.spyOn(codeApi, 'messages')
+      .mockReturnValueOnce(firstMessages.promise)
+      .mockReturnValueOnce(secondMessages.promise);
+    vi.spyOn(codeApi, 'sessionControls').mockResolvedValue({
+      sessionId: task.sessionId,
+      effort: 'medium',
+      planningMode: 'disabled',
+      goalTracking: false,
+    });
+    const hook = renderHook(() => useTaskController());
+    let firstSelection!: Promise<void>;
+    let secondSelection!: Promise<void>;
+
+    act(() => {
+      firstSelection = hook.result.current.selectSession(task.sessionId);
+      secondSelection = hook.result.current.selectSession(task.sessionId);
+    });
+    await act(async () => {
+      secondMessages.resolve({ items: [chatMessage(task.sessionId, 'newest')], total: 1, page: 1, limit: 100 });
+      await secondSelection;
+    });
+    await act(async () => {
+      firstMessages.resolve({ items: [chatMessage(task.sessionId, 'stale')], total: 1, page: 1, limit: 100 });
+      await firstSelection;
+    });
+
+    expect(appState.messagesBySession[task.sessionId]?.map((message) => message.content)).toEqual(['newest']);
+    expect(appState.messagesLoading[task.sessionId]).toBe(false);
+    hook.unmount();
+  });
+
+  it('does not let an older controls load overwrite a successful effort update', async () => {
+    const task = codeSession('task-a', '/repo');
+    const staleControls = deferred<Awaited<ReturnType<typeof codeApi.sessionControls>>>();
+    appState.sessions = [task];
+    appState.activeSessionId = task.sessionId;
+    appState.messagesBySession = { [task.sessionId]: [] };
+    appState.filesByDirectory = { '/repo': [] };
+    appState.taskConfigSaving = null;
+    vi.spyOn(codeApi, 'sessionControls').mockReturnValue(staleControls.promise);
+    vi.spyOn(codeApi, 'updateSessionControls').mockResolvedValue({
+      sessionId: task.sessionId,
+      effort: 'high',
+      planningMode: 'disabled',
+      goalTracking: false,
+    });
+    const hook = renderHook(() => useTaskController());
+    let pendingSelection!: Promise<void>;
+
+    act(() => {
+      pendingSelection = hook.result.current.selectSession(task.sessionId);
+    });
+    await act(() => hook.result.current.updateEffort('high'));
+    expect(appState.sessionControls[task.sessionId]?.effort).toBe('high');
+
+    await act(async () => {
+      staleControls.resolve({
+        sessionId: task.sessionId,
+        effort: 'low',
+        planningMode: 'disabled',
+        goalTracking: false,
+      });
+      await pendingSelection;
+    });
+
+    expect(appState.sessionControls[task.sessionId]?.effort).toBe('high');
+    expect(appState.sessionControlsLoading[task.sessionId]).toBe(false);
+    hook.unmount();
+  });
+
+  it('restores editor tabs, dirty drafts, selection, and view per task even when tasks share a workspace', async () => {
+    const taskA = codeSession('task-a', '/repo');
+    const taskB = codeSession('task-b', '/repo');
+    const tabA = fileTab('/repo/a.ts', 'saved A', 'draft A');
+    appState.sessions = [taskA, taskB];
+    appState.activeSessionId = taskA.sessionId;
+    appState.workspaceRoot = taskA.workspace;
+    appState.taskView = 'review';
+    appState.editorTabs = [tabA];
+    appState.activeEditorTabId = tabA.id;
+    appState.messagesBySession = { 'task-a': [], 'task-b': [] };
+    appState.draftsByTask = {};
+    vi.spyOn(codeApi, 'sessionControls').mockImplementation(async (sessionId) => ({
+      sessionId,
+      effort: 'medium',
+      planningMode: 'disabled',
+      goalTracking: false,
+    }));
+    const hook = renderHook(() => useTaskController());
+
+    await act(() => hook.result.current.selectSession('task-b'));
+
+    expect(appState.activeSessionId).toBe('task-b');
+    expect(appState.workspaceRoot).toBe('/repo');
+    expect(appState.editorTabs).toEqual([]);
+    expect(appState.activeEditorTabId).toBeNull();
+    expect(appState.taskView).toBe('conversation');
+
+    const tabB = fileTab('/repo/b.ts', 'saved B');
+    appState.editorTabs = [tabB];
+    appState.activeEditorTabId = tabB.id;
+    appState.taskView = 'activity';
+
+    await act(() => hook.result.current.selectSession('task-a'));
+
+    expect(appState.editorTabs).toHaveLength(1);
+    expect(appState.editorTabs[0]).toMatchObject({
+      id: tabA.id,
+      content: 'saved A',
+      draft: 'draft A',
+    });
+    expect(appState.activeEditorTabId).toBe(tabA.id);
+    expect(appState.taskView).toBe('review');
+
+    await act(() => hook.result.current.selectSession('task-b'));
+
+    expect(appState.editorTabs).toHaveLength(1);
+    expect(appState.editorTabs[0]).toMatchObject({ id: tabB.id, content: 'saved B' });
+    expect(appState.activeEditorTabId).toBe(tabB.id);
+    expect(appState.taskView).toBe('activity');
+    hook.unmount();
+  });
+
   it('restores drafts but leaves execution queues to the service after refresh', () => {
     localStorage.setItem('a3s-code-web.active-task', 'task-a');
     localStorage.setItem(
@@ -139,10 +329,67 @@ describe('task-scoped draft recovery', () => {
   });
 });
 
+function codeSession(sessionId: string, workspace: string) {
+  return {
+    sessionId,
+    workspace,
+    cwd: workspace,
+    model: 'codex/gpt',
+    followDefaultModel: false,
+    permissionMode: 'default',
+    state: 'idle',
+    createdAt: 1,
+  };
+}
+
+function fileTab(path: string, content: string, draft = content): WorkspaceFileEditorTab {
+  return {
+    id: fileEditorTabId(path),
+    kind: 'file',
+    path,
+    content,
+    draft,
+    revision: null,
+    isBinary: false,
+    location: null,
+    loading: false,
+    loadError: null,
+    saving: false,
+    configValidation: null,
+  };
+}
+
+function chatMessage(sessionId: string, content: string) {
+  return {
+    id: `${sessionId}-${content}`,
+    sessionId,
+    role: 'assistant' as const,
+    content,
+    createdAt: new Date(0).toISOString(),
+    pending: false,
+    events: [],
+  };
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 describe('task configuration', () => {
   it('switches the new-task workspace and removes context owned by the previous workspace', async () => {
     appState.activeSessionId = null;
     appState.workspaceRoot = '/repo';
+    appState.editorTabs = [fileTab('/repo/old.ts', 'saved', 'draft')];
+    appState.activeEditorTabId = fileEditorTabId('/repo/old.ts');
+    appState.workspaceSearchQuery = 'old query';
+    appState.gitStatus = { isGitRepo: true, branch: 'main', files: [] };
     appState.composerContextFiles = ['src/app.ts'];
     appState.composerSkills = ['review'];
     appState.newTaskConfig = {
@@ -160,6 +407,10 @@ describe('task configuration', () => {
     expect(readDir).toHaveBeenCalledWith('/clients/acme');
     expect(appState.newTaskConfig.workspace).toBe('/clients/acme');
     expect(appState.workspaceRoot).toBe('/clients/acme');
+    expect(appState.editorTabs).toEqual([]);
+    expect(appState.activeEditorTabId).toBeNull();
+    expect(appState.workspaceSearchQuery).toBe('');
+    expect(appState.gitStatus).toBeNull();
     expect(appState.composerContextFiles).toEqual([]);
     expect(appState.composerSkills).toEqual([]);
     expect(JSON.parse(localStorage.getItem('a3s-code-web.new-task-config') ?? '{}')).toMatchObject({
@@ -171,7 +422,7 @@ describe('task configuration', () => {
   it('opens a native folder picker and applies the returned directory', async () => {
     appState.activeSessionId = null;
     appState.newTaskConfig.workspace = '/repo';
-    vi.spyOn(codeApi, 'pickWorkspaceDirectory').mockResolvedValue({
+    const pickWorkspaceDirectory = vi.spyOn(codeApi, 'pickWorkspaceDirectory').mockResolvedValue({
       cancelled: false,
       path: '/local/design-system',
     });
@@ -180,6 +431,7 @@ describe('task configuration', () => {
 
     await expect(act(() => hook.result.current.pickNewTaskWorkspace())).resolves.toBe('/local/design-system');
 
+    expect(pickWorkspaceDirectory).toHaveBeenCalledWith('/repo');
     expect(appState.newTaskConfig.workspace).toBe('/local/design-system');
     hook.unmount();
   });
@@ -467,6 +719,70 @@ describe('task configuration', () => {
     expect(localStorage.getItem('a3s-code-web.active-task')).toBeNull();
     expect(appState.newTaskConfig.workspace).toBe('/code-project');
     expect(appState.newTaskConfig.goal).toBe('Keep the Code goal');
+    hook.unmount();
+  });
+
+  it('promotes prepared editor and composer state without leaking it into the next new task', async () => {
+    appState.activeSessionId = null;
+    appState.workspaceRoot = '/repo';
+    appState.sessions = [];
+    appState.messagesBySession = {};
+    appState.newTaskConfig = {
+      workspace: '/repo',
+      model: 'codex/gpt',
+      effort: 'medium',
+      permissionMode: 'default',
+      goal: '',
+    };
+    const tab = fileTab('/repo/src/prepared.ts', 'saved', 'prepared draft');
+    appState.editorTabs = [tab];
+    appState.activeEditorTabId = tab.id;
+    appState.taskView = 'review';
+    appState.composerValue = 'Review the prepared draft';
+    appState.composerContextFiles = ['src/prepared.ts'];
+    appState.composerSkills = ['review'];
+    appState.draftsByTask = {
+      [newTaskDraftKey]: {
+        content: 'Review the prepared draft',
+        contextFiles: ['src/prepared.ts'],
+        skillNames: ['review'],
+      },
+    };
+    const session = codeSession('task-created', '/repo');
+    vi.spyOn(codeApi, 'createSession').mockResolvedValue({ success: true, session });
+    vi.spyOn(codeApi, 'updateSessionControls').mockResolvedValue({
+      sessionId: session.sessionId,
+      effort: 'medium',
+      planningMode: 'disabled',
+      goalTracking: false,
+    });
+    const hook = renderHook(() => useTaskController());
+
+    await act(() => hook.result.current.createSession('Prepared task'));
+
+    expect(appState.activeSessionId).toBe(session.sessionId);
+    expect(appState.workspaceRoot).toBe('/repo');
+    expect(appState.editorTabs).toHaveLength(1);
+    expect(appState.editorTabs[0]).toMatchObject({
+      id: tab.id,
+      content: 'saved',
+      draft: 'prepared draft',
+    });
+    expect(appState.activeEditorTabId).toBe(tab.id);
+    expect(appState.taskView).toBe('review');
+    expect(appState.draftsByTask[newTaskDraftKey]).toBeUndefined();
+    expect(appState.draftsByTask[session.sessionId]).toEqual({
+      content: 'Review the prepared draft',
+      contextFiles: ['src/prepared.ts'],
+      skillNames: ['review'],
+    });
+    expect(JSON.parse(localStorage.getItem('a3s-code-web.task-drafts') ?? '{}')).toEqual({
+      [session.sessionId]: {
+        content: 'Review the prepared draft',
+        contextFiles: ['src/prepared.ts'],
+        skillNames: ['review'],
+      },
+    });
     hook.unmount();
   });
 

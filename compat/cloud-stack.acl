@@ -1,0 +1,129 @@
+stack "cloud" {
+  format = 1
+  owner = "A3S-Lab/Cloud"
+  rust_version = "1.88.0"
+  schema = "a3s.cloud.compatibility-lock.v1"
+}
+component "acl" {
+  owner = "A3S-Lab/ACL"
+  package = "a3s-acl"
+  path = "crates/acl"
+  repository = "git@github.com:A3S-Lab/ACL.git"
+  revision = "5317e166222495585909d81f2caffdca90273c99"
+  source = "git"
+  version = "0.3.0"
+}
+component "boot" {
+  owner = "A3S-Lab/Boot"
+  package = "a3s-boot"
+  path = "crates/boot"
+  repository = "git@github.com:A3S-Lab/Boot.git"
+  revision = "3029e7eda4832c26c6d4dfa8578049e65de8dfbd"
+  source = "git"
+  version = "0.1.2"
+}
+component "cloud" {
+  owner = "A3S-Lab/Cloud"
+  path = "apps/cloud"
+  repository = "git@github.com:A3S-Lab/Cloud.git"
+  revision = "5d7307cc7bf5b155f708ca9f5bd3e5d06745b68d"
+  source = "git"
+  version = "0.1.0"
+}
+component "event" {
+  owner = "A3S-Lab/Event"
+  package = "a3s-event"
+  path = "crates/event"
+  repository = "git@github.com:A3S-Lab/Event.git"
+  revision = "6df3d6551a2a3ab68b2f8271d33a87b078fc8151"
+  source = "git"
+  version = "0.3.0"
+}
+component "flow" {
+  owner = "A3S-Lab/Flow"
+  package = "a3s-flow"
+  path = "crates/flow"
+  repository = "git@github.com:A3S-Lab/Flow.git"
+  revision = "ca17ae78968370eacd97992d9202dabf1cd82a2e"
+  source = "git"
+  version = "0.4.2"
+}
+component "gateway" {
+  owner = "A3S-Lab/Gateway"
+  package = "a3s-gateway"
+  path = "crates/gateway"
+  repository = "git@github.com:A3S-Lab/Gateway.git"
+  revision = "f8500b89284e75342dd0286a0200b3a6e3f51e32"
+  source = "git"
+  version = "1.0.12"
+}
+component "orm" {
+  owner = "A3S-Lab/ORM"
+  package = "a3s-orm"
+  path = "crates/orm"
+  repository = "git@github.com:A3S-Lab/ORM.git"
+  revision = "6fdeae38032a5134e858cf3985f47d60cb5180ac"
+  source = "git"
+  version = "0.1.0"
+}
+component "runtime" {
+  owner = "A3S-Lab/Runtime"
+  package = "a3s-runtime"
+  path = "crates/runtime"
+  repository = "git@github.com:A3S-Lab/Runtime.git"
+  revision = "cfaac63af6f76beebdc64a1ec228cedc42bb98ec"
+  source = "git"
+  version = "0.2.0"
+}
+component "sentry" {
+  owner = "A3S-Lab/Sentry"
+  package = "a3s-sentry"
+  path = "crates/sentry"
+  repository = "git@github.com:A3S-Lab/Sentry.git"
+  revision = "c1b45120662224fe1f3065d6888da0d291b4ff07"
+  source = "git"
+  version = "0.7.0"
+}
+component "updater" {
+  owner = "A3S-Lab/a3s"
+  package = "a3s-updater"
+  path = "crates/updater"
+  source = "workspace"
+  version = "0.3.0"
+}
+protocol "cloud-gateway-snapshot" {
+  level = 2
+  owner = "A3S-Lab/Cloud"
+  schema = "a3s.cloud.gateway-snapshot.v2"
+  source = "apps/cloud/crates/contracts/src/node/gateway.rs"
+}
+protocol "cloud-node-command" {
+  level = 1
+  owner = "A3S-Lab/Cloud"
+  schema = "a3s.cloud.node-command.v1"
+  source = "apps/cloud/crates/contracts/src/node/command.rs"
+}
+protocol "flow-native-typescript" {
+  level = 1
+  owner = "A3S-Lab/Flow"
+  schema = "a3s.flow.native_ts.v1"
+  source = "crates/flow/src/protocol.rs"
+}
+protocol "runtime-capabilities" {
+  level = 3
+  owner = "A3S-Lab/Runtime"
+  schema = "a3s.runtime.capabilities.v3"
+  source = "crates/runtime/src/contract/capabilities.rs"
+}
+protocol "runtime-observation" {
+  level = 2
+  owner = "A3S-Lab/Runtime"
+  schema = "a3s.runtime.observation.v2"
+  source = "crates/runtime/src/contract/observation.rs"
+}
+protocol "runtime-unit-spec" {
+  level = 2
+  owner = "A3S-Lab/Runtime"
+  schema = "a3s.runtime.unit-spec.v2"
+  source = "crates/runtime/src/contract/unit.rs"
+}

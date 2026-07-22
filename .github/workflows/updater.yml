@@ -1,0 +1,43 @@
+name: A3S Updater
+
+on:
+  pull_request:
+    paths:
+      - "crates/updater/**"
+      - ".github/workflows/updater.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/updater/**"
+      - ".github/workflows/updater.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Linux upgrade lifecycle
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crates/updater
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: crates/updater -> target
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Test all targets
+        run: cargo test --all-targets
+
+      - name: Lint all targets
+        run: cargo clippy --all-targets -- -D warnings

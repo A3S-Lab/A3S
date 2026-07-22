@@ -30,7 +30,6 @@ describe('Work Copilot panel', () => {
     };
     appState.modelCatalog = { defaultModel: '', warnings: [], items: [] };
     appState.effortLevels = [{ id: 'medium', label: 'Medium' }];
-    appState.activeEffort = 'medium';
     appState.taskConfigSaving = null;
     appState.modelChangeNotice = null;
   });

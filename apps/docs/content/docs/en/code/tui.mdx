@@ -99,7 +99,7 @@ fan-out, trusted runtime views, and engineered automation loops.
 | Models | `/model` switches configured ACL providers and signed-in account-backed model tabs when available. |
 | Effort | `/effort` changes thinking budget, tool-round budget, continuation count, and rigor guidance from `low` through `max` and `ultracode`. |
 | Tools and safety | File, search, shell, git, web, structured-output, MCP, PTC `program`, `task`, and `parallel_task` tools all pass through workspace boundaries, permission policy, HITL approval, timeouts, hooks, and traces. |
-| Application capabilities | A3S Use is prepared on first TUI use when policy allows, then projects built-in Browser, native Office, OCR, optional OfficeCLI compatibility, and installed signed external domains into a dedicated `use` worker. |
+| Application capabilities | A3S Use is prepared on first TUI use when policy allows, then projects built-in Browser, native Office, OCR, optional OfficeCLI compatibility, and installed signed external domains into a dedicated restricted `use` worker. |
 | Context and memory | The footer tracks context fill and auto-compaction. `/ctx` searches past sessions, `/ctx <n>` attaches a transcript window, `/ctx save <n>` promotes it to memory, `/sleep` consolidates the day, and `/memory` browses durable memories as an event/entity graph. |
 | Dynamic workflows | `ultracode` and `?` DeepResearch can use `DynamicWorkflowRuntime`, a local A3S Flow-backed runtime that records workflow and step history while sandboxed PTC scripts perform tool work. |
 | Parallel work | Local fan-out uses native host-side `parallel_task`. Dynamic workflows schedule a Flow step named `parallel_task` when they need local parallel subagents; QuickJS/PTC scripts do not call `parallel_task` directly. |
@@ -181,6 +181,23 @@ the worker preserves the evidence and stops.
 Structured MCP output is not flattened away: Code retains output schemas,
 `structuredContent`, images, text/blob resources, protocol metadata, and
 SHA-256-addressed bounded artifacts for the normal transcript/tool-result path.
+
+## Browser, Office, And OCR Through A3S Use
+
+A3S Use is an independently released first-use component. Before terminal
+takeover, `a3s code` reuses a healthy installation or installs the verified
+release when networking and automatic setup are allowed. `--offline`,
+`A3S_OFFLINE=1`, and `A3S_NO_AUTO_INSTALL=1` remain strict zero-network,
+zero-receipt boundaries. Setup failure is non-fatal; install the parent
+explicitly and restart Code once if first-use preparation was disabled or
+failed.
+
+When Use is ready, Code consumes its versioned registry and gives the initial
+MCP projection a separate bounded window. Browser, native Office, OCR, and
+installed extension routes are exposed only through a dedicated `use` worker.
+The primary model never sees raw `mcp__use_*` tools, and the worker cannot use
+the workspace, shell, unrelated MCP servers, or recursive delegation. Managed
+Skills provide domain guidance without widening that boundary.
 
 ## Interaction Model
 

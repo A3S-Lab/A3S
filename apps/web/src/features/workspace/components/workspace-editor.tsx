@@ -1,9 +1,11 @@
 import {
   ArrowLeft,
+  ArrowRight,
   CheckCircle2,
   ChevronRight,
   FileCode2,
   FileDiff,
+  FileSearch,
   LoaderCircle,
   MessageSquareText,
   Plus,
@@ -12,7 +14,7 @@ import {
   ShieldAlert,
   Wrench,
 } from 'lucide-react';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
 import { Button, IconButton, StateView } from '../../../design-system/primitives';
 import {
@@ -25,6 +27,11 @@ import {
 } from '../../../state/app-state';
 import type { WorkspaceActions } from '../workspace-actions';
 import { isFileEditorTabDirty, workspaceRelativePath } from '../workspace-state';
+import { type CodeEditorNavigationAction, CodeNavigationMenu } from './code-navigation-menu';
+import { LineEndingStatusControl } from './line-ending-status-control';
+import type { MonacoCodeEditorHandle } from './monaco-code-editor';
+import { workspaceEditorModelPath } from './monaco-editor-model-store';
+import type { MonacoEditorStatus } from './monaco-editor-status';
 import { WorkspaceEditorTabs } from './workspace-editor-tabs';
 import { WorkspaceFileIcon } from './workspace-file-icon';
 
@@ -37,12 +44,40 @@ const MonacoDiffEditor = lazy(() =>
 
 export function WorkspaceEditor({ actions }: { actions: WorkspaceActions }) {
   const state = useSnapshot(appState);
+  const rootRef = useRef<HTMLElement>(null);
+  const previousTabIdsRef = useRef(state.editorTabs.map((tab) => tab.id));
+  const previousActiveTabIdRef = useRef(state.activeEditorTabId);
+  const [pendingEditorFocusTabId, setPendingEditorFocusTabId] = useState<string | null>(null);
   const activeTab = state.editorTabs.find((tab) => tab.id === state.activeEditorTabId);
   const dark =
     state.theme === 'dark' || (state.theme === 'system' && document.documentElement.dataset.theme === 'dark');
 
+  useLayoutEffect(() => {
+    const currentTabIds = state.editorTabs.map((tab) => tab.id);
+    const removedTab = previousTabIdsRef.current.some((tabId) => !currentTabIds.includes(tabId));
+    const activeTabChanged = previousActiveTabIdRef.current !== state.activeEditorTabId;
+    previousTabIdsRef.current = currentTabIds;
+    previousActiveTabIdRef.current = state.activeEditorTabId;
+    if (!removedTab && !activeTabChanged) return;
+    const activeElement = document.activeElement;
+    const focusWasLost =
+      !(activeElement instanceof HTMLElement) || activeElement === document.body || !activeElement.isConnected;
+    if (!focusWasLost) return;
+    const target = state.activeEditorTabId
+      ? rootRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+      : rootRef.current?.querySelector<HTMLElement>('.workspace-editor-empty button');
+    target?.focus({ preventScroll: true });
+  }, [state.activeEditorTabId, state.editorTabs]);
+
+  const completeEditorFocusRequest = useCallback((tabId: string) => {
+    setPendingEditorFocusTabId((pendingTabId) => (pendingTabId === tabId ? null : pendingTabId));
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || !(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {
+        return;
+      }
       const modifier = event.metaKey || event.ctrlKey;
       if (modifier && event.key.toLowerCase() === 's' && activeTab?.kind === 'file') {
         event.preventDefault();
@@ -51,7 +86,14 @@ export function WorkspaceEditor({ actions }: { actions: WorkspaceActions }) {
       }
       if (modifier && event.key.toLowerCase() === 'w' && activeTab) {
         event.preventDefault();
+        const index = state.editorTabs.findIndex((tab) => tab.id === activeTab.id);
+        const next = state.editorTabs[index + 1] ?? state.editorTabs[index - 1];
+        const startedInEditor =
+          event.target instanceof Element && event.target.closest('.monaco-editor-surface') !== null;
         actions.closeEditorTab(activeTab.id);
+        if (startedInEditor && next && appState.activeEditorTabId === next.id) {
+          setPendingEditorFocusTabId(next.id);
+        }
         return;
       }
       if (event.ctrlKey && event.key === 'Tab' && state.editorTabs.length > 1) {
@@ -59,7 +101,18 @@ export function WorkspaceEditor({ actions }: { actions: WorkspaceActions }) {
         const index = state.editorTabs.findIndex((tab) => tab.id === state.activeEditorTabId);
         const offset = event.shiftKey ? -1 : 1;
         const next = state.editorTabs[(index + offset + state.editorTabs.length) % state.editorTabs.length];
+        const startedInEditor =
+          event.target instanceof Element && event.target.closest('.monaco-editor-surface') !== null;
+        setPendingEditorFocusTabId(startedInEditor ? next.id : null);
         actions.activateEditorTab(next.id);
+        return;
+      }
+      if (event.ctrlKey && !event.metaKey && !event.altKey && event.code === 'Minus') {
+        const navigate = event.shiftKey ? actions.navigateEditorForward : actions.navigateEditorBack;
+        const available = event.shiftKey ? actions.canNavigateEditorForward : actions.canNavigateEditorBack;
+        if (!available) return;
+        event.preventDefault();
+        void navigate();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -67,7 +120,7 @@ export function WorkspaceEditor({ actions }: { actions: WorkspaceActions }) {
   }, [actions, activeTab, state.activeEditorTabId, state.editorTabs]);
 
   return (
-    <main className='workspace-editor'>
+    <main ref={rootRef} className='workspace-editor'>
       <ReviewContext />
       <WorkspaceEditorTabs actions={actions} />
       {!activeTab ? (
@@ -81,11 +134,20 @@ export function WorkspaceEditor({ actions }: { actions: WorkspaceActions }) {
             activeTab.kind === 'diff' ? `差异 ${basename(activeTab.path)}` : `文件 ${basename(activeTab.path)}`
           }
         >
-          <EditorToolbar actions={actions} />
           {activeTab.kind === 'file' ? (
-            <FileEditorContent actions={actions} dark={dark} />
+            <FileEditorContent
+              actions={actions}
+              dark={dark}
+              focusRequested={pendingEditorFocusTabId === activeTab.id}
+              onFocusRequestHandled={completeEditorFocusRequest}
+            />
           ) : (
-            <DiffEditorContent actions={actions} dark={dark} />
+            <DiffEditorContent
+              actions={actions}
+              dark={dark}
+              focusRequested={pendingEditorFocusTabId === activeTab.id}
+              onFocusRequestHandled={completeEditorFocusRequest}
+            />
           )}
         </section>
       )}
@@ -93,7 +155,13 @@ export function WorkspaceEditor({ actions }: { actions: WorkspaceActions }) {
   );
 }
 
-function EditorToolbar({ actions }: { actions: WorkspaceActions }) {
+function EditorToolbar({
+  actions,
+  codeNavigation,
+}: {
+  actions: WorkspaceActions;
+  codeNavigation?: { disabled: boolean; onSelect: (action: CodeEditorNavigationAction) => void };
+}) {
   const state = useSnapshot(appState);
   const tab = state.editorTabs.find((candidate) => candidate.id === state.activeEditorTabId);
   if (!tab) return null;
@@ -115,6 +183,23 @@ function EditorToolbar({ actions }: { actions: WorkspaceActions }) {
         {dirty && <em className='workspace-unsaved-label'>未保存</em>}
       </div>
       <div className='workspace-editor-actions'>
+        <IconButton
+          label='返回上一个编辑位置'
+          tooltip='返回上一个编辑位置 (Ctrl -)'
+          disabled={!actions.canNavigateEditorBack}
+          onClick={() => void actions.navigateEditorBack()}
+        >
+          <ArrowLeft size={14} />
+        </IconButton>
+        <IconButton
+          label='前往下一个编辑位置'
+          tooltip='前往下一个编辑位置 (Ctrl Shift -)'
+          disabled={!actions.canNavigateEditorForward}
+          onClick={() => void actions.navigateEditorForward()}
+        >
+          <ArrowRight size={14} />
+        </IconButton>
+        {codeNavigation && <CodeNavigationMenu {...codeNavigation} />}
         {tab.kind === 'diff' && (
           <IconButton
             label='打开文件'
@@ -148,20 +233,54 @@ function EditorToolbar({ actions }: { actions: WorkspaceActions }) {
   );
 }
 
-function FileEditorContent({ actions, dark }: { actions: WorkspaceActions; dark: boolean }) {
+function FileEditorContent({
+  actions,
+  dark,
+  focusRequested,
+  onFocusRequestHandled,
+}: {
+  actions: WorkspaceActions;
+  dark: boolean;
+  focusRequested: boolean;
+  onFocusRequestHandled: (tabId: string) => void;
+}) {
   const state = useSnapshot(appState);
   const tab = state.editorTabs.find((candidate) => candidate.id === state.activeEditorTabId);
+  const editorRef = useRef<MonacoCodeEditorHandle>(null);
+  const [readyEditorModelPath, setReadyEditorModelPath] = useState<string | null>(null);
   const [intelligenceStatus, setIntelligenceStatus] = useState('代码导航连接中');
+  const [editorStatus, setEditorStatus] = useState<{
+    modelPath: string;
+    value: MonacoEditorStatus | null;
+  } | null>(null);
   useEffect(() => {
     setIntelligenceStatus('代码导航连接中');
   }, [tab?.id]);
   if (tab?.kind !== 'file') return null;
+  const editorModelPath = workspaceEditorModelPath(state.editorModelScope, tab.path);
   const dirty = isFileEditorTabDirty(tab);
   const isConfig = basename(tab.path) === 'config.acl';
   const selectingContext = state.reviewIntent === 'select-context';
+  const activeEditorStatus = editorStatus?.modelPath === editorModelPath ? editorStatus.value : null;
+  const selectionStatus = activeEditorStatus ? editorSelectionStatus(activeEditorStatus) : null;
+  const editorReady = readyEditorModelPath === editorModelPath;
 
   return (
     <>
+      <EditorToolbar
+        actions={actions}
+        codeNavigation={
+          !tab.isBinary && !tab.loading && !tab.loadError
+            ? {
+                disabled: !editorReady,
+                onSelect: (action) => {
+                  if (action === 'outline') editorRef.current?.showOutline();
+                  else editorRef.current?.navigate(action);
+                },
+              }
+            : undefined
+        }
+      />
       {isConfig && !tab.isBinary && tab.configValidation && (
         <section
           className={`config-validation ${tab.configValidation.valid ? 'valid' : 'invalid'}`}
@@ -236,8 +355,9 @@ function FileEditorContent({ actions, dark }: { actions: WorkspaceActions; dark:
             fallback={<EditorState icon={<LoaderCircle className='spin' size={18} />} title='正在启动编辑器' />}
           >
             <MonacoCodeEditor
-              key={tab.id}
+              ref={editorRef}
               path={tab.path}
+              modelPath={editorModelPath}
               value={tab.draft}
               location={tab.location}
               readOnly={selectingContext}
@@ -250,6 +370,25 @@ function FileEditorContent({ actions, dark }: { actions: WorkspaceActions; dark:
               onClose={() => actions.closeEditorTab(tab.id)}
               onNavigate={actions.selectFile}
               onStatusChange={setIntelligenceStatus}
+              onEditorStatusChange={(value) => {
+                setEditorStatus({ modelPath: editorModelPath, value });
+                if (value) {
+                  actions.updateEditorPosition?.(tab.id, {
+                    line: value.lineNumber,
+                    column: value.column,
+                  });
+                }
+              }}
+              onLocationApplied={() => actions.consumeEditorLocation(tab.id)}
+              onReadyChange={(ready) => {
+                setReadyEditorModelPath((readyModelPath) => {
+                  if (ready) return editorModelPath;
+                  return readyModelPath === editorModelPath ? null : readyModelPath;
+                });
+                if (ready && focusRequested && editorRef.current?.focus()) {
+                  onFocusRequestHandled(tab.id);
+                }
+              }}
             />
           </Suspense>
         )}
@@ -258,8 +397,19 @@ function FileEditorContent({ actions, dark }: { actions: WorkspaceActions; dark:
         left={languageLabel(tab.path)}
         items={[
           selectingContext ? '只读' : dirty ? '未保存' : '已保存',
-          'UTF-8',
-          'LF',
+          ...(activeEditorStatus
+            ? [
+                `行 ${activeEditorStatus.lineNumber}，列 ${activeEditorStatus.column}`,
+                ...(selectionStatus ? [selectionStatus] : []),
+                'UTF-8',
+                <LineEndingStatusControl
+                  key='line-ending'
+                  value={activeEditorStatus.lineEnding}
+                  disabled={selectingContext}
+                  onChange={(lineEnding) => editorRef.current?.setLineEnding(lineEnding)}
+                />,
+              ]
+            : []),
           ...(!tab.isBinary && !tab.loading && !tab.loadError ? [intelligenceStatus] : []),
         ]}
       />
@@ -267,12 +417,23 @@ function FileEditorContent({ actions, dark }: { actions: WorkspaceActions; dark:
   );
 }
 
-function DiffEditorContent({ actions, dark }: { actions: WorkspaceActions; dark: boolean }) {
+function DiffEditorContent({
+  actions,
+  dark,
+  focusRequested,
+  onFocusRequestHandled,
+}: {
+  actions: WorkspaceActions;
+  dark: boolean;
+  focusRequested: boolean;
+  onFocusRequestHandled: (tabId: string) => void;
+}) {
   const state = useSnapshot(appState);
   const tab = state.editorTabs.find((candidate) => candidate.id === state.activeEditorTabId);
   if (tab?.kind !== 'diff') return null;
   return (
     <>
+      <EditorToolbar actions={actions} />
       <div className='workspace-editor-content'>
         {tab.loading ? (
           <EditorState icon={<LoaderCircle className='spin' size={18} />} title='正在生成差异' />
@@ -307,6 +468,8 @@ function DiffEditorContent({ actions, dark }: { actions: WorkspaceActions; dark:
               original={tab.original}
               modified={tab.modified}
               dark={dark}
+              focusOnMount={focusRequested}
+              onFocusOnMount={() => onFocusRequestHandled(tab.id)}
             />
           </Suspense>
         )}
@@ -334,6 +497,15 @@ function WorkspaceEditorEmpty() {
         }
       >
         <div className='workspace-editor-shortcuts'>
+          <Button
+            tone='quiet'
+            onClick={() => {
+              appState.fileQuickOpenOpen = true;
+            }}
+          >
+            <FileSearch size={13} />
+            快速打开 <kbd>⌘/Ctrl P</kbd>
+          </Button>
           <span>
             保存 <kbd>⌘/Ctrl S</kbd>
           </span>
@@ -376,14 +548,20 @@ function EditorState({
   );
 }
 
-function EditorStatusBar({ left, items }: { left: string; items: string[] }) {
+function EditorStatusBar({ left, items }: { left: string; items: Array<string | React.ReactElement> }) {
   return (
     <footer className='workspace-editor-statusbar'>
       <span>{left}</span>
       <div>
-        {items.map((item) => (
-          <span key={item}>{item}</span>
-        ))}
+        {items.map((item, index) =>
+          typeof item === 'string' ? (
+            <span key={`${item}:${index}`} title={item}>
+              {item}
+            </span>
+          ) : (
+            item
+          )
+        )}
       </div>
     </footer>
   );
@@ -505,6 +683,14 @@ function languageLabel(path: string): string {
     yml: 'YAML',
   };
   return (extension && labels[extension]) || '纯文本';
+}
+
+function editorSelectionStatus(status: MonacoEditorStatus): string | null {
+  if (status.selectedCharacters > 0) {
+    const locations = status.selectionCount > 1 ? `（${status.selectionCount} 处）` : '';
+    return `已选择 ${status.selectedCharacters} 个字符${locations}`;
+  }
+  return status.selectionCount > 1 ? `${status.selectionCount} 个光标` : null;
 }
 
 function basename(path: string): string {

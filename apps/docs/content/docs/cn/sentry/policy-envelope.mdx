@@ -1,0 +1,102 @@
+---
+title: Workload Policy Envelope
+description: Canonical ACL policy bytes、immutable workload identity binding、精确 trusted-state verification 和 enforcement boundaries。
+---
+
+# Workload Policy Envelope
+
+`PolicyEnvelope` 是 Sentry 把一份 native ACL policy 分配给一个 workload
+instance 时使用的 immutable admission contract。它绑定：
+
+- workload ID；
+- immutable workload revision ID；
+- durable replica ID；
+- node ID；
+- positive policy generation；以及
+- canonical policy payload 的 lowercase SHA-256 digest。
+
+该 API 当前由 Rust crate 暴露，并使用 `a3s-acl` `0.3.0` 完成 bounded parsing、
+canonical bytes 和 digest generation。
+
+## Canonical Wire Form
+
+Envelope 由一个 `policy_envelope` root object 和一个或多个 block-based policy
+items 组成：
+
+```text
+policy_envelope = {generation = 7, node_id = "node-01", policy_digest = "sha256:fedb025bd0e08c2a9975ac38ce1522613ba2b51b0070acfac84031938fe72cbc", replica_id = "replica-01", revision_id = "revision-sha256-abc", version = 1, workload_id = "workload-01"}
+runtime_policy "sentry-v1" {
+  default = "deny"
+  egress {
+    mode = "allowlist"
+  }
+}
+```
+
+Digest 只覆盖 header 之后的 canonical policy blocks。
+`PolicyEnvelope::from_policy_acl` 接受普通 native ACL formatting，并输出精确的
+canonical wire form。`PolicyEnvelope::parse` 只 admission 这些 canonical
+bytes，从 node boundary 消除 comment、whitespace、line-ending 和
+duplicate-field ambiguity。
+
+## Produce And Verify
+
+```rust
+use a3s_sentry::{PolicyBinding, PolicyEnvelope, PolicyExpectation};
+
+let binding = PolicyBinding::new(
+    "workload-01",
+    "revision-sha256-abc",
+    "replica-01",
+    "node-01",
+)?;
+let envelope = PolicyEnvelope::from_policy_acl(
+    binding.clone(),
+    7,
+    r#"
+runtime_policy "sentry-v1" {
+  default = "deny"
+  egress { mode = "allowlist" }
+}
+"#,
+)?;
+
+let received = PolicyEnvelope::parse(envelope.canonical_acl())?;
+let expected = PolicyExpectation::new(binding, 7, envelope.policy_digest())?;
+received.verify(&expected)?;
+```
+
+Expected binding、generation 和 digest 必须来自 trusted desired state，
+不能来自收到的 envelope。Verification 会分别拒绝每个 identity dimension、
+更低或更高的 generation，以及任何 digest mismatch。
+
+## Admission Invariants
+
+| Invariant | Required behavior |
+| --- | --- |
+| Header | 恰好一个 `policy_envelope` object，且位于 document 第一项。 |
+| Version | 必须是 `1`。 |
+| Identity | 非空，最多 256 UTF-8 bytes，不含 whitespace 或 control characters。 |
+| Generation | `1..=2^53-1`，与 trusted desired state 精确匹配。 |
+| Digest | `sha256:` 加 64 个 lowercase hexadecimal digits，并根据 canonical policy bytes 重新计算。 |
+| Payload | 非空 top-level blocks；拒绝 root attributes 和另一个 `policy_envelope`。 |
+| Wire bytes | Native ACL canonical UTF-8、LF line endings、一个 final newline。 |
+| Resource budget | Producer output 与 parser input 为 1 MiB；depth 32；collection 10,000；token 64 KiB；20 diagnostics。 |
+
+Schema 和 contract errors 不会回显 policy 或 identity values。Policy 不应包含
+secret plaintext；secret material 应通过独立授权的 delivery mechanism 引用。
+
+## Enforcement And Readiness Boundary
+
+Verification 成功不证明 egress、exec 或 file controls 已到达 Linux backend。
+在 capability-specific closed schema admission 其语义前，payload blocks 仍是
+opaque data。
+
+当前 deny-file `Enforcer` 是 node-global 且 identity-blind。它不会消费
+`PolicyEnvelope`、原子应用 workload-scoped capabilities、在 restart 后重建
+applied state，或报告 digest-bound readiness evidence。不能仅因为 envelope
+verification 成功就让 workload 进入 ready。
+
+Typed enforcement、restart-safe replacement、readiness gating、redacted audit
+evidence 和 Linux fault fixtures 仍由
+[`A3S-Lab/Sentry#2`](https://github.com/A3S-Lab/Sentry/issues/2) 跟踪。

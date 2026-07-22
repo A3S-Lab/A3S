@@ -3,6 +3,7 @@ import {
   ChevronRight,
   Copy,
   FilePlus2,
+  FileSearch,
   FileText,
   FolderOpen,
   FolderPlus,
@@ -13,7 +14,7 @@ import {
   Search,
   Trash2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
 import { Button, CollectionState, IconButton, SearchField } from '../../../design-system/primitives';
 import { appState } from '../../../state/app-state';
@@ -23,6 +24,7 @@ import { isFileEditorTabDirty, normalizePath, workspaceRelativePath } from '../w
 import { WorkspaceContextMenu, type WorkspaceContextMenuItem } from './workspace-context-menu';
 import { WorkspaceFileIcon } from './workspace-file-icon';
 import { type WorkspaceInlineAction, WorkspaceInlineEntry, workspaceInlineActionKey } from './workspace-inline-entry';
+import { type ExplorerTreeProjection, useWorkspaceExplorerTree } from './use-workspace-explorer-tree';
 
 interface ContextMenuState {
   entry: Readonly<WorkspaceEntry> | null;
@@ -30,16 +32,71 @@ interface ContextMenuState {
   y: number;
 }
 
+interface InlineFocusOrigin {
+  element: HTMLElement | null;
+  path: string | null;
+  index: number;
+}
+
 export function WorkspaceExplorer({ actions, onOpenSearch }: { actions: WorkspaceActions; onOpenSearch: () => void }) {
   const state = useSnapshot(appState);
   const [query, setQuery] = useState('');
+  const [restoreInlineFocus, setRestoreInlineFocus] = useState(false);
   const [inlineAction, setInlineAction] = useState<WorkspaceInlineAction | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const inlineFocusOriginRef = useRef<InlineFocusOrigin | null>(null);
+  const activeTab = state.editorTabs.find((tab) => tab.id === state.activeEditorTabId);
+  const activePath =
+    activeTab?.kind === 'file'
+      ? activeTab.path
+      : activeTab?.kind === 'diff'
+        ? absoluteWorkspacePath(activeTab.path, state.workspaceRoot)
+        : null;
+  const { tree, rovingPath, setFocusedPath, registerItem, focusItem, handleKeyDown } = useWorkspaceExplorerTree({
+    root: state.workspaceRoot,
+    filesByDirectory: state.filesByDirectory,
+    expandedDirectories: state.expandedDirectories,
+    query,
+    activePath,
+    toggleDirectory: actions.toggleDirectory,
+  });
   const closeContextMenu = () => setContextMenu(null);
   const updateInlineAction = (action: WorkspaceInlineAction | null) => {
     closeContextMenu();
+    if (action) {
+      const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      const returnElement = activeElement?.closest('.workspace-context-menu') ? null : activeElement;
+      const path = 'entry' in action ? action.entry.path : rovingPath;
+      inlineFocusOriginRef.current = {
+        element: returnElement,
+        path,
+        index: path ? (tree.itemByPath.get(path)?.index ?? -1) : -1,
+      };
+      if (path) setFocusedPath(path);
+      setRestoreInlineFocus(false);
+    } else if (inlineFocusOriginRef.current) {
+      setRestoreInlineFocus(true);
+    }
     setInlineAction(action);
   };
+  useLayoutEffect(() => {
+    if (!restoreInlineFocus || inlineAction) return;
+    const origin = inlineFocusOriginRef.current;
+    const fallbackIndex = Math.min(Math.max(origin?.index ?? 0, 0), Math.max(tree.items.length - 1, 0));
+    const fallbackPath =
+      (origin?.path && tree.itemByPath.has(origin.path) ? origin.path : null) ??
+      (activePath && tree.itemByPath.has(activePath) ? activePath : null) ??
+      tree.items[fallbackIndex]?.entry.path ??
+      null;
+    if (origin?.element?.isConnected) {
+      origin.element.focus({ preventScroll: true });
+      origin.element.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    } else if (fallbackPath) {
+      focusItem(fallbackPath);
+    }
+    inlineFocusOriginRef.current = null;
+    setRestoreInlineFocus(false);
+  }, [activePath, focusItem, inlineAction, restoreInlineFocus, tree]);
   const contextItems = contextMenuItems(
     contextMenu?.entry ?? null,
     state.expandedDirectories,
@@ -54,18 +111,26 @@ export function WorkspaceExplorer({ actions, onOpenSearch }: { actions: Workspac
           <strong>{basename(state.workspaceRoot)}</strong>
         </div>
         <span className='explorer-header-actions'>
+          <IconButton
+            label='快速打开文件'
+            onClick={() => {
+              appState.fileQuickOpenOpen = true;
+            }}
+          >
+            <FileSearch size={15} />
+          </IconButton>
           <IconButton label='全局搜索' onClick={onOpenSearch}>
             <Search size={15} />
           </IconButton>
           <IconButton
             label='新建文件'
-            onClick={() => setInlineAction({ kind: 'create-file', parent: state.workspaceRoot })}
+            onClick={() => updateInlineAction({ kind: 'create-file', parent: state.workspaceRoot })}
           >
             <Plus size={15} />
           </IconButton>
           <IconButton
             label='新建文件夹'
-            onClick={() => setInlineAction({ kind: 'create-directory', parent: state.workspaceRoot })}
+            onClick={() => updateInlineAction({ kind: 'create-directory', parent: state.workspaceRoot })}
           >
             <FolderPlus size={15} />
           </IconButton>
@@ -91,6 +156,8 @@ export function WorkspaceExplorer({ actions, onOpenSearch }: { actions: Workspac
         className='workspace-tree'
         role='tree'
         aria-label='工作区文件树'
+        aria-orientation='vertical'
+        onKeyDown={handleKeyDown}
         onContextMenu={(event) => {
           event.preventDefault();
           setContextMenu({ entry: null, x: event.clientX, y: event.clientY });
@@ -100,11 +167,16 @@ export function WorkspaceExplorer({ actions, onOpenSearch }: { actions: Workspac
           directory={state.workspaceRoot}
           query={query}
           depth={0}
+          tree={tree}
+          activePath={activePath}
+          rovingPath={rovingPath}
           actions={actions}
           inlineAction={inlineAction}
           contextMenuPath={contextMenu?.entry?.path ?? null}
           onInlineAction={updateInlineAction}
           onContextMenu={(entry, x, y) => setContextMenu({ entry, x, y })}
+          onEntryFocus={setFocusedPath}
+          onEntryRef={registerItem}
         />
       </div>
       {contextMenu && (
@@ -124,43 +196,36 @@ function Directory({
   directory,
   query,
   depth,
+  tree,
+  activePath,
+  rovingPath,
   actions,
   inlineAction,
   contextMenuPath,
   onInlineAction,
   onContextMenu,
+  onEntryFocus,
+  onEntryRef,
 }: {
   directory: string;
   query: string;
   depth: number;
+  tree: ExplorerTreeProjection;
+  activePath: string | null;
+  rovingPath: string | null;
   actions: WorkspaceActions;
   inlineAction: WorkspaceInlineAction | null;
   contextMenuPath: string | null;
   onInlineAction: (action: WorkspaceInlineAction | null) => void;
   onContextMenu: (entry: Readonly<WorkspaceEntry>, x: number, y: number) => void;
+  onEntryFocus: (path: string) => void;
+  onEntryRef: (path: string, element: HTMLButtonElement | null) => void;
 }) {
   const state = useSnapshot(appState);
-  const activeTab = state.editorTabs.find((tab) => tab.id === state.activeEditorTabId);
-  const activePath =
-    activeTab?.kind === 'file'
-      ? activeTab.path
-      : activeTab?.kind === 'diff'
-        ? absoluteWorkspacePath(activeTab.path, state.workspaceRoot)
-        : null;
   const entries = state.filesByDirectory[directory] ?? [];
   const loading = state.directoryLoading[directory];
   const error = state.directoryErrors[directory];
-  const normalizedQuery = query.trim().toLowerCase();
-  const hasLoadedMatch = (path: string): boolean =>
-    (state.filesByDirectory[path] ?? []).some(
-      (entry) => entry.name.toLowerCase().includes(normalizedQuery) || (entry.isDirectory && hasLoadedMatch(entry.path))
-    );
-  const visible = entries.filter(
-    (entry) =>
-      !normalizedQuery ||
-      entry.name.toLowerCase().includes(normalizedQuery) ||
-      (entry.isDirectory && hasLoadedMatch(entry.path))
-  );
+  const visible = entries.filter((entry) => tree.visiblePaths.has(entry.path));
   const createAction =
     inlineAction &&
     (inlineAction.kind === 'create-file' || inlineAction.kind === 'create-directory') &&
@@ -215,26 +280,28 @@ function Directory({
             />
           );
         }
-        const expanded = Boolean(state.expandedDirectories[entry.path]);
-        const matchingDescendant = Boolean(normalizedQuery && entry.isDirectory && hasLoadedMatch(entry.path));
-        const displayExpanded = expanded || matchingDescendant;
+        const displayExpanded = tree.displayExpandedPaths.has(entry.path);
         const relativePath = normalizePath(workspaceRelativePath(entry.path, state.workspaceRoot));
         const gitFile = state.gitStatus?.files.find((file) => normalizePath(file.path) === relativePath);
         const gitDecoration = gitFile ? gitStatusDecoration(gitFile.indexStatus, gitFile.worktreeStatus) : null;
         return (
           <div className='explorer-entry' key={entry.path}>
             <button
+              ref={(element) => onEntryRef(entry.path, element)}
               type='button'
               role='treeitem'
+              data-explorer-path={entry.path}
               aria-expanded={entry.isDirectory ? displayExpanded : undefined}
               aria-level={depth + 1}
               aria-selected={activePath === entry.path}
+              tabIndex={rovingPath === entry.path ? 0 : -1}
               className={`explorer-row ${activePath === entry.path ? 'active' : ''} ${contextMenuPath === entry.path ? 'contextual' : ''}`}
               style={{ paddingLeft: 9 + depth * 14 }}
               onClick={() => {
                 if (entry.isDirectory) void actions.toggleDirectory(entry.path);
                 else void actions.selectFile(entry);
               }}
+              onFocus={() => onEntryFocus(entry.path)}
               onContextMenu={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -242,14 +309,20 @@ function Directory({
                 onContextMenu(entry, event.clientX, event.clientY);
               }}
               onKeyDown={(event) => {
-                if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
-                  event.preventDefault();
-                  const bounds = event.currentTarget.getBoundingClientRect();
-                  onContextMenu(entry, bounds.left + Math.min(bounds.width, 180), bounds.bottom);
-                } else if (event.key === 'F2') {
+                if (event.key === 'F2') {
                   event.preventDefault();
                   onInlineAction({ kind: 'rename', entry });
+                  return;
                 }
+                if (event.key === 'Delete') {
+                  event.preventDefault();
+                  onInlineAction({ kind: 'delete', entry });
+                  return;
+                }
+                if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
+                event.preventDefault();
+                const bounds = event.currentTarget.getBoundingClientRect();
+                onContextMenu(entry, bounds.left + Math.min(bounds.width, 180), bounds.bottom);
               }}
             >
               <span>
@@ -272,11 +345,16 @@ function Directory({
                 directory={entry.path}
                 query={query}
                 depth={depth + 1}
+                tree={tree}
+                activePath={activePath}
+                rovingPath={rovingPath}
                 actions={actions}
                 inlineAction={inlineAction}
                 contextMenuPath={contextMenuPath}
                 onInlineAction={onInlineAction}
                 onContextMenu={onContextMenu}
+                onEntryFocus={onEntryFocus}
+                onEntryRef={onEntryRef}
               />
             )}
           </div>
@@ -354,6 +432,7 @@ function contextMenuItems(
     {
       id: 'rename',
       label: '重命名',
+      ariaLabel: '重命名',
       icon: <Pencil size={14} />,
       shortcut: 'F2',
       ariaKeyShortcut: 'F2',
@@ -369,7 +448,10 @@ function contextMenuItems(
     {
       id: 'delete',
       label: '删除',
+      ariaLabel: '删除',
       icon: <Trash2 size={14} />,
+      shortcut: 'Delete',
+      ariaKeyShortcut: 'Delete',
       danger: true,
       separatorBefore: true,
       onSelect: () => onInlineAction({ kind: 'delete', entry }),

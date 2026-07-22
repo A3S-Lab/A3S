@@ -1,6 +1,6 @@
 ---
 title: Pipeline
-description: L1 rules、L2 LLM、L3 A3S Code investigation、SAE signals、fail posture 与 speculative parallelism。
+description: L1 rules、L2 LLM、staged L3 dispatch、incomplete-evidence safeguards、SAE signals、fail posture 与 speculation。
 ---
 
 # Sentry Pipeline
@@ -34,12 +34,23 @@ ACL policy 文件提供，并支持热加载。
 
 L1 是快速 triage 层，不是 sandbox。它刻意保守：遇到模糊情况就 escalate，而不是猜测。
 
+对于 `ToolExec`，Observer 会在无法捕获完整 command 时报告
+`argv_truncated` 或 `argv_incomplete`。危险的已捕获 prefix 仍可直接 block；
+其它不明确的 incomplete command 会保留为 L1 escalation。进程内 L2/L3 judge
+不会猜测缺失 suffix 是 benign。
+
 ## L2 和 L3
 
 L2 是事件分类器，适合 false-positive reduction 和快速语义判断。
 
 L3 是真实 A3S Code agent。它加载安全技能，考虑 actor、观察到的 event、可能 attack chain
 和 blast radius，然后返回结构化 verdict。它更慢，但更深。
+
+需要把快速判断与深度 investigation 分离的产品可以调用
+`Pipeline::evaluate_through_l2`。它返回 L1 decision、可选 L2 decision、
+effective decision、stage status 和 escalation cause，且不会调用 L3、
+应用 `fail_closed` 或启动 speculative L3。`Escalated` result 是需要持久化并
+dispatch 到 durable external L3 worker 的工作，不是 allow。
 
 ## Speculation
 
@@ -53,3 +64,6 @@ Sentry 默认 fail-open：无法解决的 escalation 会 allow。只有在部署
 或采用能承受 unknown blocking 的 allow-list 姿态时，才应启用 fail-closed。
 
 Rules-only fail-open 模式能执行直接 `block` 的规则，但不会执行只 `escalate` 的规则。
+Incomplete `ToolExec` evidence 是例外：无论 fail mode 如何，它都保留为
+unresolved L1 escalation。Bundled daemon 会 audit 这个 result，但不提供
+durable external L3 queue。

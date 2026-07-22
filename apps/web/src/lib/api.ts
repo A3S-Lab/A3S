@@ -54,6 +54,16 @@ interface ApiEnvelope<T> {
   message?: string;
 }
 
+export interface WorkspaceSearchRequestOptions {
+  excludePattern?: string;
+  maxResults?: number;
+}
+
+export interface WorkspaceWritePrecondition {
+  expectedRevision?: string;
+  expectedContent?: string;
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly details?: unknown;
@@ -439,10 +449,10 @@ export const codeApi = {
       method: 'DELETE',
       signal,
     }),
-  pickWorkspaceDirectory: () =>
+  pickWorkspaceDirectory: (initialPath?: string) =>
     apiRequest<WorkspaceDirectorySelection>('/api/v1/workspace/actions/pick-directory', {
       method: 'POST',
-      ...jsonBody({}),
+      ...jsonBody(initialPath ? { initialPath } : {}),
     }),
   readDir: async (path: string) => {
     const entries = await apiRequest<Omit<WorkspaceEntry, 'path'>[]>(
@@ -478,12 +488,12 @@ export const codeApi = {
       `/api/v1/workspace/files?rootPath=${encodeURIComponent(rootPath)}&query=${encodeURIComponent(query)}&maxResults=${maxResults}`
     ),
   readFile: (path: string) =>
-    apiRequest<{ content: string }>(`/api/v1/workspace/read?path=${encodeURIComponent(path)}`),
+    apiRequest<{ content: string; revision?: string }>(`/api/v1/workspace/read?path=${encodeURIComponent(path)}`),
   readBinaryFile: (path: string) => binaryApiRequest(`/api/v1/workspace/read-binary?path=${encodeURIComponent(path)}`),
-  writeFile: (path: string, content: string) =>
-    apiRequest<{ success: boolean }>('/api/v1/workspace/write', {
+  writeFile: (path: string, content: string, precondition: WorkspaceWritePrecondition = {}) =>
+    apiRequest<{ success: boolean; revision?: string }>('/api/v1/workspace/write', {
       method: 'POST',
-      ...jsonBody({ path, content }),
+      ...jsonBody({ path, content, ...precondition }),
     }),
   writeBinaryFile: (path: string, data: Uint8Array, append = false) =>
     apiRequest<{ success: boolean }>('/api/v1/workspace/write-binary', {
@@ -517,9 +527,13 @@ export const codeApi = {
       method: 'POST',
       ...jsonBody({ rootPath, message }),
     }),
-  searchWorkspace: (rootPath: string, query: string) =>
+  searchWorkspace: (
+    rootPath: string,
+    query: string,
+    { excludePattern, maxResults = 300 }: WorkspaceSearchRequestOptions = {}
+  ) =>
     apiRequest<WorkspaceSearchFile[]>(
-      `/api/v1/workspace/search?rootPath=${encodeURIComponent(rootPath)}&query=${encodeURIComponent(query)}&maxResults=300`
+      `/api/v1/workspace/search${apiQuery({ rootPath, query, excludePattern, maxResults })}`
     ),
   codeIntelligenceStatus: ({ sessionId, signal }: CodeIntelligenceRequestOptions = {}) =>
     apiRequest<CodeIntelligenceStatus>(`/api/v1/workspace/code-intelligence/status${apiQuery({ sessionId })}`, {

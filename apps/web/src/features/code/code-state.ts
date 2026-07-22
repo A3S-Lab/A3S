@@ -24,6 +24,7 @@ export interface CodeShellState {
   taskView: TaskView;
   settingsOpen: boolean;
   commandPaletteOpen: boolean;
+  fileQuickOpenOpen: boolean;
   toast: ToastState | null;
 }
 
@@ -70,6 +71,7 @@ export function createCodeShellState(): CodeShellState {
     taskView: readTaskView(),
     settingsOpen: readSettingsOpen(),
     commandPaletteOpen: false,
+    fileQuickOpenOpen: false,
     toast: null,
   };
 }

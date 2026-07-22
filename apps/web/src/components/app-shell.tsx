@@ -16,6 +16,7 @@ import { WorkProduct } from '../features/work/pages/work-product';
 import { appState } from '../state/app-state';
 import { ActivityBar } from './activity-bar';
 import { CommandPalette } from './shell/command-palette';
+import { WorkspaceQuickOpen } from '../features/workspace/components/workspace-quick-open';
 
 export function AppShell({
   actions,
@@ -80,6 +81,7 @@ export function AppShell({
         </output>
       )}
       {state.activeProduct === 'code' && state.commandPaletteOpen && <CommandPalette actions={actions} />}
+      {state.activeProduct === 'code' && state.fileQuickOpenOpen && <WorkspaceQuickOpen actions={actions} />}
     </main>
   );
 }

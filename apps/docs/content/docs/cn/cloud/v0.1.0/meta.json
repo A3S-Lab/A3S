@@ -1,0 +1,4 @@
+{
+  "title": "Cloud 0.1.0",
+  "pages": ["index", "install-upgrade", "recovery", "node-operations", "interfaces", "runbooks"]
+}

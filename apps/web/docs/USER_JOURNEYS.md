@@ -59,14 +59,18 @@ task that produced it.
    preview target, or changed-file list.
 5. Selecting another artifact updates the viewport without resetting
    Conversation, Composer, or unrelated tabs.
-6. Full screen expands the same workspace state. Closing restores full
-   Conversation width and returns focus to the opening control.
+6. The task-context header or command palette expands the same workspace
+   instance to the full content area. Escape or the same header action restores
+   the docked layout; closing restores full Conversation width.
 7. Reopening Results restores the task's last safe mode, tabs, selection, size,
    and relevant scroll position.
 
 **Recovery:** a failed artifact load retains the previous content and failed
 target with one in-context retry. A dirty artifact blocks destructive close,
-reload, and task switching until explicitly resolved.
+reload, replacement, or overwrite until explicitly resolved. Switching tasks
+snapshots the dirty draft inside its originating task and restores it on return,
+so navigation itself remains non-destructive. A normal page refresh restores
+the same browser-local dirty tab without saving it to the workspace.
 
 **Acceptance outcome:** the right workspace feels like an extension of the
 selected result, not a separate IDE or disconnected feature panel.
@@ -78,22 +82,67 @@ originating task.
 
 1. The user opens Files from an artifact entry or the mode switcher.
 2. The navigator exposes the workspace tree and search without hiding the active
-   file.
+   file. `Cmd/Ctrl+P` can instead find a file by exact name, path fragment, or
+   fuzzy subsequence without expanding directories; open tabs appear first and
+   retain their drafts.
 3. A selected text file opens in a Monaco tab; additional file and diff tabs
    preserve their own view and dirty state. Binary content renders as read-only
-   metadata.
-4. The user may edit, switch tabs, and save without losing other drafts. Dirty
-   content blocks tab close, replacement, destructive reload, and deletion only
-   when those actions would discard or overwrite that content.
-5. Search opens a match at its exact location. A failed read keeps Search and
-   the prior artifact intact. Replace uses the displayed result set's query and
-   a confirmed scope.
-6. Supported configuration can be validated. A failure can be appended to the
+   metadata. Source modules, configuration, and lockfiles stay on the text path;
+   an unfamiliar extension is content-sampled before it is treated as binary.
+   When open files share a basename, each tab shows the shortest parent suffix
+   that identifies it without requiring hover. Arrow, Home, and End keys move
+   through the tab strip; deleting or closing the focused tab continues at its
+   successor instead of dropping focus into the document body.
+   Returning to an open text tab in the same page restores its undo/redo stack,
+   cursor and selections, folding, and scroll position. The same path opened by
+   another task has an isolated model. A search or semantic jump chooses the
+   initial location once and does not overwrite that restored view on later
+   returns. Renaming the file or one of its parent directories keeps that same
+   model, editing history, status, and view under the new path. If another file
+   then appears at the former path, opening it creates an independent model
+   instead of inheriting the renamed document's state.
+4. The file toolbar provides one discoverable menu for definition, declaration,
+   references, implementations, and file outline. Keyboard and Monaco context
+   menu actions reach the same saved-document navigation. Back and Forward
+   controls return to the exact source or target caret after file, search, or
+   semantic navigation; `Ctrl+-` and `Ctrl+Shift+-` provide the same actions
+   while focus remains in the workspace.
+5. The user may edit, switch tabs, and save without losing other drafts.
+   Workspace shortcuts apply only while focus remains in the workspace, so
+   typing in Conversation cannot save, close, or switch a file accidentally.
+   `Ctrl+Tab` and `Ctrl+Shift+Tab` continue typing in the destination file or
+   diff editor when invoked from Monaco, while toolbar and tab-strip controls
+   retain focus whenever they remain mounted.
+   At compact desktop widths, `Cmd/Ctrl+B` still toggles the task list while
+   Monaco owns focus, without taking the formatting chord from Conversation.
+   The status bar follows the active cursor and selection and reports the line
+   ending of the actual Monaco model instead of assuming one for every file.
+   An editable tab can switch LF or CRLF there, undo the conversion, and save it
+   through the same dirty-file flow; context-only review cannot mutate it.
+   Returning through location history reuses any open draft rather than
+   rereading the file, and choosing a new target after going back starts a new
+   forward branch.
+   Cancelling a dirty close retains the complete editing session; confirming
+   the close releases it once no active or inactive task tab references it. A
+   browser refresh restores the draft and tabs but begins a fresh undo history.
+   Dirty content blocks tab close, replacement, destructive reload, and deletion
+   only when those actions would discard or overwrite that content.
+6. Search opens a match at its exact location and initially omits repository
+   metadata, dependency caches, and build outputs. The user can include those
+   directories explicitly, which reruns the current query and remains selected
+   when Search is reopened. A failed read keeps Search and the prior artifact
+   intact. Replace uses the displayed result set's query, directory scope, and
+   workspace only after that exact search succeeds. If more than 300 matches
+   exist, Search renders the first 300, explains that the scope must be narrowed,
+   and keeps replacement unavailable.
+7. Supported configuration can be validated. A failure can be appended to the
    same task as a reviewed correction instruction with explicit file context.
-7. The user closes Results or continues directly in Conversation.
+8. The user closes Results or continues directly in Conversation.
 
-**Recovery:** external changes offer explicit reload or overwrite. Failed save,
-rename, replace, or delete preserves the draft, selection, and retry context.
+**Recovery:** external changes offer explicit reload or overwrite. A file type
+without native language support retains Monaco-local editing and outline
+features without displaying backend protocol text. Failed save, rename,
+replace, or delete preserves the draft, selection, and retry context.
 
 **Acceptance outcome:** direct correction and agent follow-up are two connected
 ways to continue the same task.

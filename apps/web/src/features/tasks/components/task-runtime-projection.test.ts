@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   completedStepCount,
   formatElapsedDuration,
+  formatSubagentIdentity,
+  formatSubagentStatus,
   projectSubagents,
   projectTaskPlan,
 } from './task-runtime-projection';
@@ -153,6 +155,123 @@ describe('task runtime projection', () => {
       status: '已中断',
       completedAt: 7_000,
     });
+  });
+
+  it('projects deduplicated Use capability routes and friendly tool actions', () => {
+    const agents = projectSubagents([
+      {
+        type: 'subagent_start',
+        task_id: 'use-1',
+        session_id: 'use-session',
+        agent: 'use',
+        description: 'Gather evidence and update the workbook',
+        started_ms: 1_000,
+      },
+      {
+        type: 'subagent_progress',
+        task_id: 'use-1',
+        session_id: 'use-session',
+        status: 'tool_completed',
+        metadata: { tool: 'mcp__use_browser__agent_browser_open', exit_code: 0 },
+      },
+      {
+        type: 'subagent_progress',
+        task_id: 'use-1',
+        session_id: 'use-session',
+        status: 'tool_completed',
+        metadata: { tool: 'mcp__use_browser__browser_snapshot', exit_code: 0 },
+      },
+      {
+        type: 'subagent_progress',
+        task_id: 'use-1',
+        session_id: 'use-session',
+        status: 'tool_completed',
+        metadata: { tool: 'mcp__use_office__office_validate', exit_code: 7 },
+      },
+      {
+        type: 'subagent_end',
+        task_id: 'use-1',
+        session_id: 'use-session',
+        agent: 'use',
+        output: 'Browser evidence collected; Office validation failed.',
+        success: false,
+        finished_ms: 5_000,
+      },
+    ]);
+
+    expect(agents[0]).toMatchObject({
+      useCapabilities: ['Browser', 'Office'],
+      currentUseCapability: 'Office',
+    });
+    expect(agents[0]?.progress.map((entry) => entry.label)).toEqual([
+      'Browser · Open 已完成',
+      'Browser · Snapshot 已完成',
+      'Office · Validate 执行失败',
+    ]);
+    expect(formatSubagentIdentity(agents[0]!)).toBe('Use · Browser + Office');
+    expect(formatSubagentStatus(agents[0]!)).toBe('执行失败');
+
+    const live = projectSubagents([
+      { type: 'subagent_start', task_id: 'use-live', agent: 'use' },
+      {
+        type: 'subagent_progress',
+        task_id: 'use-live',
+        status: 'tool_completed',
+        metadata: { tool: 'mcp__use_browser__browser_snapshot', exit_code: 0 },
+      },
+    ])[0]!;
+    expect(formatSubagentIdentity(live)).toBe('Use · Browser');
+    expect(formatSubagentStatus(live)).toBe('Snapshot 已完成');
+  });
+
+  it('identifies the dedicated Use worker before its first capability call', () => {
+    const waiting = projectSubagents([
+      {
+        type: 'subagent_start',
+        task_id: 'use-waiting',
+        session_id: 'use-waiting-session',
+        agent: 'use',
+        description: 'Prepare application access',
+      },
+    ])[0]!;
+
+    expect(waiting.useCapabilities).toEqual([]);
+    expect(formatSubagentIdentity(waiting)).toBe('Use');
+    expect(formatSubagentStatus(waiting)).toBe('执行中');
+  });
+
+  it('does not infer Use routes for ordinary subagents or unrelated MCP tools', () => {
+    const agents = projectSubagents([
+      {
+        type: 'subagent_start',
+        task_id: 'review-1',
+        agent: 'review',
+        description: 'Review browser output',
+      },
+      {
+        type: 'subagent_progress',
+        task_id: 'review-1',
+        status: 'tool_completed',
+        metadata: { tool: 'mcp__use_browser__browser_open', exit_code: 0 },
+      },
+      {
+        type: 'subagent_start',
+        task_id: 'use-2',
+        agent: 'use',
+        description: 'Query another MCP server',
+      },
+      {
+        type: 'subagent_progress',
+        task_id: 'use-2',
+        status: 'tool_completed',
+        metadata: { tool: 'mcp__search__find_docs', exit_code: 0 },
+      },
+    ]);
+
+    expect(agents[0]?.useCapabilities).toEqual([]);
+    expect(agents[0]?.progress[0]?.label).toBe('mcp__use_browser__browser_open 已完成');
+    expect(agents[1]?.useCapabilities).toEqual([]);
+    expect(agents[1]?.progress[0]?.label).toBe('mcp__search__find_docs 已完成');
   });
 
   it('uses the latest observed child completion when a restored parent has no timing record', () => {

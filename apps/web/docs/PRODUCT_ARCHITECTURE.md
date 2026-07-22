@@ -86,13 +86,15 @@ Browser  → PreviewNavigator     + BrowserViewport
 Changes  → ChangedFileNavigator + DiffViewport
 ```
 
-Search, dialogs, mode selection, and the command palette are transient support
-surfaces. Task parameters remain inside `TaskComposer`. New-task preparation
+Search, dialogs, mode selection, and the command and file palettes are
+transient support surfaces. Task parameters remain inside `TaskComposer`. New-task preparation
 does not instantiate empty active-task or result components.
 
 At wide desktop sizes, Result Workspace is a resizable peer of Conversation.
 Around 1024 px it becomes an overlay. Full screen promotes the same workspace
-instance; it does not mount another editor or duplicate state.
+instance; it does not mount another editor or duplicate state. The obscured
+Conversation becomes inert until the task-scoped presentation returns to
+docked, including through Escape or panel close.
 
 ## Feature boundaries
 
@@ -120,8 +122,23 @@ boundary rather than coexist with a duplicate right-panel system.
 
 Owns workspace tree state, the authoritative file/diff tab model, per-file dirty
 content, Monaco model identity, search scope, file conflicts, replacement, and
-configuration validation. The service remains authoritative about disk
-content.
+configuration validation. Directory reads use newest-request-wins publication;
+confirmed rename and delete operations optimistically reconcile loaded subtree
+keys and rows before refresh. The service remains authoritative about disk
+content. Every asynchronous workspace read or mutation captures the active task
+generation and workspace root before it starts; a late response may update only
+the same task context and cannot publish into a subsequently selected task.
+Initial Monaco model identity combines a stable task scope with the normalized
+document path, so two tasks may open the same file without sharing undo history
+or view state. Because Monaco URIs are immutable, the model registry rebinds a
+renamed document's new logical path to its existing URI before tab paths change;
+an old path reopened concurrently receives a collision-free identity. One
+editor instance switches among those models. The registry owns view-state
+capture and deterministic disposal: active tabs and inactive task snapshots
+form the complete retention set, a cancelled dirty close remains in that set,
+and confirmed close or snapshot removal releases any unreferenced model.
+Explicit navigation coordinates are transient commands rather than persistent
+model state.
 
 ### `features/preview`
 
@@ -241,9 +258,15 @@ stateDiagram-v2
     Closed --> Docked: reopen last safe state
 ```
 
-An unresolved dirty artifact guards transitions that would discard its draft.
-Switching tasks stores the current task's safe workspace state and restores the
-destination task's state. It never transfers the selected artifact by position.
+An unresolved dirty artifact guards only transitions that would discard or
+overwrite its draft. Switching tasks is non-destructive: it stores the current
+task's tabs, dirty drafts, active selection, mode, explorer/search state, and Git
+review state, then restores the destination task's snapshot. It never transfers
+the selected artifact by position, even when both tasks use the same repository.
+The same snapshot model is persisted with a versioned browser-local envelope.
+Writes are debounced during interaction and flushed on `pagehide`; restoration
+normalizes transient loading/saving flags, rejects malformed entries, and falls
+back to dirty-draft-first recovery when full caches exceed storage capacity.
 
 ## Core task workflow
 
@@ -293,9 +316,18 @@ flowchart LR
 
 Search retains its searched query, line, and column. Replace is blocked when the
 input no longer matches the result set or an affected file has unsaved content.
-Binary files never enter the text save path. Preview navigation remains within
-the service-defined target boundary. Git mutations preserve review context on
-failure.
+Explorer and quick open consume the same service-owned binary classification;
+binary files never enter the text read or save path regardless of which entry
+point opened them. Preview navigation remains within the service-defined target
+boundary. Git mutations preserve review context on failure.
+
+Text file state carries a content-derived revision from the workspace service to
+the task-owned editor tab. Normal saves are conditional writes against that
+revision and do not perform a browser-side read-before-write sequence. Legacy
+persisted tabs fall back to comparing their saved content. A precondition
+mismatch leaves disk bytes untouched, returns HTTP 412, and moves the editor into
+the existing conflict state; reload refreshes both content and revision, while
+explicit overwrite is the only unconditional write path.
 
 ## Overlay and focus rules
 

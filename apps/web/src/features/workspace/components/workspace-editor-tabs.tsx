@@ -1,11 +1,11 @@
 import { Copy, FileDiff, Files, LoaderCircle, PanelRightClose, X, XCircle } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
-import { useTabNavigation } from '../../../design-system/primitives';
 import { appState, showToast } from '../../../state/app-state';
 import type { WorkspaceActions } from '../workspace-actions';
 import { isFileEditorTabDirty, type WorkspaceEditorTab, workspaceRelativePath } from '../workspace-state';
 import { WorkspaceContextMenu, type WorkspaceContextMenuItem } from './workspace-context-menu';
+import { workspaceEditorTabLabels } from './workspace-editor-tab-label';
 import { WorkspaceFileIcon } from './workspace-file-icon';
 
 interface TabContextMenuState {
@@ -16,87 +16,120 @@ interface TabContextMenuState {
 
 export function WorkspaceEditorTabs({ actions }: { actions: WorkspaceActions }) {
   const state = useSnapshot(appState);
+  const activeRef = useRef<HTMLDivElement>(null);
+  const tabRefs = useRef(new Map<string, HTMLButtonElement>());
+  const requestedFocusIdRef = useRef<string | null>(null);
   const [contextMenu, setContextMenu] = useState<TabContextMenuState | null>(null);
-  const tabNavigation = useTabNavigation({ items: state.editorTabs, onChange: actions.activateEditorTab });
-  useEffect(() => {
-    if (state.activeEditorTabId) {
-      tabNavigation.getTabElement(state.activeEditorTabId)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
-    }
-  }, [state.activeEditorTabId, tabNavigation.getTabElement]);
+
+  useLayoutEffect(() => {
+    activeRef.current?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    const requestedFocusId = requestedFocusIdRef.current;
+    if (!requestedFocusId || requestedFocusId !== state.activeEditorTabId) return;
+    const target = tabRefs.current.get(requestedFocusId);
+    if (!target) return;
+    requestedFocusIdRef.current = null;
+    target.focus({ preventScroll: true });
+  }, [state.activeEditorTabId]);
   if (!state.editorTabs.length) return null;
+  const labels = workspaceEditorTabLabels(state.editorTabs, state.workspaceRoot);
   const contextualTab = contextMenu ? state.editorTabs.find((tab) => tab.id === contextMenu.tabId) : undefined;
+  const contextualLabel = contextualTab ? labels.get(contextualTab.id) : undefined;
+
+  const activateFromKeyboard = (tabId: string) => {
+    requestedFocusIdRef.current = tabId;
+    actions.activateEditorTab(tabId);
+    const target = tabRefs.current.get(tabId);
+    if (!target) return;
+    requestedFocusIdRef.current = null;
+    target.focus({ preventScroll: true });
+  };
+
+  const openContextMenu = (tabId: string, x: number, y: number) => {
+    tabRefs.current.get(tabId)?.focus({ preventScroll: true });
+    setContextMenu({ tabId, x, y });
+  };
 
   return (
     <>
-      <div className='workspace-editor-tabs' role='tablist' aria-label='已打开的编辑器'>
-        {state.editorTabs.map((tab) => {
+      <div className='workspace-editor-tabs' role='tablist' aria-label='已打开的编辑器' aria-orientation='horizontal'>
+        {state.editorTabs.map((tab, index) => {
           const active = tab.id === state.activeEditorTabId;
           const dirty = tab.kind === 'file' && isFileEditorTabDirty(tab);
-          const relativePath = workspaceRelativePath(tab.path, state.workspaceRoot);
-          const label =
-            tab.kind === 'diff'
-              ? `${basename(tab.path)} ${tab.staged ? '（已暂存）' : '（工作树）'}`
-              : basename(tab.path);
+          const display = labels.get(tab.id);
+          if (!display) return null;
           return (
             <div
-              ref={(element) => tabNavigation.setTabElement(tab.id, element)}
+              ref={active ? activeRef : undefined}
               className={`workspace-editor-tab ${active ? 'active' : ''} ${dirty ? 'dirty' : ''} ${
-                contextMenu?.tabId === tab.id ? 'contextual' : ''
-              }`}
+                display.detail ? 'disambiguated' : ''
+              } ${contextMenu?.tabId === tab.id ? 'contextual' : ''}`}
               key={tab.id}
-              role='tab'
-              aria-selected={active}
-              aria-controls='workspace-editor-active-panel'
-              aria-haspopup='menu'
-              tabIndex={active ? 0 : -1}
-              title={
-                tab.kind === 'diff' ? `${relativePath} · ${tab.staged ? '已暂存差异' : '工作树差异'}` : relativePath
-              }
-              onClick={() => actions.activateEditorTab(tab.id)}
-              onAuxClick={(event) => {
-                if (event.button === 1) actions.closeEditorTab(tab.id);
-              }}
-              onContextMenu={(event) => {
-                event.preventDefault();
-                event.currentTarget.focus();
-                setContextMenu({ tabId: tab.id, x: event.clientX, y: event.clientY });
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
-                  event.preventDefault();
-                  const bounds = event.currentTarget.getBoundingClientRect();
-                  setContextMenu({
-                    tabId: tab.id,
-                    x: bounds.left + Math.min(bounds.width, 160),
-                    y: bounds.bottom,
-                  });
-                  return;
-                }
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  actions.activateEditorTab(tab.id);
-                  return;
-                }
-                tabNavigation.handleTabKeyDown(event, tab.id);
-              }}
             >
-              {tab.kind === 'diff' ? (
-                <FileDiff className={`workspace-tab-icon ${tab.staged ? 'staged' : 'working'}`} size={14} />
-              ) : (
-                <WorkspaceFileIcon path={tab.path} size={14} />
-              )}
-              <span>{label}</span>
+              <button
+                ref={(element) => {
+                  if (element) tabRefs.current.set(tab.id, element);
+                  else tabRefs.current.delete(tab.id);
+                }}
+                type='button'
+                className='workspace-editor-tab-trigger'
+                role='tab'
+                aria-label={`${display.ariaLabel}${dirty ? '，未保存' : ''}`}
+                aria-selected={active}
+                aria-controls='workspace-editor-active-panel'
+                aria-haspopup='menu'
+                tabIndex={active ? 0 : -1}
+                title={display.title}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  openContextMenu(tab.id, event.clientX, event.clientY);
+                }}
+                onClick={() => actions.activateEditorTab(tab.id)}
+                onAuxClick={(event) => {
+                  if (event.button === 1) actions.closeEditorTab(tab.id);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+                    event.preventDefault();
+                    const bounds = event.currentTarget.getBoundingClientRect();
+                    openContextMenu(tab.id, bounds.left + Math.min(bounds.width, 160), bounds.bottom);
+                    return;
+                  }
+                  let targetIndex: number | null = null;
+                  if (event.key === 'ArrowLeft') targetIndex = index - 1;
+                  if (event.key === 'ArrowRight') targetIndex = index + 1;
+                  if (event.key === 'Home') targetIndex = 0;
+                  if (event.key === 'End') targetIndex = state.editorTabs.length - 1;
+                  if (targetIndex !== null) {
+                    event.preventDefault();
+                    const next = state.editorTabs[(targetIndex + state.editorTabs.length) % state.editorTabs.length];
+                    activateFromKeyboard(next.id);
+                    return;
+                  }
+                  if (event.key === 'Delete') {
+                    event.preventDefault();
+                    actions.closeEditorTab(tab.id);
+                  }
+                }}
+              >
+                {tab.kind === 'diff' ? (
+                  <FileDiff className={`workspace-tab-icon ${tab.staged ? 'staged' : 'working'}`} size={14} />
+                ) : (
+                  <WorkspaceFileIcon path={tab.path} size={14} />
+                )}
+                <span className='workspace-tab-label'>
+                  <span className='workspace-tab-name'>{display.name}</span>
+                  {display.detail && <small className='workspace-tab-detail'>{display.detail}</small>}
+                </span>
+              </button>
               {tab.loading ? (
                 <LoaderCircle className='workspace-tab-loading spin' size={12} />
               ) : (
                 <button
                   type='button'
                   className='workspace-tab-close'
-                  aria-label={`关闭 ${label}${dirty ? '，未保存' : ''}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    actions.closeEditorTab(tab.id);
-                  }}
+                  aria-label={`关闭 ${display.ariaLabel}${dirty ? '，未保存' : ''}`}
+                  tabIndex={active ? 0 : -1}
+                  onClick={() => actions.closeEditorTab(tab.id)}
                 >
                   <span className='workspace-tab-dirty-dot' aria-hidden='true' />
                   <X className='workspace-tab-close-icon' size={12} />
@@ -108,7 +141,7 @@ export function WorkspaceEditorTabs({ actions }: { actions: WorkspaceActions }) 
       </div>
       {contextMenu && contextualTab && (
         <WorkspaceContextMenu
-          label={`${basename(contextualTab.path)} 标签页操作`}
+          label={`${contextualLabel?.ariaLabel ?? basename(contextualTab.path)} 标签页操作`}
           x={contextMenu.x}
           y={contextMenu.y}
           items={tabContextMenuItems(

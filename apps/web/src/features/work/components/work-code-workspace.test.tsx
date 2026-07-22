@@ -23,7 +23,7 @@ describe('Work code file detail page', () => {
     vi.restoreAllMocks();
   });
 
-  it('uses the Office detail-page chrome with a Monaco body and no WebIDE navigation', () => {
+  it('uses the full WebIDE shell with Monaco and Markdown preview', () => {
     const updateDraft = vi.fn();
     const tab = {
       path: '/repo/README.md',
@@ -55,16 +55,18 @@ describe('Work code file detail page', () => {
         rootPath='/repo'
         assistantOpen={false}
         onBack={vi.fn()}
+        onOpenEntry={vi.fn()}
         onToggleAssistant={vi.fn()}
         onAgentRequest={vi.fn()}
       />
     );
 
-    expect(screen.getByRole('button', { name: '返回办公文件' })).toBeInTheDocument();
-    expect(screen.getByText('README.md')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '返回 Work 文件管理器' })).toBeInTheDocument();
+    expect(screen.getAllByText('README.md')).toHaveLength(2);
     expect(screen.getByRole('button', { name: '保存代码文件' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '打开 AI 助手' })).toBeInTheDocument();
-    expect(screen.queryByRole('navigation', { name: 'WebIDE 编辑器标签' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '打开 Work AI 助手' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'WebIDE 编辑器标签' })).toBeInTheDocument();
+    expect(screen.getByRole('tree', { name: '代码文件列表' })).toBeInTheDocument();
     expect(screen.getByLabelText('Markdown 编辑区')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Markdown 实时预览' })).toHaveTextContent('Project');
     expect(screen.getByRole('region', { name: 'Markdown 实时预览' })).toHaveTextContent('Ready');
@@ -76,6 +78,6 @@ describe('Work code file detail page', () => {
       target: { value: '# Updated' },
     });
     expect(updateDraft).toHaveBeenCalledWith('/repo/README.md', '# Updated');
-    expect(codeApi.readDir).not.toHaveBeenCalled();
+    expect(codeApi.readDir).toHaveBeenCalledWith('/repo');
   });
 });

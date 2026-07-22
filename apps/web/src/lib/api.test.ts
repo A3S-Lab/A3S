@@ -417,6 +417,89 @@ describe('codeApi workspace code intelligence', () => {
   });
 });
 
+describe('codeApi workspace search', () => {
+  it('encodes the optional exclusion pattern and result limit', async () => {
+    const fetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ code: 200, data: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+    vi.stubGlobal('fetch', fetch);
+
+    await codeApi.searchWorkspace('/repo with spaces', 'find me', {
+      excludePattern: '.git/,node_modules/,target/',
+      maxResults: 42,
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/v1/workspace/search?rootPath=%2Frepo%20with%20spaces&query=find%20me&excludePattern=.git%2F%2Cnode_modules%2F%2Ctarget%2F&maxResults=42',
+      expect.objectContaining({ headers: expect.any(Headers) })
+    );
+  });
+
+  it('encodes workspace file catalog queries and result limits', async () => {
+    const fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            code: 200,
+            data: { workspaceRoot: '/repo with spaces', items: [], total: 0, truncated: false },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    );
+    vi.stubGlobal('fetch', fetch);
+
+    await codeApi.workspaceFiles('/repo with spaces', 'src/app', 25);
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/v1/workspace/files?rootPath=%2Frepo%20with%20spaces&query=src%2Fapp&maxResults=25',
+      expect.objectContaining({ headers: expect.any(Headers) })
+    );
+  });
+});
+
+describe('codeApi workspace mutations', () => {
+  it('uses the native workspace routes and request shapes', async () => {
+    const fetch = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify({ code: 200, data: { success: true } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+    vi.stubGlobal('fetch', fetch);
+
+    await codeApi.createDirectory('/repo/new folder');
+    await codeApi.createFile('/repo/new file.ts');
+    await codeApi.writeFile('/repo/new file.ts', 'next content', { expectedRevision: 'sha256:baseline' });
+    await codeApi.renamePath('/repo/old.ts', '/repo/new.ts');
+    await codeApi.copyPath('/repo/source.ts', '/repo/copy.ts');
+    await codeApi.deletePath('/repo/obsolete.ts');
+
+    expect(
+      fetch.mock.calls.map(([path, init]) => [
+        path,
+        init?.method,
+        typeof init?.body === 'string' ? JSON.parse(init.body) : null,
+      ])
+    ).toEqual([
+      ['/api/v1/workspace/mkdir', 'POST', { path: '/repo/new folder' }],
+      ['/api/v1/workspace/create-file', 'POST', { path: '/repo/new file.ts' }],
+      [
+        '/api/v1/workspace/write',
+        'POST',
+        { path: '/repo/new file.ts', content: 'next content', expectedRevision: 'sha256:baseline' },
+      ],
+      ['/api/v1/workspace/rename', 'POST', { src: '/repo/old.ts', dest: '/repo/new.ts' }],
+      ['/api/v1/workspace/copy', 'POST', { src: '/repo/source.ts', dest: '/repo/copy.ts' }],
+      ['/api/v1/workspace/delete?path=%2Frepo%2Fobsolete.ts', 'DELETE', null],
+    ]);
+  });
+});
+
 function requestJson(fetch: ReturnType<typeof vi.fn>, call: number): unknown {
   return JSON.parse(String(fetch.mock.calls[call]?.[1]?.body));
 }

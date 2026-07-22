@@ -97,6 +97,20 @@ describe('tool call syntax presentation', () => {
     );
   });
 
+  it('recognizes namespaced command tools used by other agent providers', () => {
+    const presentation = toolInvocationPresentation({
+      name: 'functions.shell_command',
+      args: { command: 'rg --files', workdir: '/repo' },
+      inputText: '',
+    });
+
+    expect(presentation).toMatchObject({
+      kind: 'shell',
+      text: 'rg --files',
+      cwd: '/repo',
+    });
+  });
+
   it('keeps the latest output lines and reports how much earlier evidence was folded', () => {
     expect(toolOutputExcerpt('one\ntwo\nthree\nfour\n', 2)).toEqual({
       lines: ['three', 'four'],
