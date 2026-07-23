@@ -2,12 +2,6 @@
   position: relative;
 }
 
-.task-conversation-pane[data-task-runtime-layout="wide"] .execution-column {
-  width: min(780px, calc(100% - 424px));
-  margin-right: auto;
-  margin-left: max(32px, calc((100% - 1172px) / 2));
-}
-
 .task-runtime-floating-panel {
   position: absolute;
   z-index: 36;

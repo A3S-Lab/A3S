@@ -7,8 +7,7 @@ const PANEL_HEADER_HEIGHT = 54;
 const PANEL_RIGHT_INSET = 16;
 const PANEL_BOTTOM_GAP = 14;
 const INSTRUCTION_GAP = 12;
-const WIDE_PANEL_MIN_PANE_WIDTH = 1040;
-const WIDE_PANEL_MIN_PREPARATION_WIDTH = 1100;
+const FLOATING_PANEL_MIN_SURFACE_WIDTH = 1600;
 
 interface RuntimePanelRect {
   bottom: number;
@@ -38,9 +37,9 @@ type RuntimePanelStyle = CSSProperties & {
   '--task-runtime-panel-top': string;
 };
 
-export function resolveTaskRuntimePanelLayout(paneWidth: number): RuntimePanelLayout {
-  if (!Number.isFinite(paneWidth) || paneWidth <= 0) return 'wide';
-  return paneWidth < WIDE_PANEL_MIN_PANE_WIDTH ? 'compact' : 'wide';
+export function resolveTaskRuntimePanelLayout(surfaceWidth: number): RuntimePanelLayout {
+  if (!Number.isFinite(surfaceWidth) || surfaceWidth <= 0) return 'wide';
+  return surfaceWidth < FLOATING_PANEL_MIN_SURFACE_WIDTH ? 'compact' : 'wide';
 }
 
 export function resolveTaskRuntimePanelPlacement({
@@ -108,9 +107,7 @@ export function useTaskRuntimeFloatingPlacement(identity: string, expanded: bool
       const content = panel.querySelector<HTMLElement>('.task-runtime-floating-content');
       const surfaceRect = surface.getBoundingClientRect();
       const panelRect = panel.getBoundingClientRect();
-      const nextLayout = pane
-        ? resolveTaskRuntimePanelLayout(surfaceRect.width)
-        : resolvePreparationRuntimePanelLayout(surfaceRect.width);
+      const nextLayout = resolveTaskRuntimePanelLayout(surfaceRect.width);
       surface.dataset.taskRuntimeLayout = nextLayout;
       setLayout((current) => (current === nextLayout ? current : nextLayout));
       const triggerHeight = trigger?.getBoundingClientRect().height || PANEL_HEADER_HEIGHT;
@@ -166,11 +163,6 @@ export function useTaskRuntimeFloatingPlacement(identity: string, expanded: bool
     '--task-runtime-panel-top': `${placement.top}px`,
   };
   return { layout, panelRef, style };
-}
-
-function resolvePreparationRuntimePanelLayout(surfaceWidth: number): RuntimePanelLayout {
-  if (!Number.isFinite(surfaceWidth) || surfaceWidth <= 0) return 'wide';
-  return surfaceWidth < WIDE_PANEL_MIN_PREPARATION_WIDTH ? 'compact' : 'wide';
 }
 
 function placementWithinComposer(

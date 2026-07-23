@@ -13,10 +13,6 @@
   background: var(--a3s-bg);
 }
 
-.new-task-product[data-task-runtime-layout='wide'] .new-task-preparation {
-  padding-right: 424px;
-}
-
 .new-task-preparation-inner {
   width: min(760px, 100%);
   margin: auto;
