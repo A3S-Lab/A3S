@@ -4,6 +4,7 @@ import {
   updateDocumentColumnWidth,
 } from '../work-document-columns';
 import type { WorkDocumentColumns } from '../work-types';
+import { OfficeCheckbox, OfficeNumberField } from './office-controls';
 
 export function DocumentColumnsPanel({
   columns,
@@ -27,97 +28,89 @@ export function DocumentColumnsPanel({
   return (
     <fieldset className='work-document-columns-panel'>
       <legend>分栏</legend>
-      <label>
+      <div className='work-office-field'>
         <span>栏数</span>
-        <input
-          type='number'
-          min='1'
-          max='6'
-          step='1'
-          aria-label='分栏数量'
+        <OfficeNumberField
+          min={1}
+          max={6}
+          step={1}
+          ariaLabel='分栏数量'
           value={normalized.count}
-          onChange={(event) =>
+          onValueChange={(value) =>
             onChange(
               normalizeDocumentColumns({
                 ...normalized,
-                count: Number(event.target.value),
+                count: Number(value),
               })
             )
           }
         />
-      </label>
+      </div>
       {!normalized.custom && (
-        <label>
+        <div className='work-office-field'>
           <span>间距</span>
-          <input
-            type='number'
-            min='0'
-            max='30'
-            step='0.5'
-            aria-label='分栏间距'
+          <OfficeNumberField
+            min={0}
+            max={30}
+            step={0.5}
+            ariaLabel='分栏间距'
             value={normalized.spacing}
-            onChange={(event) =>
+            onValueChange={(value) =>
               onChange(
                 normalizeDocumentColumns({
                   ...normalized,
-                  spacing: Number(event.target.value),
+                  spacing: Number(value),
                 })
               )
             }
           />
-        </label>
+        </div>
       )}
-      <label className='work-document-column-option'>
-        <input
-          type='checkbox'
-          aria-label='自定义栏宽'
-          disabled={normalized.count < 2}
-          checked={Boolean(normalized.custom)}
-          onChange={(event) => onChange(setCustomDocumentColumns(normalized, event.target.checked))}
-        />
-        <span>自定义栏宽</span>
-      </label>
-      <label className='work-document-column-option'>
-        <input
-          type='checkbox'
-          aria-label='分栏分隔线'
-          checked={normalized.separator}
-          onChange={(event) => onChange({ ...normalized, separator: event.target.checked })}
-        />
-        <span>分隔线</span>
-      </label>
+      <OfficeCheckbox
+        className='work-document-column-option'
+        ariaLabel='自定义栏宽'
+        disabled={normalized.count < 2}
+        checked={Boolean(normalized.custom)}
+        onCheckedChange={(checked) => onChange(setCustomDocumentColumns(normalized, checked))}
+      >
+        自定义栏宽
+      </OfficeCheckbox>
+      <OfficeCheckbox
+        className='work-document-column-option'
+        ariaLabel='分栏分隔线'
+        checked={normalized.separator}
+        onCheckedChange={(checked) => onChange({ ...normalized, separator: checked })}
+      >
+        分隔线
+      </OfficeCheckbox>
       {custom && (
         <div className='work-document-custom-columns'>
           {custom.map((column, index) => (
             <div key={`document-column-${index + 1}`} className='work-document-custom-column'>
               <strong>第 {index + 1} 栏</strong>
-              <label>
+              <div className='work-office-field'>
                 <span>宽度 %</span>
-                <input
-                  type='number'
-                  min='5'
+                <OfficeNumberField
+                  min={5}
                   max={100 - (normalized.count - 1) * 5}
-                  step='0.5'
-                  aria-label={`第 ${index + 1} 栏宽度百分比`}
+                  step={0.5}
+                  ariaLabel={`第 ${index + 1} 栏宽度百分比`}
                   value={column.widthPercent}
-                  onChange={(event) =>
-                    onChange(updateDocumentColumnWidth(normalized, index, Number(event.target.value)))
-                  }
+                  onValueChange={(value) => onChange(updateDocumentColumnWidth(normalized, index, Number(value)))}
                 />
-              </label>
+              </div>
               {index < custom.length - 1 && (
-                <label>
+                <div className='work-office-field'>
                   <span>栏后间距</span>
-                  <input
-                    type='number'
-                    min='0'
-                    max='30'
-                    step='0.5'
-                    aria-label={`第 ${index + 1} 栏后间距`}
+                  <OfficeNumberField
+                    min={0}
+                    max={30}
+                    step={0.5}
+                    ariaLabel={`第 ${index + 1} 栏后间距`}
                     value={column.spacing}
-                    onChange={(event) => updateCustomSpacing(index, Number(event.target.value))}
+                    onValueChange={(value) => updateCustomSpacing(index, Number(value))}
                   />
-                </label>
+                </div>
               )}
             </div>
           ))}

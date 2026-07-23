@@ -103,10 +103,26 @@ The first active Work release includes:
   Markdown always places editable source on the left and a semantic live
   preview on the right;
 - a resizable right-side Work AI Assistant that binds the selected local root as
-  its workspace and leaves sending to the user. Work and Code share the runtime
-  implementation but never the active conversation: Work sessions are tagged
-  with `agentId=work`, persisted under a Work-only key, restored independently
-  on product switches, and hidden from the Code task list;
+  its workspace and leaves sending to the user. Its 460 px desktop default is
+  capped as the viewport narrows so common laptop widths retain a usable Office
+  pane; the Office ribbon also tightens group spacing below 1120 px, and the
+  assistant becomes an overlay only on compact screens. Work and Code share the
+  runtime implementation but never the active conversation: Work sessions are
+  tagged with `agentId=work`, persisted under a Work-only key, restored
+  independently on product switches, and hidden from the Code task list;
+- shared Chinese Office detail chrome for documents, spreadsheets, and
+  presentations, with a compact file menu, tabbed ribbon, explicit horizontal
+  overflow controls, and a consistent status bar. File menus focus the first
+  available action when opened, support Arrow Up/Down, Home, and End, close on
+  Tab, and return focus to the trigger on Escape. Ribbon position survives
+  ordinary editor rerenders and resets only when the active tab changes.
+  Document, spreadsheet, and presentation commands support the applicable
+  Cmd/Ctrl formatting, undo, redo, creation, printing, and presentation
+  shortcuts while leaving native text-field history and active dialogs alone.
+  The PDF adapter applies the same menu and dialog semantics inside EmbedPDF's
+  Shadow DOM, including labeled native overlays, initial focus, keyboard menu
+  navigation, and trigger restoration after Escape. Browser regressions cover
+  the common 1024 px, 900 px, and 768 px editor widths;
 - file context actions for asking AI Assistant, summarizing files, proposing folder
   organization, and suggesting clearer names. Organization and naming prompts
   explicitly request advice before mutation;

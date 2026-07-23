@@ -365,8 +365,8 @@ describe('Web-native session experiences', () => {
     const workspaceLauncher = screen.getByRole('button', { name: '打开工作区' });
     workspaceLauncher.focus();
     fireEvent.click(workspaceLauncher);
-    await waitFor(() => expect(screen.getByRole('button', { name: '工作区' })).toHaveFocus());
-    fireEvent.click(await screen.findByRole('button', { name: '活动' }));
+    await waitFor(() => expect(screen.getByRole('tab', { name: '工作区' })).toHaveFocus());
+    fireEvent.click(await screen.findByRole('tab', { name: '活动' }));
 
     const closeFromActivity = screen.getByRole('button', { name: '关闭任务上下文面板' });
     closeFromActivity.focus();
@@ -377,7 +377,7 @@ describe('Web-native session experiences', () => {
     const activityLauncher = screen.getByRole('button', { name: '打开任务活动' });
     activityLauncher.focus();
     fireEvent.click(activityLauncher);
-    await waitFor(() => expect(screen.getByRole('button', { name: '活动' })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole('tab', { name: '活动' })).toHaveFocus());
     const closeActivity = await screen.findByRole('button', { name: '关闭任务上下文面板' });
     closeActivity.focus();
     fireEvent.click(closeActivity);
@@ -421,7 +421,7 @@ describe('Web-native session experiences', () => {
     const resultHandoff = screen.getByRole('button', { name: '审阅变更' });
     resultHandoff.focus();
     fireEvent.click(resultHandoff);
-    await waitFor(() => expect(screen.getByRole('button', { name: '工作区' })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole('tab', { name: '工作区' })).toHaveFocus());
     const close = await screen.findByRole('button', { name: '关闭任务上下文面板' });
     close.focus();
     fireEvent.click(close);
@@ -452,7 +452,7 @@ describe('Web-native session experiences', () => {
     fireEvent.click(screen.getByRole('button', { name: '打开工作区' }));
 
     expect(screen.getByRole('textbox', { name: '任务指令' })).toBeInTheDocument();
-    expect(await screen.findByRole('navigation', { name: '任务上下文面板' })).toBeInTheDocument();
+    expect(await screen.findByRole('tablist', { name: '任务上下文面板' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '全屏显示任务工作区' }));
     await waitFor(() => expect(container.querySelector('.task-conversation-pane')).toHaveAttribute('inert'));
     expect(container.querySelector('.task-conversation-pane')).toHaveAttribute('aria-hidden', 'true');
@@ -467,7 +467,7 @@ describe('Web-native session experiences', () => {
     fireEvent.click(screen.getByRole('button', { name: '工作区变更' }));
     fireEvent.click(screen.getByRole('button', { name: '关闭工作区变更' }));
 
-    fireEvent.click(screen.getByRole('button', { name: '活动' }));
+    fireEvent.click(screen.getByRole('tab', { name: '活动' }));
     expect(screen.getByRole('textbox', { name: '任务指令' })).toBeInTheDocument();
     expect(await screen.findByRole('region', { name: '当前任务活动' })).toBeInTheDocument();
   });

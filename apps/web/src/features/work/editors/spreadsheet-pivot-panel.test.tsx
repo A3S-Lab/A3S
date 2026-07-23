@@ -33,9 +33,9 @@ describe('SpreadsheetPivotPanel', () => {
       outputReference: expect.stringMatching(/^A1:/),
     });
     expect(screen.getByLabelText('透视表名称')).toHaveValue('PivotTable1');
-    expect(screen.getByLabelText('Region 字段区域')).toHaveValue('row');
-    expect(screen.getByLabelText('Quarter 字段区域')).toHaveValue('column');
-    expect(screen.getByLabelText('Revenue 字段区域')).toHaveValue('value');
+    expect(screen.getByRole('combobox', { name: 'Region 字段区域' })).toHaveTextContent('行');
+    expect(screen.getByRole('combobox', { name: 'Quarter 字段区域' })).toHaveTextContent('列');
+    expect(screen.getByRole('combobox', { name: 'Revenue 字段区域' })).toHaveTextContent('值');
   });
 
   it('explains that a source selection is required', () => {
@@ -81,8 +81,9 @@ describe('SpreadsheetPivotPanel', () => {
       />
     );
 
-    fireEvent.change(await screen.findByLabelText('Quarter 字段区域'), { target: { value: 'filter' } });
-    fireEvent.change(screen.getByLabelText('Quarter 筛选值'), { target: { value: 'string:Q1' } });
+    await screen.findByRole('combobox', { name: 'Quarter 字段区域' });
+    chooseOfficeOption('Quarter 字段区域', '筛选');
+    chooseOfficeOption('Quarter 筛选值', 'Q1');
     fireEvent.click(screen.getByRole('button', { name: '保存并刷新' }));
 
     const saved = onChange.mock.lastCall?.[0] as WorkSpreadsheetContent;
@@ -96,6 +97,11 @@ describe('SpreadsheetPivotPanel', () => {
     expect(report?.data?.[0]?.[1]?.v).toBe('Q1');
   });
 });
+
+function chooseOfficeOption(label: string, option: string) {
+  fireEvent.click(screen.getByRole('combobox', { name: label }));
+  fireEvent.click(screen.getByRole('option', { name: option }));
+}
 
 function salesWorkbook(): WorkSpreadsheetContent {
   const artifact = createWorkArtifact('blank-spreadsheet');

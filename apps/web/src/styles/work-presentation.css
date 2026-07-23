@@ -135,7 +135,6 @@
   color: var(--a3s-faint);
 }
 
-.work-presentation-design-panel button,
 .work-presentation-design-panel select,
 .work-presentation-design-panel input:not([type="checkbox"], [type="color"]) {
   height: 27px;
@@ -147,28 +146,7 @@
   font: inherit;
 }
 
-.work-presentation-design-panel button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 0 8px;
-  cursor: pointer;
-}
-
-.work-presentation-design-panel button:hover:not(:disabled),
-.work-presentation-design-panel button.active {
-  border-color: color-mix(in srgb, #db663b 45%, var(--a3s-line));
-  background: color-mix(in srgb, #db663b 8%, var(--a3s-bg));
-  color: #b44e31;
-}
-
-.work-presentation-design-panel button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.work-presentation-design-panel button.close {
+.work-presentation-design-panel .ds-icon-button.close {
   width: 25px;
   height: 25px;
   padding: 0;
@@ -182,6 +160,11 @@
   gap: 7px;
   padding: 5px 12px;
   overflow-x: auto;
+}
+
+.work-presentation-design-controls > .ds-button,
+.work-presentation-design-editing > .ds-button {
+  flex: 0 0 auto;
 }
 
 .work-presentation-design-controls > label,
@@ -237,49 +220,25 @@
   font-size: 10px;
 }
 
-.work-presentation-transition-panel label {
+.work-presentation-transition-panel .work-office-field,
+.work-presentation-transition-panel .work-office-checkbox {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   gap: 5px;
 }
 
-.work-presentation-transition-panel select,
-.work-presentation-transition-panel input[type="number"] {
-  height: 27px;
-  padding: 0 7px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 5px;
-  outline: 0;
-  background: var(--a3s-bg);
-  color: var(--a3s-ink);
-  font: inherit;
-}
-
-.work-presentation-transition-panel input[type="number"] {
+.work-presentation-transition-panel .work-office-number-field {
   width: 58px;
 }
 
-.work-presentation-transition-panel label.toggle {
+.work-presentation-transition-panel .work-office-checkbox.toggle {
   gap: 4px;
 }
 
-.work-presentation-transition-panel label.toggle input {
-  width: 13px;
-  height: 13px;
-  margin: 0;
-}
-
-.work-presentation-transition-panel button {
-  height: 27px;
+.work-presentation-transition-panel > .ds-button {
   flex: 0 0 auto;
-  padding: 0 9px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 5px;
-  background: var(--a3s-bg);
-  color: var(--a3s-muted);
-  font-size: 9px;
-  cursor: pointer;
+  font-size: 10px;
 }
 
 .work-presentation-transition-panel :disabled {
@@ -343,6 +302,7 @@
 .work-presentation-chart-panel button {
   display: inline-flex;
   height: 27px;
+  min-height: 27px;
   align-items: center;
   justify-content: center;
   gap: 4px;
@@ -381,25 +341,24 @@
   align-items: stretch;
 }
 
-.work-presentation-chart-controls > label {
+.work-presentation-chart-controls > .work-office-field {
   flex: 0 0 auto;
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
 }
 
-.work-presentation-chart-controls input,
-.work-presentation-chart-controls select {
+.work-presentation-chart-controls .work-office-select,
+.work-presentation-chart-controls .work-office-text-field,
+.work-presentation-chart-controls .work-office-text-area {
   width: 116px;
-  height: 28px;
-  padding: 0 7px;
 }
 
-.work-presentation-chart-controls input[type="number"] {
+.work-presentation-chart-controls .work-office-number-field {
   width: 64px;
 }
 
-.work-presentation-chart-controls > label.check {
+.work-presentation-chart-controls > .check {
   min-width: 72px;
 }
 
@@ -418,13 +377,6 @@
   align-items: center;
   gap: 6px;
   color: var(--a3s-ink);
-}
-
-.work-presentation-chart-check-control input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-  margin: 0;
-  accent-color: #db663b;
 }
 
 .work-presentation-chart-layout {
@@ -496,32 +448,24 @@
   gap: 7px;
 }
 
-.work-presentation-chart-data-labels label.check {
+.work-presentation-chart-data-labels .work-office-checkbox.check {
   flex-direction: row;
   gap: 4px;
   white-space: nowrap;
 }
 
-.work-presentation-chart-data-labels label:not(.check) {
+.work-presentation-chart-data-labels .work-office-field {
   flex-direction: column;
   align-items: flex-start;
   gap: 3px;
 }
 
-.work-presentation-chart-data-labels input[type="checkbox"] {
-  width: 13px;
-  height: 13px;
-  margin: 0;
-  accent-color: #db663b;
-}
-
-.work-presentation-chart-data-labels select,
-.work-presentation-chart-data-labels input:not([type="checkbox"]) {
+.work-presentation-chart-data-labels .work-office-select,
+.work-presentation-chart-data-labels .work-office-text-field {
   width: 82px;
-  height: 25px;
 }
 
-.work-presentation-chart-controls > label.categories textarea {
+.work-presentation-chart-controls > .work-office-field.categories .work-office-text-area {
   width: 132px;
   height: 51px;
   padding: 5px 7px;
@@ -552,21 +496,17 @@
   color: var(--a3s-muted);
 }
 
-.work-presentation-chart-series-card > .work-spreadsheet-chart-series-style label.check {
+.work-presentation-chart-series-card > .work-spreadsheet-chart-series-style .work-office-checkbox.check {
   display: flex;
   align-items: center;
-  flex-direction: row;
   gap: 5px;
 }
 
-.work-presentation-chart-series-card > .work-spreadsheet-chart-series-style input,
-.work-presentation-chart-series-card > .work-spreadsheet-chart-series-style select {
+.work-presentation-chart-series-card > .work-spreadsheet-chart-series-style .work-office-field,
+.work-presentation-chart-series-card > .work-spreadsheet-chart-series-style .work-office-select,
+.work-presentation-chart-series-card > .work-spreadsheet-chart-series-style .work-office-number-field,
+.work-presentation-chart-series-card > .work-spreadsheet-chart-series-style .work-office-color-picker {
   width: 100%;
-}
-
-.work-presentation-chart-series-card > .work-spreadsheet-chart-series-style input[type='checkbox'] {
-  width: 13px;
-  height: 13px;
 }
 
 .work-presentation-chart-series-card > fieldset {
@@ -646,594 +586,18 @@
   color: var(--a3s-muted);
 }
 
-.work-presentation-chart-series-analysis label.check {
+.work-presentation-chart-series-analysis .work-office-checkbox.check {
   display: flex;
   min-height: 28px;
   align-items: center;
   align-self: end;
-  flex-direction: row;
   gap: 5px;
 }
 
-.work-presentation-chart-series-analysis input,
-.work-presentation-chart-series-analysis select {
+.work-presentation-chart-series-analysis .work-office-field,
+.work-presentation-chart-series-analysis .work-office-select,
+.work-presentation-chart-series-analysis .work-office-number-field,
+.work-presentation-chart-series-analysis .work-office-text-field {
   width: 100%;
   min-width: 0;
-}
-
-.work-presentation-chart-series-analysis input[type='checkbox'] {
-  width: 13px;
-  height: 13px;
-  margin: 0;
-  accent-color: #db663b;
-}
-
-.work-presentation-comments-panel {
-  display: flex;
-  max-height: 250px;
-  flex: 0 0 auto;
-  flex-direction: column;
-  border-bottom: 1px solid var(--a3s-line);
-  background: var(--a3s-panel);
-  color: var(--a3s-ink);
-}
-
-.work-presentation-comments-panel > header {
-  display: flex;
-  min-height: 42px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 6px 10px 5px 12px;
-  border-bottom: 1px solid var(--a3s-line);
-}
-
-.work-presentation-comments-panel > header > div {
-  display: grid;
-  gap: 1px;
-}
-
-.work-presentation-comments-panel > header strong {
-  font-size: 11px;
-}
-
-.work-presentation-comments-panel > header span {
-  color: var(--a3s-faint);
-  font-size: 9px;
-}
-
-.work-presentation-comments-panel > header button.close {
-  display: inline-grid;
-  width: 27px;
-  height: 27px;
-  padding: 0;
-  place-items: center;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--a3s-muted);
-  cursor: pointer;
-}
-
-.work-presentation-comments-panel > header button.close:hover {
-  background: var(--a3s-panel-soft);
-  color: var(--a3s-ink);
-}
-
-.work-presentation-comment-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
-  gap: 7px;
-  padding: 8px 10px 10px;
-  overflow: auto;
-}
-
-.work-presentation-comment-list > article {
-  display: grid;
-  align-content: start;
-  gap: 6px;
-  padding: 8px;
-  border: 1px solid var(--a3s-line);
-  border-left: 3px solid #d4a31e;
-  border-radius: 7px;
-  background: var(--a3s-bg);
-}
-
-.work-presentation-comment-list > article.active {
-  border-color: color-mix(in srgb, #d4a31e 72%, var(--a3s-line));
-  box-shadow: 0 0 0 2px color-mix(in srgb, #d4a31e 10%, transparent);
-}
-
-.work-presentation-comment-location {
-  display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  gap: 5px;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  background: transparent;
-  color: #79590c;
-  font-size: 8px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.work-presentation-comment-location span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.work-presentation-comment-list > article > header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.work-presentation-comment-list > article > header strong {
-  font-size: 9px;
-}
-
-.work-presentation-comment-list > article > header time {
-  color: var(--a3s-faint);
-  font-size: 8px;
-  white-space: nowrap;
-}
-
-.work-presentation-comment-list textarea {
-  min-height: 48px;
-  padding: 6px 7px;
-  resize: vertical;
-  border: 1px solid var(--a3s-line);
-  border-radius: 6px;
-  outline: 0;
-  background: var(--a3s-panel);
-  color: var(--a3s-ink);
-  font: inherit;
-  font-size: 9px;
-  line-height: 1.4;
-}
-
-.work-presentation-comment-list textarea:focus {
-  border-color: var(--a3s-blue);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--a3s-blue) 12%, transparent);
-}
-
-.work-presentation-comment-list > article > footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: var(--a3s-faint);
-  font-size: 8px;
-}
-
-.work-presentation-comment-list > article > footer button {
-  display: inline-flex;
-  height: 25px;
-  align-items: center;
-  gap: 4px;
-  padding: 0 7px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 5px;
-  background: var(--a3s-panel);
-  color: var(--a3s-muted);
-  font-size: 8px;
-  cursor: pointer;
-}
-
-.work-presentation-comment-list > article > footer button:hover {
-  border-color: var(--a3s-red);
-  color: var(--a3s-red);
-}
-
-.work-presentation-comment-list > p {
-  margin: 12px;
-  color: var(--a3s-faint);
-  font-size: 9px;
-  text-align: center;
-}
-
-.work-presentation-layout {
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  flex: 1;
-}
-
-.work-slide-strip {
-  display: flex;
-  width: 184px;
-  flex: 0 0 184px;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 12px 30px;
-  overflow-y: auto;
-  border-right: 1px solid var(--a3s-line);
-  background: color-mix(in srgb, var(--a3s-panel-soft) 60%, var(--a3s-panel));
-}
-
-.work-slide-strip > button:not(.work-slide-add) {
-  position: relative;
-  display: flex;
-  width: 100%;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 4px 4px 4px 0;
-  border: 2px solid transparent;
-  border-radius: 7px;
-  background: transparent;
-  cursor: pointer;
-}
-
-.work-slide-strip > button:not(.work-slide-add):hover {
-  background: var(--a3s-panel-strong);
-}
-
-.work-slide-strip > button.active {
-  border-color: color-mix(in srgb, #db663b 72%, var(--a3s-line));
-  background: color-mix(in srgb, #db663b 6%, var(--a3s-panel));
-}
-
-.work-slide-strip > button > span:first-child {
-  width: 18px;
-  flex: 0 0 18px;
-  color: var(--a3s-faint);
-  font-size: 9px;
-  text-align: center;
-}
-
-.work-slide-strip .work-slide-canvas {
-  width: 130px;
-  flex: 0 0 130px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 3px;
-  box-shadow: 0 3px 9px rgb(25 31 45 / 8%);
-}
-
-.work-slide-add {
-  display: flex;
-  width: 136px;
-  height: 34px;
-  flex: 0 0 34px;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-left: 22px;
-  border: 1px dashed var(--a3s-line-strong);
-  border-radius: 7px;
-  background: transparent;
-  color: var(--a3s-muted);
-  font-size: 10px;
-  cursor: pointer;
-}
-
-.work-slide-add:hover {
-  border-color: #db663b;
-  background: color-mix(in srgb, #db663b 5%, var(--a3s-panel));
-  color: #b44e31;
-}
-
-.work-slide-stage {
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  flex: 1;
-  align-items: center;
-  justify-content: flex-start;
-  flex-direction: column;
-  gap: 13px;
-  padding: 24px 34px 14px;
-  overflow: auto;
-  background:
-    linear-gradient(45deg, rgb(0 0 0 / 1.5%) 25%, transparent 25%) 0 0 / 16px 16px,
-    linear-gradient(-45deg, rgb(0 0 0 / 1.5%) 25%, transparent 25%) 0 8px / 16px 16px,
-    color-mix(in srgb, var(--a3s-panel-strong) 58%, var(--a3s-bg));
-}
-
-.work-slide-stage > .work-slide-canvas {
-  width: min(100%, 1050px);
-  flex: 0 0 auto;
-  margin-top: auto;
-  box-shadow: 0 18px 46px rgb(23 28 42 / 18%);
-}
-
-.work-slide-stage > footer {
-  display: flex;
-  width: min(100%, 1050px);
-  justify-content: space-between;
-  color: var(--a3s-faint);
-  font-size: 9px;
-}
-
-.work-slide-canvas {
-  position: relative;
-  display: block;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  container-type: size;
-  color: #172033;
-}
-
-.work-slide-canvas.interactive {
-  overflow: visible;
-  touch-action: none;
-}
-
-.work-presentation-comment-pin {
-  position: absolute;
-  z-index: 12;
-  display: grid;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  transform: translate(-50%, -50%);
-  place-items: center;
-  border: 2px solid #ffffff;
-  border-radius: 50% 50% 50% 4px;
-  background: #e7ad1c;
-  box-shadow: 0 3px 8px rgb(54 43 12 / 28%);
-  color: #302400;
-  font-size: 9px;
-  font-weight: 750;
-  cursor: pointer;
-}
-
-.work-presentation-comment-pin.active {
-  outline: 2px solid color-mix(in srgb, #e7ad1c 72%, #684800);
-  outline-offset: 2px;
-}
-
-.work-slide-element {
-  position: absolute;
-  display: flex;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  align-items: center;
-  justify-content: center;
-  overflow: visible;
-  border: 0;
-  white-space: pre-wrap;
-}
-
-.work-slide-element.inherited {
-  pointer-events: none;
-}
-
-.work-slide-element.placeholder {
-  outline: 1px dashed color-mix(in srgb, #3478f6 70%, transparent);
-  outline-offset: -2px;
-}
-
-.work-slide-placeholder-guide {
-  position: absolute;
-  z-index: 1;
-  display: grid;
-  padding: 2%;
-  place-items: center;
-  border: 1px dashed color-mix(in srgb, #3478f6 62%, transparent);
-  background: color-mix(in srgb, #3478f6 5%, transparent);
-  color: color-mix(in srgb, #3478f6 78%, #172033);
-  font-size: clamp(6px, 1.2cqw, 13px);
-  cursor: text;
-}
-
-.work-slide-placeholder-guide:hover {
-  border-style: solid;
-  background: color-mix(in srgb, #3478f6 9%, transparent);
-}
-
-.work-slide-canvas:not(.interactive) .work-slide-element {
-  overflow: hidden;
-}
-
-.work-slide-element > span {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  align-items: center;
-  padding: 3%;
-  line-height: 1.2;
-  white-space: pre-wrap;
-}
-
-.work-slide-element > img {
-  width: 100%;
-  height: 100%;
-  object-fit: fill;
-  pointer-events: none;
-}
-
-.work-slide-element > canvas {
-  width: 100%;
-  height: 100%;
-}
-
-.work-slide-element-link {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  color: inherit;
-  text-decoration: none;
-}
-
-.work-slide-rich-text,
-.work-slide-rich-editor {
-  display: block;
-  width: 100%;
-  height: 100%;
-  padding: 3%;
-  overflow: hidden;
-  line-height: 1.2;
-  white-space: pre-wrap;
-}
-
-.work-slide-rich-text a {
-  color: inherit;
-  text-decoration: underline;
-}
-
-.work-slide-rich-editor {
-  outline: 0;
-  cursor: text;
-}
-
-.work-slide-element textarea {
-  width: 100%;
-  height: 100%;
-  padding: 3%;
-  resize: none;
-  overflow: hidden;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  font-family:
-    ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-    sans-serif;
-  line-height: 1.2;
-  white-space: pre-wrap;
-}
-
-.work-slide-table {
-  width: 100%;
-  height: 100%;
-  table-layout: fixed;
-  border-collapse: collapse;
-  background: #ffffff;
-  color: inherit;
-  font-size: clamp(5px, 1.25cqw, 13px);
-}
-
-.work-slide-table th,
-.work-slide-table td {
-  min-width: 0;
-  padding: 1.5% 2%;
-  overflow: hidden;
-  border: 1px solid #cbd2de;
-  text-align: left;
-  text-overflow: ellipsis;
-}
-
-.work-slide-table th {
-  background: #eef3fb;
-  font-weight: 700;
-}
-
-.work-slide-table.editable textarea {
-  min-height: 0;
-  padding: 0;
-  font: inherit;
-  line-height: 1.15;
-}
-
-.work-slide-chart {
-  display: block;
-}
-
-.work-slide-element.selected {
-  outline: 1.5px solid #3478f6;
-  outline-offset: 1px;
-}
-
-.work-slide-element.selected::before,
-.work-slide-element.selected::after {
-  position: absolute;
-  z-index: 3;
-  width: 7px;
-  height: 7px;
-  border: 1px solid #3478f6;
-  border-radius: 1px;
-  background: #ffffff;
-  content: "";
-  pointer-events: none;
-}
-
-.work-slide-element.selected::before {
-  top: -5px;
-  left: -5px;
-}
-
-.work-slide-element.selected::after {
-  right: -5px;
-  bottom: -5px;
-}
-
-.work-slide-move-handle {
-  position: absolute;
-  z-index: 4;
-  top: -9px;
-  left: 18%;
-  width: 64%;
-  height: 12px;
-  cursor: move;
-}
-
-.work-slide-resize-handle {
-  position: absolute;
-  z-index: 5;
-  right: -8px;
-  bottom: -8px;
-  width: 15px;
-  height: 15px;
-  cursor: nwse-resize;
-}
-
-.work-slide-notes {
-  display: flex;
-  width: min(100%, 1050px);
-  min-height: 78px;
-  flex: 0 0 auto;
-  flex-direction: column;
-  gap: 5px;
-  margin-bottom: auto;
-  padding: 8px 10px 10px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 8px;
-  background: var(--a3s-panel);
-  box-shadow: 0 5px 18px rgb(23 28 42 / 6%);
-}
-
-.work-slide-notes > span {
-  color: var(--a3s-faint);
-  font-size: 9px;
-  font-weight: 650;
-}
-
-.work-slide-notes textarea {
-  width: 100%;
-  min-height: 44px;
-  padding: 5px 0;
-  resize: vertical;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--a3s-ink);
-  font-family: inherit;
-  font-size: 10px;
-  line-height: 1.45;
-}
-
-@media (max-width: 1120px) {
-  .work-slide-strip {
-    width: 160px;
-    flex-basis: 160px;
-    padding-right: 8px;
-    padding-left: 8px;
-  }
-
-  .work-slide-strip .work-slide-canvas {
-    width: 112px;
-    flex-basis: 112px;
-  }
-
-  .work-slide-add {
-    width: 118px;
-  }
-
-  .work-slide-stage {
-    padding-right: 22px;
-    padding-left: 22px;
-  }
 }

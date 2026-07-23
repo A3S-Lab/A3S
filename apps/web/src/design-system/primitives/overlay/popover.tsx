@@ -1,5 +1,6 @@
 import {
   type AriaAttributes,
+  type CSSProperties,
   type KeyboardEventHandler,
   type MouseEventHandler,
   type ReactNode,
@@ -8,9 +9,11 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
+import { createPortal } from 'react-dom';
 
 export type PopoverTriggerProps = {
   ref: RefCallback<HTMLButtonElement>;
@@ -24,6 +27,16 @@ export type PopoverTriggerProps = {
 };
 
 type PopoverContent = ReactNode | ((close: () => void) => ReactNode);
+type PopoverPlacement = 'top-start' | 'top-end' | 'bottom-start' | 'bottom-end';
+
+type FloatingPosition = {
+  top: number;
+  left: number;
+  anchorWidth: number;
+};
+
+const FLOATING_GAP = 8;
+const FLOATING_VIEWPORT_PADDING = 16;
 
 const openPopoverStack: symbol[] = [];
 
@@ -48,6 +61,7 @@ export function Popover({
   panelClassName = '',
   panelRole = 'region',
   placement = 'bottom-start',
+  portal = false,
   open: controlledOpen,
   defaultOpen = false,
   panelRef,
@@ -62,7 +76,8 @@ export function Popover({
   className?: string;
   panelClassName?: string;
   panelRole?: 'region' | 'dialog' | 'menu' | 'listbox';
-  placement?: 'top-start' | 'top-end' | 'bottom-start' | 'bottom-end';
+  placement?: PopoverPlacement;
+  portal?: boolean;
   open?: boolean;
   defaultOpen?: boolean;
   panelRef?: Ref<HTMLElement>;
@@ -74,8 +89,10 @@ export function Popover({
   const openRef = useRef(open);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const panelElementRef = useRef<HTMLElement | null>(null);
   const tokenRef = useRef(Symbol('popover'));
   const panelId = useId();
+  const [floatingPosition, setFloatingPosition] = useState<FloatingPosition | null>(null);
 
   useEffect(() => {
     openRef.current = open;
@@ -96,6 +113,50 @@ export function Popover({
     triggerRef.current?.focus({ preventScroll: true });
   }, [updateOpen]);
 
+  const setPanelElement = useCallback(
+    (element: HTMLElement | null) => {
+      panelElementRef.current = element;
+      if (typeof panelRef === 'function') panelRef(element);
+      else if (panelRef) (panelRef as { current: HTMLElement | null }).current = element;
+    },
+    [panelRef]
+  );
+
+  const updateFloatingPosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    const panel = panelElementRef.current;
+    if (!trigger || !panel || typeof window === 'undefined') return;
+
+    const triggerBounds = trigger.getBoundingClientRect();
+    const panelBounds = panel.getBoundingClientRect();
+    const panelWidth = Math.min(panelBounds.width, Math.max(0, window.innerWidth - FLOATING_VIEWPORT_PADDING * 2));
+    const panelHeight = Math.min(panelBounds.height, Math.max(0, window.innerHeight - FLOATING_VIEWPORT_PADDING * 2));
+    const spaceBelow = window.innerHeight - FLOATING_VIEWPORT_PADDING - triggerBounds.bottom - FLOATING_GAP;
+    const spaceAbove = triggerBounds.top - FLOATING_GAP - FLOATING_VIEWPORT_PADDING;
+    const preferBottom = placement.startsWith('bottom');
+    const placeBelow = preferBottom
+      ? panelHeight <= spaceBelow || spaceBelow >= spaceAbove
+      : !(panelHeight <= spaceAbove || spaceAbove >= spaceBelow);
+    const desiredTop = placeBelow
+      ? triggerBounds.bottom + FLOATING_GAP
+      : triggerBounds.top - FLOATING_GAP - panelHeight;
+    const desiredLeft = placement.endsWith('end') ? triggerBounds.right - panelWidth : triggerBounds.left;
+    const next = {
+      top: clamp(
+        desiredTop,
+        FLOATING_VIEWPORT_PADDING,
+        Math.max(FLOATING_VIEWPORT_PADDING, window.innerHeight - FLOATING_VIEWPORT_PADDING - panelHeight)
+      ),
+      left: clamp(
+        desiredLeft,
+        FLOATING_VIEWPORT_PADDING,
+        Math.max(FLOATING_VIEWPORT_PADDING, window.innerWidth - FLOATING_VIEWPORT_PADDING - panelWidth)
+      ),
+      anchorWidth: triggerBounds.width,
+    };
+    setFloatingPosition((current) => (sameFloatingPosition(current, next) ? current : next));
+  }, [placement]);
+
   useEffect(() => {
     if (!disabled || !openRef.current) return;
     updateOpen(false);
@@ -107,7 +168,12 @@ export function Popover({
     pushOpenPopover(token);
 
     const closeFromOutside = (event: PointerEvent) => {
-      if (event.target instanceof Node && rootRef.current?.contains(event.target)) return;
+      if (
+        event.target instanceof Node &&
+        (rootRef.current?.contains(event.target) || panelElementRef.current?.contains(event.target))
+      ) {
+        return;
+      }
       updateOpen(false);
     };
     const closeFromKeyboard = (event: KeyboardEvent) => {
@@ -126,16 +192,50 @@ export function Popover({
   }, [close, open, updateOpen]);
 
   useEffect(() => {
+    if (!open) return;
     const root = rootRef.current;
-    if (!root) return;
+    const panel = panelElementRef.current;
     const closeFromFocusOut = (event: FocusEvent) => {
       const nextTarget = event.relatedTarget;
-      if (nextTarget instanceof Node && root.contains(nextTarget)) return;
+      if (
+        nextTarget instanceof Node &&
+        (rootRef.current?.contains(nextTarget) || panelElementRef.current?.contains(nextTarget))
+      ) {
+        return;
+      }
       updateOpen(false);
     };
-    root.addEventListener('focusout', closeFromFocusOut);
-    return () => root.removeEventListener('focusout', closeFromFocusOut);
-  }, [updateOpen]);
+    root?.addEventListener('focusout', closeFromFocusOut);
+    if (portal) panel?.addEventListener('focusout', closeFromFocusOut);
+    return () => {
+      root?.removeEventListener('focusout', closeFromFocusOut);
+      if (portal) panel?.removeEventListener('focusout', closeFromFocusOut);
+    };
+  }, [open, portal, updateOpen]);
+
+  useLayoutEffect(() => {
+    if (!open || !portal) {
+      setFloatingPosition(null);
+      return;
+    }
+    updateFloatingPosition();
+    const frame = requestAnimationFrame(updateFloatingPosition);
+    return () => cancelAnimationFrame(frame);
+  }, [floatingPosition?.anchorWidth, open, portal, updateFloatingPosition]);
+
+  useEffect(() => {
+    if (!open || !portal) return;
+    window.addEventListener('resize', updateFloatingPosition);
+    window.addEventListener('scroll', updateFloatingPosition, true);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => updateFloatingPosition());
+    if (triggerRef.current) observer?.observe(triggerRef.current);
+    if (panelElementRef.current) observer?.observe(panelElementRef.current);
+    return () => {
+      window.removeEventListener('resize', updateFloatingPosition);
+      window.removeEventListener('scroll', updateFloatingPosition, true);
+      observer?.disconnect();
+    };
+  }, [open, portal, updateFloatingPosition]);
 
   const triggerProps: PopoverTriggerProps = {
     ref: (element) => {
@@ -150,6 +250,28 @@ export function Popover({
     onClick: () => updateOpen(!openRef.current),
   };
 
+  const panel = open ? (
+    <section
+      ref={setPanelElement}
+      id={panelId}
+      className={`ds-popover-panel${panelClassName ? ` ${panelClassName}` : ''}`}
+      role={panelRole}
+      aria-label={panelLabel}
+      data-floating={portal ? 'true' : undefined}
+      onKeyDown={onPanelKeyDown}
+      style={portal ? { position: 'absolute', top: 0, left: 0 } : undefined}
+    >
+      {typeof children === 'function' ? children(close) : children}
+    </section>
+  ) : null;
+
+  const floatingStyle: CSSProperties = {
+    top: floatingPosition?.top ?? 0,
+    left: floatingPosition?.left ?? 0,
+    width: floatingPosition?.anchorWidth ?? 0,
+    visibility: floatingPosition ? 'visible' : 'hidden',
+  };
+
   return (
     <div
       ref={rootRef}
@@ -157,18 +279,27 @@ export function Popover({
       data-placement={placement}
     >
       {trigger(triggerProps, { open })}
-      {open && (
-        <section
-          ref={panelRef}
-          id={panelId}
-          className={`ds-popover-panel${panelClassName ? ` ${panelClassName}` : ''}`}
-          role={panelRole}
-          aria-label={panelLabel}
-          onKeyDown={onPanelKeyDown}
-        >
-          {typeof children === 'function' ? children(close) : children}
-        </section>
-      )}
+      {panel && portal && typeof document !== 'undefined'
+        ? createPortal(
+            <div className='ds-popover-portal-anchor' data-placement={placement} style={floatingStyle}>
+              {panel}
+            </div>,
+            document.body
+          )
+        : panel}
     </div>
+  );
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(Math.max(value, minimum), maximum);
+}
+
+function sameFloatingPosition(current: FloatingPosition | null, next: FloatingPosition): boolean {
+  return (
+    current !== null &&
+    Math.abs(current.top - next.top) < 0.5 &&
+    Math.abs(current.left - next.left) < 0.5 &&
+    Math.abs(current.anchorWidth - next.anchorWidth) < 0.5
   );
 }

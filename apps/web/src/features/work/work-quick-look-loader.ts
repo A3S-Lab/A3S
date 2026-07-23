@@ -76,7 +76,7 @@ export async function loadWorkQuickLook(
     if (entry.size > maximumTextPreviewBytes) {
       return {
         kind: 'unsupported',
-        reason: '文本文件超过 2 MiB；为避免一次载入过多内容，Quick Look 没有读取它。',
+        reason: '文本文件超过 2 MB，无法快速查看。',
       };
     }
     const result = await api.readFile(entry.path);
@@ -91,7 +91,7 @@ export async function loadWorkQuickLook(
 function binarySizeLimit(): WorkQuickLookContent {
   return {
     kind: 'unsupported',
-    reason: '文件超过 50 MiB；为避免占用过多内存，Quick Look 没有读取它。',
+    reason: '文件超过 50 MB，无法快速查看。',
   };
 }
 

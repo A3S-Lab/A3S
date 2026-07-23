@@ -1,12 +1,14 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { type ComponentProps, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CodeActions } from '../../code/use-code-controller';
 import { appState } from '../../../state/app-state';
+import type { CodeActions } from '../../code/use-code-controller';
 import { createWorkAgentProposalRequest, WORK_AGENT_PROPOSAL_PROTOCOL } from '../work-agent-proposal';
-import { WorkCopilot } from './work-copilot';
+import { readWorkCopilotWidth, WorkCopilot } from './work-copilot';
 
 describe('Work Copilot panel', () => {
   beforeEach(() => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440, writable: true });
     localStorage.removeItem('a3s-work.copilot-width');
     localStorage.removeItem('a3s-work.ai-assistant-width');
     appState.sessions = [];
@@ -43,7 +45,7 @@ describe('Work Copilot panel', () => {
     const onAgentRequest = vi.fn();
     const sendMessage = vi.fn();
     render(
-      <WorkCopilot
+      <TestWorkCopilot
         actions={{ sendMessage } as unknown as CodeActions}
         workspaceRoot='/docs'
         currentPath='/docs/Reports'
@@ -60,11 +62,15 @@ describe('Work Copilot panel', () => {
       instruction: expect.stringContaining('概览'),
     });
     expect(sendMessage).not.toHaveBeenCalled();
+    expect(screen.getByRole('complementary', { name: 'Work AI 助手' })).toHaveAttribute(
+      'data-office-shortcuts',
+      'ignore'
+    );
   });
 
-  it('supports keyboard resizing and persists the chosen width', () => {
+  it('starts wider, supports keyboard resizing, and persists the chosen width', () => {
     render(
-      <WorkCopilot
+      <TestWorkCopilot
         actions={{} as CodeActions}
         workspaceRoot='/docs'
         currentPath='/docs'
@@ -75,10 +81,80 @@ describe('Work Copilot panel', () => {
     );
 
     const separator = screen.getByRole('separator', { name: '调整 Work AI 助手宽度' });
-    expect(separator).toHaveAttribute('aria-valuenow', '420');
+    expect(separator).toHaveAttribute('aria-valuenow', '460');
     fireEvent.keyDown(separator, { key: 'ArrowLeft' });
-    expect(separator).toHaveAttribute('aria-valuenow', '440');
-    expect(localStorage.getItem('a3s-work.ai-assistant-width')).toBe('440');
+    expect(separator).toHaveAttribute('aria-valuenow', '480');
+    expect(localStorage.getItem('a3s-work.ai-assistant-width')).toBe('480');
+  });
+
+  it('resizes by dragging the panel border', () => {
+    render(
+      <TestWorkCopilot
+        actions={{} as CodeActions}
+        workspaceRoot='/docs'
+        currentPath='/docs'
+        onClose={vi.fn()}
+        onPickRoot={vi.fn()}
+        onAgentRequest={vi.fn()}
+      />
+    );
+
+    const separator = screen.getByRole('separator', { name: '调整 Work AI 助手宽度' });
+    fireEvent.pointerDown(separator, { button: 0, pointerId: 7, clientX: window.innerWidth - 460 });
+    expect(document.documentElement).toHaveAttribute('data-ds-resizing', 'vertical');
+    fireEvent.pointerMove(window, { pointerId: 7, clientX: window.innerWidth - 520 });
+    fireEvent.pointerUp(window, { pointerId: 7, clientX: window.innerWidth - 520 });
+    expect(separator).toHaveAttribute('aria-valuenow', '520');
+    expect(document.documentElement).not.toHaveAttribute('data-ds-resizing');
+    expect(localStorage.getItem('a3s-work.ai-assistant-width')).toBe('520');
+  });
+
+  it('keeps the Office pane usable when the viewport becomes narrower', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024, writable: true });
+    render(
+      <TestWorkCopilot
+        actions={{} as CodeActions}
+        workspaceRoot='/docs'
+        currentPath='/docs'
+        onClose={vi.fn()}
+        onPickRoot={vi.fn()}
+        onAgentRequest={vi.fn()}
+      />
+    );
+
+    const panel = screen.getByRole('complementary', { name: 'Work AI 助手' });
+    const separator = screen.getByRole('separator', { name: '调整 Work AI 助手宽度' });
+    expect(panel).toHaveStyle({ width: '360px' });
+    expect(separator).toHaveAttribute('aria-valuemax', '360');
+    expect(separator).toHaveAttribute('aria-valuenow', '360');
+
+    window.innerWidth = 1280;
+    fireEvent(window, new Event('resize'));
+
+    await waitFor(() => {
+      expect(panel).toHaveStyle({ width: '460px' });
+      expect(separator).toHaveAttribute('aria-valuemax', '616');
+      expect(separator).toHaveAttribute('aria-valuenow', '460');
+    });
+  });
+
+  it('uses the compact assistant width throughout overlay layouts', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 768, writable: true });
+    render(
+      <TestWorkCopilot
+        actions={{} as CodeActions}
+        workspaceRoot='/docs'
+        currentPath='/docs'
+        onClose={vi.fn()}
+        onPickRoot={vi.fn()}
+        onAgentRequest={vi.fn()}
+      />
+    );
+
+    const panel = screen.getByRole('complementary', { name: 'Work AI 助手' });
+    const separator = screen.getByRole('separator', { name: '调整 Work AI 助手宽度' });
+    expect(panel).toHaveStyle({ width: '360px' });
+    expect(separator).toHaveAttribute('aria-valuemax', '360');
   });
 
   it('projects a matching assistant proposal into an explicit review surface', () => {
@@ -128,7 +204,7 @@ describe('Work Copilot panel', () => {
     ];
 
     render(
-      <WorkCopilot
+      <TestWorkCopilot
         actions={{} as CodeActions}
         workspaceRoot='/docs'
         currentPath='/docs'
@@ -146,3 +222,8 @@ describe('Work Copilot panel', () => {
     expect(apply).toHaveBeenCalledTimes(1);
   });
 });
+
+function TestWorkCopilot(props: Omit<ComponentProps<typeof WorkCopilot>, 'width' | 'onWidthChange'>) {
+  const [width, setWidth] = useState(readWorkCopilotWidth);
+  return <WorkCopilot {...props} width={width} onWidthChange={setWidth} />;
+}

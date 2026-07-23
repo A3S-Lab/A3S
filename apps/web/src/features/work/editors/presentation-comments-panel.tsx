@@ -1,5 +1,7 @@
 import { MapPin, Trash2, X } from 'lucide-react';
+import { Button, CollectionState, IconButton } from '../../../design-system/primitives';
 import type { WorkSlide } from '../work-types';
+import { OfficeTextArea } from './office-controls';
 
 interface PresentationCommentView {
   slideId: string;
@@ -35,9 +37,9 @@ export function PresentationCommentsPanel({
           <strong>演示批注</strong>
           <span>{comments.length ? `${comments.length} 条传统 PPTX 批注` : '没有批注'}</span>
         </div>
-        <button type='button' className='close' aria-label='关闭演示批注审阅' onClick={onClose}>
+        <IconButton className='close' label='关闭演示批注审阅' onClick={onClose}>
           <X size={14} />
-        </button>
+        </IconButton>
       </header>
       <div className='work-presentation-comment-list'>
         {comments.map((comment, index) => (
@@ -57,7 +59,7 @@ export function PresentationCommentsPanel({
               <strong>{comment.author}</strong>
               <time dateTime={comment.date}>{formatCommentDate(comment.date)}</time>
             </header>
-            <textarea
+            <OfficeTextArea
               aria-label={`编辑演示批注 ${index + 1}`}
               value={comment.text}
               onFocus={() => onLocate(comment.slideId, comment.id)}
@@ -65,18 +67,22 @@ export function PresentationCommentsPanel({
             />
             <footer>
               <span>批注 {comment.commentIndex + 1}</span>
-              <button
-                type='button'
+              <Button
+                tone='quiet'
                 aria-label={`删除演示批注 ${index + 1}`}
                 onClick={() => onDelete(comment.slideId, comment.id)}
               >
                 <Trash2 size={12} />
                 删除
-              </button>
+              </Button>
             </footer>
           </article>
         ))}
-        {!comments.length && <p>在当前幻灯片或选中元素上添加批注后，可以在这里定位、编辑或删除。</p>}
+        {!comments.length && (
+          <CollectionState className='work-presentation-comments-empty' role='status'>
+            在当前幻灯片或选中元素上添加批注后，可以在这里定位、编辑或删除。
+          </CollectionState>
+        )}
       </div>
     </section>
   );

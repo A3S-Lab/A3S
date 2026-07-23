@@ -633,9 +633,11 @@ bun run build
 
 The production output is `dist/workspace`. From the monorepo root, `just web`
 checks for Bun, runs the frozen dependency install, builds this application, and
-starts the complete local service. If port `29653` is already in use, stop the
-existing local server or set `A3S_PORT` to another port before starting a second
-instance.
+starts the complete local service. It safely
+replaces an existing same-workspace A3S Web process on the configured port after
+verifying its health PID, executable, command, and port. If another application
+owns port `29653`, the command refuses to stop it; set `A3S_PORT` to another port
+or stop that application explicitly.
 
 ## Validation
 

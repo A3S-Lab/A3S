@@ -1,6 +1,6 @@
-import { History, RotateCcw } from 'lucide-react';
+import { History, LoaderCircle, RotateCcw } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Dialog } from '../../../design-system/primitives/dialog/dialog';
+import { Button, Dialog, StateView } from '../../../design-system/primitives';
 import type { WorkActions } from '../use-work-controller';
 import type { WorkArtifactVersion } from '../work-types';
 
@@ -39,9 +39,31 @@ export function WorkVersionHistoryDialog({ actions, onClose }: { actions: WorkAc
     >
       <section className='work-version-history' aria-live='polite'>
         {loading ? (
-          <output className='work-version-state'>正在读取版本…</output>
+          <StateView
+            className='work-version-state'
+            size='compact'
+            role='status'
+            icon={<LoaderCircle className='spin' size={18} />}
+            title='正在读取版本…'
+          />
         ) : error ? (
-          <div className='work-version-state error'>{error}</div>
+          <StateView
+            className='work-version-state'
+            size='compact'
+            tone='danger'
+            role='alert'
+            icon={<History size={20} />}
+            title='无法读取版本历史'
+            description={error}
+          />
+        ) : versions.length === 0 ? (
+          <StateView
+            className='work-version-state'
+            size='compact'
+            icon={<History size={20} />}
+            title='还没有历史版本'
+            description='成功保存后，版本会显示在这里。'
+          />
         ) : (
           <ol>
             {versions.map((version) => (
@@ -56,8 +78,8 @@ export function WorkVersionHistoryDialog({ actions, onClose }: { actions: WorkAc
                 {version.current ? (
                   <em>当前版本</em>
                 ) : (
-                  <button
-                    type='button'
+                  <Button
+                    tone='quiet'
                     disabled={restoring !== null}
                     onClick={async () => {
                       setRestoring(version.revision);
@@ -67,7 +89,7 @@ export function WorkVersionHistoryDialog({ actions, onClose }: { actions: WorkAc
                   >
                     <RotateCcw size={13} />
                     {restoring === version.revision ? '正在恢复…' : '恢复'}
-                  </button>
+                  </Button>
                 )}
               </li>
             ))}

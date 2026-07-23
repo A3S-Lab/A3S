@@ -1,4 +1,5 @@
 import { Plus, Trash2, X } from 'lucide-react';
+import { Button, IconButton } from '../../../design-system/primitives';
 import {
   createPresentationChartSeries,
   normalizeDoughnutHoleSize,
@@ -8,8 +9,8 @@ import {
   parsePresentationChartCategories,
   parsePresentationChartValues,
   parsePresentationChartXValues,
-  presentationChartSupportsSeriesMarkers,
   presentationChartSupportsAxisTitles,
+  presentationChartSupportsSeriesMarkers,
   presentationChartTypeLabel,
   presentationChartUsesNumericXAxis,
   withPresentationChartDataLabels,
@@ -23,6 +24,7 @@ import type {
   WorkSlideRadarStyle,
   WorkSlideScatterStyle,
 } from '../work-types';
+import { OfficeCheckbox, OfficeNumberField, OfficeSelect, OfficeTextArea, OfficeTextField } from './office-controls';
 import { PresentationChartAxisEditor } from './presentation-chart-axis-editor';
 import { PresentationChartDataLabelEditor } from './presentation-chart-data-label-editor';
 import { PresentationChartLayoutEditor } from './presentation-chart-layout-editor';
@@ -67,38 +69,33 @@ export function PresentationChartPanel({
           <span>编辑后的数据会同步到预览和原生 PPTX。</span>
         </div>
         <div>
-          <button type='button' className='danger' aria-label='删除演示图表' onClick={onDelete}>
+          <Button tone='danger' aria-label='删除演示图表' onClick={onDelete}>
             <Trash2 size={13} />
             删除图表
-          </button>
-          <button type='button' className='close' aria-label='关闭演示图表数据' onClick={onClose}>
+          </Button>
+          <IconButton className='close' label='关闭演示图表数据' onClick={onClose}>
             <X size={14} />
-          </button>
+          </IconButton>
         </div>
       </header>
       <div className='work-presentation-chart-controls'>
-        <label>
+        <div className='work-office-field'>
           <span>类型</span>
-          <select
-            aria-label='演示图表类型'
+          <OfficeSelect
+            ariaLabel='演示图表类型'
             value={chart.type}
-            onChange={(event) => onChange(withPresentationChartType(chart, event.target.value as WorkSlideChartType))}
-          >
-            {CHART_TYPES.map((type) => (
-              <option value={type} key={type}>
-                {presentationChartTypeLabel(type)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
+            options={CHART_TYPES.map((type) => ({ value: type, label: presentationChartTypeLabel(type) }))}
+            onValueChange={(type) => onChange(withPresentationChartType(chart, type as WorkSlideChartType))}
+          />
+        </div>
+        <div className='work-office-field'>
           <span>标题</span>
-          <input
+          <OfficeTextField
             aria-label='演示图表标题'
             value={chart.title ?? ''}
             onChange={(event) => onChange({ ...chart, title: event.target.value || undefined })}
           />
-        </label>
+        </div>
         <PresentationChartLayoutEditor chart={chart} onChange={onChange} />
         {presentationChartSupportsAxisTitles(chart) && (
           <PresentationChartAxisEditor chart={chart} onChange={onChange} />
@@ -109,95 +106,95 @@ export function PresentationChartPanel({
           onChange={(dataLabels) => onChange(withPresentationChartDataLabels(chart, dataLabels))}
         />
         {chart.type === 'doughnut' && (
-          <label>
+          <div className='work-office-field'>
             <span>孔径</span>
-            <input
-              type='number'
-              aria-label='圆环孔径'
+            <OfficeNumberField
+              ariaLabel='圆环孔径'
               min={10}
               max={90}
               value={normalizeDoughnutHoleSize(chart.doughnutHoleSize)}
-              onChange={(event) =>
-                onChange({ ...chart, doughnutHoleSize: normalizeDoughnutHoleSize(Number(event.target.value)) })
+              onValueChange={(value) =>
+                onChange({ ...chart, doughnutHoleSize: normalizeDoughnutHoleSize(Number(value)) })
               }
             />
-          </label>
+          </div>
         )}
         {chart.type === 'radar' && (
-          <label>
+          <div className='work-office-field'>
             <span>样式</span>
-            <select
-              aria-label='雷达图样式'
+            <OfficeSelect
+              ariaLabel='雷达图样式'
               value={chart.radarStyle ?? 'standard'}
-              onChange={(event) => onChange({ ...chart, radarStyle: event.target.value as WorkSlideRadarStyle })}
-            >
-              <option value='standard'>标准</option>
-              <option value='marker'>带数据标记</option>
-              <option value='filled'>填充</option>
-            </select>
-          </label>
+              options={[
+                { value: 'standard', label: '标准' },
+                { value: 'marker', label: '带数据标记' },
+                { value: 'filled', label: '填充' },
+              ]}
+              onValueChange={(radarStyle) => onChange({ ...chart, radarStyle: radarStyle as WorkSlideRadarStyle })}
+            />
+          </div>
         )}
         {chart.type === 'scatter' && (
-          <label>
+          <div className='work-office-field'>
             <span>散点样式</span>
-            <select
-              aria-label='演示散点图样式'
+            <OfficeSelect
+              ariaLabel='演示散点图样式'
               value={normalizePresentationScatterStyle(chart.scatterStyle)}
-              onChange={(event) => onChange({ ...chart, scatterStyle: event.target.value as WorkSlideScatterStyle })}
-            >
-              <option value='marker'>仅数据标记</option>
-              <option value='line'>直线</option>
-              <option value='lineMarker'>直线和数据标记</option>
-              <option value='smooth'>平滑线</option>
-              <option value='smoothMarker'>平滑线和数据标记</option>
-            </select>
-          </label>
+              options={[
+                { value: 'marker', label: '仅数据标记' },
+                { value: 'line', label: '直线' },
+                { value: 'lineMarker', label: '直线和数据标记' },
+                { value: 'smooth', label: '平滑线' },
+                { value: 'smoothMarker', label: '平滑线和数据标记' },
+              ]}
+              onValueChange={(scatterStyle) =>
+                onChange({ ...chart, scatterStyle: scatterStyle as WorkSlideScatterStyle })
+              }
+            />
+          </div>
         )}
         {chart.type === 'bubble' && (
           <>
-            <label>
+            <div className='work-office-field'>
               <span>气泡缩放</span>
-              <input
-                type='number'
-                aria-label='演示气泡图缩放'
+              <OfficeNumberField
+                ariaLabel='演示气泡图缩放'
                 min={5}
                 max={300}
                 value={normalizePresentationBubbleScale(chart.bubbleScale)}
-                onChange={(event) =>
-                  onChange({ ...chart, bubbleScale: normalizePresentationBubbleScale(event.target.value) })
+                onValueChange={(value) => onChange({ ...chart, bubbleScale: normalizePresentationBubbleScale(value) })}
+              />
+            </div>
+            <div className='work-office-field'>
+              <span>大小表示</span>
+              <OfficeSelect
+                ariaLabel='演示气泡大小表示'
+                value={normalizePresentationBubbleSizeRepresents(chart.bubbleSizeRepresents)}
+                options={[
+                  { value: 'area', label: '面积' },
+                  { value: 'width', label: '宽度' },
+                ]}
+                onValueChange={(bubbleSizeRepresents) =>
+                  onChange({ ...chart, bubbleSizeRepresents: bubbleSizeRepresents as WorkSlideBubbleSizeRepresents })
                 }
               />
-            </label>
-            <label>
-              <span>大小表示</span>
-              <select
-                aria-label='演示气泡大小表示'
-                value={normalizePresentationBubbleSizeRepresents(chart.bubbleSizeRepresents)}
-                onChange={(event) =>
-                  onChange({ ...chart, bubbleSizeRepresents: event.target.value as WorkSlideBubbleSizeRepresents })
-                }
-              >
-                <option value='area'>面积</option>
-                <option value='width'>宽度</option>
-              </select>
-            </label>
-            <label className='check'>
+            </div>
+            <div className='check'>
               <span>负气泡</span>
-              <span className='work-presentation-chart-check-control'>
-                <input
-                  type='checkbox'
-                  aria-label='显示负气泡'
-                  checked={chart.showNegativeBubbles === true}
-                  onChange={(event) => onChange({ ...chart, showNegativeBubbles: event.target.checked })}
-                />
+              <OfficeCheckbox
+                className='work-presentation-chart-check-control'
+                ariaLabel='显示负气泡'
+                checked={chart.showNegativeBubbles === true}
+                onCheckedChange={(showNegativeBubbles) => onChange({ ...chart, showNegativeBubbles })}
+              >
                 显示
-              </span>
-            </label>
+              </OfficeCheckbox>
+            </div>
           </>
         )}
-        <label className='categories'>
+        <div className='work-office-field categories'>
           <span>{numericXAxis ? 'X 值' : '分类'}（每行一项）</span>
-          <textarea
+          <OfficeTextArea
             aria-label={numericXAxis ? '演示图表 X 值' : '演示图表分类'}
             value={chart.categories.join('\n')}
             onChange={(event) =>
@@ -209,18 +206,18 @@ export function PresentationChartPanel({
               })
             }
           />
-        </label>
+        </div>
         <div className='work-presentation-chart-series-list'>
           {chart.series.map((series, index) => (
             <div className='work-presentation-chart-series-card' key={index}>
               <fieldset>
                 <legend>系列 {index + 1}</legend>
-                <input
+                <OfficeTextField
                   aria-label={`演示图表系列 ${index + 1} 名称`}
                   value={series.name}
                   onChange={(event) => updateSeries(index, { name: event.target.value.slice(0, 255) })}
                 />
-                <textarea
+                <OfficeTextArea
                   aria-label={`演示图表系列 ${index + 1} ${numericXAxis ? 'Y 值' : '数据'}`}
                   value={series.values.join(', ')}
                   onChange={(event) =>
@@ -228,7 +225,7 @@ export function PresentationChartPanel({
                   }
                 />
                 {chart.type === 'bubble' && (
-                  <textarea
+                  <OfficeTextArea
                     aria-label={`演示气泡图系列 ${index + 1} 大小`}
                     value={series.bubbleSizes?.join(', ') ?? ''}
                     onChange={(event) =>
@@ -236,14 +233,13 @@ export function PresentationChartPanel({
                     }
                   />
                 )}
-                <button
-                  type='button'
-                  aria-label={`删除演示图表系列 ${index + 1}`}
+                <IconButton
+                  label={`删除演示图表系列 ${index + 1}`}
                   disabled={chart.series.length === 1}
                   onClick={() => onChange({ ...chart, series: chart.series.filter((_, current) => current !== index) })}
                 >
                   <Trash2 size={12} />
-                </button>
+                </IconButton>
               </fieldset>
               <SpreadsheetChartSeriesStyleEditor
                 seriesNumber={index + 1}
@@ -254,15 +250,15 @@ export function PresentationChartPanel({
               <PresentationChartSeriesAnalysisEditor chart={chart} seriesIndex={index} onChange={onChange} />
             </div>
           ))}
-          <button
-            type='button'
+          <Button
+            tone='secondary'
             className='add-series'
             aria-label='添加图表系列'
             onClick={() => onChange({ ...chart, series: [...chart.series, createPresentationChartSeries(chart)] })}
           >
             <Plus size={13} />
             添加系列
-          </button>
+          </Button>
         </div>
       </div>
     </section>

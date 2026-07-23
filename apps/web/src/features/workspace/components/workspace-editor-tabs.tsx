@@ -30,7 +30,6 @@ export function WorkspaceEditorTabs({ actions }: { actions: WorkspaceActions }) 
     requestedFocusIdRef.current = null;
     target.focus({ preventScroll: true });
   }, [state.activeEditorTabId]);
-
   if (!state.editorTabs.length) return null;
   const labels = workspaceEditorTabLabels(state.editorTabs, state.workspaceRoot);
   const contextualTab = contextMenu ? state.editorTabs.find((tab) => tab.id === contextMenu.tabId) : undefined;

@@ -4,6 +4,7 @@ import {
   presentationChartDataLabelPositions,
 } from '../work-presentation-charts';
 import type { WorkSlideChartDataLabelPosition, WorkSlideChartDataLabels, WorkSlideChartType } from '../work-types';
+import { OfficeCheckbox, OfficeSelect, OfficeTextField } from './office-controls';
 
 export function PresentationChartDataLabelEditor({
   chartType,
@@ -17,89 +18,81 @@ export function PresentationChartDataLabelEditor({
   const change = (patch: Partial<WorkSlideChartDataLabels>) => onChange({ ...value, ...patch });
   return (
     <section className='work-presentation-chart-data-labels' aria-label='演示图表数据标签'>
-      <label className='check enable-data-labels'>
-        <input
-          type='checkbox'
-          aria-label='显示演示图表数据标签'
-          checked={value !== undefined}
-          onChange={(event) => onChange(event.target.checked ? { showValue: true } : undefined)}
-        />
-        <span>数据标签</span>
-      </label>
+      <OfficeCheckbox
+        className='check enable-data-labels'
+        ariaLabel='显示演示图表数据标签'
+        checked={value !== undefined}
+        onCheckedChange={(checked) => onChange(checked ? { showValue: true } : undefined)}
+      >
+        数据标签
+      </OfficeCheckbox>
       {value && (
         <div>
-          <label className='check'>
-            <input
-              type='checkbox'
-              aria-label='演示图表数据标签显示数值'
-              checked={value.showValue === true}
-              onChange={(event) => change({ showValue: event.target.checked })}
-            />
-            <span>数值</span>
-          </label>
-          <label className='check'>
-            <input
-              type='checkbox'
-              aria-label='演示图表数据标签显示分类名称'
-              checked={value.showCategoryName === true}
-              onChange={(event) => change({ showCategoryName: event.target.checked })}
-            />
-            <span>分类</span>
-          </label>
-          <label className='check'>
-            <input
-              type='checkbox'
-              aria-label='演示图表数据标签显示系列名称'
-              checked={value.showSeriesName === true}
-              onChange={(event) => change({ showSeriesName: event.target.checked })}
-            />
-            <span>系列</span>
-          </label>
+          <OfficeCheckbox
+            className='check'
+            ariaLabel='演示图表数据标签显示数值'
+            checked={value.showValue === true}
+            onCheckedChange={(showValue) => change({ showValue })}
+          >
+            数值
+          </OfficeCheckbox>
+          <OfficeCheckbox
+            className='check'
+            ariaLabel='演示图表数据标签显示分类名称'
+            checked={value.showCategoryName === true}
+            onCheckedChange={(showCategoryName) => change({ showCategoryName })}
+          >
+            分类
+          </OfficeCheckbox>
+          <OfficeCheckbox
+            className='check'
+            ariaLabel='演示图表数据标签显示系列名称'
+            checked={value.showSeriesName === true}
+            onCheckedChange={(showSeriesName) => change({ showSeriesName })}
+          >
+            系列
+          </OfficeCheckbox>
           {(chartType === 'pie' || chartType === 'doughnut') && (
-            <label className='check'>
-              <input
-                type='checkbox'
-                aria-label='演示图表数据标签显示百分比'
-                checked={value.showPercentage === true}
-                onChange={(event) => change({ showPercentage: event.target.checked })}
-              />
-              <span>百分比</span>
-            </label>
+            <OfficeCheckbox
+              className='check'
+              ariaLabel='演示图表数据标签显示百分比'
+              checked={value.showPercentage === true}
+              onCheckedChange={(showPercentage) => change({ showPercentage })}
+            >
+              百分比
+            </OfficeCheckbox>
           )}
           {chartType === 'bubble' && (
-            <label className='check'>
-              <input
-                type='checkbox'
-                aria-label='演示图表数据标签显示气泡大小'
-                checked={value.showBubbleSize === true}
-                onChange={(event) => change({ showBubbleSize: event.target.checked })}
-              />
-              <span>气泡大小</span>
-            </label>
-          )}
-          <label>
-            <span>位置</span>
-            <select
-              aria-label='演示图表数据标签位置'
-              value={normalizePresentationChartDataLabelPosition(value.position, chartType)}
-              onChange={(event) => change({ position: event.target.value as WorkSlideChartDataLabelPosition })}
+            <OfficeCheckbox
+              className='check'
+              ariaLabel='演示图表数据标签显示气泡大小'
+              checked={value.showBubbleSize === true}
+              onCheckedChange={(showBubbleSize) => change({ showBubbleSize })}
             >
-              {presentationChartDataLabelPositions(chartType).map((position) => (
-                <option value={position} key={position}>
-                  {presentationChartDataLabelPositionLabel(position)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
+              气泡大小
+            </OfficeCheckbox>
+          )}
+          <div className='work-office-field'>
+            <span>位置</span>
+            <OfficeSelect
+              ariaLabel='演示图表数据标签位置'
+              value={normalizePresentationChartDataLabelPosition(value.position, chartType)}
+              options={presentationChartDataLabelPositions(chartType).map((position) => ({
+                value: position,
+                label: presentationChartDataLabelPositionLabel(position),
+              }))}
+              onValueChange={(position) => change({ position: position as WorkSlideChartDataLabelPosition })}
+            />
+          </div>
+          <div className='work-office-field'>
             <span>分隔符</span>
-            <input
+            <OfficeTextField
               aria-label='演示图表数据标签分隔符'
               value={value.separator ?? ', '}
               maxLength={64}
               onChange={(event) => change({ separator: event.target.value })}
             />
-          </label>
+          </div>
         </div>
       )}
     </section>

@@ -1,6 +1,8 @@
 import type { Selection } from '@fortune-sheet/core';
 import { Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Button, CollectionState, InlineNotice, StateView } from '../../../design-system/primitives';
+import { spreadsheetPivotFilterValueKey } from '../work-spreadsheet-pivot-values';
 import {
   createSpreadsheetPivotFromSelection,
   defaultPivotValueCaption,
@@ -11,13 +13,13 @@ import {
   spreadsheetPivotFilterItems,
   spreadsheetPivotValidation,
 } from '../work-spreadsheet-pivots';
-import { spreadsheetPivotFilterValueKey } from '../work-spreadsheet-pivot-values';
 import type {
   WorkSpreadsheetContent,
   WorkSpreadsheetPivotAggregation,
   WorkSpreadsheetPivotFilterValue,
   WorkSpreadsheetPivotTable,
 } from '../work-types';
+import { OfficeCheckbox, OfficeSelect, OfficeTextField } from './office-controls';
 
 interface SpreadsheetPivotPanelProps {
   content: WorkSpreadsheetContent;
@@ -188,14 +190,14 @@ export function SpreadsheetPivotPanel({ content, activeSheetId, selection, onCha
   return (
     <div className='work-spreadsheet-pivot-manager'>
       <aside aria-label='工作簿数据透视表'>
-        <button type='button' className='create' onClick={addPivot}>
+        <Button className='create' tone='secondary' onClick={addPivot}>
           <Plus size={13} />
           根据当前选区新建
-        </button>
-        <button type='button' className='refresh' disabled={!items.length} onClick={refreshAll}>
+        </Button>
+        <Button className='refresh' tone='secondary' disabled={!items.length} onClick={refreshAll}>
           <RefreshCw size={13} />
           刷新全部
-        </button>
+        </Button>
         <div className='work-spreadsheet-pivot-list'>
           {items.map((item) => (
             <button
@@ -210,7 +212,11 @@ export function SpreadsheetPivotPanel({ content, activeSheetId, selection, onCha
               </span>
             </button>
           ))}
-          {!items.length && <p>还没有数据透视表。选择带标题的数据区域后创建。</p>}
+          {!items.length && (
+            <CollectionState className='work-office-collection-empty' role='status'>
+              还没有数据透视表。选择带标题的数据区域后创建。
+            </CollectionState>
+          )}
         </div>
       </aside>
       {draft ? (
@@ -221,85 +227,81 @@ export function SpreadsheetPivotPanel({ content, activeSheetId, selection, onCha
           }}
         >
           <div className='work-spreadsheet-pivot-fields'>
-            <label>
+            <div className='work-office-field'>
               <span>名称</span>
-              <input
+              <OfficeTextField
                 aria-label='透视表名称'
                 value={draft.name}
                 maxLength={255}
                 onChange={(event) => setDraft({ ...draft, name: event.target.value })}
               />
-            </label>
-            <label>
+            </div>
+            <div className='work-office-field'>
               <span>源工作表</span>
-              <select
-                aria-label='透视表源工作表'
+              <OfficeSelect
+                ariaLabel='透视表源工作表'
                 value={draft.sourceSheetId}
-                onChange={(event) => setDraft({ ...draft, sourceSheetId: event.target.value })}
-              >
-                {content.sheets.map((sheet) => (
-                  <option value={sheet.id} key={sheet.id ?? sheet.name}>
-                    {sheet.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
+                options={content.sheets.flatMap((sheet) => (sheet.id ? [{ value: sheet.id, label: sheet.name }] : []))}
+                onValueChange={(sourceSheetId) => setDraft({ ...draft, sourceSheetId })}
+              />
+            </div>
+            <div className='work-office-field'>
               <span>源区域</span>
-              <input
+              <OfficeTextField
                 aria-label='透视表源区域'
                 value={draft.sourceReference}
                 placeholder='A1:D200'
                 onChange={(event) => setDraft({ ...draft, sourceReference: event.target.value })}
               />
-            </label>
-            <label>
+            </div>
+            <div className='work-office-field'>
               <span>输出位置</span>
-              <input
+              <OfficeTextField
                 aria-label='透视表输出位置'
                 value={draft.anchor}
                 placeholder='A1'
                 onChange={(event) => setDraft({ ...draft, anchor: event.target.value })}
               />
-            </label>
-            <label>
+            </div>
+            <div className='work-office-field'>
               <span>样式</span>
-              <select
-                aria-label='透视表样式'
+              <OfficeSelect
+                ariaLabel='透视表样式'
                 value={draft.styleName}
-                onChange={(event) => setDraft({ ...draft, styleName: event.target.value })}
-              >
-                <option value='PivotStyleLight16'>浅色 16</option>
-                <option value='PivotStyleLight18'>浅色 18</option>
-                <option value='PivotStyleMedium2'>中等 2</option>
-                <option value='PivotStyleMedium9'>中等 9</option>
-                <option value='PivotStyleDark3'>深色 3</option>
-              </select>
-            </label>
-            <label className='check'>
-              <input
-                type='checkbox'
-                checked={draft.refreshOnLoad}
-                onChange={(event) => setDraft({ ...draft, refreshOnLoad: event.target.checked })}
+                options={[
+                  { value: 'PivotStyleLight16', label: '浅色 16' },
+                  { value: 'PivotStyleLight18', label: '浅色 18' },
+                  { value: 'PivotStyleMedium2', label: '中等 2' },
+                  { value: 'PivotStyleMedium9', label: '中等 9' },
+                  { value: 'PivotStyleDark3', label: '深色 3' },
+                ]}
+                onValueChange={(styleName) => setDraft({ ...draft, styleName })}
               />
-              <span>在 Excel 中打开时刷新</span>
-            </label>
-            <label className='check'>
-              <input
-                type='checkbox'
-                checked={draft.rowGrandTotals}
-                onChange={(event) => setDraft({ ...draft, rowGrandTotals: event.target.checked })}
-              />
-              <span>显示右侧总计列</span>
-            </label>
-            <label className='check'>
-              <input
-                type='checkbox'
-                checked={draft.columnGrandTotals}
-                onChange={(event) => setDraft({ ...draft, columnGrandTotals: event.target.checked })}
-              />
-              <span>显示底部总计行</span>
-            </label>
+            </div>
+            <OfficeCheckbox
+              className='check'
+              ariaLabel='在 Excel 中打开时刷新'
+              checked={draft.refreshOnLoad}
+              onCheckedChange={(refreshOnLoad) => setDraft({ ...draft, refreshOnLoad })}
+            >
+              在 Excel 中打开时刷新
+            </OfficeCheckbox>
+            <OfficeCheckbox
+              className='check'
+              ariaLabel='显示右侧总计列'
+              checked={draft.rowGrandTotals}
+              onCheckedChange={(rowGrandTotals) => setDraft({ ...draft, rowGrandTotals })}
+            >
+              显示右侧总计列
+            </OfficeCheckbox>
+            <OfficeCheckbox
+              className='check'
+              ariaLabel='显示底部总计行'
+              checked={draft.columnGrandTotals}
+              onCheckedChange={(columnGrandTotals) => setDraft({ ...draft, columnGrandTotals })}
+            >
+              显示底部总计行
+            </OfficeCheckbox>
           </div>
           <section className='work-spreadsheet-pivot-layout' aria-label='透视表字段布局'>
             <header>
@@ -317,47 +319,46 @@ export function SpreadsheetPivotPanel({ content, activeSheetId, selection, onCha
                     <div className='work-spreadsheet-pivot-field-row' key={field.index}>
                       <strong>{field.name}</strong>
                       <span>{field.numeric ? '数值' : '文本/分类'}</span>
-                      <select
-                        aria-label={`${field.name} 字段区域`}
+                      <OfficeSelect
+                        ariaLabel={`${field.name} 字段区域`}
                         value={role}
-                        onChange={(event) =>
+                        options={[
+                          { value: 'unused', label: '未使用' },
+                          { value: 'row', label: '行' },
+                          { value: 'column', label: '列' },
+                          { value: 'filter', label: '筛选' },
+                          { value: 'value', label: '值' },
+                        ]}
+                        onValueChange={(nextRole) =>
                           setDraft(
                             assignPivotFieldRole(
                               draft,
                               field.index,
-                              event.target.value as PivotFieldRole,
+                              nextRole as PivotFieldRole,
                               field.name,
                               field.numeric
                             )
                           )
                         }
-                      >
-                        <option value='unused'>未使用</option>
-                        <option value='row'>行</option>
-                        <option value='column'>列</option>
-                        <option value='filter'>筛选</option>
-                        <option value='value'>值</option>
-                      </select>
+                      />
                       {role === 'value' && value ? (
                         <>
-                          <select
-                            aria-label={`${field.name} 聚合方式`}
+                          <OfficeSelect
+                            ariaLabel={`${field.name} 聚合方式`}
                             value={value.aggregation}
-                            onChange={(event) =>
+                            options={AGGREGATIONS.map((aggregation) => ({
+                              value: aggregation,
+                              label: spreadsheetPivotAggregationLabel(aggregation),
+                            }))}
+                            onValueChange={(aggregation) =>
                               setDraft(
                                 updatePivotValue(draft, field.index, {
-                                  aggregation: event.target.value as WorkSpreadsheetPivotAggregation,
+                                  aggregation: aggregation as WorkSpreadsheetPivotAggregation,
                                 })
                               )
                             }
-                          >
-                            {AGGREGATIONS.map((aggregation) => (
-                              <option value={aggregation} key={aggregation}>
-                                {spreadsheetPivotAggregationLabel(aggregation)}
-                              </option>
-                            ))}
-                          </select>
-                          <input
+                          />
+                          <OfficeTextField
                             aria-label={`${field.name} 值标题`}
                             value={value.caption ?? ''}
                             placeholder={defaultPivotValueCaption(field.name, value.aggregation)}
@@ -368,37 +369,34 @@ export function SpreadsheetPivotPanel({ content, activeSheetId, selection, onCha
                         </>
                       ) : role === 'filter' && filter ? (
                         <>
-                          <select
-                            aria-label={`${field.name} 筛选值`}
+                          <OfficeSelect
+                            ariaLabel={`${field.name} 筛选值`}
                             value={
                               filter.selectedItem === undefined
                                 ? 'all:'
                                 : spreadsheetPivotFilterValueKey(filter.selectedItem)
                             }
-                            onChange={(event) =>
+                            options={[
+                              { value: 'all:', label: '（全部）' },
+                              ...filterItems.map((item) => ({
+                                value: spreadsheetPivotFilterValueKey(item.value),
+                                label: item.label,
+                              })),
+                            ]}
+                            onValueChange={(selectedValue) =>
                               setDraft(
                                 updatePivotReportFilter(
                                   draft,
                                   field.index,
-                                  event.target.value === 'all:'
+                                  selectedValue === 'all:'
                                     ? undefined
                                     : filterItems.find(
-                                        (item) => spreadsheetPivotFilterValueKey(item.value) === event.target.value
+                                        (item) => spreadsheetPivotFilterValueKey(item.value) === selectedValue
                                       )?.value
                                 )
                               )
                             }
-                          >
-                            <option value='all:'>（全部）</option>
-                            {filterItems.map((item) => (
-                              <option
-                                value={spreadsheetPivotFilterValueKey(item.value)}
-                                key={spreadsheetPivotFilterValueKey(item.value)}
-                              >
-                                {item.label}
-                              </option>
-                            ))}
-                          </select>
+                          />
                           <span className='filter-hint'>单选报表筛选</span>
                         </>
                       ) : (
@@ -413,22 +411,33 @@ export function SpreadsheetPivotPanel({ content, activeSheetId, selection, onCha
             )}
           </section>
           <div className='actions'>
-            <button type='button' className='danger' onClick={deletePivot}>
+            <Button tone='danger' onClick={deletePivot}>
               <Trash2 size={13} />
               删除
-            </button>
-            <span className='error'>{error}</span>
-            <button type='submit' className='primary'>
+            </Button>
+            {error && (
+              <InlineNotice className='work-office-form-error' tone='danger' role='alert'>
+                {error}
+              </InlineNotice>
+            )}
+            <Button type='submit' tone='primary'>
               保存并刷新
-            </button>
+            </Button>
           </div>
         </form>
       ) : (
-        <div className='work-spreadsheet-pivot-empty'>
-          <strong>用当前选区创建数据透视表</strong>
-          <p>首行将作为字段名，Work 会在新的报告工作表中生成可刷新的汇总结果。</p>
-          {error && <p className='error'>{error}</p>}
-        </div>
+        <StateView
+          className='work-spreadsheet-pivot-empty'
+          size='compact'
+          title='用当前选区创建数据透视表'
+          description='首行将作为字段名，Work 会在新的报告工作表中生成可刷新的汇总结果。'
+        >
+          {error && (
+            <InlineNotice className='work-office-form-error' tone='danger' role='alert'>
+              {error}
+            </InlineNotice>
+          )}
+        </StateView>
       )}
     </div>
   );

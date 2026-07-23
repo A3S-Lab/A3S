@@ -1,20 +1,23 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { WorkSidebar } from './work-sidebar';
 
 describe('Work Finder sidebar', () => {
-  it('opens, removes, and accepts drops on local favorite folders', () => {
+  it('switches real workspaces and keeps favorite folder actions available', async () => {
     const onOpenLocalFavorite = vi.fn();
     const onRemoveLocalFavorite = vi.fn();
     const onMoveLocalEntries = vi.fn();
     const onImportLocalDrop = vi.fn();
-    const onPickWorkspace = vi.fn();
-    render(
+    const onCollapse = vi.fn();
+    const onSelectWorkspace = vi.fn(async (path: string) => path);
+    const onPickWorkspace = vi.fn(async () => '/projects/new');
+    const { container } = render(
       <WorkSidebar
         surface='files'
         localRootName='docs'
         localRootPath='/docs'
         localCurrentPath='/docs/Reports'
+        recentRootPaths={['/docs', '/clients/acme']}
         localFavoritePaths={['/docs/Reports']}
         view='home'
         totalCount={0}
@@ -25,17 +28,32 @@ describe('Work Finder sidebar', () => {
         onChangeView={vi.fn()}
         onOpenFolder={vi.fn()}
         onOpenLocalFiles={vi.fn()}
+        onSelectWorkspace={onSelectWorkspace}
+        onPickWorkspace={onPickWorkspace}
         onOpenLocalFavorite={onOpenLocalFavorite}
         onRemoveLocalFavorite={onRemoveLocalFavorite}
         onMoveLocalEntries={onMoveLocalEntries}
         onImportLocalDrop={onImportLocalDrop}
-        onPickWorkspace={onPickWorkspace}
+        onCollapse={onCollapse}
         onCreate={vi.fn()}
         onImport={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: '切换工作区' }));
-    expect(onPickWorkspace).toHaveBeenCalled();
+    expect(container.querySelector('.work-workspace-switcher')).toHaveClass('variant-sidebar');
+    expect(container.querySelector('.work-workspace-switcher')).not.toHaveClass('sidebar');
+    expect(screen.getByText('办公')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '切换工作区，当前 docs' }));
+    expect(screen.getByRole('region', { name: '选择办公工作区' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('option', { name: /acme/ }));
+    await waitFor(() => expect(onSelectWorkspace).toHaveBeenCalledWith('/clients/acme'));
+
+    fireEvent.click(screen.getByRole('button', { name: '切换工作区，当前 docs' }));
+    fireEvent.click(screen.getByRole('button', { name: '打开其他文件夹' }));
+    await waitFor(() => expect(onPickWorkspace).toHaveBeenCalledTimes(1));
+
+    expect(screen.getByRole('button', { name: '收起办公侧边栏' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '收起办公侧边栏' }));
+    expect(onCollapse).toHaveBeenCalledTimes(1);
     const dataTransfer = {
       dropEffect: 'none',
       types: ['application/x-a3s-work-local-paths'],

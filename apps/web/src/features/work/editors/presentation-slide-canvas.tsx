@@ -1,5 +1,7 @@
+import { useRef } from 'react';
 import { presentationSlideView } from '../work-presentation-layouts';
 import type { WorkPresentationContent, WorkSlide, WorkSlideElement } from '../work-types';
+import { OfficeTextArea } from './office-controls';
 import { SlideChart } from './presentation-chart-canvas';
 
 export function SlideCanvas({
@@ -65,6 +67,7 @@ export function RichEditableText({
   element: WorkSlideElement;
   onCommit: (text: string) => void;
 }) {
+  const dirtyRef = useRef(false);
   return (
     // biome-ignore lint/a11y/useSemanticElements: A contentEditable surface preserves imported rich-text runs until the user edits them.
     <div
@@ -76,7 +79,14 @@ export function RichEditableText({
       role='textbox'
       aria-label='幻灯片富文本'
       style={slideTextStyle(element)}
-      onBlur={(event) => onCommit(event.currentTarget.innerText)}
+      onInput={() => {
+        dirtyRef.current = true;
+      }}
+      onBlur={(event) => {
+        if (!dirtyRef.current) return;
+        dirtyRef.current = false;
+        onCommit(event.currentTarget.innerText);
+      }}
     >
       {element.textRuns?.map((run, index) => (
         <span
@@ -115,7 +125,7 @@ export function EditableSlideTable({
               const Cell = rowIndex < (table.headerRows ?? 0) ? 'th' : 'td';
               return (
                 <Cell key={columnIndex}>
-                  <textarea
+                  <OfficeTextArea
                     aria-label={`第 ${rowIndex + 1} 行第 ${columnIndex + 1} 列`}
                     value={cell}
                     onChange={(event) => {

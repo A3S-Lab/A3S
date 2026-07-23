@@ -1,63 +1,64 @@
 import type { Selection } from '@fortune-sheet/core';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { createSpreadsheetChartFromSelection, parseSpreadsheetChartReference } from '../work-spreadsheet-charts';
-import { validateSpreadsheetChartSeriesTrendlines } from '../work-spreadsheet-chart-validation';
+import { Button, CollectionState, InlineNotice, StateView } from '../../../design-system/primitives';
 import { normalizeWorkSpreadsheetChartAxes } from '../work-spreadsheet-chart-axis';
 import {
   normalizeWorkSpreadsheetChartLayout,
   workSpreadsheetChartSupportsSeriesAnalysis,
 } from '../work-spreadsheet-chart-layout';
+import { normalizeWorkSpreadsheetChartSeriesStyle } from '../work-spreadsheet-chart-series-style';
+import { validateSpreadsheetChartSeriesTrendlines } from '../work-spreadsheet-chart-validation';
+import { createSpreadsheetChartFromSelection, parseSpreadsheetChartReference } from '../work-spreadsheet-charts';
 import {
-  normalizeWorkSpreadsheetChartAxisGroup,
-  normalizeWorkSpreadsheetCombinationSeriesType,
   normalizeWorkSpreadsheetBubbleScale,
   normalizeWorkSpreadsheetBubbleSizeRepresents,
+  normalizeWorkSpreadsheetChartAxisGroup,
+  normalizeWorkSpreadsheetCombinationSeriesType,
   normalizeWorkSpreadsheetDataLabels,
   normalizeWorkSpreadsheetDoughnutHoleSize,
   normalizeWorkSpreadsheetErrorBars,
   normalizeWorkSpreadsheetRadarStyle,
   normalizeWorkSpreadsheetScatterStyle,
   normalizeWorkSpreadsheetTrendline,
+  type WorkSpreadsheetBubbleSizeRepresents,
   type WorkSpreadsheetChart,
   type WorkSpreadsheetChartAxisGroup,
-  type WorkSpreadsheetBubbleSizeRepresents,
-  type WorkSpreadsheetChartSeries,
   type WorkSpreadsheetChartType,
   type WorkSpreadsheetCombinationSeriesType,
   type WorkSpreadsheetContent,
   type WorkSpreadsheetRadarStyle,
   type WorkSpreadsheetScatterStyle,
-  workSpreadsheetChartSupportsErrorBars,
   workSpreadsheetChartSupportsAxes,
+  workSpreadsheetChartSupportsErrorBars,
   workSpreadsheetChartSupportsTrendlines,
-  workSpreadsheetChartUsesNumericXAxis,
   workSpreadsheetChartTypeLabel,
+  workSpreadsheetChartUsesNumericXAxis,
 } from '../work-types';
-import { SpreadsheetDataLabelEditor } from './spreadsheet-data-label-editor';
+import { OfficeCheckbox, OfficeNumberField, OfficeSelect, OfficeTextField } from './office-controls';
 import { SpreadsheetChartAxisEditor } from './spreadsheet-chart-axis-editor';
+import {
+  type ChartDraft,
+  type ChartListItem,
+  chartDraft,
+  chartDraftWithType,
+  chartKey,
+  newChartSeries,
+  replaceSeries,
+  validateChartAxes,
+  validateSeriesErrorBars,
+} from './spreadsheet-chart-draft';
 import { SpreadsheetChartLayoutEditor } from './spreadsheet-chart-layout-editor';
+import { SpreadsheetChartSeriesStyleEditor } from './spreadsheet-chart-series-style-editor';
+import { SpreadsheetDataLabelEditor } from './spreadsheet-data-label-editor';
 import { SpreadsheetErrorBarEditor } from './spreadsheet-error-bar-editor';
 import { SpreadsheetTrendlineEditor } from './spreadsheet-trendline-editor';
-import { SpreadsheetChartSeriesStyleEditor } from './spreadsheet-chart-series-style-editor';
-import { normalizeWorkSpreadsheetChartSeriesStyle } from '../work-spreadsheet-chart-series-style';
 
 interface SpreadsheetChartPanelProps {
   content: WorkSpreadsheetContent;
   activeSheetId: string;
   selection?: Selection;
   onChange: (content: WorkSpreadsheetContent) => void;
-}
-
-interface ChartListItem {
-  sheetId: string;
-  sheetName: string;
-  chart: WorkSpreadsheetChart;
-}
-
-interface ChartDraft extends Omit<WorkSpreadsheetChart, 'series'> {
-  sheetId: string;
-  series: WorkSpreadsheetChartSeries[];
 }
 
 export function SpreadsheetChartPanel({ content, activeSheetId, selection, onChange }: SpreadsheetChartPanelProps) {
@@ -332,10 +333,10 @@ export function SpreadsheetChartPanel({ content, activeSheetId, selection, onCha
   return (
     <div className='work-spreadsheet-chart-manager'>
       <aside aria-label='工作簿图表'>
-        <button type='button' className='create' onClick={addChart}>
+        <Button className='create' tone='secondary' onClick={addChart}>
           <Plus size={13} />
           根据当前选区新建
-        </button>
+        </Button>
         <div className='work-spreadsheet-chart-list'>
           {items.map((item) => (
             <button
@@ -350,7 +351,11 @@ export function SpreadsheetChartPanel({ content, activeSheetId, selection, onCha
               </span>
             </button>
           ))}
-          {!items.length && <p>还没有图表。先选择带标题的数据区域，再创建图表。</p>}
+          {!items.length && (
+            <CollectionState className='work-office-collection-empty' role='status'>
+              还没有图表。先选择带标题的数据区域，再创建图表。
+            </CollectionState>
+          )}
         </div>
       </aside>
       {draft ? (
@@ -361,144 +366,147 @@ export function SpreadsheetChartPanel({ content, activeSheetId, selection, onCha
           }}
         >
           <div className='work-spreadsheet-chart-fields'>
-            <label>
+            <div className='work-office-field'>
               <span>对象名称</span>
-              <input
+              <OfficeTextField
                 aria-label='图表对象名称'
                 value={draft.name}
                 maxLength={255}
                 onChange={(event) => setDraft({ ...draft, name: event.target.value })}
               />
-            </label>
-            <label>
+            </div>
+            <div className='work-office-field'>
               <span>图表类型</span>
-              <select
-                aria-label='图表类型'
+              <OfficeSelect
+                ariaLabel='图表类型'
                 value={draft.type}
-                onChange={(event) => {
-                  const type = event.target.value as WorkSpreadsheetChartType;
+                options={[
+                  { value: 'column', label: '簇状柱形图' },
+                  { value: 'bar', label: '簇状条形图' },
+                  { value: 'line', label: '折线图' },
+                  { value: 'pie', label: '饼图' },
+                  { value: 'doughnut', label: '圆环图' },
+                  { value: 'area', label: '面积图' },
+                  { value: 'radar', label: '雷达图' },
+                  { value: 'scatter', label: '散点图' },
+                  { value: 'bubble', label: '气泡图' },
+                  { value: 'combination', label: '组合图' },
+                ]}
+                onValueChange={(nextType) => {
+                  const type = nextType as WorkSpreadsheetChartType;
                   setDraft(chartDraftWithType(draft, type));
                 }}
-              >
-                <option value='column'>簇状柱形图</option>
-                <option value='bar'>簇状条形图</option>
-                <option value='line'>折线图</option>
-                <option value='pie'>饼图</option>
-                <option value='doughnut'>圆环图</option>
-                <option value='area'>面积图</option>
-                <option value='radar'>雷达图</option>
-                <option value='scatter'>散点图</option>
-                <option value='bubble'>气泡图</option>
-                <option value='combination'>组合图</option>
-              </select>
-            </label>
+              />
+            </div>
             {draft.type === 'doughnut' && (
-              <label>
+              <div className='work-office-field'>
                 <span>圆环孔径（%）</span>
-                <input
-                  type='number'
-                  aria-label='圆环孔径（%）'
+                <OfficeNumberField
+                  ariaLabel='圆环孔径（%）'
                   min={10}
                   max={90}
                   step={1}
                   value={draft.doughnutHoleSize ?? 50}
-                  onChange={(event) => setDraft({ ...draft, doughnutHoleSize: Number(event.target.value) })}
+                  onValueChange={(doughnutHoleSize) =>
+                    setDraft({ ...draft, doughnutHoleSize: Number(doughnutHoleSize) })
+                  }
                 />
-              </label>
+              </div>
             )}
             {draft.type === 'radar' && (
-              <label>
+              <div className='work-office-field'>
                 <span>雷达图样式</span>
-                <select
-                  aria-label='雷达图样式'
+                <OfficeSelect
+                  ariaLabel='雷达图样式'
                   value={normalizeWorkSpreadsheetRadarStyle(draft.radarStyle)}
-                  onChange={(event) =>
-                    setDraft({ ...draft, radarStyle: event.target.value as WorkSpreadsheetRadarStyle })
+                  options={[
+                    { value: 'standard', label: '标准雷达图' },
+                    { value: 'marker', label: '带数据标记的雷达图' },
+                    { value: 'filled', label: '填充雷达图' },
+                  ]}
+                  onValueChange={(radarStyle) =>
+                    setDraft({ ...draft, radarStyle: radarStyle as WorkSpreadsheetRadarStyle })
                   }
-                >
-                  <option value='standard'>标准雷达图</option>
-                  <option value='marker'>带数据标记的雷达图</option>
-                  <option value='filled'>填充雷达图</option>
-                </select>
-              </label>
+                />
+              </div>
             )}
             {draft.type === 'scatter' && (
-              <label>
+              <div className='work-office-field'>
                 <span>散点图样式</span>
-                <select
-                  aria-label='散点图样式'
+                <OfficeSelect
+                  ariaLabel='散点图样式'
                   value={normalizeWorkSpreadsheetScatterStyle(draft.scatterStyle)}
-                  onChange={(event) =>
-                    setDraft({ ...draft, scatterStyle: event.target.value as WorkSpreadsheetScatterStyle })
+                  options={[
+                    { value: 'marker', label: '仅数据标记' },
+                    { value: 'line', label: '直线' },
+                    { value: 'lineMarker', label: '带数据标记的直线' },
+                    { value: 'smooth', label: '平滑线' },
+                    { value: 'smoothMarker', label: '带数据标记的平滑线' },
+                  ]}
+                  onValueChange={(scatterStyle) =>
+                    setDraft({ ...draft, scatterStyle: scatterStyle as WorkSpreadsheetScatterStyle })
                   }
-                >
-                  <option value='marker'>仅数据标记</option>
-                  <option value='line'>直线</option>
-                  <option value='lineMarker'>带数据标记的直线</option>
-                  <option value='smooth'>平滑线</option>
-                  <option value='smoothMarker'>带数据标记的平滑线</option>
-                </select>
-              </label>
+                />
+              </div>
             )}
             {draft.type === 'bubble' && (
               <>
-                <label>
+                <div className='work-office-field'>
                   <span>气泡缩放（%）</span>
-                  <input
-                    type='number'
-                    aria-label='气泡缩放（%）'
+                  <OfficeNumberField
+                    ariaLabel='气泡缩放（%）'
                     min={0}
                     max={300}
                     step={1}
                     value={draft.bubbleScale ?? 100}
-                    onChange={(event) => setDraft({ ...draft, bubbleScale: Number(event.target.value) })}
+                    onValueChange={(bubbleScale) => setDraft({ ...draft, bubbleScale: Number(bubbleScale) })}
                   />
-                </label>
-                <label>
+                </div>
+                <div className='work-office-field'>
                   <span>气泡大小表示</span>
-                  <select
-                    aria-label='气泡大小表示'
+                  <OfficeSelect
+                    ariaLabel='气泡大小表示'
                     value={normalizeWorkSpreadsheetBubbleSizeRepresents(draft.bubbleSizeRepresents)}
-                    onChange={(event) =>
+                    options={[
+                      { value: 'area', label: '面积' },
+                      { value: 'width', label: '宽度' },
+                    ]}
+                    onValueChange={(bubbleSizeRepresents) =>
                       setDraft({
                         ...draft,
-                        bubbleSizeRepresents: event.target.value as WorkSpreadsheetBubbleSizeRepresents,
+                        bubbleSizeRepresents: bubbleSizeRepresents as WorkSpreadsheetBubbleSizeRepresents,
                       })
                     }
-                  >
-                    <option value='area'>面积</option>
-                    <option value='width'>宽度</option>
-                  </select>
-                </label>
-                <label className='check'>
-                  <input
-                    type='checkbox'
-                    aria-label='显示负值气泡'
-                    checked={draft.showNegativeBubbles === true}
-                    onChange={(event) => setDraft({ ...draft, showNegativeBubbles: event.target.checked })}
                   />
-                  <span>显示负值气泡</span>
-                </label>
+                </div>
+                <OfficeCheckbox
+                  className='check'
+                  ariaLabel='显示负值气泡'
+                  checked={draft.showNegativeBubbles === true}
+                  onCheckedChange={(showNegativeBubbles) => setDraft({ ...draft, showNegativeBubbles })}
+                >
+                  显示负值气泡
+                </OfficeCheckbox>
               </>
             )}
-            <label>
+            <div className='work-office-field'>
               <span>图表标题</span>
-              <input
+              <OfficeTextField
                 aria-label='图表标题'
                 value={draft.title ?? ''}
                 maxLength={255}
                 onChange={(event) => setDraft({ ...draft, title: event.target.value })}
               />
-            </label>
-            <label>
+            </div>
+            <div className='work-office-field'>
               <span>标题引用（可选）</span>
-              <input
+              <OfficeTextField
                 aria-label='图表标题引用'
                 value={draft.titleReference ?? ''}
                 placeholder="'报告'!$B$1"
                 onChange={(event) => setDraft({ ...draft, titleReference: event.target.value })}
               />
-            </label>
+            </div>
             {workSpreadsheetChartSupportsAxes(draft.type) && (
               <SpreadsheetChartAxisEditor
                 axes={draft.axes}
@@ -513,26 +521,26 @@ export function SpreadsheetChartPanel({ content, activeSheetId, selection, onCha
               />
             )}
             {!workSpreadsheetChartUsesNumericXAxis(draft.type) && (
-              <label className='reference'>
+              <div className='work-office-field reference'>
                 <span>分类引用</span>
-                <input
+                <OfficeTextField
                   aria-label='图表分类引用'
                   value={draft.categoryReference ?? ''}
                   placeholder="'报告'!$A$2:$A$8"
                   onChange={(event) => setDraft({ ...draft, categoryReference: event.target.value })}
                 />
-              </label>
+              </div>
             )}
-            <label className='alternative-text'>
+            <div className='work-office-field alternative-text'>
               <span>替代文本</span>
-              <input
+              <OfficeTextField
                 aria-label='图表替代文本'
                 value={draft.altText ?? ''}
                 maxLength={1_024}
                 placeholder='说明图表表达的关键数据或趋势'
                 onChange={(event) => setDraft({ ...draft, altText: event.target.value })}
               />
-            </label>
+            </div>
             <SpreadsheetChartLayoutEditor chart={draft} onChange={(change) => setDraft({ ...draft, ...change })} />
           </div>
           <section className='work-spreadsheet-chart-series' aria-label='图表数据系列'>
@@ -561,19 +569,19 @@ export function SpreadsheetChartPanel({ content, activeSheetId, selection, onCha
                 }${draft.type === 'bubble' ? ' bubble' : ''}${draft.type === 'combination' ? ' combination' : ''}`}
                 key={`${draft.id}-series-${index}`}
               >
-                <label className='series-name'>
+                <div className='work-office-field series-name'>
                   <span>系列 {index + 1} 名称</span>
-                  <input
+                  <OfficeTextField
                     aria-label={`系列 ${index + 1} 名称`}
                     value={series.name}
                     onChange={(event) =>
                       setDraft({ ...draft, series: replaceSeries(draft.series, index, { name: event.target.value }) })
                     }
                   />
-                </label>
-                <label className='name-reference'>
+                </div>
+                <div className='work-office-field name-reference'>
                   <span>名称引用</span>
-                  <input
+                  <OfficeTextField
                     aria-label={`系列 ${index + 1} 名称引用`}
                     value={series.nameReference ?? ''}
                     placeholder="'报告'!$B$1"
@@ -584,11 +592,11 @@ export function SpreadsheetChartPanel({ content, activeSheetId, selection, onCha
                       })
                     }
                   />
-                </label>
+                </div>
                 {workSpreadsheetChartUsesNumericXAxis(draft.type) && (
-                  <label className='x-reference'>
+                  <div className='work-office-field x-reference'>
                     <span>X 值引用</span>
-                    <input
+                    <OfficeTextField
                       aria-label={`系列 ${index + 1} X 值引用`}
                       value={series.xValuesReference ?? ''}
                       placeholder="'报告'!$A$2:$A$8"
@@ -599,11 +607,15 @@ export function SpreadsheetChartPanel({ content, activeSheetId, selection, onCha
                         })
                       }
                     />
-                  </label>
+                  </div>
                 )}
-                <label className={workSpreadsheetChartUsesNumericXAxis(draft.type) ? 'y-reference' : 'reference'}>
+                <div
+                  className={`work-office-field ${
+                    workSpreadsheetChartUsesNumericXAxis(draft.type) ? 'y-reference' : 'reference'
+                  }`}
+                >
                   <span>{workSpreadsheetChartUsesNumericXAxis(draft.type) ? 'Y 值引用' : '数值引用'}</span>
-                  <input
+                  <OfficeTextField
                     aria-label={`系列 ${index + 1} ${
                       workSpreadsheetChartUsesNumericXAxis(draft.type) ? 'Y 值引用' : '数值引用'
                     }`}
@@ -616,52 +628,54 @@ export function SpreadsheetChartPanel({ content, activeSheetId, selection, onCha
                       })
                     }
                   />
-                </label>
+                </div>
                 {draft.type === 'combination' && (
                   <>
-                    <label className='combination-chart-type'>
+                    <div className='work-office-field combination-chart-type'>
                       <span>系列图表类型</span>
-                      <select
-                        aria-label={`系列 ${index + 1} 图表类型`}
+                      <OfficeSelect
+                        ariaLabel={`系列 ${index + 1} 图表类型`}
                         value={normalizeWorkSpreadsheetCombinationSeriesType(series.chartType)}
-                        onChange={(event) =>
+                        options={[
+                          { value: 'column', label: '柱形图' },
+                          { value: 'line', label: '折线图' },
+                          { value: 'area', label: '面积图' },
+                        ]}
+                        onValueChange={(chartType) =>
                           setDraft({
                             ...draft,
                             series: replaceSeries(draft.series, index, {
-                              chartType: event.target.value as WorkSpreadsheetCombinationSeriesType,
+                              chartType: chartType as WorkSpreadsheetCombinationSeriesType,
                             }),
                           })
                         }
-                      >
-                        <option value='column'>柱形图</option>
-                        <option value='line'>折线图</option>
-                        <option value='area'>面积图</option>
-                      </select>
-                    </label>
-                    <label className='combination-axis-group'>
+                      />
+                    </div>
+                    <div className='work-office-field combination-axis-group'>
                       <span>坐标轴</span>
-                      <select
-                        aria-label={`系列 ${index + 1} 坐标轴`}
+                      <OfficeSelect
+                        ariaLabel={`系列 ${index + 1} 坐标轴`}
                         value={normalizeWorkSpreadsheetChartAxisGroup(series.axisGroup)}
-                        onChange={(event) =>
+                        options={[
+                          { value: 'primary', label: '主坐标轴' },
+                          { value: 'secondary', label: '次坐标轴' },
+                        ]}
+                        onValueChange={(axisGroup) =>
                           setDraft({
                             ...draft,
                             series: replaceSeries(draft.series, index, {
-                              axisGroup: event.target.value as WorkSpreadsheetChartAxisGroup,
+                              axisGroup: axisGroup as WorkSpreadsheetChartAxisGroup,
                             }),
                           })
                         }
-                      >
-                        <option value='primary'>主坐标轴</option>
-                        <option value='secondary'>次坐标轴</option>
-                      </select>
-                    </label>
+                      />
+                    </div>
                   </>
                 )}
                 {draft.type === 'bubble' && (
-                  <label className='bubble-reference'>
+                  <div className='work-office-field bubble-reference'>
                     <span>气泡大小引用</span>
-                    <input
+                    <OfficeTextField
                       aria-label={`系列 ${index + 1} 气泡大小引用`}
                       value={series.bubbleSizesReference ?? ''}
                       placeholder="'报告'!$C$2:$C$8"
@@ -674,7 +688,7 @@ export function SpreadsheetChartPanel({ content, activeSheetId, selection, onCha
                         })
                       }
                     />
-                  </label>
+                  </div>
                 )}
                 <button
                   type='button'
@@ -741,255 +755,34 @@ export function SpreadsheetChartPanel({ content, activeSheetId, selection, onCha
             ))}
           </section>
           <div className='actions'>
-            {error && <output className='error'>{error}</output>}
-            <button type='button' className='danger' onClick={deleteChart}>
+            {error && (
+              <InlineNotice className='work-office-form-error' tone='danger' role='alert'>
+                {error}
+              </InlineNotice>
+            )}
+            <Button tone='danger' onClick={deleteChart}>
               <Trash2 size={13} />
               删除图表
-            </button>
-            <button type='submit' className='primary'>
+            </Button>
+            <Button type='submit' tone='primary'>
               保存图表
-            </button>
+            </Button>
           </div>
         </form>
       ) : (
-        <div className='work-spreadsheet-chart-empty'>
-          <strong>从单元格选区创建原生图表</strong>
-          <p>第一行会作为系列名称，第一列会作为分类标签；创建后仍可修改引用和图表类型。</p>
-          {error && <output className='error'>{error}</output>}
-        </div>
+        <StateView
+          className='work-spreadsheet-chart-empty'
+          size='compact'
+          title='从单元格选区创建原生图表'
+          description='第一行会作为系列名称，第一列会作为分类标签；创建后仍可修改引用和图表类型。'
+        >
+          {error && (
+            <InlineNotice className='work-office-form-error' tone='danger' role='alert'>
+              {error}
+            </InlineNotice>
+          )}
+        </StateView>
       )}
     </div>
   );
-}
-
-function chartDraft(item: ChartListItem): ChartDraft {
-  return {
-    ...item.chart,
-    sheetId: item.sheetId,
-    axes: item.chart.axes
-      ? {
-          bottom: item.chart.axes.bottom ? { ...item.chart.axes.bottom } : undefined,
-          left: item.chart.axes.left ? { ...item.chart.axes.left } : undefined,
-          top: item.chart.axes.top ? { ...item.chart.axes.top } : undefined,
-          right: item.chart.axes.right ? { ...item.chart.axes.right } : undefined,
-        }
-      : undefined,
-    series: item.chart.series.map((series) => ({
-      ...series,
-      values: [...series.values],
-      xValues: series.xValues ? [...series.xValues] : undefined,
-      bubbleSizes: series.bubbleSizes ? [...series.bubbleSizes] : undefined,
-      dataLabels: series.dataLabels ? { ...series.dataLabels } : undefined,
-      errorBars: series.errorBars?.map((errorBars) => ({
-        ...errorBars,
-        plusValues: errorBars.plusValues ? [...errorBars.plusValues] : undefined,
-        minusValues: errorBars.minusValues ? [...errorBars.minusValues] : undefined,
-      })),
-      trendlines: series.trendlines?.map((trendline) => ({ ...trendline })),
-      style: series.style
-        ? { ...series.style, marker: series.style.marker ? { ...series.style.marker } : undefined }
-        : undefined,
-    })),
-  };
-}
-
-function chartDraftWithType(draft: ChartDraft, type: WorkSpreadsheetChartType): ChartDraft {
-  const numericXAxis = workSpreadsheetChartUsesNumericXAxis(type);
-  const numericCategories = draft.categories.map(strictNumericCategory);
-  const categoriesAreNumeric = numericCategories.length > 0 && numericCategories.every((value) => value !== null);
-  const typedSeries = numericXAxis
-    ? draft.series.map((item) => {
-        if (item.xValuesReference?.trim() || item.xValues?.length) return item;
-        return {
-          ...item,
-          xValues: item.values.map((_, index) => numericCategories[index] ?? index + 1),
-          xValuesReference: categoriesAreNumeric ? draft.categoryReference : undefined,
-        };
-      })
-    : type === 'combination'
-      ? draft.series.map((item, index) => ({
-          ...item,
-          chartType: item.chartType
-            ? normalizeWorkSpreadsheetCombinationSeriesType(item.chartType)
-            : combinationType(index),
-          axisGroup: item.axisGroup
-            ? normalizeWorkSpreadsheetChartAxisGroup(item.axisGroup)
-            : index === 0
-              ? 'primary'
-              : 'secondary',
-        }))
-      : draft.series;
-  const supportsErrorBars = workSpreadsheetChartSupportsErrorBars(type);
-  const series = typedSeries.map((item) => {
-    if (!supportsErrorBars) return { ...item, errorBars: undefined };
-    const errorBars = item.errorBars
-      ?.filter((source) => numericXAxis || source.direction !== 'x')
-      .map((source) => normalizeWorkSpreadsheetErrorBars(source, type));
-    return { ...item, errorBars: errorBars?.length ? errorBars : undefined };
-  });
-  const hasSecondaryAxes =
-    type === 'combination' &&
-    series.some((item) => normalizeWorkSpreadsheetChartAxisGroup(item.axisGroup) === 'secondary');
-  return {
-    ...draft,
-    type,
-    series,
-    axes: normalizeWorkSpreadsheetChartAxes(draft.axes, type, hasSecondaryAxes),
-    ...normalizeWorkSpreadsheetChartLayout({ ...draft, type }),
-    doughnutHoleSize:
-      type === 'doughnut' ? normalizeWorkSpreadsheetDoughnutHoleSize(draft.doughnutHoleSize) : draft.doughnutHoleSize,
-    radarStyle: type === 'radar' ? normalizeWorkSpreadsheetRadarStyle(draft.radarStyle) : draft.radarStyle,
-    scatterStyle: type === 'scatter' ? normalizeWorkSpreadsheetScatterStyle(draft.scatterStyle) : draft.scatterStyle,
-    bubbleScale: type === 'bubble' ? normalizeWorkSpreadsheetBubbleScale(draft.bubbleScale) : draft.bubbleScale,
-    showNegativeBubbles: type === 'bubble' ? draft.showNegativeBubbles === true : draft.showNegativeBubbles,
-    bubbleSizeRepresents:
-      type === 'bubble'
-        ? normalizeWorkSpreadsheetBubbleSizeRepresents(draft.bubbleSizeRepresents)
-        : draft.bubbleSizeRepresents,
-  };
-}
-
-function strictNumericCategory(value: string): number | null {
-  const text = value.trim();
-  if (!text) return null;
-  const number = Number(text);
-  return Number.isFinite(number) ? number : null;
-}
-
-function newChartSeries(type: WorkSpreadsheetChartType, index: number): WorkSpreadsheetChartSeries {
-  return {
-    name: `系列 ${index + 1}`,
-    values: [],
-    valuesReference: '',
-    ...(workSpreadsheetChartUsesNumericXAxis(type) ? { xValues: [], xValuesReference: '' } : {}),
-    ...(type === 'bubble' ? { bubbleSizes: [], bubbleSizesReference: '' } : {}),
-    ...(type === 'combination'
-      ? {
-          chartType: combinationType(index),
-          axisGroup: index === 0 ? 'primary' : 'secondary',
-        }
-      : {}),
-  };
-}
-
-function combinationType(index: number): WorkSpreadsheetCombinationSeriesType {
-  return index === 0 ? 'column' : 'line';
-}
-
-function chartKey(item: ChartListItem | undefined): string | null {
-  return item ? `${item.sheetId}:${item.chart.id}` : null;
-}
-
-function replaceSeries(
-  series: WorkSpreadsheetChartSeries[],
-  index: number,
-  change: Partial<WorkSpreadsheetChartSeries>
-): WorkSpreadsheetChartSeries[] {
-  return series.map((item, candidate) => (candidate === index ? { ...item, ...change } : item));
-}
-
-function validateSeriesErrorBars(
-  content: WorkSpreadsheetContent,
-  ownerSheet: WorkSpreadsheetContent['sheets'][number],
-  series: WorkSpreadsheetChartSeries,
-  seriesIndex: number,
-  chartType: WorkSpreadsheetChartType
-): string | null {
-  const directions = new Set<string>();
-  for (const [errorBarIndex, errorBars] of (series.errorBars ?? []).entries()) {
-    const prefix = `系列 ${seriesIndex + 1} 的误差线 ${errorBarIndex + 1}`;
-    if (!workSpreadsheetChartUsesNumericXAxis(chartType) && errorBars.direction === 'x') {
-      return `${prefix}不能在当前图表类型中使用 X 方向。`;
-    }
-    if (directions.has(errorBars.direction)) {
-      return `系列 ${seriesIndex + 1} 的误差线方向不能重复。`;
-    }
-    directions.add(errorBars.direction);
-
-    if (
-      (errorBars.valueType === 'fixedValue' ||
-        errorBars.valueType === 'percentage' ||
-        errorBars.valueType === 'standardDeviation') &&
-      (typeof errorBars.value !== 'number' || !Number.isFinite(errorBars.value) || errorBars.value < 0)
-    ) {
-      return `${prefix}的数值必须是非负有效数字。`;
-    }
-    if (errorBars.valueType !== 'custom') continue;
-
-    if (errorBars.barType !== 'minus') {
-      const issue = validateCustomErrorBarSource(
-        content,
-        ownerSheet,
-        errorBars.plusReference,
-        errorBars.plusValues,
-        `${prefix}的正误差`
-      );
-      if (issue) return issue;
-    }
-    if (errorBars.barType !== 'plus') {
-      const issue = validateCustomErrorBarSource(
-        content,
-        ownerSheet,
-        errorBars.minusReference,
-        errorBars.minusValues,
-        `${prefix}的负误差`
-      );
-      if (issue) return issue;
-    }
-  }
-  return null;
-}
-
-function validateChartAxes(
-  content: WorkSpreadsheetContent,
-  ownerSheet: WorkSpreadsheetContent['sheets'][number],
-  axes: WorkSpreadsheetChart['axes'],
-  hasSecondaryAxes: boolean
-): string | null {
-  const entries = [
-    ['横坐标轴', axes?.bottom],
-    ['纵坐标轴', axes?.left],
-    ...(hasSecondaryAxes
-      ? ([
-          ['次横坐标轴', axes?.top],
-          ['次纵坐标轴', axes?.right],
-        ] as const)
-      : []),
-  ] as const;
-  for (const [label, axis] of entries) {
-    if ((axis?.title?.length ?? 0) > 255) return `${label}标题不能超过 255 个字符。`;
-    if (axis?.titleReference?.trim() && !parseSpreadsheetChartReference(content, ownerSheet, axis.titleReference)) {
-      return `${label}标题引用无效。`;
-    }
-    if (axis?.minimum !== undefined && !Number.isFinite(axis.minimum)) return `${label}最小值无效。`;
-    if (axis?.maximum !== undefined && !Number.isFinite(axis.maximum)) return `${label}最大值无效。`;
-    if (axis?.minimum !== undefined && axis.maximum !== undefined && axis.minimum >= axis.maximum) {
-      return `${label}最小值必须小于最大值。`;
-    }
-    if (axis?.majorUnit !== undefined && (!Number.isFinite(axis.majorUnit) || axis.majorUnit <= 0)) {
-      return `${label}主单位必须大于 0。`;
-    }
-    if (
-      axis?.labelInterval !== undefined &&
-      (!Number.isInteger(axis.labelInterval) || axis.labelInterval < 1 || axis.labelInterval > 31_999)
-    ) {
-      return `${label}标签间隔必须是 1 到 31999 之间的整数。`;
-    }
-    if ((axis?.numberFormat?.length ?? 0) > 255) return `${label}数字格式不能超过 255 个字符。`;
-  }
-  return null;
-}
-
-function validateCustomErrorBarSource(
-  content: WorkSpreadsheetContent,
-  ownerSheet: WorkSpreadsheetContent['sheets'][number],
-  reference: string | undefined,
-  values: number[] | undefined,
-  label: string
-): string | null {
-  if (reference?.trim()) {
-    return parseSpreadsheetChartReference(content, ownerSheet, reference) ? null : `${label}引用无效。`;
-  }
-  if (!values?.length) return `${label}需要有效的单元格引用。`;
-  return values.every((value) => Number.isFinite(value) && value >= 0) ? null : `${label}缓存包含无效数值。`;
 }

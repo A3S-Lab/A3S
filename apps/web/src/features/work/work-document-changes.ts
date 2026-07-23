@@ -30,6 +30,7 @@ interface ChangeSegment {
 }
 
 const documentChangePluginKey = new PluginKey('documentChangeTracking');
+const CONTINUOUS_INSERTION_WINDOW_MS = 30_000;
 
 export const DocumentChange = Mark.create<DocumentChangeOptions>({
   name: 'documentChange',
@@ -264,8 +265,12 @@ function trackedReplacement(
   }
   const position = transaction.mapping.map(to, -1);
   if (text) {
+    const insertion =
+      from === to
+        ? continuousInsertionMark(document, type, position, createChange)
+        : changeMark(type, 'insertion', createChange);
     transaction.insertText(text, position);
-    transaction.addMark(position, position + text.length, changeMark(type, 'insertion', createChange));
+    transaction.addMark(position, position + text.length, insertion);
   }
   const cursor = Math.min(transaction.doc.content.size, position + text.length);
   transaction.setSelection(TextSelection.near(transaction.doc.resolve(cursor)));
@@ -368,6 +373,31 @@ function changeMark(
     author: identity.author || 'A3S Work',
     date: identity.date || new Date().toISOString(),
   });
+}
+
+function continuousInsertionMark(
+  document: ProseMirrorNode,
+  type: ProseMirrorMark['type'],
+  position: number,
+  createChange: (kind: WorkDocumentChangeKind) => WorkDocumentChangeIdentity
+): ProseMirrorMark {
+  const next = changeMark(type, 'insertion', createChange);
+  const previousNode = document.resolve(position).nodeBefore;
+  const previous = previousNode?.marks.find(
+    (mark) => mark.type === type && changeKind(mark.attrs.kind) === 'insertion'
+  );
+  if (!previous) return next;
+  if (stringAttribute(previous.attrs.author) !== stringAttribute(next.attrs.author)) return next;
+  const previousTime = Date.parse(stringAttribute(previous.attrs.date));
+  const nextTime = Date.parse(stringAttribute(next.attrs.date));
+  if (
+    !Number.isFinite(previousTime) ||
+    !Number.isFinite(nextTime) ||
+    Math.abs(nextTime - previousTime) > CONTINUOUS_INSERTION_WINDOW_MS
+  ) {
+    return next;
+  }
+  return previous;
 }
 
 function documentChangeMark(marks: readonly ProseMirrorMark[]): ProseMirrorMark | undefined {

@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
-import type { WorkPresentationContent } from '../work-types';
-import { SlideCanvas } from './presentation-slide-canvas';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import type { WorkPresentationContent, WorkSlideElement } from '../work-types';
+import { RichEditableText, SlideCanvas } from './presentation-slide-canvas';
 
 describe('Work presentation slide canvas inheritance', () => {
   it('renders master and layout artwork behind slide content', () => {
@@ -92,5 +92,38 @@ describe('Work presentation slide canvas inheritance', () => {
     });
     expect(container.querySelectorAll('[data-slide-element-origin="inherited"]')).toHaveLength(2);
     expect(container.querySelectorAll('[data-slide-element-origin="slide"]')).toHaveLength(1);
+  });
+
+  it('preserves imported rich-text runs when toolbar focus only blurs the editor', () => {
+    const element: WorkSlideElement = {
+      id: 'rich-title',
+      type: 'text',
+      x: 8,
+      y: 10,
+      width: 84,
+      height: 10,
+      text: 'Quarterly Review',
+      textRuns: [
+        { text: 'Quarterly ', bold: true, color: '#2563eb' },
+        { text: 'Review', italic: true, color: '#dc2626' },
+      ],
+      fontSize: 30,
+      color: '#172033',
+      fill: 'transparent',
+      bold: true,
+      align: 'left',
+    };
+    const onCommit = vi.fn();
+    render(<RichEditableText element={element} onCommit={onCommit} />);
+
+    const editor = screen.getByRole('textbox', { name: '幻灯片富文本' });
+    fireEvent.focus(editor);
+    fireEvent.blur(editor);
+
+    expect(onCommit).not.toHaveBeenCalled();
+
+    fireEvent.input(editor, { target: { innerText: 'Quarterly Review updated' } });
+    fireEvent.blur(editor);
+    expect(onCommit).toHaveBeenCalledWith('Quarterly Review updated');
   });
 });

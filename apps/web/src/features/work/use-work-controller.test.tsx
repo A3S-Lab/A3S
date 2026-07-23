@@ -241,6 +241,169 @@ describe('Work controller compatibility review', () => {
     expect(readWorkLocalFileBinding(artifact.id)?.fingerprint).toBe(await fingerprintWorkFile(output));
   });
 
+  it('does not mark a metadata-only file open as unsaved content', async () => {
+    const artifact = createWorkArtifact('blank-document');
+    repository.loadWorkLibrary.mockResolvedValue({
+      artifacts: [artifact],
+      folders: [],
+      limits: null,
+      storage: 'local',
+    });
+    const { result } = renderHook(() => useWorkController());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(() => result.current.openArtifact(artifact.id));
+
+    expect(result.current.saveState).toBe('saved');
+  });
+
+  it('does not create another managed revision when the current snapshot is already saved', async () => {
+    const artifact = createWorkArtifact('blank-document');
+    repository.loadWorkLibrary.mockResolvedValue({
+      artifacts: [artifact],
+      folders: [],
+      limits: null,
+      storage: 'local',
+    });
+    const { result } = renderHook(() => useWorkController());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(() => result.current.openArtifact(artifact.id));
+    await act(() => result.current.saveNow());
+    repository.saveWorkArtifact.mockClear();
+
+    await act(() => result.current.saveNow(result.current.activeArtifact));
+
+    expect(repository.saveWorkArtifact).not.toHaveBeenCalled();
+    expect(result.current.saveState).toBe('saved');
+  });
+
+  it('joins an in-flight managed save before writing the same revision to a bound file', async () => {
+    const artifact = createWorkArtifact('blank-presentation');
+    const original = Uint8Array.from([1, 2, 3]);
+    const output = Uint8Array.from([9, 8, 7]);
+    saveWorkLocalFileBinding({
+      artifactId: artifact.id,
+      path: '/docs/Quarterly.pptx',
+      fingerprint: await fingerprintWorkFile(original),
+      size: original.byteLength,
+      updatedAt: Date.now(),
+    });
+    repository.loadWorkLibrary.mockResolvedValue({
+      artifacts: [artifact],
+      folders: [],
+      limits: null,
+      storage: 'local',
+    });
+    fileIo.createWorkArtifactBlob.mockResolvedValue(new Blob([output]));
+    localFileApi.pathExists.mockResolvedValue({ exists: true });
+    localFileApi.readBinaryFile.mockResolvedValueOnce(original).mockResolvedValueOnce(output);
+    const { result } = renderHook(() => useWorkController());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(() => result.current.openArtifact(artifact.id));
+    await act(() => result.current.saveNow());
+    repository.saveWorkArtifact.mockClear();
+
+    let finishManagedSave!: (artifact: typeof result.current.activeArtifact) => void;
+    repository.saveWorkArtifact.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishManagedSave = resolve;
+        })
+    );
+    act(() => {
+      result.current.updateArtifact((current) => ({ ...current, title: '季度汇报' }));
+    });
+
+    let managedSave!: Promise<boolean>;
+    act(() => {
+      managedSave = result.current.saveNow();
+    });
+    await waitFor(() => expect(repository.saveWorkArtifact).toHaveBeenCalledTimes(1));
+
+    let localSave!: Promise<boolean>;
+    act(() => {
+      localSave = result.current.saveLocalFile();
+    });
+    await act(async () => Promise.resolve());
+    const callsWhileFirstSaveWasPending = repository.saveWorkArtifact.mock.calls.length;
+    const snapshot = repository.saveWorkArtifact.mock.calls[0][0];
+    await act(async () => {
+      finishManagedSave(snapshot);
+      await Promise.all([managedSave, localSave]);
+    });
+
+    expect(callsWhileFirstSaveWasPending).toBe(1);
+    expect(localFileApi.renamePath).toHaveBeenCalledWith(expect.any(String), '/docs/Quarterly.pptx');
+    expect(result.current.saveState).toBe('saved');
+    expect(result.current.localSaveState).toBe('saved');
+  });
+
+  it('serializes a newer edit behind an in-flight save and writes the latest snapshot', async () => {
+    const artifact = createWorkArtifact('blank-presentation');
+    const original = Uint8Array.from([1, 2, 3]);
+    const output = Uint8Array.from([9, 8, 7]);
+    saveWorkLocalFileBinding({
+      artifactId: artifact.id,
+      path: '/docs/Quarterly.pptx',
+      fingerprint: await fingerprintWorkFile(original),
+      size: original.byteLength,
+      updatedAt: Date.now(),
+    });
+    repository.loadWorkLibrary.mockResolvedValue({
+      artifacts: [artifact],
+      folders: [],
+      limits: null,
+      storage: 'local',
+    });
+    fileIo.createWorkArtifactBlob.mockResolvedValue(new Blob([output]));
+    localFileApi.pathExists.mockResolvedValue({ exists: true });
+    localFileApi.readBinaryFile.mockResolvedValueOnce(original).mockResolvedValueOnce(output);
+    const { result } = renderHook(() => useWorkController());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(() => result.current.openArtifact(artifact.id));
+    await act(() => result.current.saveNow());
+    repository.saveWorkArtifact.mockClear();
+
+    let finishFirstSave!: (artifact: typeof result.current.activeArtifact) => void;
+    repository.saveWorkArtifact.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishFirstSave = resolve;
+        })
+    );
+    act(() => {
+      result.current.updateArtifact((current) => ({ ...current, title: '第一版标题' }));
+    });
+    let firstSave!: Promise<boolean>;
+    act(() => {
+      firstSave = result.current.saveNow();
+    });
+    await waitFor(() => expect(repository.saveWorkArtifact).toHaveBeenCalledTimes(1));
+
+    act(() => {
+      result.current.updateArtifact((current) => ({ ...current, title: '最终标题' }));
+    });
+    let localSave!: Promise<boolean>;
+    act(() => {
+      localSave = result.current.saveLocalFile();
+    });
+    await act(async () => Promise.resolve());
+    expect(repository.saveWorkArtifact).toHaveBeenCalledTimes(1);
+
+    const firstSnapshot = repository.saveWorkArtifact.mock.calls[0][0];
+    await act(async () => {
+      finishFirstSave(firstSnapshot);
+      await Promise.all([firstSave, localSave]);
+    });
+
+    expect(repository.saveWorkArtifact).toHaveBeenCalledTimes(2);
+    expect(repository.saveWorkArtifact.mock.calls[1][0]).toMatchObject({ title: '最终标题' });
+    expect(fileIo.createWorkArtifactBlob).toHaveBeenCalledWith(expect.objectContaining({ title: '最终标题' }));
+    expect(result.current.activeArtifact?.title).toBe('最终标题');
+    expect(result.current.saveState).toBe('saved');
+    expect(result.current.localSaveState).toBe('saved');
+  });
+
   it('persists an EmbedPDF export to A3S and writes the same PDF back to its bound file', async () => {
     const artifact = createWorkArtifact('blank-document');
     artifact.kind = 'pdf';

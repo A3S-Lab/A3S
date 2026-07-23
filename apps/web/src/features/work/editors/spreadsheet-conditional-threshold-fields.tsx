@@ -1,4 +1,5 @@
 import type { SpreadsheetConditionalThresholdType } from '../work-spreadsheet-conditional-values';
+import { OfficeCheckbox, OfficeNumberField, OfficeSelect } from './office-controls';
 import type { SpreadsheetConditionalThresholdDraft } from './spreadsheet-conditional-format-model';
 
 interface SpreadsheetConditionalThresholdFieldsProps {
@@ -25,38 +26,37 @@ export function SpreadsheetConditionalThresholdFields({
         return (
           <div key={index}>
             <span>第 {index + 1} 级起点</span>
-            <select
-              aria-label={`${label}阈值 ${index + 1} 类型`}
+            <OfficeSelect
+              ariaLabel={`${label}阈值 ${index + 1} 类型`}
               value={threshold.type}
-              onChange={(event) =>
+              options={[
+                { value: 'percent', label: '百分比' },
+                { value: 'percentile', label: '百分位' },
+                { value: 'num', label: '数值' },
+                { value: 'min', label: '最小值' },
+                { value: 'max', label: '最大值' },
+              ]}
+              onValueChange={(type) =>
                 onChange(index, {
-                  type: event.target.value as SpreadsheetConditionalThresholdType,
+                  type: type as SpreadsheetConditionalThresholdType,
                 })
               }
-            >
-              <option value='percent'>百分比</option>
-              <option value='percentile'>百分位</option>
-              <option value='num'>数值</option>
-              <option value='min'>最小值</option>
-              <option value='max'>最大值</option>
-            </select>
-            <input
-              type='number'
-              aria-label={`${label}阈值 ${index + 1}`}
+            />
+            <OfficeNumberField
+              ariaLabel={`${label}阈值 ${index + 1}`}
               value={valueRequired ? threshold.value : ''}
               disabled={!valueRequired}
-              onChange={(event) => onChange(index, { value: event.target.value })}
+              onValueChange={(value) => onChange(index, { value })}
             />
             {showEquality ? (
-              <label className='threshold-gte'>
-                <input
-                  type='checkbox'
-                  aria-label={`${label}阈值 ${index + 1} 包含等于`}
-                  checked={threshold.gte}
-                  onChange={(event) => onChange(index, { gte: event.target.checked })}
-                />
-                <span>包含等于</span>
-              </label>
+              <OfficeCheckbox
+                className='threshold-gte'
+                ariaLabel={`${label}阈值 ${index + 1} 包含等于`}
+                checked={threshold.gte}
+                onCheckedChange={(gte) => onChange(index, { gte })}
+              >
+                包含等于
+              </OfficeCheckbox>
             ) : (
               <span />
             )}

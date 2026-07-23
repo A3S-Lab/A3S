@@ -1,11 +1,12 @@
 import type { Editor } from '@tiptap/core';
 import { Check, CheckCheck, Undo2, X, XCircle } from 'lucide-react';
+import { Button, CollectionState, IconButton } from '../../../design-system/primitives';
 import {
   acceptAllDocumentChanges,
   acceptDocumentChange,
-  type WorkDocumentChange,
   rejectAllDocumentChanges,
   rejectDocumentChange,
+  type WorkDocumentChange,
 } from '../work-document-changes';
 
 export function DocumentChangesPanel({
@@ -25,17 +26,17 @@ export function DocumentChangesPanel({
           <span>{changes.length ? `${changes.length} 项待处理的文字修订` : '没有待处理的文字修订'}</span>
         </div>
         <div className='work-document-changes-bulk-actions'>
-          <button type='button' disabled={!changes.length} onClick={() => acceptAllDocumentChanges(editor)}>
+          <Button tone='quiet' disabled={!changes.length} onClick={() => acceptAllDocumentChanges(editor)}>
             <CheckCheck size={13} />
             全部接受
-          </button>
-          <button type='button' disabled={!changes.length} onClick={() => rejectAllDocumentChanges(editor)}>
+          </Button>
+          <Button tone='quiet' disabled={!changes.length} onClick={() => rejectAllDocumentChanges(editor)}>
             <Undo2 size={13} />
             全部拒绝
-          </button>
-          <button type='button' className='close' aria-label='关闭修订审阅' onClick={onClose}>
+          </Button>
+          <IconButton className='close' label='关闭修订审阅' onClick={onClose}>
             <X size={14} />
-          </button>
+          </IconButton>
         </div>
       </header>
       <div className='work-document-change-list'>
@@ -64,26 +65,30 @@ export function DocumentChangesPanel({
               </small>
             </button>
             <div>
-              <button
-                type='button'
+              <Button
+                tone='quiet'
                 aria-label={`接受修订 ${index + 1}`}
                 onClick={() => acceptDocumentChange(editor, change.id)}
               >
                 <Check size={13} />
                 接受
-              </button>
-              <button
-                type='button'
+              </Button>
+              <Button
+                tone='quiet'
                 aria-label={`拒绝修订 ${index + 1}`}
                 onClick={() => rejectDocumentChange(editor, change.id)}
               >
                 <XCircle size={13} />
                 拒绝
-              </button>
+              </Button>
             </div>
           </article>
         ))}
-        {!changes.length && <p>开启修订后，新增和删除的文字会显示在这里，并保留到 DOCX。</p>}
+        {!changes.length && (
+          <CollectionState className='work-document-changes-empty' role='status'>
+            开启修订后，新增和删除的文字会显示在这里，并保留到 DOCX。
+          </CollectionState>
+        )}
       </div>
     </section>
   );

@@ -1,4 +1,9 @@
 import {
+  normalizePresentationChartLegendPosition,
+  presentationChartShowsLegend,
+  withPresentationChartLayout,
+} from '../work-presentation-charts';
+import {
   normalizeWorkSpreadsheetChartGapWidth,
   normalizeWorkSpreadsheetChartGrouping,
   normalizeWorkSpreadsheetChartLegendOverlay,
@@ -10,12 +15,8 @@ import {
   workSpreadsheetChartSupportsGrouping,
   workSpreadsheetChartSupportsSmoothLines,
 } from '../work-spreadsheet-chart-layout';
-import {
-  normalizePresentationChartLegendPosition,
-  presentationChartShowsLegend,
-  withPresentationChartLayout,
-} from '../work-presentation-charts';
 import type { WorkSlideChart, WorkSlideChartLegendPosition } from '../work-types';
+import { OfficeCheckbox, OfficeNumberField, OfficeSelect } from './office-controls';
 
 export function PresentationChartLayoutEditor({
   chart,
@@ -35,56 +36,65 @@ export function PresentationChartLayoutEditor({
         <span>位置、堆积、间距与线条布局</span>
       </header>
       <div>
-        <label className='check'>
+        <div className='check'>
           <span>图例</span>
-          <span className='work-presentation-chart-check-control'>
-            <input
-              type='checkbox'
-              aria-label='显示演示图表图例'
-              checked={showLegend}
-              onChange={(event) => change({ showLegend: event.target.checked })}
-            />
+          <OfficeCheckbox
+            className='work-presentation-chart-check-control'
+            ariaLabel='显示演示图表图例'
+            checked={showLegend}
+            onCheckedChange={(showLegend) => change({ showLegend })}
+          >
             显示
-          </span>
-        </label>
+          </OfficeCheckbox>
+        </div>
         {showLegend && (
           <>
-            <label>
+            <div className='work-office-field'>
               <span>图例位置</span>
-              <select
-                aria-label='演示图表图例位置'
+              <OfficeSelect
+                ariaLabel='演示图表图例位置'
                 value={normalizePresentationChartLegendPosition(chart.legendPosition)}
-                onChange={(event) => change({ legendPosition: event.target.value as WorkSlideChartLegendPosition })}
-              >
-                <option value='right'>右侧</option>
-                <option value='left'>左侧</option>
-                <option value='top'>顶部</option>
-                <option value='bottom'>底部</option>
-                <option value='topRight'>右上角</option>
-              </select>
-            </label>
-            <label className='check'>
+                options={[
+                  { value: 'right', label: '右侧' },
+                  { value: 'left', label: '左侧' },
+                  { value: 'top', label: '顶部' },
+                  { value: 'bottom', label: '底部' },
+                  { value: 'topRight', label: '右上角' },
+                ]}
+                onValueChange={(legendPosition) =>
+                  change({ legendPosition: legendPosition as WorkSlideChartLegendPosition })
+                }
+              />
+            </div>
+            <div className='check'>
               <span>图例布局</span>
-              <span className='work-presentation-chart-check-control'>
-                <input
-                  type='checkbox'
-                  aria-label='演示图表图例叠加在绘图区'
-                  checked={normalizeWorkSpreadsheetChartLegendOverlay(chart.legendOverlay)}
-                  onChange={(event) => change({ legendOverlay: event.target.checked })}
-                />
+              <OfficeCheckbox
+                className='work-presentation-chart-check-control'
+                ariaLabel='演示图表图例叠加在绘图区'
+                checked={normalizeWorkSpreadsheetChartLegendOverlay(chart.legendOverlay)}
+                onCheckedChange={(legendOverlay) => change({ legendOverlay })}
+              >
                 叠加绘图区
-              </span>
-            </label>
+              </OfficeCheckbox>
+            </div>
           </>
         )}
         {workSpreadsheetChartSupportsGrouping(chart.type) && (
-          <label>
+          <div className='work-office-field'>
             <span>分组方式</span>
-            <select
-              aria-label='演示图表分组方式'
+            <OfficeSelect
+              ariaLabel='演示图表分组方式'
               value={grouping}
-              onChange={(event) => {
-                const nextGrouping = event.target.value as WorkSpreadsheetChartGrouping;
+              options={[
+                ...(workSpreadsheetChartSupportsBarSpacing(chart.type)
+                  ? [{ value: 'clustered', label: '簇状' } as const]
+                  : []),
+                { value: 'standard', label: '标准' },
+                { value: 'stacked', label: '堆积' },
+                { value: 'percentStacked', label: '百分比堆积' },
+              ]}
+              onValueChange={(value) => {
+                const nextGrouping = value as WorkSpreadsheetChartGrouping;
                 if (!workSpreadsheetChartSupportsBarSpacing(chart.type)) {
                   change({ grouping: nextGrouping });
                   return;
@@ -97,55 +107,47 @@ export function PresentationChartLayoutEditor({
                   overlap: currentOverlap === currentDefault ? nextDefault : currentOverlap,
                 });
               }}
-            >
-              {workSpreadsheetChartSupportsBarSpacing(chart.type) && <option value='clustered'>簇状</option>}
-              <option value='standard'>标准</option>
-              <option value='stacked'>堆积</option>
-              <option value='percentStacked'>百分比堆积</option>
-            </select>
-          </label>
+            />
+          </div>
         )}
         {workSpreadsheetChartSupportsBarSpacing(chart.type) && (
           <>
-            <label>
+            <div className='work-office-field'>
               <span>分类间距（%）</span>
-              <input
-                type='number'
-                aria-label='演示图表分类间距（%）'
+              <OfficeNumberField
+                ariaLabel='演示图表分类间距（%）'
                 min={0}
                 max={500}
                 step={1}
                 value={normalizeWorkSpreadsheetChartGapWidth(chart.gapWidth)}
-                onChange={(event) => change({ gapWidth: Number(event.target.value) })}
+                onValueChange={(value) => change({ gapWidth: Number(value) })}
               />
-            </label>
-            <label>
+            </div>
+            <div className='work-office-field'>
               <span>系列重叠（%）</span>
-              <input
-                type='number'
-                aria-label='演示图表系列重叠（%）'
+              <OfficeNumberField
+                ariaLabel='演示图表系列重叠（%）'
                 min={-100}
                 max={100}
                 step={1}
                 value={normalizeWorkSpreadsheetChartOverlap(chart.overlap, grouping)}
-                onChange={(event) => change({ overlap: Number(event.target.value) })}
+                onValueChange={(value) => change({ overlap: Number(value) })}
               />
-            </label>
+            </div>
           </>
         )}
         {workSpreadsheetChartSupportsSmoothLines(chart.type) && (
-          <label className='check'>
+          <div className='check'>
             <span>折线</span>
-            <span className='work-presentation-chart-check-control'>
-              <input
-                type='checkbox'
-                aria-label='演示图表使用平滑线'
-                checked={normalizeWorkSpreadsheetChartSmoothLines(chart.smoothLines)}
-                onChange={(event) => change({ smoothLines: event.target.checked })}
-              />
+            <OfficeCheckbox
+              className='work-presentation-chart-check-control'
+              ariaLabel='演示图表使用平滑线'
+              checked={normalizeWorkSpreadsheetChartSmoothLines(chart.smoothLines)}
+              onCheckedChange={(smoothLines) => change({ smoothLines })}
+            >
               使用平滑线
-            </span>
-          </label>
+            </OfficeCheckbox>
+          </div>
         )}
       </div>
       {workSpreadsheetChartGroupingIsStacked(grouping) && (

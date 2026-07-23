@@ -9,6 +9,7 @@ import type {
   WorkDocumentPageChromeContent,
   WorkDocumentPageChromeVariant,
 } from '../work-types';
+import { OfficeCheckbox, OfficeColorPicker, OfficeFileInput, OfficeSelect, useOfficeDialog } from './office-controls';
 
 export function DocumentPageChromePanel({
   pageChrome,
@@ -44,40 +45,33 @@ export function DocumentPageChromePanel({
     <fieldset className='work-document-page-chrome-panel'>
       <legend>富文本页眉与页脚</legend>
       <div className='work-document-page-chrome-options'>
-        <label>
-          <input
-            type='checkbox'
-            aria-label='首页页眉页脚不同'
-            checked={chrome.differentFirstPage}
-            onChange={(event) => toggleFirstPage(event.target.checked)}
-          />
-          <span>首页不同</span>
-        </label>
-        <label>
-          <input
-            type='checkbox'
-            aria-label='奇偶页页眉页脚不同'
-            checked={chrome.differentOddEvenPages}
-            onChange={(event) => toggleOddEvenPages(event.target.checked)}
-          />
-          <span>奇偶页不同</span>
-        </label>
-        <label>
+        <OfficeCheckbox
+          ariaLabel='首页页眉页脚不同'
+          checked={chrome.differentFirstPage}
+          onCheckedChange={toggleFirstPage}
+        >
+          首页不同
+        </OfficeCheckbox>
+        <OfficeCheckbox
+          ariaLabel='奇偶页页眉页脚不同'
+          checked={chrome.differentOddEvenPages}
+          onCheckedChange={toggleOddEvenPages}
+        >
+          奇偶页不同
+        </OfficeCheckbox>
+        <div className='work-office-field'>
           <span>编辑</span>
-          <select
-            aria-label='页眉页脚页面类型'
+          <OfficeSelect
+            ariaLabel='页眉页脚页面类型'
             value={variant}
-            onChange={(event) => setVariant(event.target.value as WorkDocumentPageChromeVariant)}
-          >
-            <option value='default'>默认页</option>
-            <option value='first' disabled={!chrome.differentFirstPage}>
-              首页
-            </option>
-            <option value='even' disabled={!chrome.differentOddEvenPages}>
-              偶数页
-            </option>
-          </select>
-        </label>
+            options={[
+              { value: 'default', label: '默认页' },
+              { value: 'first', label: '首页', disabled: !chrome.differentFirstPage },
+              { value: 'even', label: '偶数页', disabled: !chrome.differentOddEvenPages },
+            ]}
+            onValueChange={setVariant}
+          />
+        </div>
       </div>
       <PageChromeRichTextEditor
         key={`${variant}-header`}
@@ -91,15 +85,14 @@ export function DocumentPageChromePanel({
         value={chrome[variant].footerHtml}
         onChange={(footerHtml) => updateVariant({ footerHtml })}
       />
-      <label className='work-document-page-number-option'>
-        <input
-          type='checkbox'
-          aria-label={`${label}显示页码`}
-          checked={chrome[variant].showPageNumber}
-          onChange={(event) => updateVariant({ showPageNumber: event.target.checked })}
-        />
-        <span>在本页面类型的页脚中显示页码</span>
-      </label>
+      <OfficeCheckbox
+        className='work-document-page-number-option'
+        ariaLabel={`${label}显示页码`}
+        checked={chrome[variant].showPageNumber}
+        onCheckedChange={(showPageNumber) => updateVariant({ showPageNumber })}
+      >
+        在本页面类型的页脚中显示页码
+      </OfficeCheckbox>
     </fieldset>
   );
 }
@@ -115,6 +108,8 @@ function PageChromeRichTextEditor({
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const [textColor, setTextColor] = useState('#4d5668');
+  const officeDialog = useOfficeDialog();
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -138,83 +133,87 @@ function PageChromeRichTextEditor({
   };
 
   return (
-    <section className='work-document-page-chrome-editor' aria-label={label}>
-      <div className='work-document-page-chrome-toolbar' role='toolbar' aria-label={`${label}格式`}>
-        <ChromeButton label={`${label}加粗`} onClick={() => format('bold')}>
-          B
-        </ChromeButton>
-        <ChromeButton label={`${label}斜体`} onClick={() => format('italic')}>
-          I
-        </ChromeButton>
-        <ChromeButton label={`${label}下划线`} onClick={() => format('underline')}>
-          U
-        </ChromeButton>
-        <ChromeButton label={`${label}左对齐`} onClick={() => format('justifyLeft')}>
-          左
-        </ChromeButton>
-        <ChromeButton label={`${label}居中`} onClick={() => format('justifyCenter')}>
-          中
-        </ChromeButton>
-        <ChromeButton label={`${label}右对齐`} onClick={() => format('justifyRight')}>
-          右
-        </ChromeButton>
-        <ChromeButton
-          label={`${label}链接`}
-          onClick={() => {
-            const href = window.prompt('链接地址', 'https://');
-            if (href?.trim()) format('createLink', href.trim());
-          }}
-        >
-          链接
-        </ChromeButton>
-        <label className='work-document-page-chrome-color' title={`${label}文字颜色`}>
-          <input
-            type='color'
-            aria-label={`${label}文字颜色`}
-            defaultValue='#4d5668'
-            onInput={(event) => format('foreColor', event.currentTarget.value)}
+    <>
+      <section className='work-document-page-chrome-editor' aria-label={label}>
+        <div className='work-document-page-chrome-toolbar' role='toolbar' aria-label={`${label}格式`}>
+          <ChromeButton label={`${label}加粗`} onClick={() => format('bold')}>
+            B
+          </ChromeButton>
+          <ChromeButton label={`${label}斜体`} onClick={() => format('italic')}>
+            I
+          </ChromeButton>
+          <ChromeButton label={`${label}下划线`} onClick={() => format('underline')}>
+            U
+          </ChromeButton>
+          <ChromeButton label={`${label}左对齐`} onClick={() => format('justifyLeft')}>
+            左
+          </ChromeButton>
+          <ChromeButton label={`${label}居中`} onClick={() => format('justifyCenter')}>
+            中
+          </ChromeButton>
+          <ChromeButton label={`${label}右对齐`} onClick={() => format('justifyRight')}>
+            右
+          </ChromeButton>
+          <ChromeButton
+            label={`${label}链接`}
+            onClick={() =>
+              void officeDialog.prompt({ title: '链接地址', initialValue: 'https://' }).then((href) => {
+                if (href?.trim()) format('createLink', href.trim());
+              })
+            }
+          >
+            链接
+          </ChromeButton>
+          <OfficeColorPicker
+            compact
+            className='work-document-page-chrome-color'
+            ariaLabel={`${label}文字颜色`}
+            value={textColor}
+            onValueChange={(color) => {
+              setTextColor(color);
+              format('foreColor', color);
+            }}
           />
-        </label>
-        <ChromeButton label={`${label}插入图片`} onClick={() => imageInputRef.current?.click()}>
-          图片
-        </ChromeButton>
-      </div>
-      <input
-        ref={imageInputRef}
-        className='work-file-input'
-        type='file'
-        accept='image/*'
-        aria-label={`${label}图片文件`}
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          event.target.value = '';
-          if (!file || file.size > 4 * 1024 * 1024) return;
-          void fileToDataUrl(file).then((source) => {
-            const editor = editorRef.current;
-            if (!editor) return;
-            editor.focus();
-            if (typeof document.execCommand === 'function') document.execCommand('insertImage', false, source);
-            else editor.insertAdjacentHTML('beforeend', `<img src="${source}" alt="${escapeHtml(file.name)}">`);
-            commit();
-          });
-        }}
-      />
-      {/* biome-ignore lint/a11y/useSemanticElements: Rich formatted content requires a contenteditable surface. */}
-      <div
-        ref={editorRef}
-        className='work-document-page-chrome-content'
-        role='textbox'
-        aria-label={label}
-        aria-multiline='true'
-        tabIndex={0}
-        contentEditable
-        suppressContentEditableWarning
-        data-placeholder={`输入${label}`}
-        dangerouslySetInnerHTML={{ __html: value }}
-        onInput={commit}
-        onBlur={commit}
-      />
-    </section>
+          <ChromeButton label={`${label}插入图片`} onClick={() => imageInputRef.current?.click()}>
+            图片
+          </ChromeButton>
+        </div>
+        <OfficeFileInput
+          ref={imageInputRef}
+          accept='image/*'
+          aria-label={`${label}图片文件`}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            if (!file || file.size > 4 * 1024 * 1024) return;
+            void fileToDataUrl(file).then((source) => {
+              const editor = editorRef.current;
+              if (!editor) return;
+              editor.focus();
+              if (typeof document.execCommand === 'function') document.execCommand('insertImage', false, source);
+              else editor.insertAdjacentHTML('beforeend', `<img src="${source}" alt="${escapeHtml(file.name)}">`);
+              commit();
+            });
+          }}
+        />
+        {/* biome-ignore lint/a11y/useSemanticElements: Rich formatted content requires a contenteditable surface. */}
+        <div
+          ref={editorRef}
+          className='work-document-page-chrome-content'
+          role='textbox'
+          aria-label={label}
+          aria-multiline='true'
+          tabIndex={0}
+          contentEditable
+          suppressContentEditableWarning
+          data-placeholder={`输入${label}`}
+          dangerouslySetInnerHTML={{ __html: value }}
+          onInput={commit}
+          onBlur={commit}
+        />
+      </section>
+      {officeDialog.dialog}
+    </>
   );
 }
 

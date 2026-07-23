@@ -8,6 +8,7 @@ import type {
   WorkSpreadsheetChartMarkerSymbol,
   WorkSpreadsheetChartSeriesStyle,
 } from '../work-types';
+import { OfficeCheckbox, OfficeColorPicker, OfficeNumberField, OfficeSelect } from './office-controls';
 
 interface SpreadsheetChartSeriesStyleEditorProps {
   seriesNumber: number;
@@ -31,121 +32,115 @@ export function SpreadsheetChartSeriesStyleEditor({
     update({ marker: { ...marker, ...change } });
   return (
     <section className='work-spreadsheet-chart-series-style' aria-label={`系列 ${seriesNumber} 外观设置`}>
-      <label className='check enable-series-style'>
-        <input
-          type='checkbox'
-          aria-label={`系列 ${seriesNumber} 使用自定义外观`}
-          checked={Boolean(value)}
-          onChange={(event) => onChange(event.target.checked ? defaults : undefined)}
-        />
-        <span>自定义系列外观</span>
-      </label>
+      <OfficeCheckbox
+        className='check enable-series-style'
+        ariaLabel={`系列 ${seriesNumber} 使用自定义外观`}
+        checked={Boolean(value)}
+        onCheckedChange={(checked) => onChange(checked ? defaults : undefined)}
+      >
+        自定义系列外观
+      </OfficeCheckbox>
       {value && (
         <div>
-          <label>
+          <div className='work-office-field'>
             <span>填充颜色</span>
-            <input
-              type='color'
-              aria-label={`系列 ${seriesNumber} 填充颜色`}
+            <OfficeColorPicker
+              ariaLabel={`系列 ${seriesNumber} 填充颜色`}
               value={style.fillColor ?? '#4F6BED'}
-              onChange={(event) => update({ fillColor: event.target.value })}
+              onValueChange={(fillColor) => update({ fillColor })}
             />
-          </label>
-          <label>
+          </div>
+          <div className='work-office-field'>
             <span>填充透明度（%）</span>
-            <input
-              type='number'
-              aria-label={`系列 ${seriesNumber} 填充透明度`}
+            <OfficeNumberField
+              ariaLabel={`系列 ${seriesNumber} 填充透明度`}
               min={0}
               max={100}
               step={1}
               value={style.fillTransparency ?? 0}
-              onChange={(event) => update({ fillTransparency: Number(event.target.value) })}
+              onValueChange={(fillTransparency) => update({ fillTransparency: Number(fillTransparency) })}
             />
-          </label>
-          <label>
+          </div>
+          <div className='work-office-field'>
             <span>线条颜色</span>
-            <input
-              type='color'
-              aria-label={`系列 ${seriesNumber} 线条颜色`}
+            <OfficeColorPicker
+              ariaLabel={`系列 ${seriesNumber} 线条颜色`}
               value={style.lineColor ?? '#4F6BED'}
-              onChange={(event) => update({ lineColor: event.target.value })}
+              onValueChange={(lineColor) => update({ lineColor })}
             />
-          </label>
-          <label>
+          </div>
+          <div className='work-office-field'>
             <span>线条宽度（磅）</span>
-            <input
-              type='number'
-              aria-label={`系列 ${seriesNumber} 线条宽度`}
+            <OfficeNumberField
+              ariaLabel={`系列 ${seriesNumber} 线条宽度`}
               min={0.25}
               max={20}
               step={0.25}
               value={style.lineWidth ?? 2.25}
-              onChange={(event) => update({ lineWidth: Number(event.target.value) })}
+              onValueChange={(lineWidth) => update({ lineWidth: Number(lineWidth) })}
             />
-          </label>
-          <label>
+          </div>
+          <div className='work-office-field'>
             <span>线条虚线</span>
-            <select
-              aria-label={`系列 ${seriesNumber} 线条虚线`}
+            <OfficeSelect
+              ariaLabel={`系列 ${seriesNumber} 线条虚线`}
               value={style.lineDash ?? 'solid'}
-              onChange={(event) => update({ lineDash: event.target.value as WorkSpreadsheetChartLineDash })}
-            >
-              <option value='solid'>实线</option>
-              <option value='dash'>虚线</option>
-              <option value='dot'>点线</option>
-              <option value='dashDot'>点划线</option>
-            </select>
-          </label>
+              options={[
+                { value: 'solid', label: '实线' },
+                { value: 'dash', label: '虚线' },
+                { value: 'dot', label: '点线' },
+                { value: 'dashDot', label: '点划线' },
+              ]}
+              onValueChange={(lineDash) => update({ lineDash: lineDash as WorkSpreadsheetChartLineDash })}
+            />
+          </div>
           {supportsMarkers && (
             <>
-              <label>
+              <div className='work-office-field'>
                 <span>数据标记符号</span>
-                <select
-                  aria-label={`系列 ${seriesNumber} 数据标记符号`}
+                <OfficeSelect
+                  ariaLabel={`系列 ${seriesNumber} 数据标记符号`}
                   value={marker.symbol ?? 'circle'}
-                  onChange={(event) => updateMarker({ symbol: event.target.value as WorkSpreadsheetChartMarkerSymbol })}
-                >
-                  <option value='none'>无</option>
-                  <option value='circle'>圆形</option>
-                  <option value='square'>方形</option>
-                  <option value='diamond'>菱形</option>
-                  <option value='triangle'>三角形</option>
-                  <option value='plus'>加号</option>
-                  <option value='x'>叉号</option>
-                  <option value='star'>星形</option>
-                </select>
-              </label>
-              <label>
+                  options={[
+                    { value: 'none', label: '无' },
+                    { value: 'circle', label: '圆形' },
+                    { value: 'square', label: '方形' },
+                    { value: 'diamond', label: '菱形' },
+                    { value: 'triangle', label: '三角形' },
+                    { value: 'plus', label: '加号' },
+                    { value: 'x', label: '叉号' },
+                    { value: 'star', label: '星形' },
+                  ]}
+                  onValueChange={(symbol) => updateMarker({ symbol: symbol as WorkSpreadsheetChartMarkerSymbol })}
+                />
+              </div>
+              <div className='work-office-field'>
                 <span>数据标记大小（磅）</span>
-                <input
-                  type='number'
-                  aria-label={`系列 ${seriesNumber} 数据标记大小`}
+                <OfficeNumberField
+                  ariaLabel={`系列 ${seriesNumber} 数据标记大小`}
                   min={2}
                   max={72}
                   step={1}
                   value={marker.size ?? 5}
-                  onChange={(event) => updateMarker({ size: Number(event.target.value) })}
+                  onValueChange={(size) => updateMarker({ size: Number(size) })}
                 />
-              </label>
-              <label>
+              </div>
+              <div className='work-office-field'>
                 <span>数据标记填充</span>
-                <input
-                  type='color'
-                  aria-label={`系列 ${seriesNumber} 数据标记填充颜色`}
+                <OfficeColorPicker
+                  ariaLabel={`系列 ${seriesNumber} 数据标记填充颜色`}
                   value={marker.fillColor ?? '#FFFFFF'}
-                  onChange={(event) => updateMarker({ fillColor: event.target.value })}
+                  onValueChange={(fillColor) => updateMarker({ fillColor })}
                 />
-              </label>
-              <label>
+              </div>
+              <div className='work-office-field'>
                 <span>数据标记轮廓</span>
-                <input
-                  type='color'
-                  aria-label={`系列 ${seriesNumber} 数据标记轮廓颜色`}
+                <OfficeColorPicker
+                  ariaLabel={`系列 ${seriesNumber} 数据标记轮廓颜色`}
                   value={marker.lineColor ?? style.lineColor ?? '#4F6BED'}
-                  onChange={(event) => updateMarker({ lineColor: event.target.value })}
+                  onValueChange={(lineColor) => updateMarker({ lineColor })}
                 />
-              </label>
+              </div>
             </>
           )}
         </div>

@@ -19,10 +19,13 @@ describe('Work local Office creation dialog', () => {
 
     expect(screen.getByLabelText('本地 Office 文件名')).toHaveValue('新建文字文档.docx');
     fireEvent.click(screen.getByRole('button', { name: '创建文件' }));
-    await screen.findByText('当前文件夹中已有同名文件，请使用其他名称。');
+    const error = await screen.findByText('当前文件夹中已有同名文件，请使用其他名称。');
+    const fileName = screen.getByLabelText('本地 Office 文件名');
+    expect(fileName).toHaveAttribute('aria-describedby', error.id);
+    expect(fileName).toHaveAttribute('aria-invalid', 'true');
     expect(onClose).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByLabelText('本地 Office 文件名'), { target: { value: '项目计划.docx' } });
+    fireEvent.change(fileName, { target: { value: '项目计划.docx' } });
     fireEvent.click(screen.getByRole('button', { name: '创建文件' }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(onCreate).toHaveBeenNthCalledWith(2, '项目计划.docx');

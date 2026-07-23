@@ -1,6 +1,6 @@
 import { Check, FilePlus2, FolderPlus, LoaderCircle, Trash2, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { IconButton } from '../../../design-system/primitives';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Button, IconButton } from '../../../design-system/primitives';
 import type { WorkspaceEntry } from '../../../types/api';
 import type { WorkspaceActions } from '../workspace-actions';
 import { WorkspaceFileIcon } from './workspace-file-icon';
@@ -26,9 +26,11 @@ export function WorkspaceInlineEntry({
   const [busy, setBusy] = useState(false);
   const [touched, setTouched] = useState(false);
   const [operationError, setOperationError] = useState<string | null>(null);
+  const errorId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const deleteCancelRef = useRef<HTMLButtonElement>(null);
   const nameError = validateWorkspaceEntryName(name);
+  const visibleError = (touched && nameError) || operationError;
   const unchanged = action.kind === 'rename' && name.trim() === action.entry.name;
 
   useEffect(() => {
@@ -54,12 +56,11 @@ export function WorkspaceInlineEntry({
             {dirtyDescendant ? '包含未保存编辑' : action.entry.isDirectory ? '同时删除内部内容' : '此操作无法撤销'}
           </small>
         </span>
-        <button ref={deleteCancelRef} type='button' disabled={busy} onClick={onComplete}>
+        <Button ref={deleteCancelRef} tone='quiet' disabled={busy} onClick={onComplete}>
           取消
-        </button>
-        <button
-          type='button'
-          className='danger'
+        </Button>
+        <Button
+          tone='danger'
           aria-label={`确认删除 ${action.entry.name}`}
           disabled={busy}
           onClick={() => {
@@ -73,7 +74,7 @@ export function WorkspaceInlineEntry({
           }}
         >
           {busy ? <LoaderCircle className='spin' size={12} /> : '删除'}
-        </button>
+        </Button>
       </fieldset>
     );
   }
@@ -134,8 +135,9 @@ export function WorkspaceInlineEntry({
         <input
           ref={inputRef}
           aria-label='文件或文件夹名称'
-          aria-invalid={Boolean((touched && nameError) || operationError)}
-          title={(touched && nameError) || operationError || undefined}
+          aria-invalid={Boolean(visibleError)}
+          aria-describedby={visibleError ? errorId : undefined}
+          title={visibleError || undefined}
           value={name}
           disabled={busy}
           onChange={(event) => {
@@ -150,14 +152,10 @@ export function WorkspaceInlineEntry({
             }
           }}
         />
-        {((touched && nameError) || operationError) && (
-          <span
-            className='explorer-inline-error'
-            role='alert'
-            aria-label={(touched && nameError) || operationError || undefined}
-            title={(touched && nameError) || operationError || undefined}
-          >
-            !
+        {visibleError && (
+          <span className='explorer-inline-error' id={errorId} role='alert' title={visibleError}>
+            <span aria-hidden='true'>!</span>
+            <span className='sr-only'>{visibleError}</span>
           </span>
         )}
         <IconButton label='确认文件操作' type='submit' disabled={Boolean(nameError) || unchanged || busy}>

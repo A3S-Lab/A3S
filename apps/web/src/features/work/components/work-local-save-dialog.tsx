@@ -1,8 +1,9 @@
 import { AlertTriangle, FolderOpen } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
-import { Button, Dialog } from '../../../design-system/primitives';
-import { safeFileName } from '../work-file-download';
+import { Button, Dialog, InlineNotice } from '../../../design-system/primitives';
+import { OfficeTextField } from '../editors/office-controls';
 import type { WorkLocalFileConflict } from '../use-work-controller';
+import { safeFileName } from '../work-file-download';
 import { type WorkArtifact, workArtifactExtension } from '../work-types';
 
 export function WorkLocalSaveDialog({
@@ -37,7 +38,7 @@ export function WorkLocalSaveDialog({
   return (
     <Dialog
       title='另存为本地 Office 文件'
-      description='保存成功后，此 Work 文件会绑定到所选本地路径；以后可用 Cmd/Ctrl+S 显式写回。'
+      description='选择保存位置，之后可用 Cmd/Ctrl+S 写回此文件。'
       closeDisabled={busy}
       onClose={onClose}
       footer={
@@ -81,10 +82,10 @@ export function WorkLocalSaveDialog({
             .finally(() => setSubmitting(false));
         }}
       >
-        <label>
+        <div className='work-office-field'>
           <span>保存到</span>
           <div className='work-local-save-location'>
-            <input aria-label='本地保存文件夹' value={directory} readOnly />
+            <OfficeTextField aria-label='本地保存文件夹' value={directory} readOnly />
             <button
               type='button'
               disabled={busy}
@@ -105,10 +106,10 @@ export function WorkLocalSaveDialog({
               {picking ? '正在选择…' : '选择文件夹'}
             </button>
           </div>
-        </label>
-        <label>
+        </div>
+        <div className='work-office-field'>
           <span>文件名</span>
-          <input
+          <OfficeTextField
             data-autofocus
             aria-label='本地文件名'
             value={fileName}
@@ -120,11 +121,16 @@ export function WorkLocalSaveDialog({
             }}
             onFocus={(event) => selectFileBaseName(event.currentTarget)}
           />
-        </label>
+        </div>
         {error && (
-          <p className={`work-local-save-message ${replaceExisting ? 'warning' : 'error'}`} role='alert'>
+          <InlineNotice
+            className='work-local-save-message'
+            tone={replaceExisting ? 'warning' : 'danger'}
+            role='alert'
+            title={replaceExisting ? '需要确认替换' : '保存失败'}
+          >
             {error}
-          </p>
+          </InlineNotice>
         )}
       </form>
     </Dialog>
@@ -174,15 +180,15 @@ export function WorkLocalFileConflictDialog({
         </>
       }
     >
-      <section className='work-local-conflict-summary'>
-        <span>
-          <AlertTriangle size={18} />
-        </span>
-        <div>
-          <strong>{conflict.missing ? '原路径不可用' : '检测到不同的文件版本'}</strong>
-          <p>{conflict.path}</p>
-        </div>
-      </section>
+      <InlineNotice
+        className='work-local-conflict-summary'
+        tone='warning'
+        role='alert'
+        icon={<AlertTriangle size={18} />}
+        title={conflict.missing ? '原路径不可用' : '检测到不同的文件版本'}
+      >
+        <code>{conflict.path}</code>
+      </InlineNotice>
     </Dialog>
   );
 }

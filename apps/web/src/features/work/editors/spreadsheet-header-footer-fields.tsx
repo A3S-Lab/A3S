@@ -1,4 +1,5 @@
 import type { EffectiveSpreadsheetPageSetup } from '../work-spreadsheet-page-setup';
+import { OfficeCheckbox, OfficeNumberField, OfficeSelect, OfficeTextField } from './office-controls';
 
 export function SpreadsheetHeaderFooterFields({
   pageSetup,
@@ -43,51 +44,49 @@ export function SpreadsheetHeaderFooterFields({
         value={pageSetup.footer.right}
         onChange={(value) => updateSection('footer', 'right', value)}
       />
-      <label>
+      <div className='work-office-field'>
         <span>起始页码</span>
-        <input
-          aria-label='起始页码'
-          type='number'
+        <OfficeNumberField
+          ariaLabel='起始页码'
           min={1}
           max={32767}
           value={pageSetup.pageNumberStart}
-          onChange={(event) => onChange({ ...pageSetup, pageNumberStart: Number(event.target.value) })}
+          onValueChange={(pageNumberStart) => onChange({ ...pageSetup, pageNumberStart: Number(pageNumberStart) })}
         />
-      </label>
-      <label>
+      </div>
+      <div className='work-office-field'>
         <span>打印页顺序</span>
-        <select
-          aria-label='打印页顺序'
+        <OfficeSelect
+          ariaLabel='打印页顺序'
           value={pageSetup.pageOrder}
-          onChange={(event) =>
+          options={[
+            { value: 'overThenDown', label: '先向右，再向下' },
+            { value: 'downThenOver', label: '先向下，再向右' },
+          ]}
+          onValueChange={(pageOrder) =>
             onChange({
               ...pageSetup,
-              pageOrder: event.target.value as EffectiveSpreadsheetPageSetup['pageOrder'],
+              pageOrder: pageOrder as EffectiveSpreadsheetPageSetup['pageOrder'],
             })
           }
-        >
-          <option value='overThenDown'>先向右，再向下</option>
-          <option value='downThenOver'>先向下，再向右</option>
-        </select>
-      </label>
-      <label className='toggle'>
-        <input
-          aria-label='页眉页脚随文档缩放'
-          type='checkbox'
-          checked={pageSetup.scaleWithDocument}
-          onChange={(event) => onChange({ ...pageSetup, scaleWithDocument: event.target.checked })}
         />
-        <span>页眉页脚随文档缩放</span>
-      </label>
-      <label className='toggle'>
-        <input
-          aria-label='页眉页脚与页边距对齐'
-          type='checkbox'
-          checked={pageSetup.alignWithMargins}
-          onChange={(event) => onChange({ ...pageSetup, alignWithMargins: event.target.checked })}
-        />
-        <span>页眉页脚与页边距对齐</span>
-      </label>
+      </div>
+      <OfficeCheckbox
+        className='toggle'
+        ariaLabel='页眉页脚随文档缩放'
+        checked={pageSetup.scaleWithDocument}
+        onCheckedChange={(scaleWithDocument) => onChange({ ...pageSetup, scaleWithDocument })}
+      >
+        页眉页脚随文档缩放
+      </OfficeCheckbox>
+      <OfficeCheckbox
+        className='toggle'
+        ariaLabel='页眉页脚与页边距对齐'
+        checked={pageSetup.alignWithMargins}
+        onCheckedChange={(alignWithMargins) => onChange({ ...pageSetup, alignWithMargins })}
+      >
+        页眉页脚与页边距对齐
+      </OfficeCheckbox>
       <p className='tokens'>
         可用字段：{'{page}'}、{'{pages}'}、{'{sheet}'}、{'{file}'}、{'{path}'}、{'{date}'}、{'{time}'}
       </p>
@@ -105,14 +104,14 @@ function TemplateField({
   onChange: (value: string) => void;
 }) {
   return (
-    <label>
+    <div className='work-office-field'>
       <span>{label}</span>
-      <input
+      <OfficeTextField
         aria-label={label}
         value={value}
         placeholder={label.includes('右侧') ? 'Page {page} of {pages}' : ''}
         onChange={(event) => onChange(event.target.value)}
       />
-    </label>
+    </div>
   );
 }

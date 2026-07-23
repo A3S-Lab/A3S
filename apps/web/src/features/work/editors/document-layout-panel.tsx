@@ -1,8 +1,10 @@
 import { clampDocumentMargin } from '../work-document-layout';
+import { Button } from '../../../design-system/primitives';
 import { documentPageChromeLegacyFields, normalizeDocumentPageChrome } from '../work-document-page-chrome';
 import type { WorkDocumentMargins, WorkDocumentSectionLayout } from '../work-types';
 import { DocumentColumnsPanel } from './document-columns-panel';
 import { DocumentPageChromePanel } from './document-page-chrome-panel';
+import { OfficeNumberField, OfficeSelect } from './office-controls';
 
 export function DocumentLayoutPanel({
   layout,
@@ -31,95 +33,96 @@ export function DocumentLayoutPanel({
       <legend>
         第 {sectionIndex + 1} 节 · 共 {sectionCount} 节
       </legend>
-      <label>
+      <div className='work-office-field'>
         <span>本节之后</span>
-        <select
-          aria-label='分节方式'
+        <OfficeSelect
+          ariaLabel='分节方式'
           value={layout.breakAfter}
-          onChange={(event) => update({ breakAfter: event.target.value as WorkDocumentSectionLayout['breakAfter'] })}
-        >
-          <option value='nextPage'>下一页</option>
-          <option value='continuous'>连续</option>
-          <option value='evenPage'>下一偶数页</option>
-          <option value='oddPage'>下一奇数页</option>
-          <option value='nextColumn'>下一栏（预览按连续节）</option>
-        </select>
-      </label>
-      <div className='work-document-section-actions'>
-        <button type='button' onClick={onInsertSection}>
-          插入新节
-        </button>
-        <button type='button' disabled={sectionIndex === 0} onClick={onMergeSection}>
-          与上一节合并
-        </button>
+          options={[
+            { value: 'nextPage', label: '下一页' },
+            { value: 'continuous', label: '连续' },
+            { value: 'evenPage', label: '下一偶数页' },
+            { value: 'oddPage', label: '下一奇数页' },
+            { value: 'nextColumn', label: '下一栏（预览按连续节）' },
+          ]}
+          onValueChange={(breakAfter) => update({ breakAfter })}
+        />
       </div>
-      <label>
+      <div className='work-document-section-actions'>
+        <Button size='compact' onClick={onInsertSection}>
+          插入新节
+        </Button>
+        <Button size='compact' disabled={sectionIndex === 0} onClick={onMergeSection}>
+          与上一节合并
+        </Button>
+      </div>
+      <div className='work-office-field'>
         <span>纸张</span>
-        <select
-          aria-label='纸张大小'
+        <OfficeSelect
+          ariaLabel='纸张大小'
           value={layout.pageSize}
-          onChange={(event) => update({ pageSize: event.target.value as WorkDocumentSectionLayout['pageSize'] })}
-        >
-          <option value='a4'>A4</option>
-          <option value='letter'>Letter</option>
-        </select>
-      </label>
-      <label>
+          options={[
+            { value: 'a4', label: 'A4' },
+            { value: 'letter', label: 'Letter' },
+          ]}
+          onValueChange={(pageSize) => update({ pageSize })}
+        />
+      </div>
+      <div className='work-office-field'>
         <span>方向</span>
-        <select
-          aria-label='页面方向'
+        <OfficeSelect
+          ariaLabel='页面方向'
           value={layout.orientation}
-          onChange={(event) => update({ orientation: event.target.value as WorkDocumentSectionLayout['orientation'] })}
-        >
-          <option value='portrait'>纵向</option>
-          <option value='landscape'>横向</option>
-        </select>
-      </label>
+          options={[
+            { value: 'portrait', label: '纵向' },
+            { value: 'landscape', label: '横向' },
+          ]}
+          onValueChange={(orientation) => update({ orientation })}
+        />
+      </div>
       <DocumentColumnsPanel columns={layout.columns} onChange={(columns) => update({ columns })} />
       <fieldset>
         <legend>页边距（毫米）</legend>
         {marginFields.map(([side, label]) => (
-          <label key={side}>
+          <div className='work-office-field' key={side}>
             <span>{label}</span>
-            <input
-              type='number'
-              min='5'
-              max='60'
-              step='1'
-              aria-label={`${label}页边距`}
+            <OfficeNumberField
+              min={5}
+              max={60}
+              step={1}
+              ariaLabel={`${label}页边距`}
               value={layout.margins[side]}
-              onChange={(event) =>
+              onValueChange={(value) =>
                 update({
                   margins: {
                     ...layout.margins,
-                    [side]: clampDocumentMargin(Number(event.target.value)),
+                    [side]: clampDocumentMargin(Number(value)),
                   },
                 })
               }
             />
-          </label>
+          </div>
         ))}
       </fieldset>
       <DocumentPageChromePanel
         pageChrome={normalizeDocumentPageChrome(layout.pageChrome, layout)}
         onChange={(pageChrome) => update({ pageChrome, ...documentPageChromeLegacyFields(pageChrome) })}
       />
-      <label className='work-document-page-number-option'>
+      <div className='work-office-field work-document-page-number-option'>
         <span>本节页码从</span>
-        <input
-          type='number'
-          min='1'
-          max='9999'
-          aria-label='起始页码'
+        <OfficeNumberField
+          min={1}
+          max={9999}
+          ariaLabel='起始页码'
           value={Math.max(1, layout.pageNumberStart ?? 1)}
-          onChange={(event) =>
+          onValueChange={(value) =>
             update({
-              pageNumberStart: Math.min(9999, Math.max(1, Math.round(Number(event.target.value) || 1))),
+              pageNumberStart: Math.min(9999, Math.max(1, Math.round(Number(value) || 1))),
             })
           }
         />
         <span>开始</span>
-      </label>
+      </div>
     </fieldset>
   );
 }

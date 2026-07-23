@@ -1,26 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
-import type { CodeActions } from '../../code/use-code-controller';
 import { codeApi } from '../../../lib/api';
 import { appState, formatApiError, showToast } from '../../../state/app-state';
 import type { WorkspaceEntry } from '../../../types/api';
+import type { CodeActions } from '../../code/use-code-controller';
 import { codeDefaultWorkspace } from '../../workspace/code-default-workspace';
-import { WorkCompatibilityDialog } from '../components/work-compatibility-dialog';
 import { WorkCodeWorkspace } from '../components/work-code-workspace';
-import { WorkCopilot } from '../components/work-copilot';
+import { WorkCompatibilityDialog } from '../components/work-compatibility-dialog';
+import { readWorkCopilotWidth, WorkCopilot } from '../components/work-copilot';
 import { WorkEditorShell } from '../components/work-editor-shell';
 import { WorkFilesWorkspace } from '../components/work-files-workspace';
 import { WorkHome } from '../components/work-home';
 import { WorkLocalArtifactCreateDialog } from '../components/work-local-artifact-create-dialog';
 import { WorkSidebar } from '../components/work-sidebar';
-import { type WorkAgentProposalRequest, workAgentProposalInstruction } from '../work-agent-proposal';
-import { prepareWorkAgentRequest, type WorkAgentRequest, type WorkEditorAgentRequest } from '../work-agent-request';
-import { WORK_IMPORT_ACCEPT } from '../work-file-io';
-import { isWorkOfficePath, isWorkTextEditorEntry, localPathBasename, workFileMimeType } from '../work-local-files';
 import { useWorkCodeController } from '../use-work-code-controller';
 import { useWorkController } from '../use-work-controller';
 import { useWorkFilesController } from '../use-work-files-controller';
-import type { WorkArtifact, WorkFolder } from '../work-types';
+import { type WorkAgentProposalRequest, workAgentProposalInstruction } from '../work-agent-proposal';
+import { prepareWorkAgentRequest, type WorkAgentRequest, type WorkEditorAgentRequest } from '../work-agent-request';
+import { WORK_IMPORT_ACCEPT } from '../work-file-io';
+import { isOfficeShortcutBlocked } from '../editors/office-shortcuts';
+import { isWorkOfficePath, isWorkTextEditorEntry, localPathBasename, workFileMimeType } from '../work-local-files';
 
 const surfaceStorageKey = 'a3s-work.surface';
 const copilotStorageKey = 'a3s-work.copilot-open';
@@ -39,6 +39,7 @@ export function WorkProduct({ actions: codeActions }: { actions: CodeActions }) 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [surface, setSurface] = useState<'files' | 'library'>(readSurface);
   const [copilotOpen, setCopilotOpen] = useState(readCopilotOpen);
+  const [copilotWidth, setCopilotWidth] = useState(readWorkCopilotWidth);
   const [openingPath, setOpeningPath] = useState<string | null>(null);
   const [agentProposal, setAgentProposal] = useState<WorkAgentProposalRequest | null>(null);
   const [localCreateRequest, setLocalCreateRequest] = useState<{
@@ -77,7 +78,16 @@ export function WorkProduct({ actions: codeActions }: { actions: CodeActions }) 
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey)) return;
+      if (
+        event.defaultPrevented ||
+        event.repeat ||
+        event.altKey ||
+        event.shiftKey ||
+        isOfficeShortcutBlocked(event.target) ||
+        !(event.metaKey || event.ctrlKey)
+      ) {
+        return;
+      }
       const key = event.key.toLocaleLowerCase();
       if (key === 'n') {
         event.preventDefault();
@@ -99,20 +109,6 @@ export function WorkProduct({ actions: codeActions }: { actions: CodeActions }) 
       setAgentProposal(null);
     }
   }, [actions.activeArtifact?.id]);
-  const confirmDelete = (artifact: WorkArtifact) => {
-    const message = artifact.trashedAt
-      ? `确定永久删除“${artifact.title}”吗？此操作无法撤销。`
-      : `确定将“${artifact.title}”移到回收站吗？`;
-    if (!window.confirm(message)) return;
-    void actions.removeArtifact(artifact.id);
-  };
-  const confirmDeleteFolder = (folder: WorkFolder) => {
-    const message = folder.trashedAt
-      ? `确定永久删除文件夹“${folder.name}”吗？文件夹必须为空。`
-      : `确定将文件夹“${folder.name}”移到回收站吗？`;
-    if (!window.confirm(message)) return;
-    void actions.removeFolder(folder.id);
-  };
   const openLocalFile = async (entry: WorkspaceEntry) => {
     if (openingPath) return;
     setOpeningPath(entry.path);
@@ -122,7 +118,7 @@ export function WorkProduct({ actions: codeActions }: { actions: CodeActions }) 
         return;
       }
       if (!isWorkOfficePath(entry.path)) {
-        showToast('此二进制格式暂不能在 Work WebIDE 中编辑。', 'info');
+        showToast('这个文件暂不能直接编辑。', 'info');
         return;
       }
       const bytes = await codeApi.readBinaryFile(entry.path);
@@ -223,65 +219,80 @@ export function WorkProduct({ actions: codeActions }: { actions: CodeActions }) 
             actions={code}
             rootPath={files.rootPath}
             assistantOpen={copilotOpen}
+            onOpenEntry={openLocalFile}
             onBack={() => {
               code.closeWorkspace();
             }}
-            onOpenEntry={openLocalFile}
             onToggleAssistant={() => updateCopilotOpen(!copilotOpen)}
             onAgentRequest={requestAgent}
           />
         ) : (
           <>
-            <WorkSidebar
-              surface={surface}
-              localRootName={files.rootPath ? localPathBasename(files.rootPath) : ''}
-              localRootPath={files.rootPath}
-              localCurrentPath={files.currentPath}
-              localFavoritePaths={files.favoritePaths}
-              view={actions.libraryView}
-              totalCount={actions.artifacts.filter((artifact) => !artifact.trashedAt).length}
-              favoriteCount={actions.artifacts.filter((artifact) => artifact.favorite && !artifact.trashedAt).length}
-              trashCount={
-                actions.artifacts.filter((artifact) => artifact.trashedAt).length +
-                actions.folders.filter((folder) => folder.trashedAt).length
-              }
-              folders={actions.folders}
-              activeFolderId={actions.activeFolderId}
-              onOpenLocalFiles={() => {
-                updateSurface('files');
-                if (files.rootPath) files.navigateTo(files.rootPath);
-              }}
-              onOpenLocalFavorite={(path) => {
-                updateSurface('files');
-                files.navigateTo(path);
-              }}
-              onRemoveLocalFavorite={files.toggleFavoritePath}
-              onMoveLocalEntries={files.moveEntries}
-              onImportLocalDrop={files.importDroppedItems}
-              onPickWorkspace={() => {
-                void files.pickRoot().then((path) => {
-                  if (path) updateSurface('files');
-                });
-              }}
-              onChangeView={(view) => {
-                updateSurface('library');
-                actions.setLibraryView(view);
-              }}
-              onOpenFolder={(id) => {
-                updateSurface('library');
-                actions.openFolder(id);
-              }}
-              onCreate={createForSurface}
-              onImport={openFilePicker}
-            />
+            {state.sidebarOpen && (
+              <WorkSidebar
+                surface={surface}
+                localRootName={files.rootPath ? localPathBasename(files.rootPath) : ''}
+                localRootPath={files.rootPath}
+                localCurrentPath={files.currentPath}
+                recentRootPaths={files.recentRootPaths}
+                localFavoritePaths={files.favoritePaths}
+                view={actions.libraryView}
+                totalCount={actions.artifacts.filter((artifact) => !artifact.trashedAt).length}
+                favoriteCount={actions.artifacts.filter((artifact) => artifact.favorite && !artifact.trashedAt).length}
+                trashCount={
+                  actions.artifacts.filter((artifact) => artifact.trashedAt).length +
+                  actions.folders.filter((folder) => folder.trashedAt).length
+                }
+                folders={actions.folders}
+                activeFolderId={actions.activeFolderId}
+                onOpenLocalFiles={() => {
+                  updateSurface('files');
+                  if (files.rootPath) files.navigateTo(files.rootPath);
+                }}
+                onSelectWorkspace={async (path) => {
+                  const selected = await files.selectRoot(path);
+                  if (selected) updateSurface('files');
+                  return selected;
+                }}
+                onPickWorkspace={async () => {
+                  const selected = await files.pickRoot();
+                  if (selected) updateSurface('files');
+                  return selected;
+                }}
+                onOpenLocalFavorite={(path) => {
+                  updateSurface('files');
+                  files.navigateTo(path);
+                }}
+                onRemoveLocalFavorite={files.toggleFavoritePath}
+                onMoveLocalEntries={files.moveEntries}
+                onImportLocalDrop={files.importDroppedItems}
+                onCollapse={() => {
+                  appState.sidebarOpen = false;
+                }}
+                onChangeView={(view) => {
+                  updateSurface('library');
+                  actions.setLibraryView(view);
+                }}
+                onOpenFolder={(id) => {
+                  updateSurface('library');
+                  actions.openFolder(id);
+                }}
+                onCreate={createForSurface}
+                onImport={openFilePicker}
+              />
+            )}
             {surface === 'files' ? (
               <WorkFilesWorkspace
                 actions={files}
                 openingPath={openingPath}
                 copilotOpen={copilotOpen}
+                sidebarOpen={state.sidebarOpen}
                 onOpenFile={openLocalFile}
                 onAgentRequest={requestAgent}
                 onCreateArtifact={(templateId) => void openLocalCreateDialog(templateId)}
+                onOpenSidebar={() => {
+                  appState.sidebarOpen = true;
+                }}
                 onToggleCopilot={() => updateCopilotOpen(!copilotOpen)}
               />
             ) : (
@@ -292,6 +303,10 @@ export function WorkProduct({ actions: codeActions }: { actions: CodeActions }) 
                 activeFolderId={actions.activeFolderId}
                 loading={actions.loading}
                 error={actions.loadError}
+                sidebarOpen={state.sidebarOpen}
+                onOpenSidebar={() => {
+                  appState.sidebarOpen = true;
+                }}
                 onCreate={(templateId) => void actions.createArtifact(templateId)}
                 onOpen={(id) => void actions.openArtifact(id)}
                 onImport={openFilePicker}
@@ -300,12 +315,12 @@ export function WorkProduct({ actions: codeActions }: { actions: CodeActions }) 
                 onCopy={(id) => void actions.copyArtifact(id)}
                 onMove={(id, folderId) => void actions.patchStoredArtifact(id, { folderId })}
                 onRestore={(id) => void actions.restoreArtifact(id)}
-                onDelete={confirmDelete}
+                onDelete={(artifact) => void actions.removeArtifact(artifact.id)}
                 onOpenFolder={actions.openFolder}
                 onCreateFolder={(name) => void actions.createFolder(name)}
                 onRenameFolder={(id, name) => void actions.patchFolder(id, { name: name.trim() })}
                 onRestoreFolder={(id) => void actions.restoreFolder(id)}
-                onDeleteFolder={confirmDeleteFolder}
+                onDeleteFolder={(folder) => void actions.removeFolder(folder.id)}
                 onRetry={() => void actions.refresh()}
               />
             )}
@@ -322,6 +337,8 @@ export function WorkProduct({ actions: codeActions }: { actions: CodeActions }) 
             await files.pickRoot();
           }}
           onAgentRequest={requestAgent}
+          width={copilotWidth}
+          onWidthChange={setCopilotWidth}
           proposal={agentProposal}
           onDismissProposal={() => setAgentProposal(null)}
         />

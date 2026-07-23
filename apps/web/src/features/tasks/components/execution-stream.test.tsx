@@ -644,6 +644,7 @@ describe('ExecutionStream permission decisions', () => {
 
     await waitFor(() => expect(toolCall).toHaveClass('succeeded'));
     expect(toolCall).toHaveTextContent('passed');
+    expect(container.querySelector('.tool-call-summary')).not.toBeInTheDocument();
   });
 
   it('offers a direct way back to the latest content after the user scrolls upward', () => {
@@ -1064,9 +1065,9 @@ describe('ExecutionStream permission decisions', () => {
     const { container } = render(<ExecutionStream actions={{} as TaskActions} />);
 
     expect(screen.getByText('查看技术详情')).toBeInTheDocument();
-    expect(container.querySelector('.recovery-notice .ds-inline-notice-copy p')?.textContent?.length).toBeLessThan(
-      error.length
-    );
+    const summary = container.querySelector<HTMLElement>('.recovery-notice .ds-inline-notice-copy p');
+    expect(summary).not.toBeNull();
+    expect(summary?.textContent?.length ?? error.length).toBeLessThan(error.length);
     const technicalDetails = container.querySelector('.recovery-technical-details') as HTMLElement;
     const disclosure = within(technicalDetails).getByRole('button', { name: '查看技术详情' });
     expect(disclosure).toHaveAttribute('aria-expanded', 'false');

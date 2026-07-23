@@ -61,7 +61,7 @@ describe('Work local file model', () => {
     expect(formatWorkFileSize(1536)).toBe('1.5 KB');
   });
 
-  it('routes Office files to native editors and text or code files to Work WebIDE', () => {
+  it('routes Office files to native editors and text or code files to the Monaco detail editor', () => {
     expect(isWorkOfficePath('/docs/Plan.docx')).toBe(true);
     expect(isWorkOfficePath('/repo/src/app.tsx')).toBe(false);
     expect(isWorkTextEditorEntry(file('README.md'))).toBe(true);

@@ -10,40 +10,54 @@ import {
   Grid2X2,
   List,
   RefreshCw,
-  Search,
   Sparkles,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import {
+  Button,
+  IconButton,
+  SearchField,
+  SegmentedControl,
+  StateView,
+  StatusBadge,
+} from '../../../design-system/primitives';
 import type { WorkspaceEntry } from '../../../types/api';
 import { hasDraggedWorkspaceFiles } from '../../workspace/workspace-drop-import';
-import type { WorkAgentRequest } from '../work-agent-request';
+import { OfficeSelect } from '../editors/office-controls';
 import type { WorkFilesActions } from '../use-work-files-controller';
+import type { WorkAgentRequest } from '../work-agent-request';
 import {
   canMoveLocalPaths,
   hasWorkLocalFileDragData,
   localPathBasename,
   readWorkLocalFileDragData,
-  workBreadcrumbs,
   type WorkFilesSortKey,
+  workBreadcrumbs,
 } from '../work-local-files';
 import { WorkFilesView } from './work-files-view';
 import { WorkQuickLook } from './work-quick-look';
+import { WorkSidebarOpenButton } from './work-sidebar-open-button';
+import { WorkWorkspaceSwitcher } from './work-workspace-switcher';
 
 export function WorkFilesWorkspace({
   actions,
   openingPath,
   copilotOpen,
+  sidebarOpen,
   onOpenFile,
   onAgentRequest,
   onCreateArtifact,
+  onOpenSidebar,
   onToggleCopilot,
 }: {
   actions: WorkFilesActions;
   openingPath: string | null;
   copilotOpen: boolean;
+  sidebarOpen: boolean;
   onOpenFile: (entry: WorkspaceEntry) => void | Promise<void>;
   onAgentRequest: (request: WorkAgentRequest) => void | Promise<void>;
   onCreateArtifact?: (templateId: string) => void;
+  onOpenSidebar: () => void;
   onToggleCopilot: () => void;
 }) {
   const [createFolderRequest, setCreateFolderRequest] = useState(0);
@@ -71,17 +85,31 @@ export function WorkFilesWorkspace({
   if (!actions.rootPath) {
     return (
       <main className='work-files-onboarding'>
-        <span className='work-files-onboarding-icon'>
-          <FolderOpen size={30} />
-        </span>
-        <span className='eyebrow'>A3S WORK · LOCAL FILES</span>
-        <h1>把本地文件夹变成智能工作台</h1>
-        <p>像在访达中一样浏览真实文件，并在右侧随时调用 AI 助手。A3S 只会在你明确操作时读写本地内容。</p>
-        <button type='button' onClick={() => void actions.pickRoot()}>
-          <FolderOpen size={16} />
-          选择本地文件夹
-        </button>
-        <small>支持目录浏览、搜索、排序、新建文件夹、重命名和创建副本。</small>
+        {!sidebarOpen && (
+          <div className='work-files-onboarding-toolbar'>
+            <WorkSidebarOpenButton onOpen={onOpenSidebar} />
+            <WorkWorkspaceSwitcher
+              rootPath={actions.rootPath}
+              recentPaths={actions.recentRootPaths}
+              variant='compact'
+              onSelect={actions.selectRoot}
+              onPick={actions.pickRoot}
+            />
+          </div>
+        )}
+        <StateView
+          className='work-files-onboarding-state'
+          tone='info'
+          icon={<FolderOpen size={26} />}
+          title='打开本地文件夹'
+          description='在这里浏览、编辑和整理本地文件。'
+          actions={
+            <Button tone='primary' onClick={() => void actions.pickRoot()}>
+              <FolderOpen size={16} />
+              选择文件夹
+            </Button>
+          }
+        />
       </main>
     );
   }
@@ -90,16 +118,28 @@ export function WorkFilesWorkspace({
   return (
     <main className='work-files-workspace'>
       <header className='work-files-toolbar'>
+        {!sidebarOpen && (
+          <>
+            <WorkSidebarOpenButton onOpen={onOpenSidebar} />
+            <WorkWorkspaceSwitcher
+              rootPath={actions.rootPath}
+              recentPaths={actions.recentRootPaths}
+              variant='compact'
+              onSelect={actions.selectRoot}
+              onPick={actions.pickRoot}
+            />
+          </>
+        )}
         <div className='work-files-history-actions'>
-          <button type='button' aria-label='后退' disabled={!actions.canGoBack} onClick={actions.goBack}>
+          <IconButton label='后退' disabled={!actions.canGoBack} onClick={actions.goBack}>
             <ChevronLeft size={17} />
-          </button>
-          <button type='button' aria-label='前进' disabled={!actions.canGoForward} onClick={actions.goForward}>
+          </IconButton>
+          <IconButton label='前进' disabled={!actions.canGoForward} onClick={actions.goForward}>
             <ChevronRight size={17} />
-          </button>
-          <button type='button' aria-label='上一级文件夹' disabled={!actions.canGoUp} onClick={actions.goUp}>
+          </IconButton>
+          <IconButton label='上一级文件夹' disabled={!actions.canGoUp} onClick={actions.goUp}>
             <ChevronUp size={17} />
-          </button>
+          </IconButton>
         </div>
         <nav className='work-files-breadcrumbs' aria-label='当前文件夹路径' title={actions.currentPath}>
           {breadcrumbs.map((breadcrumb, index) => (
@@ -160,62 +200,56 @@ export function WorkFilesWorkspace({
             </span>
           ))}
         </nav>
-        <label className='work-files-search'>
-          <Search size={14} />
-          <input
-            type='search'
-            aria-label={workspaceSearching ? '搜索整个工作区' : '搜索当前文件夹'}
-            placeholder='搜索'
-            value={actions.query}
-            onChange={(event) => actions.setQuery(event.target.value)}
-          />
-        </label>
+        <SearchField
+          className='work-files-search'
+          size='compact'
+          label={workspaceSearching ? '搜索全部文件' : '搜索当前文件夹'}
+          clearLabel='清除文件搜索'
+          placeholder='搜索'
+          value={actions.query}
+          onValueChange={actions.setQuery}
+        />
         <div className='work-files-toolbar-actions'>
-          <button
-            type='button'
-            aria-label='新建文件夹'
+          <IconButton
+            label='新建文件夹'
             disabled={actions.loading || actions.dropImporting || Boolean(actions.error)}
             onClick={() => setCreateFolderRequest((value) => value + 1)}
           >
             <FolderPlus size={16} />
-          </button>
-          <button
-            type='button'
-            aria-label='刷新当前文件夹'
+          </IconButton>
+          <IconButton
+            label='刷新当前文件夹'
             disabled={actions.loading || actions.dropImporting}
             onClick={() => void actions.refresh()}
           >
             <RefreshCw className={actions.loading || actions.dropImporting ? 'spin' : ''} size={15} />
-          </button>
-          <button
-            type='button'
-            aria-label='快速查看所选项目'
+          </IconButton>
+          <IconButton
+            label='快速查看所选项目'
             disabled={actions.selectedEntries.length !== 1}
             onClick={() => setQuickLookPath(actions.selectedEntries[0]?.path ?? null)}
           >
             <Eye size={15} />
-          </button>
-          <label className='work-files-sort-select'>
-            <span className='sr-only'>排序方式</span>
-            <select
-              aria-label='排序方式'
-              value={actions.sort.key}
-              onChange={(event) =>
-                actions.setSort({
-                  ...actions.sort,
-                  key: event.target.value as WorkFilesSortKey,
-                })
-              }
-            >
-              <option value='name'>名称</option>
-              <option value='modified'>修改日期</option>
-              <option value='size'>大小</option>
-              <option value='kind'>种类</option>
-            </select>
-          </label>
-          <button
-            type='button'
-            aria-label={actions.sort.direction === 'ascending' ? '切换为降序' : '切换为升序'}
+          </IconButton>
+          <OfficeSelect
+            className='work-files-sort-select'
+            ariaLabel='排序方式'
+            value={actions.sort.key}
+            options={[
+              { value: 'name', label: '名称' },
+              { value: 'modified', label: '修改日期' },
+              { value: 'size', label: '大小' },
+              { value: 'kind', label: '种类' },
+            ]}
+            onValueChange={(key) =>
+              actions.setSort({
+                ...actions.sort,
+                key: key as WorkFilesSortKey,
+              })
+            }
+          />
+          <IconButton
+            label={actions.sort.direction === 'ascending' ? '切换为降序' : '切换为升序'}
             onClick={() =>
               actions.setSort({
                 ...actions.sort,
@@ -224,28 +258,28 @@ export function WorkFilesWorkspace({
             }
           >
             {actions.sort.direction === 'ascending' ? <ArrowDownAZ size={15} /> : <ArrowDownZA size={15} />}
-          </button>
+          </IconButton>
           <fieldset className='work-files-layout-toggle'>
             <legend className='sr-only'>文件布局</legend>
-            <button
-              type='button'
+            <IconButton
+              label='图标视图'
+              selected={actions.layout === 'grid'}
               className={actions.layout === 'grid' ? 'active' : ''}
-              aria-label='图标视图'
               onClick={() => actions.setLayout('grid')}
             >
               <Grid2X2 size={15} />
-            </button>
-            <button
-              type='button'
+            </IconButton>
+            <IconButton
+              label='列表视图'
+              selected={actions.layout === 'list'}
               className={actions.layout === 'list' ? 'active' : ''}
-              aria-label='列表视图'
               onClick={() => actions.setLayout('list')}
             >
               <List size={16} />
-            </button>
+            </IconButton>
           </fieldset>
-          <button
-            type='button'
+          <Button
+            tone='quiet'
             className={`work-copilot-toggle ${copilotOpen ? 'active' : ''}`}
             aria-label={copilotOpen ? '关闭 Work AI 助手' : '打开 Work AI 助手'}
             aria-pressed={copilotOpen}
@@ -253,59 +287,67 @@ export function WorkFilesWorkspace({
           >
             <Sparkles size={15} />
             <span>AI 助手</span>
-          </button>
+          </Button>
         </div>
       </header>
       {actions.query.trim() && (
-        <section className='work-files-search-scope' aria-label='搜索范围'>
+        <section className='work-files-search-scope' aria-label='文件搜索范围与状态'>
           <span>搜索范围</span>
-          <button
-            type='button'
-            className={actions.searchScope === 'folder' ? 'active' : ''}
-            aria-label={`仅搜索当前文件夹 ${localPathBasename(actions.currentPath)}`}
-            aria-pressed={actions.searchScope === 'folder'}
-            onClick={() => actions.setSearchScope('folder')}
-          >
-            {localPathBasename(actions.currentPath)}
-          </button>
-          <button
-            type='button'
-            className={actions.searchScope === 'workspace' ? 'active' : ''}
-            aria-label={`搜索整个工作区 ${localPathBasename(actions.rootPath)}`}
-            aria-pressed={actions.searchScope === 'workspace'}
-            onClick={() => actions.setSearchScope('workspace')}
-          >
-            整个“{localPathBasename(actions.rootPath)}”
-          </button>
+          <SegmentedControl<'folder' | 'workspace'>
+            ariaLabel='搜索范围'
+            value={actions.searchScope}
+            size='compact'
+            className='work-files-search-scope-control'
+            items={[
+              {
+                id: 'folder',
+                label: localPathBasename(actions.currentPath),
+                ariaLabel: `仅搜索当前文件夹 ${localPathBasename(actions.currentPath)}`,
+              },
+              {
+                id: 'workspace',
+                label: '全部文件',
+                ariaLabel: `搜索全部文件 ${localPathBasename(actions.rootPath)}`,
+              },
+            ]}
+            onChange={actions.setSearchScope}
+          />
           {workspaceSearching && actions.searchError && (
-            <span className='error' role='alert'>
-              搜索失败：{actions.searchError}
-            </span>
+            <output aria-label='文件搜索失败'>
+              <StatusBadge tone='danger'>搜索失败：{actions.searchError}</StatusBadge>
+            </output>
           )}
           {workspaceSearching && !actions.searchError && actions.searchTruncated && (
-            <span className='notice'>结果已达到安全上限，仅显示已找到的部分项目。</span>
+            <output aria-label='搜索结果已截断'>
+              <StatusBadge tone='warning'>结果较多，仅显示前一部分。</StatusBadge>
+            </output>
           )}
           {workspaceSearching && actions.searchUnreadableDirectories > 0 && (
-            <span className='notice'>已略过 {actions.searchUnreadableDirectories} 个无法读取的文件夹。</span>
+            <output aria-label='搜索已跳过文件夹'>
+              <StatusBadge tone='warning'>
+                已跳过 {actions.searchUnreadableDirectories} 个无法读取的文件夹。
+              </StatusBadge>
+            </output>
           )}
         </section>
       )}
       {actions.error && !actions.loading ? (
-        <section className='work-files-load-error' role='alert'>
-          <span>
-            <FolderOpen size={24} />
-          </span>
-          <strong>无法读取这个文件夹</strong>
-          <p>{actions.error}</p>
-          <div>
-            <button type='button' onClick={() => void actions.refresh()}>
-              重试
-            </button>
-            <button type='button' onClick={() => void actions.pickRoot()}>
-              选择其他文件夹
-            </button>
-          </div>
-        </section>
+        <StateView
+          className='work-files-load-state'
+          tone='danger'
+          role='alert'
+          icon={<FolderOpen size={24} />}
+          title='无法读取这个文件夹'
+          description={actions.error}
+          actions={
+            <>
+              <Button tone='primary' onClick={() => void actions.refresh()}>
+                重试
+              </Button>
+              <Button onClick={() => void actions.pickRoot()}>选择其他文件夹</Button>
+            </>
+          }
+        />
       ) : (
         <WorkFilesView
           actions={actions}
@@ -325,7 +367,11 @@ export function WorkFilesWorkspace({
       {(actions.loading || actions.dropImporting || actions.searchLoading) && (
         <output className='work-files-loading' aria-live='polite'>
           <span />
-          {actions.dropImporting ? '正在复制拖入项目…' : actions.searchLoading ? '正在搜索工作区…' : '正在读取文件夹…'}
+          {actions.dropImporting
+            ? '正在复制拖入项目…'
+            : actions.searchLoading
+              ? '正在搜索全部文件…'
+              : '正在读取文件夹…'}
         </output>
       )}
       {quickLookEntry && (

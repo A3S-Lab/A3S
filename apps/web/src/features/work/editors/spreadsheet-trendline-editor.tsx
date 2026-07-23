@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react';
 import type { WorkSpreadsheetTrendline, WorkSpreadsheetTrendlineType } from '../work-types';
+import { OfficeCheckbox, OfficeNumberField, OfficeSelect, OfficeTextField } from './office-controls';
 
 interface SpreadsheetTrendlineEditorProps {
   seriesNumber: number;
@@ -33,127 +34,118 @@ export function SpreadsheetTrendlineEditor({ seriesNumber, trendlines, onChange 
         return (
           <fieldset key={`${seriesNumber}-${trendlineNumber}`}>
             <legend>趋势线 {trendlineNumber}</legend>
-            <label>
+            <div className='work-office-field'>
               <span>类型</span>
-              <select
-                aria-label={`${labelPrefix} 类型`}
+              <OfficeSelect
+                ariaLabel={`${labelPrefix} 类型`}
                 value={trendline.type}
-                onChange={(event) =>
+                options={[
+                  { value: 'linear', label: '线性' },
+                  { value: 'exponential', label: '指数' },
+                  { value: 'logarithmic', label: '对数' },
+                  { value: 'polynomial', label: '多项式' },
+                  { value: 'power', label: '幂' },
+                  { value: 'movingAverage', label: '移动平均' },
+                ]}
+                onValueChange={(value) =>
                   onChange(
                     trendlines.map((item, candidate) =>
-                      candidate === index
-                        ? trendlineWithType(item, event.target.value as WorkSpreadsheetTrendlineType)
-                        : item
+                      candidate === index ? trendlineWithType(item, value as WorkSpreadsheetTrendlineType) : item
                     )
                   )
                 }
-              >
-                <option value='linear'>线性</option>
-                <option value='exponential'>指数</option>
-                <option value='logarithmic'>对数</option>
-                <option value='polynomial'>多项式</option>
-                <option value='power'>幂</option>
-                <option value='movingAverage'>移动平均</option>
-              </select>
-            </label>
-            <label>
+              />
+            </div>
+            <div className='work-office-field'>
               <span>名称</span>
-              <input
+              <OfficeTextField
                 aria-label={`${labelPrefix} 名称`}
                 value={trendline.name ?? ''}
                 maxLength={255}
                 placeholder={`趋势线 ${trendlineNumber}`}
                 onChange={(event) => replaceTrendline(index, { name: event.target.value })}
               />
-            </label>
+            </div>
             {trendline.type === 'polynomial' && (
-              <label>
+              <div className='work-office-field'>
                 <span>阶数</span>
-                <input
-                  type='number'
-                  aria-label={`${labelPrefix} 阶数`}
+                <OfficeNumberField
+                  ariaLabel={`${labelPrefix} 阶数`}
                   min={2}
                   max={6}
                   step={1}
                   value={trendline.order ?? 2}
-                  onChange={(event) => replaceTrendline(index, { order: optionalNumber(event.target.value) })}
+                  onValueChange={(value) => replaceTrendline(index, { order: optionalNumber(value) })}
                 />
-              </label>
+              </div>
             )}
             {trendline.type === 'movingAverage' && (
-              <label>
+              <div className='work-office-field'>
                 <span>周期</span>
-                <input
-                  type='number'
-                  aria-label={`${labelPrefix} 周期`}
+                <OfficeNumberField
+                  ariaLabel={`${labelPrefix} 周期`}
                   min={2}
                   max={255}
                   step={1}
                   value={trendline.period ?? 2}
-                  onChange={(event) => replaceTrendline(index, { period: optionalNumber(event.target.value) })}
+                  onValueChange={(value) => replaceTrendline(index, { period: optionalNumber(value) })}
                 />
-              </label>
+              </div>
             )}
-            <label>
+            <div className='work-office-field'>
               <span>前推</span>
-              <input
-                type='number'
-                aria-label={`${labelPrefix} 前推`}
+              <OfficeNumberField
+                ariaLabel={`${labelPrefix} 前推`}
                 min={0}
-                step='any'
+                step={0.1}
                 value={trendline.forward ?? 0}
-                onChange={(event) => replaceTrendline(index, { forward: optionalNumber(event.target.value) })}
+                onValueChange={(value) => replaceTrendline(index, { forward: optionalNumber(value) })}
               />
-            </label>
-            <label>
+            </div>
+            <div className='work-office-field'>
               <span>后推</span>
-              <input
-                type='number'
-                aria-label={`${labelPrefix} 后推`}
+              <OfficeNumberField
+                ariaLabel={`${labelPrefix} 后推`}
                 min={0}
-                step='any'
+                step={0.1}
                 value={trendline.backward ?? 0}
-                onChange={(event) => replaceTrendline(index, { backward: optionalNumber(event.target.value) })}
+                onValueChange={(value) => replaceTrendline(index, { backward: optionalNumber(value) })}
               />
-            </label>
-            <label className='check intercept-toggle'>
-              <input
-                type='checkbox'
-                aria-label={`${labelPrefix} 固定截距`}
-                checked={hasIntercept}
-                onChange={(event) => replaceTrendline(index, { intercept: event.target.checked ? 0 : undefined })}
-              />
-              <span>固定截距</span>
-            </label>
-            <label>
+            </div>
+            <OfficeCheckbox
+              className='check intercept-toggle'
+              ariaLabel={`${labelPrefix} 固定截距`}
+              checked={hasIntercept}
+              onCheckedChange={(checked) => replaceTrendline(index, { intercept: checked ? 0 : undefined })}
+            >
+              固定截距
+            </OfficeCheckbox>
+            <div className='work-office-field'>
               <span>截距</span>
-              <input
-                type='number'
-                aria-label={`${labelPrefix} 截距`}
-                step='any'
+              <OfficeNumberField
+                ariaLabel={`${labelPrefix} 截距`}
+                step={0.1}
                 disabled={!hasIntercept}
                 value={trendline.intercept ?? 0}
-                onChange={(event) => replaceTrendline(index, { intercept: optionalNumber(event.target.value) })}
+                onValueChange={(value) => replaceTrendline(index, { intercept: optionalNumber(value) })}
               />
-            </label>
-            <label className='check'>
-              <input
-                type='checkbox'
-                aria-label={`${labelPrefix} 显示公式`}
-                checked={trendline.displayEquation === true}
-                onChange={(event) => replaceTrendline(index, { displayEquation: event.target.checked })}
-              />
-              <span>显示公式</span>
-            </label>
-            <label className='check'>
-              <input
-                type='checkbox'
-                aria-label={`${labelPrefix} 显示 R 方`}
-                checked={trendline.displayRSquared === true}
-                onChange={(event) => replaceTrendline(index, { displayRSquared: event.target.checked })}
-              />
-              <span>显示 R²</span>
-            </label>
+            </div>
+            <OfficeCheckbox
+              className='check'
+              ariaLabel={`${labelPrefix} 显示公式`}
+              checked={trendline.displayEquation === true}
+              onCheckedChange={(displayEquation) => replaceTrendline(index, { displayEquation })}
+            >
+              显示公式
+            </OfficeCheckbox>
+            <OfficeCheckbox
+              className='check'
+              ariaLabel={`${labelPrefix} 显示 R 方`}
+              checked={trendline.displayRSquared === true}
+              onCheckedChange={(displayRSquared) => replaceTrendline(index, { displayRSquared })}
+            >
+              显示 R²
+            </OfficeCheckbox>
             <button
               type='button'
               className='remove-trendline'

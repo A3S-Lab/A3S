@@ -535,8 +535,8 @@
   flex: 1;
 }
 
-.workspace-editor-empty-content,
-.workspace-editor-state {
+.workspace-editor-empty-content.ds-state-view,
+.workspace-editor-state.ds-state-view {
   display: flex;
   min-height: 0;
   align-items: center;
@@ -548,16 +548,16 @@
   text-align: center;
 }
 
-.workspace-editor-empty-content strong,
-.workspace-editor-state strong {
+.workspace-editor-empty-content.ds-state-view h2,
+.workspace-editor-state.ds-state-view h2 {
   margin-top: 11px;
   color: var(--a3s-muted);
   font-size: 12px;
   font-weight: 600;
 }
 
-.workspace-editor-empty-content p,
-.workspace-editor-state span {
+.workspace-editor-empty-content.ds-state-view > p,
+.workspace-editor-state.ds-state-view > p {
   max-width: 380px;
   margin: 5px 0 0;
   color: var(--a3s-faint);
@@ -565,11 +565,7 @@
   line-height: 1.55;
 }
 
-.workspace-editor-state.error {
-  color: var(--a3s-red);
-}
-
-.workspace-editor-state .ds-button {
+.workspace-editor-state.ds-state-view .ds-button {
   min-height: 30px;
   margin-top: 13px;
   font-size: 11px;

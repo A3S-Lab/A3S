@@ -1,10 +1,11 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { Editor } from '@tiptap/core';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { WorkspaceContextMenu } from '../../workspace/components/workspace-context-menu';
 import { documentSections } from '../work-document-section';
 import type { WorkDocumentContent } from '../work-types';
-import { documentAgentMenuItems, documentEditorSelectionText, DocumentEditor } from './document-editor';
-import { WorkspaceContextMenu } from '../../workspace/components/workspace-context-menu';
+import { DocumentEditor, documentAgentMenuItems, documentEditorSelectionText } from './document-editor';
 
 describe('Work document editor', () => {
   afterEach(() => {
@@ -63,15 +64,14 @@ describe('Work document editor', () => {
     await waitFor(() => expect(screen.getByText('Ribbon workflow')).toBeInTheDocument());
     expect(screen.getByRole('tablist', { name: '文字功能区' })).toBeInTheDocument();
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
-      '首页',
+      '开始',
       '插入',
-      '页面',
+      '页面布局',
       '引用',
       '审阅',
       '视图',
-      '工具',
     ]);
-    expect(screen.getByRole('tab', { name: '首页' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: '开始' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('button', { name: '加粗' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '插入图片' })).not.toBeInTheDocument();
 
@@ -81,12 +81,145 @@ describe('Work document editor', () => {
     expect(screen.queryByRole('button', { name: '加粗' })).not.toBeInTheDocument();
 
     fireEvent.keyDown(screen.getByRole('tab', { name: '插入' }), { key: 'ArrowRight' });
-    expect(screen.getByRole('tab', { name: '页面' })).toHaveAttribute('aria-selected', 'true');
-    await waitFor(() => expect(screen.getByRole('tab', { name: '页面' })).toHaveFocus());
+    expect(screen.getByRole('tab', { name: '页面布局' })).toHaveAttribute('aria-selected', 'true');
+    await waitFor(() => expect(screen.getByRole('tab', { name: '页面布局' })).toHaveFocus());
 
     openRibbonTab('审阅');
     expect(screen.getByRole('button', { name: '修订模式' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '拼写检查' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('keeps the file menu available without exposing editing commands in preview', async () => {
+    const print = vi.fn();
+    render(
+      <DocumentEditor
+        content={{ type: 'document', pageSize: 'a4', html: '<p>Preview workflow</p>' }}
+        preview
+        fileActions={[{ id: 'print', label: '打印', onSelect: print }]}
+        onChange={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByRole('region', { name: '文字预览工具' })).toHaveTextContent('只读预览1 页');
+    expect(screen.queryByRole('tablist', { name: '文字功能区' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '文件' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: '打印' }));
+
+    expect(print).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes document find, replace, and page-break shortcuts inside the editor', async () => {
+    const onChange = vi.fn();
+    render(
+      <DocumentEditor
+        content={{
+          type: 'document',
+          pageSize: 'a4',
+          html: '<p>Shortcut workflow</p>',
+        }}
+        preview={false}
+        onChange={onChange}
+      />
+    );
+    const editor = await screen.findByRole('textbox', { name: '文档正文' });
+
+    expect(fireEvent.keyDown(editor, { key: 'f', ctrlKey: true })).toBe(false);
+    expect(screen.getByRole('dialog', { name: '查找文字' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+
+    expect(fireEvent.keyDown(editor, { key: 'h', ctrlKey: true })).toBe(false);
+    expect(screen.getByRole('dialog', { name: '查找要替换的文字' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+
+    expect(fireEvent.keyDown(editor, { key: 'k', ctrlKey: true })).toBe(false);
+    expect(screen.getByRole('dialog', { name: '链接地址' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+
+    expect(fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true })).toBe(false);
+    await waitFor(() =>
+      expect(onChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ html: expect.stringContaining('data-page-break="true"') })
+      )
+    );
+  });
+
+  it('supports formatting shortcuts with either platform command modifier', async () => {
+    render(
+      <DocumentEditor
+        content={{
+          type: 'document',
+          pageSize: 'a4',
+          html: '<p>Formatting shortcut</p>',
+        }}
+        preview={false}
+        onChange={vi.fn()}
+      />
+    );
+    const editor = await screen.findByRole('textbox', { name: '文档正文' });
+
+    expect(fireEvent.keyDown(editor, { key: 'b', metaKey: true })).toBe(false);
+    expect(fireEvent.keyDown(editor, { key: 'i', metaKey: true })).toBe(false);
+    expect(fireEvent.keyDown(editor, { key: 'u', metaKey: true })).toBe(false);
+    expect(fireEvent.keyDown(editor, { key: 'b', ctrlKey: true })).toBe(false);
+    expect(fireEvent.keyDown(editor, { key: 'i', ctrlKey: true })).toBe(false);
+    expect(fireEvent.keyDown(editor, { key: 'u', ctrlKey: true })).toBe(false);
+    expect(fireEvent.keyDown(editor, { key: 'z', ctrlKey: true })).toBe(false);
+    expect(fireEvent.keyDown(editor, { key: 'z', ctrlKey: true, shiftKey: true })).toBe(false);
+    expect(fireEvent.keyDown(editor, { key: 'y', ctrlKey: true })).toBe(false);
+  });
+
+  it('does not restart document shortcuts from inside an Office dialog', async () => {
+    render(
+      <DocumentEditor
+        content={{
+          type: 'document',
+          pageSize: 'a4',
+          html: '<p>Shortcut workflow</p>',
+        }}
+        preview={false}
+        onChange={vi.fn()}
+      />
+    );
+    const editor = await screen.findByRole('textbox', { name: '文档正文' });
+    fireEvent.keyDown(editor, { key: 'f', ctrlKey: true });
+    const query = screen.getByRole('textbox', { name: '查找文字' });
+    fireEvent.change(query, { target: { value: 'Shortcut' } });
+
+    expect(fireEvent.keyDown(query, { key: 'f', ctrlKey: true })).toBe(false);
+
+    expect(screen.getByRole('textbox', { name: '查找文字' })).toHaveValue('Shortcut');
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+  });
+
+  it('keeps focus in the replacement prompt and applies the replacement', async () => {
+    const onChange = vi.fn();
+    render(
+      <DocumentEditor
+        content={{
+          type: 'document',
+          pageSize: 'a4',
+          html: '<p>Shortcut workflow</p>',
+        }}
+        preview={false}
+        onChange={onChange}
+      />
+    );
+    const editor = await screen.findByRole('textbox', { name: '文档正文' });
+
+    fireEvent.keyDown(editor, { key: 'h', ctrlKey: true });
+    const query = screen.getByRole('textbox', { name: '查找要替换的文字' });
+    fireEvent.change(query, { target: { value: 'Shortcut' } });
+    fireEvent.click(screen.getByRole('button', { name: '确定' }));
+
+    const replacement = await screen.findByRole('textbox', { name: '替换为' });
+    await waitFor(() => expect(replacement).toHaveFocus());
+    fireEvent.change(replacement, { target: { value: 'Keyboard' } });
+    fireEvent.click(screen.getByRole('button', { name: '确定' }));
+
+    await waitFor(() =>
+      expect(onChange.mock.calls.some(([next]) => next.html.includes('Keyboard workflow'))).toBe(true)
+    );
+    await waitFor(() => expect(editor).toHaveFocus());
   });
 
   it('provides live page, word, proofing, save, view, and zoom status', async () => {
@@ -119,13 +252,61 @@ describe('Work document editor', () => {
     fireEvent.click(screen.getByRole('button', { name: '放大文档' }));
     expect(screen.getByLabelText('文档缩放比例')).toHaveTextContent('100%');
     expect(pageStage).toHaveStyle({ '--work-document-zoom': '1' });
-    fireEvent.change(screen.getByRole('slider', { name: '文档缩放' }), { target: { value: '125' } });
+    for (let step = 0; step < 5; step += 1) {
+      fireEvent.keyDown(screen.getByRole('slider', { name: '文档缩放' }), { key: 'ArrowRight' });
+    }
     expect(screen.getByLabelText('文档缩放比例')).toHaveTextContent('125%');
     expect(pageStage).toHaveStyle({ '--work-document-zoom': '1.25' });
 
     fireEvent.click(screen.getByRole('button', { name: '网页视图' }));
     expect(screen.getByRole('button', { name: '网页视图' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByLabelText('文档内容编辑区域')).toHaveClass('web');
+  });
+
+  it('does not reconfigure the editor for a view-only state change', async () => {
+    const setOptions = vi.spyOn(Editor.prototype, 'setOptions');
+    render(
+      <DocumentEditor
+        content={{ type: 'document', pageSize: 'a4', html: '<p>Stable editor</p>' }}
+        preview={false}
+        onChange={vi.fn()}
+      />
+    );
+    await waitFor(() => expect(screen.getByText('Stable editor')).toBeInTheDocument());
+    setOptions.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: '放大文档' }));
+
+    expect(screen.getByLabelText('文档缩放比例')).toHaveTextContent('100%');
+    expect(setOptions).not.toHaveBeenCalled();
+  });
+
+  it('applies content replaced outside the editor without reporting another edit', async () => {
+    const onChange = vi.fn();
+    function Harness() {
+      const [content, setContent] = useState<WorkDocumentContent>({
+        type: 'document',
+        pageSize: 'a4',
+        html: '<p>Before restore</p>',
+      });
+      return (
+        <>
+          <button type='button' onClick={() => setContent({ ...content, html: '<p>After restore</p>' })}>
+            恢复外部版本
+          </button>
+          <DocumentEditor content={content} preview={false} onChange={onChange} />
+        </>
+      );
+    }
+    render(<Harness />);
+    await waitFor(() => expect(screen.getByText('Before restore')).toBeInTheDocument());
+    onChange.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: '恢复外部版本' }));
+
+    await waitFor(() => expect(screen.getByText('After restore')).toBeInTheDocument());
+    expect(screen.queryByText('Before restore')).not.toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('edits page setup and inserts explicit page breaks', async () => {
@@ -151,10 +332,10 @@ describe('Work document editor', () => {
 
     render(<Harness />);
     await waitFor(() => expect(screen.getByText('First page')).toBeInTheDocument());
-    openRibbonTab('页面');
+    openRibbonTab('页面布局');
     fireEvent.click(screen.getByRole('button', { name: '页面设置' }));
-    fireEvent.change(screen.getByLabelText('纸张大小'), { target: { value: 'letter' } });
-    fireEvent.change(screen.getByLabelText('页面方向'), { target: { value: 'landscape' } });
+    chooseOfficeOption('纸张大小', 'Letter');
+    chooseOfficeOption('页面方向', '横向');
     fireEvent.change(screen.getByLabelText('上页边距'), { target: { value: '30' } });
     const defaultHeader = screen.getByRole('textbox', { name: '默认页页眉' });
     defaultHeader.innerHTML = '<p>A3S Work</p>';
@@ -191,6 +372,24 @@ describe('Work document editor', () => {
     });
   });
 
+  it('closes page setup after leaving the page-layout ribbon tab', async () => {
+    render(
+      <DocumentEditor
+        content={{ type: 'document', pageSize: 'a4', html: '<p>正文</p>' }}
+        preview={false}
+        onChange={vi.fn()}
+      />
+    );
+    await waitFor(() => expect(screen.getByRole('textbox', { name: '文档正文' })).toHaveTextContent('正文'));
+    openRibbonTab('页面布局');
+    fireEvent.click(screen.getByRole('button', { name: '页面设置' }));
+    expect(screen.getByRole('combobox', { name: '纸张大小' })).toBeInTheDocument();
+
+    openRibbonTab('引用');
+
+    expect(screen.queryByRole('combobox', { name: '纸张大小' })).not.toBeInTheDocument();
+  });
+
   it('creates editable sections with independent columns and page layout', async () => {
     const onChange = vi.fn();
     const initial: WorkDocumentContent = {
@@ -214,12 +413,12 @@ describe('Work document editor', () => {
 
     render(<Harness />);
     await waitFor(() => expect(screen.getByText('First section')).toBeInTheDocument());
-    openRibbonTab('页面');
+    openRibbonTab('页面布局');
     fireEvent.click(screen.getByRole('button', { name: '页面设置' }));
     fireEvent.change(screen.getByLabelText('分栏数量'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('分栏间距'), { target: { value: '9.5' } });
     fireEvent.click(screen.getByRole('checkbox', { name: '分栏分隔线' }));
-    fireEvent.change(screen.getByLabelText('分节方式'), { target: { value: 'continuous' } });
+    chooseOfficeOption('分节方式', '连续');
     fireEvent.click(screen.getByRole('button', { name: '插入分节符' }));
 
     await waitFor(() => expect(screen.getByLabelText('分节状态')).toHaveTextContent('共 2 节'));
@@ -233,7 +432,7 @@ describe('Work document editor', () => {
     expect(sections[0].html).toContain('First section');
     expect(sections[1].html).toContain('Move this block into the next section');
 
-    fireEvent.change(screen.getByLabelText('页面方向'), { target: { value: 'landscape' } });
+    chooseOfficeOption('页面方向', '横向');
     await waitFor(() => {
       latest = onChange.mock.lastCall?.[0] as WorkDocumentContent;
       sections = documentSections(latest);
@@ -272,7 +471,7 @@ describe('Work document editor', () => {
 
     render(<Harness />);
     await waitFor(() => expect(screen.getByText('Unequal columns')).toBeInTheDocument());
-    openRibbonTab('页面');
+    openRibbonTab('页面布局');
     fireEvent.click(screen.getByRole('button', { name: '页面设置' }));
     fireEvent.change(screen.getByLabelText('分栏数量'), { target: { value: '2' } });
     fireEvent.click(screen.getByRole('checkbox', { name: '自定义栏宽' }));
@@ -327,7 +526,6 @@ describe('Work document editor', () => {
       pageSize: 'a4',
       html: '<p>Caption workflow</p>',
     };
-    vi.spyOn(window, 'prompt').mockReturnValueOnce('Architecture').mockReturnValueOnce('图 1');
     function Harness() {
       const [content, setContent] = useState(initial);
       return (
@@ -346,6 +544,10 @@ describe('Work document editor', () => {
     await waitFor(() => expect(screen.getByText('Caption workflow')).toBeInTheDocument());
     openRibbonTab('引用');
     fireEvent.click(screen.getByRole('button', { name: '插入图片题注' }));
+    fireEvent.change(await screen.findByRole('textbox', { name: '图片题注文字' }), {
+      target: { value: 'Architecture' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '插入题注' }));
     await waitFor(() => {
       const latest = onChange.mock.lastCall?.[0] as WorkDocumentContent;
       expect(latest.html).toContain('data-document-caption');
@@ -354,6 +556,8 @@ describe('Work document editor', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: '插入交叉引用' }));
+    expect(await screen.findByRole('textbox', { name: '引用题注' })).toHaveValue('图 1');
+    fireEvent.click(screen.getByRole('button', { name: '插入引用' }));
     await waitFor(() => {
       const latest = onChange.mock.lastCall?.[0] as WorkDocumentContent;
       expect(latest.html).toContain('data-document-cross-reference');
@@ -385,7 +589,7 @@ describe('Work document editor', () => {
     render(<Harness />);
     await waitFor(() => expect(screen.getByText('Field workflow')).toBeInTheDocument());
     openRibbonTab('插入');
-    fireEvent.change(screen.getByLabelText('插入正文域'), { target: { value: 'numPages' } });
+    chooseOfficeOption('插入页码或日期', '总页数');
 
     await waitFor(() => {
       const latest = onChange.mock.lastCall?.[0] as WorkDocumentContent;
@@ -395,8 +599,8 @@ describe('Work document editor', () => {
     });
     expect(document.querySelector('[data-document-field]')).toHaveTextContent('1');
 
-    openRibbonTab('工具');
-    fireEvent.click(screen.getByRole('button', { name: '更新所有正文域' }));
+    openRibbonTab('引用');
+    fireEvent.click(screen.getByRole('button', { name: '更新页码和日期' }));
     expect(screen.getByRole('textbox', { name: '文档正文' })).toHaveFocus();
   });
 
@@ -424,7 +628,7 @@ describe('Work document editor', () => {
     render(<Harness />);
     await waitFor(() => expect(screen.getByText('Citation workflow')).toBeInTheDocument());
     openRibbonTab('引用');
-    fireEvent.click(screen.getByRole('button', { name: '文献库' }));
+    fireEvent.click(screen.getByRole('button', { name: '引用来源' }));
     fireEvent.change(screen.getByLabelText('引用标记'), {
       target: { value: 'Smith2026' },
     });
@@ -499,13 +703,13 @@ describe('Work document editor', () => {
     render(<Harness />);
 
     await waitFor(() => expect(screen.getByText('Rich page chrome')).toBeInTheDocument());
-    openRibbonTab('页面');
+    openRibbonTab('页面布局');
     fireEvent.click(screen.getByRole('button', { name: '页面设置' }));
     fireEvent.click(screen.getByRole('checkbox', { name: '首页页眉页脚不同' }));
     await waitFor(() => expect(screen.getByRole('checkbox', { name: '首页页眉页脚不同' })).toBeChecked());
     fireEvent.click(screen.getByRole('checkbox', { name: '奇偶页页眉页脚不同' }));
     await waitFor(() => expect(screen.getByRole('checkbox', { name: '奇偶页页眉页脚不同' })).toBeChecked());
-    fireEvent.change(screen.getByLabelText('页眉页脚页面类型'), { target: { value: 'first' } });
+    chooseOfficeOption('页眉页脚页面类型', '首页');
 
     const firstHeader = screen.getByRole('textbox', { name: '首页页眉' });
     firstHeader.innerHTML = '<p><strong>Executive report</strong></p>';
@@ -561,7 +765,7 @@ describe('Work document editor', () => {
     openRibbonTab('审阅');
     expect(screen.getByRole('button', { name: '修订模式' })).toHaveAttribute('aria-pressed', 'true');
 
-    fireEvent.click(screen.getByRole('button', { name: '审阅修订（2）' }));
+    fireEvent.click(screen.getByRole('button', { name: '查看修订（2）' }));
     expect(screen.getByRole('region', { name: '修订审阅' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '接受修订 1' }));
     await waitFor(() => expect(screen.getByRole('button', { name: '拒绝修订 1' })).toBeInTheDocument());
@@ -610,7 +814,7 @@ describe('Work document editor', () => {
     render(<Harness />);
     await waitFor(() => expect(screen.getByText('this claim')).toBeInTheDocument());
     openRibbonTab('审阅');
-    fireEvent.click(screen.getByRole('button', { name: '审阅批注（1）' }));
+    fireEvent.click(screen.getByRole('button', { name: '查看批注（1）' }));
     expect(screen.getByRole('region', { name: '批注审阅' })).toHaveTextContent('Please verify the source.');
 
     fireEvent.change(screen.getByLabelText('回复批注 1'), { target: { value: 'Verified.' } });
@@ -686,4 +890,9 @@ describe('Work document editor', () => {
 
 function openRibbonTab(name: string) {
   fireEvent.click(screen.getByRole('tab', { name }));
+}
+
+function chooseOfficeOption(label: string, option: string) {
+  fireEvent.click(screen.getByRole('combobox', { name: label }));
+  fireEvent.click(screen.getByRole('option', { name: option }));
 }

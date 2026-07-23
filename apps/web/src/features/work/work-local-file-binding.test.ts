@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  WorkLocalFileConflictError,
-  WorkLocalFileExistsError,
   fingerprintWorkFile,
   moveWorkLocalFileBindings,
   readWorkLocalFileBinding,
   readWorkLocalFileBindingByPath,
   removeWorkLocalFileBinding,
+  removeWorkLocalFileBindingsAtPath,
   saveWorkLocalFileBinding,
+  WorkLocalFileConflictError,
+  WorkLocalFileExistsError,
   writeWorkLocalFileAtomically,
 } from './work-local-file-binding';
 
@@ -63,6 +64,27 @@ describe('Work local file bindings', () => {
 
     expect(readWorkLocalFileBinding('artifact-1')?.path).toBe('/docs/Research/Plan.docx');
     expect(readWorkLocalFileBinding('artifact-2')?.path).toBe('/docs/Meeting notes.docx');
+  });
+
+  it('removes bindings for a deleted file or folder tree', () => {
+    saveWorkLocalFileBinding({
+      artifactId: 'artifact-report',
+      path: '/docs/Reports/Plan.docx',
+      fingerprint: 'sha256:report',
+      size: 1,
+      updatedAt: 100,
+    });
+    saveWorkLocalFileBinding({
+      artifactId: 'artifact-notes',
+      path: '/docs/Notes.docx',
+      fingerprint: 'sha256:notes',
+      size: 2,
+      updatedAt: 200,
+    });
+
+    expect(removeWorkLocalFileBindingsAtPath('/docs/Reports')).toBe(1);
+    expect(readWorkLocalFileBinding('artifact-report')).toBeNull();
+    expect(readWorkLocalFileBinding('artifact-notes')).not.toBeNull();
   });
 
   it('keeps one stable artifact binding per local path', () => {

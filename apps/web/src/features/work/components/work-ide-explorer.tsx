@@ -1,8 +1,10 @@
-import { ChevronDown, ChevronRight, FilePlus2, FolderTree, RefreshCw, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, FilePlus2, FolderTree, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { CollectionState, IconButton, SearchField } from '../../../design-system/primitives';
 import { codeApi } from '../../../lib/api';
 import { formatApiError, showToast } from '../../../state/app-state';
 import type { WorkspaceEntry } from '../../../types/api';
+import { useOfficeDialog } from '../editors/office-controls';
 import { joinLocalPath, localPathBasename, sortWorkFileEntries } from '../work-local-files';
 import { WorkFileIcon } from './work-file-icon';
 
@@ -20,6 +22,7 @@ export function WorkIdeExplorer({
   const [loading, setLoading] = useState<Set<string>>(() => new Set());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [query, setQuery] = useState('');
+  const officeDialog = useOfficeDialog();
 
   const loadDirectory = useCallback(async (path: string) => {
     setLoading((current) => new Set(current).add(path));
@@ -54,7 +57,7 @@ export function WorkIdeExplorer({
   }, [loadDirectory, rootPath]);
 
   const createFile = async () => {
-    const requested = window.prompt('新建代码文件', 'untitled.ts');
+    const requested = await officeDialog.prompt({ title: '新建代码文件', initialValue: 'untitled.ts' });
     const name = requested?.trim();
     if (!name) return;
     if (name === '.' || name === '..' || name.includes('/') || name.includes('\\')) {
@@ -73,59 +76,60 @@ export function WorkIdeExplorer({
   };
 
   return (
-    <aside className='work-ide-explorer' aria-label='Work WebIDE 文件资源管理器'>
-      <header>
-        <span>
-          <FolderTree size={16} />
-          <strong title={rootPath}>{localPathBasename(rootPath)}</strong>
-        </span>
-        <div>
-          <button type='button' aria-label='新建代码文件' onClick={() => void createFile()}>
-            <FilePlus2 size={15} />
-          </button>
-          <button
-            type='button'
-            aria-label='刷新 WebIDE 文件树'
-            disabled={loading.has(rootPath)}
-            onClick={() => void loadDirectory(rootPath)}
-          >
-            <RefreshCw className={loading.has(rootPath) ? 'spin' : ''} size={14} />
-          </button>
-        </div>
-      </header>
-      <label>
-        <Search size={14} />
-        <input
-          type='search'
-          aria-label='筛选 WebIDE 文件'
+    <>
+      <aside className='work-ide-explorer' aria-label='代码文件导航'>
+        <header>
+          <span>
+            <FolderTree size={16} />
+            <strong title={rootPath}>{localPathBasename(rootPath)}</strong>
+          </span>
+          <div>
+            <IconButton label='新建代码文件' onClick={() => void createFile()}>
+              <FilePlus2 size={15} />
+            </IconButton>
+            <IconButton
+              label='刷新代码文件列表'
+              disabled={loading.has(rootPath)}
+              onClick={() => void loadDirectory(rootPath)}
+            >
+              <RefreshCw className={loading.has(rootPath) ? 'spin' : ''} size={14} />
+            </IconButton>
+          </div>
+        </header>
+        <SearchField
+          className='work-ide-explorer-filter'
+          size='compact'
+          label='筛选代码文件'
+          clearLabel='清除代码文件筛选'
           placeholder='筛选文件'
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onValueChange={setQuery}
         />
-      </label>
-      <div className='work-ide-tree' role='tree' aria-label='Work WebIDE 文件树'>
-        <IdeDirectory
-          path={rootPath}
-          depth={0}
-          query={query.trim().toLocaleLowerCase()}
-          activePath={activePath}
-          directories={directories}
-          expanded={expanded}
-          loading={loading}
-          error={errors[rootPath]}
-          onToggle={(entry) => {
-            setExpanded((current) => {
-              const next = new Set(current);
-              if (next.has(entry.path)) next.delete(entry.path);
-              else next.add(entry.path);
-              return next;
-            });
-            if (!directories[entry.path]) void loadDirectory(entry.path);
-          }}
-          onOpenFile={onOpenFile}
-        />
-      </div>
-    </aside>
+        <div className='work-ide-tree' role='tree' aria-label='代码文件列表'>
+          <IdeDirectory
+            path={rootPath}
+            depth={0}
+            query={query.trim().toLocaleLowerCase()}
+            activePath={activePath}
+            directories={directories}
+            expanded={expanded}
+            loading={loading}
+            error={errors[rootPath]}
+            onToggle={(entry) => {
+              setExpanded((current) => {
+                const next = new Set(current);
+                if (next.has(entry.path)) next.delete(entry.path);
+                else next.add(entry.path);
+                return next;
+              });
+              if (!directories[entry.path]) void loadDirectory(entry.path);
+            }}
+            onOpenFile={onOpenFile}
+          />
+        </div>
+      </aside>
+      {officeDialog.dialog}
+    </>
   );
 }
 
@@ -161,8 +165,16 @@ function IdeDirectory({
   );
   return (
     <div>
-      {loading.has(path) && !directories[path] && <output className='work-ide-tree-state'>正在读取…</output>}
-      {error && <p className='work-ide-tree-state error'>{error}</p>}
+      {loading.has(path) && !directories[path] && (
+        <CollectionState className='work-ide-tree-state' role='status'>
+          正在读取…
+        </CollectionState>
+      )}
+      {error && (
+        <CollectionState className='work-ide-tree-state' tone='danger' role='alert'>
+          {error}
+        </CollectionState>
+      )}
       {entries.map((entry) => {
         const open = entry.isDirectory && expanded.has(entry.path);
         return (
@@ -203,7 +215,11 @@ function IdeDirectory({
           </div>
         );
       })}
-      {!loading.has(path) && !error && !entries.length && <p className='work-ide-tree-state'>目录为空</p>}
+      {!loading.has(path) && !error && !entries.length && (
+        <CollectionState className='work-ide-tree-state' role='status'>
+          目录为空
+        </CollectionState>
+      )}
     </div>
   );
 }

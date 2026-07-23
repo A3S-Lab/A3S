@@ -1,8 +1,10 @@
 import { Calculator, RefreshCw, Save } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { Button, CollectionState } from '../../../design-system/primitives';
 import { spreadsheetFormulaAnalysis } from '../work-spreadsheet-formula-analysis';
 import { effectiveSpreadsheetCalculationSettings } from '../work-spreadsheet-formulas';
 import type { WorkSpreadsheetCalculationSettings, WorkSpreadsheetContent } from '../work-types';
+import { OfficeCheckbox, OfficeNumberField, OfficeSelect } from './office-controls';
 
 interface SpreadsheetFormulaPanelProps {
   content: WorkSpreadsheetContent;
@@ -71,93 +73,88 @@ export function SpreadsheetFormulaPanel({
         }}
       >
         <div className='work-spreadsheet-calculation-fields'>
-          <label>
+          <div className='work-office-field'>
             <span>计算模式</span>
-            <select
-              aria-label='计算模式'
+            <OfficeSelect
+              ariaLabel='计算模式'
               value={settings.mode}
-              onChange={(event) => update('mode', event.target.value as WorkSpreadsheetCalculationSettings['mode'])}
-            >
-              <option value='automatic'>自动</option>
-              <option value='automatic-except-data-tables'>自动（模拟运算表除外）</option>
-              <option value='manual'>手动</option>
-            </select>
-          </label>
-          <label>
+              options={[
+                { value: 'automatic', label: '自动' },
+                { value: 'automatic-except-data-tables', label: '自动（模拟运算表除外）' },
+                { value: 'manual', label: '手动' },
+              ]}
+              onValueChange={(mode) => update('mode', mode as WorkSpreadsheetCalculationSettings['mode'])}
+            />
+          </div>
+          <div className='work-office-field'>
             <span>最大迭代次数</span>
-            <input
-              aria-label='最大迭代次数'
-              type='number'
+            <OfficeNumberField
+              ariaLabel='最大迭代次数'
               min={1}
               max={10_000}
               step={1}
               disabled={!settings.iterativeCalculation}
               value={settings.maximumIterations}
-              onChange={(event) => update('maximumIterations', Number(event.target.value))}
+              onValueChange={(value) => update('maximumIterations', Number(value))}
             />
-          </label>
-          <label>
+          </div>
+          <div className='work-office-field'>
             <span>最大更改值</span>
-            <input
-              aria-label='最大更改值'
-              type='number'
-              min='0.000000000001'
-              step='any'
+            <OfficeNumberField
+              ariaLabel='最大更改值'
+              min={0.000000000001}
+              step={0.000001}
               disabled={!settings.iterativeCalculation}
               value={settings.maximumChange}
-              onChange={(event) => update('maximumChange', Number(event.target.value))}
+              onValueChange={(value) => update('maximumChange', Number(value))}
             />
-          </label>
-          <label className='toggle'>
-            <input
-              aria-label='打开工作簿时完整重算'
-              type='checkbox'
-              checked={settings.fullCalculationOnLoad}
-              onChange={(event) => update('fullCalculationOnLoad', event.target.checked)}
-            />
+          </div>
+          <OfficeCheckbox
+            className='toggle'
+            ariaLabel='打开工作簿时完整重算'
+            checked={settings.fullCalculationOnLoad}
+            onCheckedChange={(checked) => update('fullCalculationOnLoad', checked)}
+          >
             打开工作簿时完整重算
-          </label>
-          <label className='toggle'>
-            <input
-              aria-label='强制完整计算'
-              type='checkbox'
-              checked={settings.forceFullCalculation}
-              onChange={(event) => update('forceFullCalculation', event.target.checked)}
-            />
+          </OfficeCheckbox>
+          <OfficeCheckbox
+            className='toggle'
+            ariaLabel='强制完整计算'
+            checked={settings.forceFullCalculation}
+            onCheckedChange={(checked) => update('forceFullCalculation', checked)}
+          >
             强制完整计算
-          </label>
-          <label className='toggle'>
-            <input
-              aria-label='使用迭代计算'
-              type='checkbox'
-              checked={settings.iterativeCalculation}
-              onChange={(event) => update('iterativeCalculation', event.target.checked)}
-            />
+          </OfficeCheckbox>
+          <OfficeCheckbox
+            className='toggle'
+            ariaLabel='使用迭代计算'
+            checked={settings.iterativeCalculation}
+            onCheckedChange={(checked) => update('iterativeCalculation', checked)}
+          >
             使用迭代计算
-          </label>
-          <label className='toggle'>
-            <input
-              aria-label='使用完整精度'
-              type='checkbox'
-              checked={settings.fullPrecision}
-              onChange={(event) => update('fullPrecision', event.target.checked)}
-            />
+          </OfficeCheckbox>
+          <OfficeCheckbox
+            className='toggle'
+            ariaLabel='使用完整精度'
+            checked={settings.fullPrecision}
+            onCheckedChange={(checked) => update('fullPrecision', checked)}
+          >
             使用完整精度
-          </label>
+          </OfficeCheckbox>
           <div className='actions'>
             {status && <span className='status'>{status}</span>}
-            <button type='button' disabled={!canRecalculateSelection} onClick={() => recalculate('selection')}>
+            <Button tone='secondary' disabled={!canRecalculateSelection} onClick={() => recalculate('selection')}>
               <RefreshCw size={12} />
               重新计算当前选区
-            </button>
-            <button type='button' onClick={() => recalculate('workbook')}>
+            </Button>
+            <Button tone='secondary' onClick={() => recalculate('workbook')}>
               <Calculator size={12} />
               重新计算工作簿
-            </button>
-            <button type='submit' className='primary'>
+            </Button>
+            <Button type='submit' tone='primary'>
               <Save size={12} />
               保存计算设置
-            </button>
+            </Button>
           </div>
         </div>
         <section className='work-spreadsheet-formula-diagnostics' aria-label='公式兼容性诊断'>
@@ -178,7 +175,11 @@ export function SpreadsheetFormulaPanel({
                 )}
               </article>
             ))}
-            {!diagnostics.length && <p className='empty'>当前公式可由 Work 直接计算，也没有缓存错误或分组冲突。</p>}
+            {!diagnostics.length && (
+              <CollectionState className='work-office-collection-empty' role='status'>
+                当前公式可由 Work 直接计算，也没有缓存错误或分组冲突。
+              </CollectionState>
+            )}
           </div>
         </section>
       </form>

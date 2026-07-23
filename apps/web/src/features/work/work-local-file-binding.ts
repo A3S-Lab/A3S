@@ -107,6 +107,18 @@ export function moveWorkLocalFileBindings(sourcePath: string, destinationPath: s
   return moved;
 }
 
+export function removeWorkLocalFileBindingsAtPath(path: string): number {
+  const bindings = readBindings();
+  let removed = 0;
+  for (const [artifactId, binding] of Object.entries(bindings)) {
+    if (!localPathInside(path, binding.path)) continue;
+    delete bindings[artifactId];
+    removed += 1;
+  }
+  if (removed) writeBindings(bindings);
+  return removed;
+}
+
 export async function fingerprintWorkFile(bytes: Uint8Array): Promise<string> {
   const source = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
   if (globalThis.crypto?.subtle) {

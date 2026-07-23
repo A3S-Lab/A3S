@@ -1,8 +1,9 @@
-import { SPREADSHEET_CONDITIONAL_COMPARISONS, type ConditionalRuleDraft } from './spreadsheet-conditional-format-model';
 import {
-  spreadsheetConditionalComparisonNeedsUpperValue,
   type SpreadsheetConditionalComparisonOperator,
+  spreadsheetConditionalComparisonNeedsUpperValue,
 } from '../work-spreadsheet-conditional-comparisons';
+import { OfficeCheckbox, OfficeColorPicker, OfficeSelect, OfficeTextField } from './office-controls';
+import { type ConditionalRuleDraft, SPREADSHEET_CONDITIONAL_COMPARISONS } from './spreadsheet-conditional-format-model';
 
 interface SpreadsheetConditionalComparisonFieldsProps {
   draft: ConditionalRuleDraft;
@@ -16,78 +17,72 @@ export function SpreadsheetConditionalComparisonFields({
   const needsUpperValue = spreadsheetConditionalComparisonNeedsUpperValue(draft.comparisonOperator);
   return (
     <>
-      <label>
+      <div className='work-office-field'>
         <span>比较方式</span>
-        <select
-          aria-label='条件比较运算符'
+        <OfficeSelect
+          ariaLabel='条件比较运算符'
           value={draft.comparisonOperator}
-          onChange={(event) =>
-            onChange({ comparisonOperator: event.target.value as SpreadsheetConditionalComparisonOperator })
+          options={SPREADSHEET_CONDITIONAL_COMPARISONS.map((comparison) => ({
+            value: comparison.name,
+            label: comparison.label,
+          }))}
+          onValueChange={(comparisonOperator) =>
+            onChange({ comparisonOperator: comparisonOperator as SpreadsheetConditionalComparisonOperator })
           }
-        >
-          {SPREADSHEET_CONDITIONAL_COMPARISONS.map((comparison) => (
-            <option value={comparison.name} key={comparison.name}>
-              {comparison.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
+        />
+      </div>
+      <div className='work-office-field'>
         <span>{needsUpperValue ? '下限' : '比较值'}</span>
-        <input
+        <OfficeTextField
           aria-label={needsUpperValue ? '条件比较下限' : '条件比较值'}
           value={draft.comparisonValue}
           onChange={(event) => onChange({ comparisonValue: event.target.value })}
         />
-      </label>
+      </div>
       {needsUpperValue && (
-        <label>
+        <div className='work-office-field'>
           <span>上限</span>
-          <input
+          <OfficeTextField
             aria-label='条件比较上限'
             value={draft.comparisonUpperValue}
             onChange={(event) => onChange({ comparisonUpperValue: event.target.value })}
           />
-        </label>
+        </div>
       )}
-      <label className='toggle'>
-        <input
-          type='checkbox'
-          aria-label='设置文字颜色'
-          checked={draft.comparisonUseTextColor}
-          onChange={(event) => onChange({ comparisonUseTextColor: event.target.checked })}
-        />
-        <span>设置文字颜色</span>
-      </label>
-      <label className='color'>
+      <OfficeCheckbox
+        className='toggle'
+        ariaLabel='设置文字颜色'
+        checked={draft.comparisonUseTextColor}
+        onCheckedChange={(comparisonUseTextColor) => onChange({ comparisonUseTextColor })}
+      >
+        设置文字颜色
+      </OfficeCheckbox>
+      <div className='work-office-field color'>
         <span>文字颜色</span>
-        <input
-          type='color'
-          aria-label='条件文字颜色'
+        <OfficeColorPicker
+          ariaLabel='条件文字颜色'
           value={draft.comparisonTextColor}
           disabled={!draft.comparisonUseTextColor}
-          onChange={(event) => onChange({ comparisonTextColor: event.target.value })}
+          onValueChange={(comparisonTextColor) => onChange({ comparisonTextColor })}
         />
-      </label>
-      <label className='toggle'>
-        <input
-          type='checkbox'
-          aria-label='设置填充颜色'
-          checked={draft.comparisonUseCellColor}
-          onChange={(event) => onChange({ comparisonUseCellColor: event.target.checked })}
-        />
-        <span>设置填充颜色</span>
-      </label>
-      <label className='color'>
+      </div>
+      <OfficeCheckbox
+        className='toggle'
+        ariaLabel='设置填充颜色'
+        checked={draft.comparisonUseCellColor}
+        onCheckedChange={(comparisonUseCellColor) => onChange({ comparisonUseCellColor })}
+      >
+        设置填充颜色
+      </OfficeCheckbox>
+      <div className='work-office-field color'>
         <span>填充颜色</span>
-        <input
-          type='color'
-          aria-label='条件填充颜色'
+        <OfficeColorPicker
+          ariaLabel='条件填充颜色'
           value={draft.comparisonCellColor}
           disabled={!draft.comparisonUseCellColor}
-          onChange={(event) => onChange({ comparisonCellColor: event.target.value })}
+          onValueChange={(comparisonCellColor) => onChange({ comparisonCellColor })}
         />
-      </label>
+      </div>
     </>
   );
 }

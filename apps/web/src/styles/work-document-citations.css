@@ -85,7 +85,7 @@
   font-size: 9px;
 }
 
-.work-document-citations-panel > header > label {
+.work-document-citations-panel > header > .work-office-field {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -239,13 +239,13 @@
   overflow: auto;
 }
 
-.work-document-citation-manager > form > label {
+.work-document-citation-manager > form > .work-office-field {
   display: grid;
   min-width: 0;
   gap: 4px;
 }
 
-.work-document-citation-manager > form > label > span:first-child {
+.work-document-citation-manager > form > .work-office-field > span:first-child {
   color: var(--a3s-muted);
   font-size: 8px;
 }
@@ -267,12 +267,6 @@
   gap: 5px;
 }
 
-.work-document-citation-manager .actions .error {
-  margin-right: auto;
-  color: var(--a3s-red);
-  font-size: 8px;
-}
-
 .work-document-citation-manager .actions button.primary {
   border-color: var(--a3s-blue);
   background: var(--a3s-blue);
@@ -286,7 +280,7 @@
 
 @media (max-width: 760px) {
   .work-document-citations-panel > header > div span,
-  .work-document-citations-panel > header > label > span {
+  .work-document-citations-panel > header > .work-office-field > span {
     display: none;
   }
 

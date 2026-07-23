@@ -1,6 +1,7 @@
 import type { Sheet } from '@fortune-sheet/core';
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Button, CollectionState, InlineNotice, StateView } from '../../../design-system/primitives';
 import {
   defaultSpreadsheetConditionalIconThresholds,
   SPREADSHEET_CONDITIONAL_ICON_SETS,
@@ -8,24 +9,25 @@ import {
 } from '../work-spreadsheet-conditional-icons';
 import { defaultSpreadsheetColorScaleThresholds } from '../work-spreadsheet-conditional-values';
 import { formatSpreadsheetCellRanges } from '../work-spreadsheet-ranges';
-import type { FortuneConditionalFormatRule } from '../work-xlsx-conditional-format';
 import type { WorkSpreadsheetContent } from '../work-types';
+import type { FortuneConditionalFormatRule } from '../work-xlsx-conditional-format';
+import { OfficeCheckbox, OfficeColorPicker, OfficeNumberField, OfficeSelect, OfficeTextField } from './office-controls';
 import { SpreadsheetConditionalComparisonFields } from './spreadsheet-conditional-comparison-fields';
-import { SpreadsheetConditionalThresholdFields } from './spreadsheet-conditional-threshold-fields';
 import {
   buildConditionalRule,
+  type ConditionalRuleDraft,
   conditionalRuleDraftForRule,
   conditionalRuleLabel,
-  conditionalToolbarRuleSummary,
   conditionalThresholdDrafts,
+  conditionalToolbarRuleSummary,
   isManagedConditionalRule,
   managedConditionalRuleEntries,
   newConditionalRuleDraft,
+  type SpreadsheetConditionalThresholdDraft,
   sheetConditionalRules,
   withConditionalRules,
-  type ConditionalRuleDraft,
-  type SpreadsheetConditionalThresholdDraft,
 } from './spreadsheet-conditional-format-model';
+import { SpreadsheetConditionalThresholdFields } from './spreadsheet-conditional-threshold-fields';
 
 export { managedConditionalFormatCount } from './spreadsheet-conditional-format-model';
 
@@ -159,14 +161,22 @@ export function SpreadsheetConditionalFormatPanel({ content, onChange }: Spreads
   const selectedSheet = selection ? sheets.find((sheet) => sheet.id === selection.sheetId) : undefined;
   const selectedRuleCount = selectedSheet ? sheetConditionalRules(selectedSheet).length : 0;
 
-  if (!sheets.length) return <p className='work-spreadsheet-conditional-empty'>当前工作簿没有可编辑的工作表。</p>;
+  if (!sheets.length) {
+    return (
+      <StateView
+        className='work-office-panel-empty work-spreadsheet-conditional-empty'
+        size='compact'
+        title='当前工作簿没有可编辑的工作表'
+      />
+    );
+  }
   return (
     <div className='work-spreadsheet-conditional-manager'>
       <aside aria-label='Work 条件格式规则'>
-        <button type='button' className='create' onClick={startNew}>
+        <Button className='create' tone='secondary' onClick={startNew}>
           <Plus size={13} />
           新建规则
-        </button>
+        </Button>
         <div className='work-spreadsheet-conditional-list'>
           {entries.map(({ sheet, rule, index }) => {
             const selected = selection?.sheetId === sheet.id && selection.index === index;
@@ -183,7 +193,11 @@ export function SpreadsheetConditionalFormatPanel({ content, onChange }: Spreads
               </button>
             );
           })}
-          {!entries.length && <p>还没有 Work 可管理的条件格式规则。</p>}
+          {!entries.length && (
+            <CollectionState className='work-office-collection-empty' role='status'>
+              还没有 Work 可管理的条件格式规则。
+            </CollectionState>
+          )}
         </div>
       </aside>
       <form
@@ -192,58 +206,57 @@ export function SpreadsheetConditionalFormatPanel({ content, onChange }: Spreads
           saveRule();
         }}
       >
-        <label>
+        <div className='work-office-field'>
           <span>工作表</span>
-          <select
-            aria-label='条件格式工作表'
+          <OfficeSelect
+            ariaLabel='条件格式工作表'
             value={draft.sheetId}
-            onChange={(event) => setDraft({ ...draft, sheetId: event.target.value })}
-          >
-            {sheets.map((sheet) => (
-              <option value={sheet.id} key={sheet.id}>
-                {sheet.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
+            options={sheets.map((sheet) => ({ value: sheet.id, label: sheet.name }))}
+            onValueChange={(sheetId) => setDraft({ ...draft, sheetId })}
+          />
+        </div>
+        <div className='work-office-field'>
           <span>规则类型</span>
-          <select
-            aria-label='条件格式规则类型'
+          <OfficeSelect
+            ariaLabel='条件格式规则类型'
             value={draft.type}
             disabled={draft.type === 'toolbarRule'}
-            onChange={(event) => setDraft({ ...draft, type: event.target.value as ConditionalRuleDraft['type'] })}
-          >
-            <option value='cellComparison'>单元格比较</option>
-            <option value='colorGradation'>色阶</option>
-            <option value='dataBar'>数据条</option>
-            <option value='icons'>图标集</option>
-            {draft.type === 'toolbarRule' && <option value='toolbarRule'>工具栏规则</option>}
-          </select>
-        </label>
-        <label className='reference'>
+            options={[
+              { value: 'cellComparison', label: '单元格比较' },
+              { value: 'colorGradation', label: '色阶' },
+              { value: 'dataBar', label: '数据条' },
+              { value: 'icons', label: '图标集' },
+              ...(draft.type === 'toolbarRule' ? [{ value: 'toolbarRule' as const, label: '工具栏规则' }] : []),
+            ]}
+            onValueChange={(type) => setDraft({ ...draft, type: type as ConditionalRuleDraft['type'] })}
+          />
+        </div>
+        <div className='work-office-field reference'>
           <span>应用范围</span>
-          <input
+          <OfficeTextField
             aria-label='条件格式范围'
             value={draft.reference}
             placeholder='A2:A20'
             onChange={(event) => setDraft({ ...draft, reference: event.target.value })}
           />
-        </label>
-        <label className='toggle'>
-          <input
-            type='checkbox'
-            aria-label='匹配后停止后续规则'
-            checked={draft.stopIfTrue}
-            onChange={(event) => setDraft({ ...draft, stopIfTrue: event.target.checked })}
-          />
-          <span>匹配后停止后续规则</span>
-        </label>
+        </div>
+        <OfficeCheckbox
+          className='toggle'
+          ariaLabel='匹配后停止后续规则'
+          checked={draft.stopIfTrue}
+          onCheckedChange={(stopIfTrue) => setDraft({ ...draft, stopIfTrue })}
+        >
+          匹配后停止后续规则
+        </OfficeCheckbox>
         {draft.type === 'toolbarRule' ? (
-          <label className='reference'>
+          <div className='work-office-field reference'>
             <span>规则摘要</span>
-            <input aria-label='条件格式规则摘要' readOnly value={conditionalToolbarRuleSummary(draft.preservedRule)} />
-          </label>
+            <OfficeTextField
+              aria-label='条件格式规则摘要'
+              readOnly
+              value={conditionalToolbarRuleSummary(draft.preservedRule)}
+            />
+          </div>
         ) : draft.type === 'cellComparison' ? (
           <SpreadsheetConditionalComparisonFields
             draft={draft}
@@ -251,25 +264,26 @@ export function SpreadsheetConditionalFormatPanel({ content, onChange }: Spreads
           />
         ) : draft.type === 'colorGradation' ? (
           <>
-            <label>
+            <div className='work-office-field'>
               <span>色阶级数</span>
-              <select
-                aria-label='色阶级数'
+              <OfficeSelect
+                ariaLabel='色阶级数'
                 value={draft.scaleSize}
-                onChange={(event) =>
+                options={[
+                  { value: '2', label: '双色阶' },
+                  { value: '3', label: '三色阶' },
+                ]}
+                onValueChange={(scaleSize) =>
                   setDraft({
                     ...draft,
-                    scaleSize: event.target.value as ConditionalRuleDraft['scaleSize'],
+                    scaleSize: scaleSize as ConditionalRuleDraft['scaleSize'],
                     scaleThresholds: conditionalThresholdDrafts(
-                      defaultSpreadsheetColorScaleThresholds(Number(event.target.value))
+                      defaultSpreadsheetColorScaleThresholds(Number(scaleSize))
                     ),
                   })
                 }
-              >
-                <option value='2'>双色阶</option>
-                <option value='3'>三色阶</option>
-              </select>
-            </label>
+              />
+            </div>
             <ColorField
               label='最小值颜色'
               value={draft.minimumColor}
@@ -300,36 +314,34 @@ export function SpreadsheetConditionalFormatPanel({ content, onChange }: Spreads
               value={draft.barColor}
               onChange={(barColor) => setDraft({ ...draft, barColor })}
             />
-            <label className='toggle'>
-              <input
-                type='checkbox'
-                checked={draft.barShowValue}
-                onChange={(event) => setDraft({ ...draft, barShowValue: event.target.checked })}
-              />
-              <span>显示数据条数值</span>
-            </label>
-            <label>
+            <OfficeCheckbox
+              className='toggle'
+              ariaLabel='显示数据条数值'
+              checked={draft.barShowValue}
+              onCheckedChange={(barShowValue) => setDraft({ ...draft, barShowValue })}
+            >
+              显示数据条数值
+            </OfficeCheckbox>
+            <div className='work-office-field'>
               <span>最短长度（%）</span>
-              <input
-                type='number'
-                min='0'
-                max='100'
-                aria-label='数据条最短长度'
+              <OfficeNumberField
+                min={0}
+                max={100}
+                ariaLabel='数据条最短长度'
                 value={draft.barMinLength}
-                onChange={(event) => setDraft({ ...draft, barMinLength: event.target.value })}
+                onValueChange={(barMinLength) => setDraft({ ...draft, barMinLength })}
               />
-            </label>
-            <label>
+            </div>
+            <div className='work-office-field'>
               <span>最长长度（%）</span>
-              <input
-                type='number'
-                min='0'
-                max='100'
-                aria-label='数据条最长长度'
+              <OfficeNumberField
+                min={0}
+                max={100}
+                ariaLabel='数据条最长长度'
                 value={draft.barMaxLength}
-                onChange={(event) => setDraft({ ...draft, barMaxLength: event.target.value })}
+                onValueChange={(barMaxLength) => setDraft({ ...draft, barMaxLength })}
               />
-            </label>
+            </div>
             <SpreadsheetConditionalThresholdFields
               label='数据条'
               thresholds={draft.barThresholds}
@@ -338,36 +350,34 @@ export function SpreadsheetConditionalFormatPanel({ content, onChange }: Spreads
           </>
         ) : (
           <>
-            <label>
+            <div className='work-office-field'>
               <span>图标集</span>
-              <select
-                aria-label='图标集'
+              <OfficeSelect
+                ariaLabel='图标集'
                 value={draft.iconSet}
-                onChange={(event) => setIconSet(event.target.value as SpreadsheetConditionalIconSetName)}
-              >
-                {SPREADSHEET_CONDITIONAL_ICON_SETS.map((iconSet) => (
-                  <option value={iconSet.name} key={iconSet.name}>
-                    {iconSet.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className='toggle'>
-              <input
-                type='checkbox'
-                checked={draft.iconReverse}
-                onChange={(event) => setDraft({ ...draft, iconReverse: event.target.checked })}
+                options={SPREADSHEET_CONDITIONAL_ICON_SETS.map((iconSet) => ({
+                  value: iconSet.name,
+                  label: iconSet.label,
+                }))}
+                onValueChange={(iconSet) => setIconSet(iconSet as SpreadsheetConditionalIconSetName)}
               />
-              <span>反转图标顺序</span>
-            </label>
-            <label className='toggle'>
-              <input
-                type='checkbox'
-                checked={draft.iconShowValue}
-                onChange={(event) => setDraft({ ...draft, iconShowValue: event.target.checked })}
-              />
-              <span>显示单元格值</span>
-            </label>
+            </div>
+            <OfficeCheckbox
+              className='toggle'
+              ariaLabel='反转图标顺序'
+              checked={draft.iconReverse}
+              onCheckedChange={(iconReverse) => setDraft({ ...draft, iconReverse })}
+            >
+              反转图标顺序
+            </OfficeCheckbox>
+            <OfficeCheckbox
+              className='toggle'
+              ariaLabel='显示单元格值'
+              checked={draft.iconShowValue}
+              onCheckedChange={(iconShowValue) => setDraft({ ...draft, iconShowValue })}
+            >
+              显示单元格值
+            </OfficeCheckbox>
             <SpreadsheetConditionalThresholdFields
               label='图标'
               thresholds={draft.iconThresholds}
@@ -379,32 +389,36 @@ export function SpreadsheetConditionalFormatPanel({ content, onChange }: Spreads
         )}
         <p>文本、重复值、排名、平均值和公式规则的条件与样式由表格工具栏维护；此处可统一修改范围、停止行为和优先级。</p>
         <div className='actions'>
-          {error && <output className='error'>{error}</output>}
-          <button
-            type='button'
+          {error && (
+            <InlineNotice className='work-office-form-error' tone='danger' role='alert'>
+              {error}
+            </InlineNotice>
+          )}
+          <Button
+            tone='secondary'
             disabled={!selection || selection.index <= 0}
             aria-label='提高优先级'
             onClick={() => moveRule(-1)}
           >
             <ArrowUp size={13} />
             提高优先级
-          </button>
-          <button
-            type='button'
+          </Button>
+          <Button
+            tone='secondary'
             disabled={!selection || selection.index >= selectedRuleCount - 1}
             aria-label='降低优先级'
             onClick={() => moveRule(1)}
           >
             <ArrowDown size={13} />
             降低优先级
-          </button>
-          <button type='button' className='danger' disabled={!selection} onClick={deleteRule}>
+          </Button>
+          <Button tone='danger' disabled={!selection} onClick={deleteRule}>
             <Trash2 size={13} />
             删除规则
-          </button>
-          <button type='submit' className='primary'>
+          </Button>
+          <Button type='submit' tone='primary'>
             保存规则
-          </button>
+          </Button>
         </div>
       </form>
     </div>
@@ -413,9 +427,9 @@ export function SpreadsheetConditionalFormatPanel({ content, onChange }: Spreads
 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
-    <label className='color'>
+    <div className='work-office-field color'>
       <span>{label}</span>
-      <input type='color' aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} />
-    </label>
+      <OfficeColorPicker ariaLabel={label} value={value} onValueChange={onChange} />
+    </div>
   );
 }

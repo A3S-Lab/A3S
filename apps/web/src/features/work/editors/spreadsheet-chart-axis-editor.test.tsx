@@ -12,12 +12,12 @@ describe('Spreadsheet chart axis display editor', () => {
     render(<SpreadsheetChartPanel content={content} activeSheetId='sheet-axis' onChange={onChange} />);
 
     fireEvent.click(screen.getByLabelText('横坐标轴逆序显示'));
-    fireEvent.change(screen.getByLabelText('横坐标轴标签位置'), { target: { value: 'high' } });
-    fireEvent.change(screen.getByLabelText('横坐标轴主要刻度线'), { target: { value: 'outside' } });
+    chooseOfficeOption('横坐标轴标签位置', '高位');
+    chooseOfficeOption('横坐标轴主要刻度线', '向外');
     fireEvent.change(screen.getByLabelText('横坐标轴标签间隔'), { target: { value: '3' } });
     fireEvent.click(screen.getByLabelText('纵坐标轴逆序显示'));
-    fireEvent.change(screen.getByLabelText('纵坐标轴标签位置'), { target: { value: 'none' } });
-    fireEvent.change(screen.getByLabelText('纵坐标轴主要刻度线'), { target: { value: 'cross' } });
+    chooseOfficeOption('纵坐标轴标签位置', '不显示');
+    chooseOfficeOption('纵坐标轴主要刻度线', '交叉');
     expect(screen.queryByLabelText('纵坐标轴标签间隔')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '保存图表' }));
 
@@ -38,6 +38,11 @@ describe('Spreadsheet chart axis display editor', () => {
     });
   });
 });
+
+function chooseOfficeOption(label: string, option: string) {
+  fireEvent.click(screen.getByRole('combobox', { name: label }));
+  fireEvent.click(screen.getByRole('option', { name: option }));
+}
 
 function spreadsheetWithChart(): WorkSpreadsheetContent {
   return {

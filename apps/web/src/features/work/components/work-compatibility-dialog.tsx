@@ -1,4 +1,5 @@
 import { AlertTriangle, CheckCircle2, Info, ShieldAlert } from 'lucide-react';
+import { useState } from 'react';
 import { Button, Dialog } from '../../../design-system/primitives';
 import type { WorkCompatibilityReport } from '../work-types';
 
@@ -15,6 +16,7 @@ export function WorkCompatibilityDialog({
   onClose: () => void;
   onConfirm?: () => void;
 }) {
+  const [technicalDetailsOpen, setTechnicalDetailsOpen] = useState(false);
   const warnings = report.issues.filter((issue) => issue.severity === 'warning').length;
   const errors = report.issues.filter((issue) => issue.severity === 'error').length;
   const title =
@@ -27,12 +29,12 @@ export function WorkCompatibilityDialog({
           : '文件兼容性';
   const description =
     mode === 'import'
-      ? `A3S Work 已分析 ${report.sourceName}，请在保存转换结果前检查兼容性。`
+      ? '确认后即可继续编辑。'
       : mode === 'export'
-        ? '这些项目可能与原始 Office 文件不同。原始文件仍可单独下载。'
+        ? '确认后继续导出。'
         : mode === 'save'
-          ? '写入本地 Office 文件后，这些项目可能与原始版本不同。'
-          : `来自 ${report.sourceFormat} 的转换报告。`;
+          ? '确认后写回本地文件。'
+          : `${report.sourceName} 的检查结果`;
 
   return (
     <Dialog
@@ -61,15 +63,24 @@ export function WorkCompatibilityDialog({
           <div>
             <strong>
               {errors
-                ? `${errors} 个项目无法转换`
+                ? '有些内容无法完整转换，原文件仍会保留。'
                 : warnings
-                  ? `${warnings} 个项目可能发生变化`
-                  : '没有发现已知的兼容性问题'}
+                  ? '排版可能有轻微变化，正文和原文件都会保留。'
+                  : '文件可以正常编辑，原文件也会保留。'}
             </strong>
-            <small>原始 {report.sourceFormat} 文件会与可编辑副本一起保留，可随时下载。</small>
           </div>
         </header>
         {report.issues.length > 0 && (
+          <Button
+            tone='quiet'
+            className='work-compatibility-details'
+            aria-expanded={technicalDetailsOpen}
+            onClick={() => setTechnicalDetailsOpen((open) => !open)}
+          >
+            {technicalDetailsOpen ? '收起技术详情' : '查看技术详情'}
+          </Button>
+        )}
+        {technicalDetailsOpen && report.issues.length > 0 && (
           <ol>
             {report.issues.map((issue, index) => (
               <li className={issue.severity} key={`${issue.code}-${issue.location ?? ''}-${index}`}>

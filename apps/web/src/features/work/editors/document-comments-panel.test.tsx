@@ -1,8 +1,8 @@
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DocumentComment, collectDocumentCommentAnchors, documentCommentViews } from '../work-document-comments';
+import { collectDocumentCommentAnchors, DocumentComment, documentCommentViews } from '../work-document-comments';
 import type { WorkDocumentComment } from '../work-types';
 import { DocumentCommentsPanel } from './document-comments-panel';
 
@@ -68,5 +68,24 @@ describe('Work document comment review', () => {
     expect(onDelete).toHaveBeenCalledWith('comment-1');
     fireEvent.click(screen.getByRole('button', { name: '关闭批注审阅' }));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('uses the shared collection state for an empty comment list', () => {
+    editor = new Editor({ extensions: [StarterKit, DocumentComment], content: '<p>No comments</p>' });
+
+    render(
+      <DocumentCommentsPanel
+        editor={editor}
+        comments={[]}
+        onReply={vi.fn()}
+        onToggleResolved={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.getByText('选择文字并添加批注后，可以在这里回复、解决或删除。').closest('.ds-collection-state')
+    ).toBeInTheDocument();
   });
 });

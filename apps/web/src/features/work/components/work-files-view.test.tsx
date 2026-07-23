@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceEntry } from '../../../types/api';
 import type { WorkFilesActions } from '../use-work-files-controller';
@@ -29,6 +29,7 @@ const archive: WorkspaceEntry = {
 function actions(overrides: Partial<WorkFilesActions> = {}): WorkFilesActions {
   return {
     rootPath: '/docs',
+    recentRootPaths: ['/docs'],
     currentPath: '/docs',
     entries: [report],
     visibleEntries: [report],
@@ -55,7 +56,8 @@ function actions(overrides: Partial<WorkFilesActions> = {}): WorkFilesActions {
     setSearchScope: vi.fn(),
     setLayout: vi.fn(),
     setSort: vi.fn(),
-    pickRoot: vi.fn(),
+    selectRoot: vi.fn(async (path: string) => path),
+    pickRoot: vi.fn(async () => null),
     navigateTo: vi.fn(),
     goBack: vi.fn(),
     goForward: vi.fn(),
@@ -68,6 +70,7 @@ function actions(overrides: Partial<WorkFilesActions> = {}): WorkFilesActions {
     createFolder: vi.fn(),
     renameEntry: vi.fn(),
     duplicateEntry: vi.fn(),
+    deleteEntries: vi.fn(),
     moveEntries: vi.fn(),
     importDroppedItems: vi.fn(),
     ...overrides,
@@ -76,6 +79,26 @@ function actions(overrides: Partial<WorkFilesActions> = {}): WorkFilesActions {
 
 describe('Work Finder file view', () => {
   afterEach(cleanup);
+
+  it('restores the collapsed office sidebar from the file toolbar', () => {
+    const onOpenSidebar = vi.fn();
+    render(
+      <WorkFilesWorkspace
+        actions={actions()}
+        openingPath={null}
+        copilotOpen={false}
+        sidebarOpen={false}
+        onOpenFile={vi.fn()}
+        onAgentRequest={vi.fn()}
+        onOpenSidebar={onOpenSidebar}
+        onToggleCopilot={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '展开办公侧边栏' }));
+    expect(onOpenSidebar).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: '切换工作区，当前 docs' })).toBeInTheDocument();
+  });
 
   it('opens supported Office files explicitly as Work copies', () => {
     const openFile = vi.fn();
@@ -92,9 +115,36 @@ describe('Work Finder file view', () => {
 
     const item = screen.getByRole('option', { name: /Report.docx/ });
     fireEvent.contextMenu(item, { clientX: 30, clientY: 40 });
-    expect(screen.queryByRole('menuitem', { name: '删除' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('menuitem', { name: '在 Work 中打开' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '打开' }));
     expect(openFile).toHaveBeenCalledWith(report);
+  });
+
+  it('requires an in-product confirmation before permanently deleting local entries', async () => {
+    const deleteEntries = vi.fn().mockResolvedValue(undefined);
+    render(
+      <WorkFilesView
+        actions={actions({
+          entries: [report, archive],
+          visibleEntries: [report, archive],
+          selectedPaths: new Set([report.path, archive.path]),
+          selectedEntries: [report, archive],
+          deleteEntries,
+        })}
+        openingPath={null}
+        createFolderRequest={0}
+        onOpenFile={vi.fn()}
+        onQuickLook={vi.fn()}
+        onAgentRequest={vi.fn()}
+      />
+    );
+
+    fireEvent.contextMenu(screen.getByRole('option', { name: /Report.docx/ }), { clientX: 30, clientY: 40 });
+    fireEvent.click(screen.getByRole('menuitem', { name: '永久删除 2 项' }));
+    expect(screen.getByRole('dialog', { name: '永久删除 2 项' })).toBeInTheDocument();
+    expect(deleteEntries).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '确认永久删除' }));
+    await waitFor(() => expect(deleteEntries).toHaveBeenCalledWith([report, archive]));
   });
 
   it('creates native Office files from the current-folder context menu', () => {
@@ -146,7 +196,7 @@ describe('Work Finder file view', () => {
   it('switches between current-folder and whole-workspace search and shows result locations', () => {
     const setSearchScope = vi.fn();
     const nestedReport = { ...report, path: '/docs/Reports/Report.docx' };
-    render(
+    const { rerender } = render(
       <WorkFilesWorkspace
         actions={actions({
           currentPath: '/docs/Reports',
@@ -158,17 +208,59 @@ describe('Work Finder file view', () => {
         })}
         openingPath={null}
         copilotOpen={false}
+        sidebarOpen={true}
         onOpenFile={vi.fn()}
         onAgentRequest={vi.fn()}
+        onOpenSidebar={vi.fn()}
         onToggleCopilot={vi.fn()}
       />
     );
 
     expect(screen.getByRole('option', { name: /Report.docx/ })).toHaveTextContent('Reports');
-    fireEvent.click(screen.getByRole('button', { name: '仅搜索当前文件夹 Reports' }));
+    fireEvent.click(screen.getByRole('radio', { name: '仅搜索当前文件夹 Reports' }));
     expect(setSearchScope).toHaveBeenCalledWith('folder');
-    fireEvent.click(screen.getByRole('button', { name: '搜索整个工作区 docs' }));
+    rerender(
+      <WorkFilesWorkspace
+        actions={actions({
+          currentPath: '/docs/Reports',
+          entries: [],
+          visibleEntries: [nestedReport],
+          query: 'report',
+          searchScope: 'folder',
+          setSearchScope,
+        })}
+        openingPath={null}
+        copilotOpen={false}
+        sidebarOpen={true}
+        onOpenFile={vi.fn()}
+        onAgentRequest={vi.fn()}
+        onOpenSidebar={vi.fn()}
+        onToggleCopilot={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole('radio', { name: '搜索全部文件 docs' }));
     expect(setSearchScope).toHaveBeenCalledWith('workspace');
+  });
+
+  it('sorts with an in-product menu instead of a system select', () => {
+    const setSort = vi.fn();
+    const { container } = render(
+      <WorkFilesWorkspace
+        actions={actions({ setSort })}
+        openingPath={null}
+        copilotOpen={false}
+        sidebarOpen={true}
+        onOpenFile={vi.fn()}
+        onAgentRequest={vi.fn()}
+        onOpenSidebar={vi.fn()}
+        onToggleCopilot={vi.fn()}
+      />
+    );
+
+    expect(container.querySelector('select')).toBeNull();
+    fireEvent.click(screen.getByRole('combobox', { name: '排序方式' }));
+    fireEvent.click(screen.getByRole('option', { name: '修改日期' }));
+    expect(setSort).toHaveBeenCalledWith({ key: 'modified', direction: 'ascending' });
   });
 
   it('opens Quick Look from the Space key and the contextual action', () => {
@@ -208,8 +300,10 @@ describe('Work Finder file view', () => {
         })}
         openingPath={null}
         copilotOpen={false}
+        sidebarOpen={true}
         onOpenFile={vi.fn()}
         onAgentRequest={vi.fn()}
+        onOpenSidebar={vi.fn()}
         onToggleCopilot={vi.fn()}
       />
     );
@@ -217,9 +311,7 @@ describe('Work Finder file view', () => {
     fireEvent.click(screen.getByRole('button', { name: '快速查看所选项目' }));
 
     expect(screen.getByRole('dialog', { name: 'Archive' })).toBeInTheDocument();
-    expect(
-      await screen.findByText('Quick Look 不会递归读取文件夹内容；打开文件夹后可以继续浏览。')
-    ).toBeInTheDocument();
+    expect(await screen.findByText('快速查看不会读取文件夹内的内容；打开文件夹后可以继续浏览。')).toBeInTheDocument();
   });
 
   it('moves selected files to an ancestor breadcrumb', () => {
@@ -238,8 +330,10 @@ describe('Work Finder file view', () => {
         })}
         openingPath={null}
         copilotOpen={false}
+        sidebarOpen={true}
         onOpenFile={vi.fn()}
         onAgentRequest={vi.fn()}
+        onOpenSidebar={vi.fn()}
         onToggleCopilot={vi.fn()}
       />
     );
@@ -269,8 +363,10 @@ describe('Work Finder file view', () => {
         })}
         openingPath={null}
         copilotOpen={false}
+        sidebarOpen={true}
         onOpenFile={vi.fn()}
         onAgentRequest={vi.fn()}
+        onOpenSidebar={vi.fn()}
         onToggleCopilot={vi.fn()}
       />
     );

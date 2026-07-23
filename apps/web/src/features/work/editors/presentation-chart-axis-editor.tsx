@@ -6,6 +6,7 @@ import {
   workSpreadsheetChartAxisShowsMajorGridlinesByDefault,
 } from '../work-spreadsheet-chart-axis';
 import type { WorkSlideChart, WorkSlideChartAxis, WorkSpreadsheetChartAxisPosition } from '../work-types';
+import { OfficeCheckbox, OfficeNumberField, OfficeSelect, OfficeTextField } from './office-controls';
 
 const PRIMARY_AXES: Array<{ position: WorkSpreadsheetChartAxisPosition; label: string }> = [
   { position: 'bottom', label: '横轴' },
@@ -49,112 +50,109 @@ export function PresentationChartAxisEditor({
           return (
             <fieldset key={position}>
               <legend>{label}</legend>
-              <label>
+              <div className='work-office-field'>
                 <span>标题</span>
-                <input
+                <OfficeTextField
                   aria-label={`${ariaName}标题`}
                   value={axis?.title ?? ''}
                   maxLength={255}
                   onChange={(event) => updateAxis(position, { title: event.target.value })}
                 />
-              </label>
-              <label className='axis-check'>
-                <input
-                  type='checkbox'
-                  aria-label={`${ariaName}逆序`}
-                  checked={axis?.reverseOrder === true}
-                  onChange={(event) => updateAxis(position, { reverseOrder: event.target.checked })}
-                />
-                <span>逆序</span>
-              </label>
-              <label>
+              </div>
+              <OfficeCheckbox
+                className='axis-check'
+                ariaLabel={`${ariaName}逆序`}
+                checked={axis?.reverseOrder === true}
+                onCheckedChange={(reverseOrder) => updateAxis(position, { reverseOrder })}
+              >
+                逆序
+              </OfficeCheckbox>
+              <div className='work-office-field'>
                 <span>标签位置</span>
-                <select
-                  aria-label={`${ariaName}标签位置`}
+                <OfficeSelect
+                  ariaLabel={`${ariaName}标签位置`}
                   value={labelPosition}
-                  onChange={(event) =>
+                  options={[
+                    { value: 'nextTo', label: '轴旁' },
+                    { value: 'high', label: '高位' },
+                    { value: 'low', label: '低位' },
+                    { value: 'none', label: '不显示' },
+                  ]}
+                  onValueChange={(value) =>
                     updateAxis(position, {
-                      labelPosition: event.target.value as NonNullable<WorkSlideChartAxis['labelPosition']>,
+                      labelPosition: value as NonNullable<WorkSlideChartAxis['labelPosition']>,
                     })
                   }
-                >
-                  <option value='nextTo'>轴旁</option>
-                  <option value='high'>高位</option>
-                  <option value='low'>低位</option>
-                  <option value='none'>不显示</option>
-                </select>
-              </label>
-              <label>
+                />
+              </div>
+              <div className='work-office-field'>
                 <span>主要刻度线</span>
-                <select
-                  aria-label={`${ariaName}主要刻度线`}
+                <OfficeSelect
+                  ariaLabel={`${ariaName}主要刻度线`}
                   value={axis?.majorTickMark ?? 'none'}
-                  onChange={(event) =>
+                  options={[
+                    { value: 'none', label: '无' },
+                    { value: 'inside', label: '向内' },
+                    { value: 'outside', label: '向外' },
+                    { value: 'cross', label: '交叉' },
+                  ]}
+                  onValueChange={(value) =>
                     updateAxis(position, {
-                      majorTickMark: event.target.value as NonNullable<WorkSlideChartAxis['majorTickMark']>,
+                      majorTickMark: value as NonNullable<WorkSlideChartAxis['majorTickMark']>,
                     })
                   }
-                >
-                  <option value='none'>无</option>
-                  <option value='inside'>向内</option>
-                  <option value='outside'>向外</option>
-                  <option value='cross'>交叉</option>
-                </select>
-              </label>
+                />
+              </div>
               {categoryAxis && (
-                <label>
+                <div className='work-office-field'>
                   <span>标签间隔</span>
-                  <input
-                    type='number'
+                  <OfficeNumberField
                     min={1}
                     max={31_999}
                     step={1}
-                    aria-label={`${ariaName}标签间隔`}
+                    ariaLabel={`${ariaName}标签间隔`}
                     value={axis?.labelInterval ?? ''}
                     placeholder='自动'
-                    onChange={(event) => updateAxis(position, { labelInterval: optionalInteger(event.target.value) })}
+                    onValueChange={(value) => updateAxis(position, { labelInterval: optionalInteger(value) })}
                   />
-                </label>
+                </div>
               )}
               {valueAxis && (
                 <>
-                  <label>
+                  <div className='work-office-field'>
                     <span>最小值</span>
-                    <input
-                      type='number'
-                      step='any'
-                      aria-label={`${ariaName}最小值`}
+                    <OfficeNumberField
+                      step={0.1}
+                      ariaLabel={`${ariaName}最小值`}
                       value={axis?.minimum ?? ''}
                       placeholder='自动'
-                      onChange={(event) => updateAxis(position, { minimum: optionalNumber(event.target.value) })}
+                      onValueChange={(value) => updateAxis(position, { minimum: optionalNumber(value) })}
                     />
-                  </label>
-                  <label>
+                  </div>
+                  <div className='work-office-field'>
                     <span>最大值</span>
-                    <input
-                      type='number'
-                      step='any'
-                      aria-label={`${ariaName}最大值`}
+                    <OfficeNumberField
+                      step={0.1}
+                      ariaLabel={`${ariaName}最大值`}
                       value={axis?.maximum ?? ''}
                       placeholder='自动'
-                      onChange={(event) => updateAxis(position, { maximum: optionalNumber(event.target.value) })}
+                      onValueChange={(value) => updateAxis(position, { maximum: optionalNumber(value) })}
                     />
-                  </label>
-                  <label>
+                  </div>
+                  <div className='work-office-field'>
                     <span>主单位</span>
-                    <input
-                      type='number'
-                      min='0'
-                      step='any'
-                      aria-label={`${ariaName}主单位`}
+                    <OfficeNumberField
+                      min={0}
+                      step={0.1}
+                      ariaLabel={`${ariaName}主单位`}
                       value={axis?.majorUnit ?? ''}
                       placeholder='自动'
-                      onChange={(event) => updateAxis(position, { majorUnit: optionalNumber(event.target.value) })}
+                      onValueChange={(value) => updateAxis(position, { majorUnit: optionalNumber(value) })}
                     />
-                  </label>
-                  <label>
+                  </div>
+                  <div className='work-office-field'>
                     <span>数字格式</span>
-                    <input
+                    <OfficeTextField
                       aria-label={`${ariaName}数字格式`}
                       value={axis?.numberFormat ?? ''}
                       maxLength={255}
@@ -167,25 +165,23 @@ export function PresentationChartAxisEditor({
                         });
                       }}
                     />
-                  </label>
-                  <label className='axis-check'>
-                    <input
-                      type='checkbox'
-                      aria-label={`${ariaName}主要网格线`}
-                      checked={showMajorGridlines}
-                      onChange={(event) => updateAxis(position, { showMajorGridlines: event.target.checked })}
-                    />
-                    <span>主要网格线</span>
-                  </label>
-                  <label className='axis-check'>
-                    <input
-                      type='checkbox'
-                      aria-label={`${ariaName}链接源数字格式`}
-                      checked={sourceLinked}
-                      onChange={(event) => updateAxis(position, { numberFormatSourceLinked: event.target.checked })}
-                    />
-                    <span>链接源格式</span>
-                  </label>
+                  </div>
+                  <OfficeCheckbox
+                    className='axis-check'
+                    ariaLabel={`${ariaName}主要网格线`}
+                    checked={showMajorGridlines}
+                    onCheckedChange={(showMajorGridlines) => updateAxis(position, { showMajorGridlines })}
+                  >
+                    主要网格线
+                  </OfficeCheckbox>
+                  <OfficeCheckbox
+                    className='axis-check'
+                    ariaLabel={`${ariaName}链接源数字格式`}
+                    checked={sourceLinked}
+                    onCheckedChange={(numberFormatSourceLinked) => updateAxis(position, { numberFormatSourceLinked })}
+                  >
+                    链接源格式
+                  </OfficeCheckbox>
                 </>
               )}
             </fieldset>

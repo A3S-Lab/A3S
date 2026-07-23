@@ -1,9 +1,17 @@
 import { CheckCircle2, GitBranch, LoaderCircle, RefreshCw, Undo2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSnapshot } from 'valtio';
-import { Button, Dialog, IconButton, StatusBadge } from '../../../design-system/primitives';
-import type { WorkspaceActions } from '../workspace-actions';
+import {
+  Button,
+  Dialog,
+  Field,
+  IconButton,
+  InlineNotice,
+  StateView,
+  StatusBadge,
+} from '../../../design-system/primitives';
 import { appState } from '../../../state/app-state';
+import type { WorkspaceActions } from '../workspace-actions';
 import { WorkspaceFileIcon } from './workspace-file-icon';
 
 export function ChangesInspector({
@@ -67,59 +75,82 @@ export function ChangesInspector({
       </header>
       <section className='changes-scroll' aria-label='工作区变更列表'>
         {state.gitStatusLoading ? (
-          <div className='changes-empty'>
-            <LoaderCircle className='spin' size={18} />
-            读取 Git 状态
-          </div>
+          <StateView
+            className='changes-state'
+            size='compact'
+            role='status'
+            icon={<LoaderCircle className='spin' size={18} />}
+            title='读取 Git 状态'
+          />
         ) : state.gitStatusError && !status ? (
-          <div className='changes-empty changes-error' role='alert'>
-            <GitBranch size={22} />
-            <strong>无法读取 Git 状态</strong>
-            <span>{state.gitStatusError}</span>
-            <Button
-              onClick={() => {
-                void actions.refreshGitStatus();
-              }}
-            >
-              重新加载 Git 状态
-            </Button>
-          </div>
+          <StateView
+            className='changes-state'
+            size='compact'
+            tone='danger'
+            role='alert'
+            icon={<GitBranch size={22} />}
+            title='无法读取 Git 状态'
+            description={state.gitStatusError}
+            actions={
+              <Button
+                onClick={() => {
+                  void actions.refreshGitStatus();
+                }}
+              >
+                重新加载 Git 状态
+              </Button>
+            }
+          />
         ) : !status?.isGitRepo ? (
-          <div className='changes-empty'>
-            <GitBranch size={22} />
-            当前工作区不是 Git 仓库
-          </div>
+          <StateView
+            className='changes-state'
+            size='compact'
+            icon={<GitBranch size={22} />}
+            title='当前工作区不是 Git 仓库'
+          />
         ) : (
           <>
             {state.gitStatusError && (
-              <div className='changes-inline-error' role='alert'>
-                <span>{state.gitStatusError} 当前仍显示上一次 Git 状态。</span>
-                <button
-                  type='button'
-                  onClick={() => {
-                    void actions.refreshGitStatus();
-                  }}
-                >
-                  重试
-                </button>
-              </div>
+              <InlineNotice
+                className='changes-inline-notice'
+                tone='danger'
+                role='alert'
+                actions={
+                  <Button
+                    tone='quiet'
+                    type='button'
+                    onClick={() => {
+                      void actions.refreshGitStatus();
+                    }}
+                  >
+                    重试
+                  </Button>
+                }
+              >
+                {state.gitStatusError} 当前仍显示上一次 Git 状态。
+              </InlineNotice>
             )}
             {state.gitDiffError && (
-              <div className='changes-inline-error' role='alert'>
-                <span>
-                  无法读取{state.gitDiffError.path ? ` ${state.gitDiffError.path}` : '工作区'}的差异：
-                  {state.gitDiffError.message}
-                </span>
-                <button
-                  type='button'
-                  onClick={() => {
-                    const error = appState.gitDiffError;
-                    if (error) void actions.loadGitDiff(error.path, error.staged);
-                  }}
-                >
-                  重试
-                </button>
-              </div>
+              <InlineNotice
+                className='changes-inline-notice'
+                tone='danger'
+                role='alert'
+                actions={
+                  <Button
+                    tone='quiet'
+                    type='button'
+                    onClick={() => {
+                      const error = appState.gitDiffError;
+                      if (error) void actions.loadGitDiff(error.path, error.staged);
+                    }}
+                  >
+                    重试
+                  </Button>
+                }
+              >
+                无法读取{state.gitDiffError.path ? ` ${state.gitDiffError.path}` : '工作区'}的差异：
+                {state.gitDiffError.message}
+              </InlineNotice>
             )}
             <ChangeGroup
               title='更改'
@@ -146,9 +177,12 @@ export function ChangesInspector({
               disabled={state.gitActionLoading}
             />
             {!status.files.length && (
-              <div className='changes-empty'>
-                <StatusBadge tone='success'>工作区干净</StatusBadge>
-              </div>
+              <StateView
+                className='changes-state changes-clean'
+                size='compact'
+                tone='success'
+                title={<StatusBadge tone='success'>工作区干净</StatusBadge>}
+              />
             )}
           </>
         )}
@@ -205,8 +239,7 @@ export function ChangesInspector({
             </>
           }
         >
-          <label className='ds-field'>
-            <span>提交说明</span>
+          <Field label='提交说明'>
             <input
               value={commitMessage}
               onChange={(event) => setCommitMessage(event.target.value)}
@@ -215,7 +248,7 @@ export function ChangesInspector({
               }}
               placeholder='描述这次更改'
             />
-          </label>
+          </Field>
         </Dialog>
       )}
     </aside>

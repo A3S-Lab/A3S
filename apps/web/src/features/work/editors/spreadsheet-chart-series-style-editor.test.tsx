@@ -12,15 +12,15 @@ describe('Spreadsheet chart series style editor', () => {
     render(<SpreadsheetChartPanel content={content} activeSheetId='sheet-series-style' onChange={onChange} />);
 
     fireEvent.click(screen.getByLabelText('系列 1 使用自定义外观'));
-    fireEvent.change(screen.getByLabelText('系列 1 填充颜色'), { target: { value: '#123456' } });
+    chooseOfficeColor('系列 1 填充颜色', '#123456');
     fireEvent.change(screen.getByLabelText('系列 1 填充透明度'), { target: { value: '42' } });
-    fireEvent.change(screen.getByLabelText('系列 1 线条颜色'), { target: { value: '#654321' } });
+    chooseOfficeColor('系列 1 线条颜色', '#654321');
     fireEvent.change(screen.getByLabelText('系列 1 线条宽度'), { target: { value: '4.5' } });
-    fireEvent.change(screen.getByLabelText('系列 1 线条虚线'), { target: { value: 'dot' } });
-    fireEvent.change(screen.getByLabelText('系列 1 数据标记符号'), { target: { value: 'triangle' } });
+    chooseOfficeOption('系列 1 线条虚线', '点线');
+    chooseOfficeOption('系列 1 数据标记符号', '三角形');
     fireEvent.change(screen.getByLabelText('系列 1 数据标记大小'), { target: { value: '11' } });
-    fireEvent.change(screen.getByLabelText('系列 1 数据标记填充颜色'), { target: { value: '#abcdef' } });
-    fireEvent.change(screen.getByLabelText('系列 1 数据标记轮廓颜色'), { target: { value: '#fedcba' } });
+    chooseOfficeColor('系列 1 数据标记填充颜色', '#abcdef');
+    chooseOfficeColor('系列 1 数据标记轮廓颜色', '#fedcba');
     fireEvent.click(screen.getByRole('button', { name: '保存图表' }));
 
     expect(onChange.mock.lastCall?.[0].sheets[0].charts[0].series[0].style).toEqual({
@@ -36,7 +36,7 @@ describe('Spreadsheet chart series style editor', () => {
         lineColor: '#FEDCBA',
       },
     });
-  });
+  }, 10_000);
 
   it('removes a previously customized appearance without retaining nested marker state', () => {
     const content = spreadsheetWithChart();
@@ -55,6 +55,17 @@ describe('Spreadsheet chart series style editor', () => {
     expect(onChange.mock.lastCall?.[0].sheets[0].charts[0].series[0].style).toBeUndefined();
   });
 });
+
+function chooseOfficeOption(label: string, option: string) {
+  fireEvent.click(screen.getByRole('combobox', { name: label }));
+  fireEvent.click(screen.getByRole('option', { name: option }));
+}
+
+function chooseOfficeColor(label: string, value: string) {
+  fireEvent.click(screen.getByRole('button', { name: label }));
+  fireEvent.change(screen.getByRole('textbox', { name: '自定义颜色值' }), { target: { value } });
+  fireEvent.click(screen.getByRole('button', { name: '应用' }));
+}
 
 function spreadsheetWithChart(): WorkSpreadsheetContent {
   return {

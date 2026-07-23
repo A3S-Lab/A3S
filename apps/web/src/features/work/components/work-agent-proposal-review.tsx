@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, FilePenLine, LoaderCircle, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Button, IconButton, InlineNotice } from '../../../design-system/primitives';
 import type {
   WorkAgentProposalApplyResult,
   WorkAgentProposalRequest,
@@ -37,35 +38,41 @@ export function WorkAgentProposalReview({
           <strong>{request.title}</strong>
           <small>{request.description}</small>
         </div>
-        <button type='button' aria-label='关闭 AI 修改建议' onClick={onDismiss}>
+        <IconButton label='关闭 AI 修改建议' onClick={onDismiss}>
           <X size={15} />
-        </button>
+        </IconButton>
       </header>
 
       {status.state === 'waiting' && (
-        <output className='work-agent-proposal-state'>
-          <LoaderCircle className={status.phase === 'response' ? 'spin' : undefined} size={15} />
-          <span>
-            {status.phase === 'draft'
-              ? '建议协议已加入 AI 助手草稿；发送后才会生成差异。'
-              : '等待 AI 助手返回可验证的差异…'}
-          </span>
-        </output>
+        <InlineNotice
+          className='work-agent-proposal-notice'
+          tone='info'
+          role='status'
+          icon={<LoaderCircle className={status.phase === 'response' ? 'spin' : undefined} size={15} />}
+        >
+          {status.phase === 'draft'
+            ? '建议协议已加入 AI 助手草稿；发送后才会生成差异。'
+            : '等待 AI 助手返回可验证的差异…'}
+        </InlineNotice>
       )}
 
       {status.state === 'invalid' && (
-        <div className='work-agent-proposal-state error' role='alert'>
-          <AlertTriangle size={15} />
-          <span>{status.message}</span>
-        </div>
+        <InlineNotice
+          className='work-agent-proposal-notice'
+          tone='danger'
+          role='alert'
+          icon={<AlertTriangle size={15} />}
+        >
+          {status.message}
+        </InlineNotice>
       )}
 
       {proposal && (
         <>
           <div className='work-agent-proposal-summary'>
             <p>{proposal.summary}</p>
-            <button
-              type='button'
+            <Button
+              tone='quiet'
               disabled={Boolean(result)}
               onClick={() =>
                 setSelected(
@@ -76,7 +83,7 @@ export function WorkAgentProposalReview({
               }
             >
               {selected.size === proposal.changes.length ? '取消全选' : '全选'}
-            </button>
+            </Button>
           </div>
           <fieldset className='work-agent-proposal-changes' disabled={Boolean(result)}>
             <legend className='sr-only'>选择要应用的修改</legend>
@@ -104,31 +111,33 @@ export function WorkAgentProposalReview({
             ))}
           </fieldset>
           {result && (
-            <output
-              className={`work-agent-proposal-result ${result.conflicts.length ? 'warning' : 'success'}`}
-              aria-live='polite'
+            <InlineNotice
+              className='work-agent-proposal-notice result'
+              tone={result.conflicts.length ? 'warning' : 'success'}
+              role='status'
+              icon={result.conflicts.length ? <AlertTriangle size={14} /> : <CheckCircle2 size={14} />}
             >
-              {result.conflicts.length ? <AlertTriangle size={14} /> : <CheckCircle2 size={14} />}
-              <span>
-                已应用 {result.appliedTargetIds.length} 项
-                {result.conflicts.length ? `；${result.conflicts.length} 项因原内容已变化而跳过。` : '。'}
-              </span>
-            </output>
+              已应用 {result.appliedTargetIds.length} 项
+              {result.conflicts.length ? `；${result.conflicts.length} 项因原内容已变化而跳过。` : '。'}
+            </InlineNotice>
           )}
           {applyError && (
-            <div className='work-agent-proposal-result error' role='alert'>
-              <AlertTriangle size={14} />
-              <span>{applyError}</span>
-            </div>
+            <InlineNotice
+              className='work-agent-proposal-notice result'
+              tone='danger'
+              role='alert'
+              icon={<AlertTriangle size={14} />}
+            >
+              {applyError}
+            </InlineNotice>
           )}
           <footer>
-            <button type='button' onClick={onDismiss}>
+            <Button tone='quiet' onClick={onDismiss}>
               {result ? '完成' : '取消'}
-            </button>
+            </Button>
             {!result && (
-              <button
-                type='button'
-                className='primary'
+              <Button
+                tone='primary'
                 disabled={!selected.size}
                 onClick={() => {
                   setApplyError('');
@@ -141,7 +150,7 @@ export function WorkAgentProposalReview({
                 }}
               >
                 应用 {selected.size} 项
-              </button>
+              </Button>
             )}
           </footer>
         </>

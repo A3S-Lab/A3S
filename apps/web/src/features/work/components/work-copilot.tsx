@@ -1,10 +1,11 @@
 import { FolderOpen, MessageSquarePlus, Sparkles, WandSparkles, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
+import { Button, IconButton, SplitHandle, StateView } from '../../../design-system/primitives';
+import { appState, formatApiError, sessionTitle, showToast } from '../../../state/app-state';
 import type { CodeActions } from '../../code/use-code-controller';
 import { ExecutionStream } from '../../tasks/components/execution-stream';
 import { TaskComposer } from '../../tasks/components/task-composer';
-import { appState, formatApiError, sessionTitle, showToast } from '../../../state/app-state';
 import {
   type WorkAgentProposalMessage,
   type WorkAgentProposalRequest,
@@ -16,8 +17,11 @@ import { WorkAgentProposalReview } from './work-agent-proposal-review';
 
 const widthStorageKey = 'a3s-work.ai-assistant-width';
 const legacyWidthStorageKey = 'a3s-work.copilot-width';
-const defaultWidth = 420;
+const defaultWidth = 460;
 const minimumWidth = 360;
+const maximumWidth = 680;
+const compactOverlayBreakpoint = 960;
+const splitPaneViewportReserve = 664;
 
 export function WorkCopilot({
   actions,
@@ -26,6 +30,8 @@ export function WorkCopilot({
   onClose,
   onPickRoot,
   onAgentRequest,
+  width,
+  onWidthChange,
   proposal,
   onDismissProposal,
 }: {
@@ -35,11 +41,12 @@ export function WorkCopilot({
   onClose: () => void;
   onPickRoot: () => void | Promise<void>;
   onAgentRequest: (request: WorkAgentRequest) => void | Promise<void>;
+  width: number;
+  onWidthChange: (width: number) => void;
   proposal?: WorkAgentProposalRequest | null;
   onDismissProposal?: () => void;
 }) {
   const state = useSnapshot(appState);
-  const [width, setWidth] = useState(readCopilotWidth);
   const actionsRef = useRef(actions);
   actionsRef.current = actions;
 
@@ -68,44 +75,33 @@ export function WorkCopilot({
     ? relativeLocalPath(currentPath, workspaceRoot) || localPathBasename(workspaceRoot)
     : localPathBasename(workspaceRoot);
 
-  const updateWidth = (nextWidth: number) => {
-    const maximum = Math.max(minimumWidth, Math.min(680, window.innerWidth * 0.58));
-    const normalized = Math.round(Math.max(minimumWidth, Math.min(maximum, nextWidth)));
-    setWidth(normalized);
-    persistCopilotWidth(normalized);
+  const viewportWidth = useViewportWidth();
+  const availableMaximumWidth = workCopilotMaximumWidth(viewportWidth);
+  const renderedWidth = clampWorkCopilotWidth(width, availableMaximumWidth);
+  const updateWidth = (nextWidth: number, persist = false) => {
+    const normalized = clampWorkCopilotWidth(nextWidth, availableMaximumWidth);
+    onWidthChange(normalized);
+    if (persist) persistCopilotWidth(normalized);
   };
 
   return (
-    <aside className='work-copilot' aria-label='Work AI 助手' style={{ width }}>
-      <hr
+    <aside
+      className='work-copilot'
+      aria-label='Work AI 助手'
+      data-office-shortcuts='ignore'
+      style={{ width: renderedWidth }}
+    >
+      <SplitHandle
         className='work-copilot-resizer'
-        tabIndex={0}
-        aria-label='调整 Work AI 助手宽度'
-        aria-orientation='vertical'
-        aria-valuemin={minimumWidth}
-        aria-valuemax={680}
-        aria-valuenow={width}
-        onPointerDown={(event) => {
-          event.preventDefault();
-          const onMove = (moveEvent: PointerEvent) => updateWidth(window.innerWidth - moveEvent.clientX);
-          const onUp = () => {
-            window.removeEventListener('pointermove', onMove);
-            window.removeEventListener('pointerup', onUp);
-            document.body.classList.remove('resizing-work-copilot');
-          };
-          document.body.classList.add('resizing-work-copilot');
-          window.addEventListener('pointermove', onMove);
-          window.addEventListener('pointerup', onUp, { once: true });
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'ArrowLeft') {
-            event.preventDefault();
-            updateWidth(width + 20);
-          } else if (event.key === 'ArrowRight') {
-            event.preventDefault();
-            updateWidth(width - 20);
-          }
-        }}
+        label='调整 Work AI 助手宽度'
+        value={renderedWidth}
+        min={minimumWidth}
+        max={availableMaximumWidth}
+        defaultValue={Math.min(defaultWidth, availableMaximumWidth)}
+        direction='reverse'
+        valueText={(value) => `${value} 像素`}
+        onChange={updateWidth}
+        onCommit={(value) => updateWidth(value, true)}
       />
       <header className='work-copilot-header'>
         <span className='work-copilot-mark'>
@@ -114,12 +110,11 @@ export function WorkCopilot({
         <div>
           <strong>AI 助手</strong>
           <small title={compatibleSession?.workspace || currentPath}>
-            {compatibleSession ? sessionTitle(compatibleSession, state.sessionTitles) : folderLabel || '等待工作区'}
+            {compatibleSession ? sessionTitle(compatibleSession, state.sessionTitles) : folderLabel || '等待选择文件夹'}
           </small>
         </div>
-        <button
-          type='button'
-          aria-label='新建 Work AI 助手对话'
+        <IconButton
+          label='新建 Work AI 助手对话'
           disabled={!workspaceRoot}
           onClick={() => {
             actions.newConversation();
@@ -129,22 +124,25 @@ export function WorkCopilot({
           }}
         >
           <MessageSquarePlus size={15} />
-        </button>
-        <button type='button' aria-label='关闭 Work AI 助手' onClick={onClose}>
+        </IconButton>
+        <IconButton label='关闭 Work AI 助手' onClick={onClose}>
           <X size={16} />
-        </button>
+        </IconButton>
       </header>
       {!workspaceRoot ? (
-        <section className='work-copilot-no-workspace'>
-          <span>
-            <FolderOpen size={22} />
-          </span>
-          <strong>先连接一个本地文件夹</strong>
-          <p>AI 助手会以这个文件夹作为独立工作区，并只在你发送指令后开始工作。</p>
-          <button type='button' onClick={() => void onPickRoot()}>
-            选择文件夹
-          </button>
-        </section>
+        <StateView
+          className='work-copilot-no-workspace'
+          size='compact'
+          tone='info'
+          icon={<FolderOpen size={22} />}
+          title='先连接一个本地文件夹'
+          description='AI 助手会读取这个文件夹，并只在你发送指令后开始工作。'
+          actions={
+            <Button tone='primary' onClick={() => void onPickRoot()}>
+              选择文件夹
+            </Button>
+          }
+        />
       ) : (
         <div className='work-copilot-thread'>
           {proposal && proposalStatus && (
@@ -223,13 +221,33 @@ function WorkCopilotWelcome({
   );
 }
 
-function readCopilotWidth(): number {
+export function readWorkCopilotWidth(): number {
   try {
     const value = Number(localStorage.getItem(widthStorageKey) ?? localStorage.getItem(legacyWidthStorageKey));
     return Number.isFinite(value) && value >= minimumWidth ? value : defaultWidth;
   } catch {
     return defaultWidth;
   }
+}
+
+function workCopilotMaximumWidth(viewportWidth: number): number {
+  const viewportMaximum = Math.min(maximumWidth, viewportWidth * 0.58);
+  if (viewportWidth <= compactOverlayBreakpoint) return minimumWidth;
+  return Math.round(Math.max(minimumWidth, Math.min(viewportMaximum, viewportWidth - splitPaneViewportReserve)));
+}
+
+function clampWorkCopilotWidth(width: number, availableMaximumWidth: number): number {
+  return Math.round(Math.max(minimumWidth, Math.min(availableMaximumWidth, width)));
+}
+
+function useViewportWidth(): number {
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const update = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+  return viewportWidth;
 }
 
 function persistCopilotWidth(width: number): void {

@@ -14,6 +14,7 @@
   display: inline-flex;
   width: 100%;
   height: 27px;
+  min-height: 27px;
   align-items: center;
   justify-content: center;
   gap: 5px;
@@ -94,46 +95,11 @@
   gap: 7px 9px;
 }
 
-.work-spreadsheet-pivot-manager label {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  color: var(--a3s-muted);
-  font-size: 9px;
-}
-
-.work-spreadsheet-pivot-manager input,
-.work-spreadsheet-pivot-manager select {
-  width: 100%;
-  height: 27px;
-  min-width: 0;
-  padding: 0 7px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 5px;
-  outline: 0;
-  background: var(--a3s-bg);
-  color: var(--a3s-ink);
-  font: inherit;
-}
-
-.work-spreadsheet-pivot-manager input:focus,
-.work-spreadsheet-pivot-manager select:focus {
-  border-color: var(--a3s-blue);
-}
-
-.work-spreadsheet-pivot-manager label.check {
+.work-spreadsheet-pivot-manager .work-office-checkbox.check {
   display: flex;
   min-height: 27px;
   align-items: center;
-  flex-direction: row;
   gap: 6px;
-}
-
-.work-spreadsheet-pivot-manager label.check input {
-  width: 13px;
-  height: 13px;
-  padding: 0;
-  accent-color: var(--a3s-blue);
 }
 
 .work-spreadsheet-pivot-layout {
@@ -198,7 +164,7 @@
   gap: 6px;
 }
 
-.work-spreadsheet-pivot-empty {
+.work-spreadsheet-pivot-empty.ds-state-view {
   display: grid;
   align-content: center;
   justify-items: center;
@@ -209,20 +175,15 @@
   text-align: center;
 }
 
-.work-spreadsheet-pivot-empty strong {
-  color: var(--a3s-ink);
+.work-spreadsheet-pivot-empty.ds-state-view h2 {
   font-size: 11px;
 }
 
-.work-spreadsheet-pivot-empty p {
+.work-spreadsheet-pivot-empty.ds-state-view > p {
   max-width: 520px;
   margin: 0;
   font-size: 9px;
   line-height: 1.5;
-}
-
-.work-spreadsheet-pivot-empty .error {
-  color: var(--a3s-red);
 }
 
 @media (max-width: 900px) {

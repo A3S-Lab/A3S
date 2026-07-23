@@ -18,34 +18,7 @@
   bottom: 0;
   left: -4px;
   width: 8px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: col-resize;
-  touch-action: none;
-}
-
-.work-copilot-resizer::after {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 3px;
-  width: 1px;
-  background: transparent;
-  content: "";
-}
-
-.work-copilot-resizer:hover::after,
-.work-copilot-resizer:focus-visible::after,
-.resizing-work-copilot .work-copilot-resizer::after {
-  background: var(--a3s-blue);
-}
-
-.resizing-work-copilot,
-.resizing-work-copilot * {
-  cursor: col-resize !important;
-  user-select: none !important;
+  height: 100%;
 }
 
 .work-copilot-header {
@@ -242,51 +215,23 @@
   font-size: 9px;
 }
 
-.work-agent-proposal-review > header > button {
-  display: grid;
+.work-agent-proposal-review > header > .ds-icon-button {
   width: 28px;
   height: 28px;
   flex: 0 0 28px;
-  padding: 0;
-  place-items: center;
-  border: 0;
   border-radius: 7px;
-  background: transparent;
-  color: var(--a3s-muted);
-  cursor: pointer;
 }
 
-.work-agent-proposal-review > header > button:hover {
-  background: var(--a3s-panel-strong);
-  color: var(--a3s-ink);
-}
-
-.work-agent-proposal-state,
-.work-agent-proposal-result {
-  display: flex;
+.work-agent-proposal-notice.ds-inline-notice {
   min-height: 52px;
-  align-items: center;
-  gap: 8px;
   padding: 11px 13px;
-  color: var(--a3s-muted);
+  border-width: 0 0 1px;
+  border-radius: 0;
+}
+
+.work-agent-proposal-notice .ds-inline-notice-copy {
   font-size: 10px;
   line-height: 1.5;
-}
-
-.work-agent-proposal-state > svg,
-.work-agent-proposal-result > svg {
-  flex: 0 0 auto;
-  color: var(--a3s-blue);
-}
-
-.work-agent-proposal-state.error,
-.work-agent-proposal-result.error {
-  color: var(--a3s-red);
-}
-
-.work-agent-proposal-state.error > svg,
-.work-agent-proposal-result.error > svg {
-  color: var(--a3s-red);
 }
 
 .work-agent-proposal-summary {
@@ -306,14 +251,11 @@
   line-height: 1.55;
 }
 
-.work-agent-proposal-summary button {
+.work-agent-proposal-summary .ds-button {
+  min-height: 24px;
   flex: 0 0 auto;
-  padding: 2px 4px;
-  border: 0;
-  background: transparent;
-  color: var(--a3s-blue);
+  padding-inline: 4px;
   font-size: 9px;
-  cursor: pointer;
 }
 
 .work-agent-proposal-changes {
@@ -388,23 +330,10 @@
   background: color-mix(in srgb, var(--a3s-green) 8%, var(--a3s-panel));
 }
 
-.work-agent-proposal-result {
+.work-agent-proposal-notice.result {
   min-height: 38px;
   padding-block: 8px;
   border-top: 1px solid var(--a3s-line);
-}
-
-.work-agent-proposal-result.success {
-  color: var(--a3s-green);
-}
-
-.work-agent-proposal-result.success > svg {
-  color: var(--a3s-green);
-}
-
-.work-agent-proposal-result.warning,
-.work-agent-proposal-result.warning > svg {
-  color: var(--a3s-warning, #b86f00);
 }
 
 .work-agent-proposal-review > footer {
@@ -419,30 +348,13 @@
   background: var(--a3s-panel-soft);
 }
 
-.work-agent-proposal-review > footer button {
+.work-agent-proposal-review > footer .ds-button {
   min-height: 29px;
-  padding: 0 10px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 7px;
-  background: var(--a3s-panel);
-  color: var(--a3s-muted);
+  padding-inline: 10px;
   font-size: 10px;
-  cursor: pointer;
 }
 
-.work-agent-proposal-review > footer button.primary {
-  border-color: var(--a3s-blue);
-  background: var(--a3s-blue);
-  color: #ffffff;
-}
-
-.work-agent-proposal-review > footer button:disabled {
-  cursor: not-allowed;
-  opacity: 0.4;
-}
-
-.work-copilot-welcome,
-.work-copilot-no-workspace {
+.work-copilot-welcome {
   display: flex;
   min-width: 0;
   min-height: 0;
@@ -464,8 +376,7 @@
   color: var(--a3s-blue);
 }
 
-.work-copilot-welcome h2,
-.work-copilot-no-workspace strong {
+.work-copilot-welcome h2 {
   margin: 0 0 6px;
   color: var(--a3s-ink);
   font-size: 16px;
@@ -473,8 +384,7 @@
   letter-spacing: -0.025em;
 }
 
-.work-copilot-welcome p,
-.work-copilot-no-workspace p {
+.work-copilot-welcome p {
   margin: 0;
   color: var(--a3s-muted);
   font-size: 11px;
@@ -515,22 +425,11 @@
   color: var(--a3s-ink);
 }
 
-.work-copilot-no-workspace {
-  align-items: center;
+.work-copilot-no-workspace.ds-state-view {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
   padding: 30px;
-  text-align: center;
-}
-
-.work-copilot-no-workspace > span {
-  width: 48px;
-  height: 48px;
-  margin-bottom: 13px;
-}
-
-.work-copilot-no-workspace > button {
-  height: 34px;
-  margin-top: 16px;
-  font-size: 11px;
 }
 
 .work-source-copy-banner {
@@ -583,13 +482,14 @@
   min-width: 0;
 }
 
-@media (max-width: 1120px) {
+@media (max-width: 960px) {
   .work-copilot {
     position: absolute;
     top: 0;
     right: 0;
     bottom: 0;
-    max-width: calc(100% - 110px);
+    min-width: min(360px, calc(100% - 64px));
+    max-width: calc(100% - 64px);
     box-shadow: -16px 0 42px rgb(20 24 40 / 14%);
   }
 }

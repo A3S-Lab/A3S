@@ -11,9 +11,9 @@ describe('Spreadsheet chart legend and plot layout editor', () => {
     const onChange = vi.fn();
     render(<SpreadsheetChartPanel content={content} activeSheetId='sheet-layout' onChange={onChange} />);
 
-    fireEvent.change(screen.getByLabelText('图例位置'), { target: { value: 'bottom' } });
+    chooseOfficeOption('图例位置', '底部');
     fireEvent.click(screen.getByLabelText('图例叠加在绘图区'));
-    fireEvent.change(screen.getByLabelText('图表分组方式'), { target: { value: 'percentStacked' } });
+    chooseOfficeOption('图表分组方式', '百分比堆积');
     fireEvent.change(screen.getByLabelText('分类间距（%）'), { target: { value: '240' } });
     fireEvent.change(screen.getByLabelText('系列重叠（%）'), { target: { value: '85' } });
     fireEvent.click(screen.getByRole('button', { name: '保存图表' }));
@@ -44,6 +44,11 @@ describe('Spreadsheet chart legend and plot layout editor', () => {
     });
   });
 });
+
+function chooseOfficeOption(label: string, option: string) {
+  fireEvent.click(screen.getByRole('combobox', { name: label }));
+  fireEvent.click(screen.getByRole('option', { name: option }));
+}
 
 function spreadsheetWithChart(type: 'column' | 'line'): WorkSpreadsheetContent {
   return {

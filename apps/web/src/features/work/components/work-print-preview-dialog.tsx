@@ -1,7 +1,8 @@
 import { AlertTriangle, ChevronLeft, ChevronRight, FileDown, Minus, Plus, Printer } from 'lucide-react';
 import { type CSSProperties, type KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Button, Dialog } from '../../../design-system/primitives';
+import { Button, Dialog, InlineNotice } from '../../../design-system/primitives';
+import { OfficeSelect, OfficeTextField } from '../editors/office-controls';
 import { parseWorkPrintRange } from '../work-print-range';
 import type { WorkArtifact, WorkPresentationPrintLayout } from '../work-types';
 import { workArtifactKindLabel } from '../work-types';
@@ -128,7 +129,7 @@ export function WorkPrintPreviewDialog({
     <Dialog
       className='work-print-preview-dialog'
       title='打印预览'
-      description={`检查 ${workArtifactKindLabel(artifact.kind)}最终分页、页序和输出范围。`}
+      description={`确认${workArtifactKindLabel(artifact.kind)}页面和打印范围。`}
       onClose={onClose}
       closeDisabled={exportingPdf || printing}
       footer={
@@ -169,59 +170,42 @@ export function WorkPrintPreviewDialog({
           </section>
 
           {artifact.content.type === 'presentation' && (
-            <label className='work-print-preview-field'>
+            <div className='work-office-field work-print-preview-field'>
               <span>打印版式</span>
-              <select
-                aria-label='演示打印版式'
+              <OfficeSelect
+                ariaLabel='演示打印版式'
                 value={presentationLayout}
-                onChange={(event) => {
+                options={[
+                  { value: 'slides', label: '整页幻灯片' },
+                  { value: 'notes', label: '备注页' },
+                  { value: 'handout-2', label: '讲义 · 每页 2 张' },
+                  { value: 'handout-3', label: '讲义 · 每页 3 张' },
+                  { value: 'handout-6', label: '讲义 · 每页 6 张' },
+                ]}
+                onValueChange={(layout) => {
                   setCurrentPage(0);
-                  onPresentationLayoutChange(event.target.value as WorkPresentationPrintLayout);
+                  onPresentationLayoutChange(layout as WorkPresentationPrintLayout);
                 }}
-              >
-                <option value='slides'>整页幻灯片</option>
-                <option value='notes'>备注页</option>
-                <option value='handout-2'>讲义 · 每页 2 张</option>
-                <option value='handout-3'>讲义 · 每页 3 张</option>
-                <option value='handout-6'>讲义 · 每页 6 张</option>
-              </select>
-            </label>
+              />
+            </div>
           )}
 
           <fieldset className='work-print-preview-range'>
             <legend>页面范围</legend>
-            <label>
-              <input
-                type='radio'
-                name='work-print-range'
-                checked={rangeMode === 'all'}
-                onChange={() => setRangeMode('all')}
-              />
-              <span>全部页面</span>
-            </label>
-            <label>
-              <input
-                type='radio'
-                name='work-print-range'
-                checked={rangeMode === 'current'}
-                onChange={() => setRangeMode('current')}
-              />
-              <span>当前页面</span>
-            </label>
-            <label>
-              <input
-                type='radio'
-                name='work-print-range'
-                checked={rangeMode === 'custom'}
-                onChange={() => {
-                  setRangeMode('custom');
-                  if (!customRange) setCustomRange(String(currentPage + 1));
-                }}
-              />
-              <span>自定义范围</span>
-            </label>
-            <input
-              type='text'
+            <OfficeSelect
+              ariaLabel='打印页面范围'
+              value={rangeMode}
+              options={[
+                { value: 'all', label: '全部页面' },
+                { value: 'current', label: '当前页面' },
+                { value: 'custom', label: '自定义范围' },
+              ]}
+              onValueChange={(mode) => {
+                setRangeMode(mode as WorkPrintRangeMode);
+                if (mode === 'custom' && !customRange) setCustomRange(String(currentPage + 1));
+              }}
+            />
+            <OfficeTextField
               aria-label='自定义页码范围'
               value={customRange}
               disabled={rangeMode !== 'custom'}
@@ -229,9 +213,9 @@ export function WorkPrintPreviewDialog({
               onChange={(event) => setCustomRange(event.target.value)}
             />
             {rangeError && (
-              <p role='alert' className='work-print-preview-range-error'>
+              <InlineNotice className='work-print-preview-range-error' tone='danger' role='alert'>
                 {rangeError}
-              </p>
+              </InlineNotice>
             )}
           </fieldset>
 

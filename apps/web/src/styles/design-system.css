@@ -17,6 +17,14 @@
     transform 150ms ease;
 }
 
+.ds-button.compact {
+  min-height: 28px;
+  gap: 6px;
+  padding: 0 9px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
 .ds-button.primary {
   background: var(--a3s-action);
   color: var(--a3s-action-ink);
@@ -252,6 +260,18 @@
   border-radius: 12px;
   background: var(--a3s-panel);
   box-shadow: var(--a3s-shadow-soft);
+}
+
+.ds-popover-portal-anchor {
+  position: fixed;
+  z-index: 80;
+  height: 0;
+  min-width: 0;
+}
+
+.ds-popover-panel[data-floating="true"] {
+  top: 0;
+  left: 0;
 }
 
 .ds-popover[data-placement="bottom-start"] > .ds-popover-panel {
@@ -542,6 +562,105 @@ html[data-ds-resizing="horizontal"] * {
   color: var(--a3s-muted);
   font-size: 9px;
   font-weight: 650;
+}
+
+.ds-segmented-control {
+  display: inline-grid;
+  max-width: 100%;
+  min-width: 0;
+  grid-auto-columns: max-content;
+  grid-auto-flow: column;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--a3s-line);
+  border-radius: 9px;
+  background: var(--a3s-panel-soft);
+}
+
+.ds-segmented-control.equal {
+  display: grid;
+  width: 100%;
+  grid-auto-columns: minmax(0, 1fr);
+}
+
+.ds-segmented-control-item {
+  position: relative;
+  min-width: 0;
+  border-radius: 7px;
+  color: var(--a3s-muted);
+  cursor: pointer;
+}
+
+.ds-segmented-control-item > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
+}
+
+.ds-segmented-control-content {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease,
+    color 150ms ease;
+}
+
+.ds-segmented-control.standard .ds-segmented-control-content {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+.ds-segmented-control.compact .ds-segmented-control-content {
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.ds-segmented-control-item:hover:not(:has(input:disabled)) {
+  color: var(--a3s-ink);
+}
+
+.ds-segmented-control-item.selected .ds-segmented-control-content {
+  background: var(--a3s-panel);
+  box-shadow: 0 1px 3px rgb(20 24 40 / 8%);
+  color: var(--a3s-blue);
+}
+
+.ds-segmented-control-item:has(input:focus-visible) .ds-segmented-control-content {
+  outline: 2px solid color-mix(in srgb, var(--a3s-blue) 48%, transparent);
+  outline-offset: 1px;
+}
+
+.ds-segmented-control-item:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.ds-segmented-control-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.ds-segmented-control-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ds-state-view {

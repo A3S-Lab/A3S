@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { codeApi } from '../../lib/api';
 import { useWorkCodeController } from './use-work-code-controller';
 
-describe('Work WebIDE controller', () => {
+describe('Work code file controller', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
@@ -42,5 +42,23 @@ describe('Work WebIDE controller', () => {
     await act(() => result.current.resolveConflict('overwrite'));
     await waitFor(() => expect(result.current.conflict).toBeNull());
     expect(writeFile).toHaveBeenCalledWith('/repo/README.md', '# Local draft\n');
+  });
+
+  it('asks inside the product before closing unsaved files', async () => {
+    vi.spyOn(codeApi, 'readFile').mockResolvedValue({ content: 'before\n' });
+    const confirm = vi.spyOn(window, 'confirm');
+    const { result } = renderHook(() => useWorkCodeController('/repo'));
+
+    await act(() => result.current.openFile({ path: '/repo/notes.md', isBinary: false }));
+    act(() => result.current.updateDraft('/repo/notes.md', 'after\n'));
+    act(() => expect(result.current.closeTab('/repo/notes.md')).toBe(false));
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(result.current.closeRequest).toMatchObject({ kind: 'tab', path: '/repo/notes.md' });
+    expect(result.current.tabs).toHaveLength(1);
+
+    act(() => result.current.confirmCloseRequest());
+    expect(result.current.closeRequest).toBeNull();
+    expect(result.current.tabs).toHaveLength(0);
   });
 });

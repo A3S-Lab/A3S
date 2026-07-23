@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceEntry } from '../../types/api';
-import { createWorkArtifact } from './work-templates';
 import { loadWorkQuickLook, type WorkQuickLookApi } from './work-quick-look-loader';
+import { createWorkArtifact } from './work-templates';
 
 const fileIo = vi.hoisted(() => ({
   importWorkFile: vi.fn(),
@@ -74,7 +74,7 @@ describe('Work Quick Look loader', () => {
     );
     const unknown = await loadWorkQuickLook(entry({ name: 'Model.bin', path: '/docs/Model.bin' }), api);
 
-    expect(oversized).toMatchObject({ kind: 'unsupported', reason: expect.stringContaining('50 MiB') });
+    expect(oversized).toMatchObject({ kind: 'unsupported', reason: expect.stringContaining('50 MB') });
     expect(unknown).toMatchObject({ kind: 'unsupported', reason: expect.stringContaining('没有安全的内置预览器') });
     expect(api.readBinaryFile).not.toHaveBeenCalled();
   });

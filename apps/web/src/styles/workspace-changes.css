@@ -149,53 +149,57 @@
   font-size: 11px;
 }
 
-.changes-empty {
-  display: flex;
+.changes-state.ds-state-view {
   min-height: 120px;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
   padding: 18px;
-  flex-direction: column;
-  color: var(--a3s-faint);
-  font-size: 10px;
-  text-align: center;
 }
 
-.changes-error strong {
-  color: var(--a3s-ink);
+.changes-state .ds-state-view-icon {
+  width: 36px;
+  height: 36px;
+  margin-bottom: 9px;
+  border-radius: 10px;
+}
+
+.changes-state.ds-state-view h2 {
   font-size: 11px;
+  line-height: 17px;
 }
 
-.changes-error span {
+.changes-state.ds-state-view > p {
   max-width: 240px;
+  font-size: 10px;
   line-height: 1.5;
 }
 
-.changes-inline-error {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
+.changes-state .ds-state-view-actions {
+  margin-top: 11px;
+}
+
+.changes-state .ds-button {
+  min-height: 28px;
+  padding-inline: 9px;
+  font-size: 10px;
+}
+
+.changes-inline-notice.ds-inline-notice {
   padding: 7px 9px;
+  gap: 6px;
   border-bottom: 1px solid color-mix(in srgb, var(--a3s-red) 20%, var(--a3s-line));
-  background: color-mix(in srgb, var(--a3s-red) 5%, var(--a3s-panel));
-  color: var(--a3s-red);
+  border-radius: 0;
   font-size: 9px;
   line-height: 1.45;
 }
 
-.changes-inline-error span {
-  min-width: 0;
-  flex: 1;
+.changes-inline-notice .ds-inline-notice-copy {
+  font-size: 9px;
+  line-height: 1.45;
 }
 
-.changes-inline-error button {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
+.changes-inline-notice .ds-button {
+  min-height: 22px;
+  padding-inline: 4px;
   font-size: 9px;
-  font-weight: 650;
 }
 
 .commit-receipt {

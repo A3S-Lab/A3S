@@ -2,8 +2,8 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { codeApi } from '../../lib/api';
 import type { WorkspaceEntry } from '../../types/api';
-import { readWorkLocalFileBinding, saveWorkLocalFileBinding } from './work-local-file-binding';
 import { useWorkFilesController } from './use-work-files-controller';
+import { readWorkLocalFileBinding, saveWorkLocalFileBinding } from './work-local-file-binding';
 
 const folder: WorkspaceEntry = {
   name: 'Reports',
@@ -89,6 +89,39 @@ describe('Work local file controller', () => {
       rootPath: '/work-choice',
       rootSource: 'user',
     });
+    expect(result.current.recentRootPaths).toEqual(['/work-choice', '/code-default']);
+  });
+
+  it('switches among recent Work workspaces without replacing the current root on failure', async () => {
+    localStorage.setItem(
+      'a3s-work.local-files',
+      JSON.stringify({
+        rootPath: '/docs',
+        rootSource: 'user',
+        recentRootPaths: ['/docs', '/archive'],
+        currentPath: '/docs',
+        layout: 'grid',
+        sort: { key: 'name', direction: 'ascending' },
+      })
+    );
+    const readDir = vi.spyOn(codeApi, 'readDir').mockImplementation(async (path) => {
+      if (path === '/missing') throw new Error('not found');
+      return [];
+    });
+    const { result } = renderHook(() => useWorkFilesController());
+    await waitFor(() => expect(readDir).toHaveBeenCalledWith('/docs'));
+
+    await act(async () => {
+      expect(await result.current.selectRoot('/archive')).toBe('/archive');
+    });
+    await waitFor(() => expect(result.current.rootPath).toBe('/archive'));
+    expect(result.current.recentRootPaths).toEqual(['/archive', '/docs']);
+
+    await act(async () => {
+      expect(await result.current.selectRoot('/missing')).toBeNull();
+    });
+    expect(result.current.rootPath).toBe('/archive');
+    expect(result.current.recentRootPaths).toEqual(['/archive', '/docs']);
   });
 
   it('persists a picked root and maintains Finder-style navigation history', async () => {
@@ -185,6 +218,39 @@ describe('Work local file controller', () => {
     expect(renamePath).toHaveBeenCalledWith('/docs/Reports', '/docs/Research');
     expect(readWorkLocalFileBinding('artifact-report')?.path).toBe('/docs/Research/Plan.docx');
     expect(readDir.mock.calls.filter(([path]) => path === '/docs').length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('permanently deletes confirmed entries and clears related local state', async () => {
+    localStorage.setItem(
+      'a3s-work.local-files',
+      JSON.stringify({
+        rootPath: '/docs',
+        currentPath: '/docs',
+        favoritePaths: ['/docs/Reports'],
+        layout: 'grid',
+        sort: { key: 'name', direction: 'ascending' },
+      })
+    );
+    vi.spyOn(codeApi, 'readDir').mockResolvedValue([folder, report]);
+    const deletePath = vi.spyOn(codeApi, 'deletePath').mockResolvedValue({ success: true });
+    saveWorkLocalFileBinding({
+      artifactId: 'artifact-report',
+      path: '/docs/Reports/Plan.docx',
+      fingerprint: 'sha256:plan',
+      size: 10,
+      updatedAt: Date.now(),
+    });
+    const { result } = renderHook(() => useWorkFilesController());
+    await waitFor(() => expect(result.current.visibleEntries).toHaveLength(2));
+
+    await act(async () => {
+      await result.current.deleteEntries([folder, report]);
+    });
+
+    expect(deletePath.mock.calls).toEqual([['/docs/Reports'], ['/docs/Plan.docx']]);
+    expect(readWorkLocalFileBinding('artifact-report')).toBeNull();
+    expect(result.current.favoritePaths).toEqual([]);
+    expect(result.current.selectedPaths).toEqual(new Set());
   });
 
   it('persists Finder sidebar favorites and rebases them after folder moves', async () => {

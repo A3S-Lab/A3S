@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { CollectionState } from '../../../design-system/primitives';
 import {
   type WorkSpreadsheetChartType,
   type WorkSpreadsheetErrorBarDirection,
@@ -8,6 +9,7 @@ import {
   type WorkSpreadsheetErrorBarValueType,
   workSpreadsheetChartUsesNumericXAxis,
 } from '../work-types';
+import { OfficeCheckbox, OfficeNumberField, OfficeSelect, OfficeTextField } from './office-controls';
 
 interface SpreadsheetErrorBarEditorProps {
   chartType: WorkSpreadsheetChartType;
@@ -57,7 +59,11 @@ export function SpreadsheetErrorBarEditor({
           </button>
         </div>
       </header>
-      {!errorBars.length && <p>添加固定值、百分比、统计或自定义范围误差线。</p>}
+      {!errorBars.length && (
+        <CollectionState className='work-spreadsheet-error-bars-empty' role='status'>
+          添加固定值、百分比、统计或自定义范围误差线。
+        </CollectionState>
+      )}
       {errorBars.map((item, index) => {
         const errorBarNumber = index + 1;
         const labelPrefix = `系列 ${seriesNumber} 误差线 ${errorBarNumber}`;
@@ -66,91 +72,90 @@ export function SpreadsheetErrorBarEditor({
             <legend>
               {item.direction.toUpperCase()} 误差线 {errorBarNumber}
             </legend>
-            <label>
+            <div className='work-office-field'>
               <span>方向</span>
-              <select
-                aria-label={`${labelPrefix} 方向`}
+              <OfficeSelect
+                ariaLabel={`${labelPrefix} 方向`}
                 value={item.direction}
-                onChange={(event) =>
-                  replaceErrorBars(index, { direction: event.target.value as WorkSpreadsheetErrorBarDirection })
+                options={[
+                  ...(workSpreadsheetChartUsesNumericXAxis(chartType) ? [{ value: 'x', label: 'X' } as const] : []),
+                  { value: 'y', label: 'Y' },
+                ]}
+                onValueChange={(direction) =>
+                  replaceErrorBars(index, { direction: direction as WorkSpreadsheetErrorBarDirection })
                 }
-              >
-                {workSpreadsheetChartUsesNumericXAxis(chartType) && <option value='x'>X</option>}
-                <option value='y'>Y</option>
-              </select>
-            </label>
-            <label>
+              />
+            </div>
+            <div className='work-office-field'>
               <span>误差类型</span>
-              <select
-                aria-label={`${labelPrefix} 误差类型`}
+              <OfficeSelect
+                ariaLabel={`${labelPrefix} 误差类型`}
                 value={item.barType}
-                onChange={(event) =>
-                  replaceErrorBars(index, { barType: event.target.value as WorkSpreadsheetErrorBarType })
+                options={[
+                  { value: 'both', label: '双向' },
+                  { value: 'plus', label: '正向' },
+                  { value: 'minus', label: '负向' },
+                ]}
+                onValueChange={(barType) =>
+                  replaceErrorBars(index, { barType: barType as WorkSpreadsheetErrorBarType })
                 }
-              >
-                <option value='both'>双向</option>
-                <option value='plus'>正向</option>
-                <option value='minus'>负向</option>
-              </select>
-            </label>
-            <label>
+              />
+            </div>
+            <div className='work-office-field'>
               <span>计算方式</span>
-              <select
-                aria-label={`${labelPrefix} 计算方式`}
+              <OfficeSelect
+                ariaLabel={`${labelPrefix} 计算方式`}
                 value={item.valueType}
-                onChange={(event) =>
-                  replaceErrorBars(
-                    index,
-                    errorBarsWithValueType(item, event.target.value as WorkSpreadsheetErrorBarValueType)
-                  )
+                options={[
+                  { value: 'fixedValue', label: '固定值' },
+                  { value: 'percentage', label: '百分比' },
+                  { value: 'standardDeviation', label: '标准差' },
+                  { value: 'standardError', label: '标准误差' },
+                  { value: 'custom', label: '自定义范围' },
+                ]}
+                onValueChange={(valueType) =>
+                  replaceErrorBars(index, errorBarsWithValueType(item, valueType as WorkSpreadsheetErrorBarValueType))
                 }
-              >
-                <option value='fixedValue'>固定值</option>
-                <option value='percentage'>百分比</option>
-                <option value='standardDeviation'>标准差</option>
-                <option value='standardError'>标准误差</option>
-                <option value='custom'>自定义范围</option>
-              </select>
-            </label>
+              />
+            </div>
             {(item.valueType === 'fixedValue' ||
               item.valueType === 'percentage' ||
               item.valueType === 'standardDeviation') && (
-              <label>
+              <div className='work-office-field'>
                 <span>{item.valueType === 'percentage' ? '百分比（%）' : '数值'}</span>
-                <input
-                  type='number'
-                  aria-label={`${labelPrefix} 数值`}
+                <OfficeNumberField
+                  ariaLabel={`${labelPrefix} 数值`}
                   min={0}
-                  step='any'
+                  step={0.1}
                   value={item.value ?? (item.valueType === 'percentage' ? 5 : 1)}
-                  onChange={(event) => replaceErrorBars(index, { value: optionalNumber(event.target.value) })}
+                  onValueChange={(value) => replaceErrorBars(index, { value: optionalNumber(value) })}
                 />
-              </label>
+              </div>
             )}
             {item.valueType === 'custom' && item.barType !== 'minus' && customInput === 'references' && (
-              <label className='error-reference'>
+              <div className='work-office-field error-reference'>
                 <span>正误差引用</span>
-                <input
+                <OfficeTextField
                   aria-label={`${labelPrefix} 正误差引用`}
                   value={item.plusReference ?? ''}
                   placeholder="'报告'!$C$2:$C$8"
                   onChange={(event) => replaceErrorBars(index, { plusReference: event.target.value })}
                 />
-              </label>
+              </div>
             )}
             {item.valueType === 'custom' && item.barType !== 'plus' && customInput === 'references' && (
-              <label className='error-reference'>
+              <div className='work-office-field error-reference'>
                 <span>负误差引用</span>
-                <input
+                <OfficeTextField
                   aria-label={`${labelPrefix} 负误差引用`}
                   value={item.minusReference ?? ''}
                   placeholder="'报告'!$D$2:$D$8"
                   onChange={(event) => replaceErrorBars(index, { minusReference: event.target.value })}
                 />
-              </label>
+              </div>
             )}
             {item.valueType === 'custom' && item.barType !== 'minus' && customInput === 'values' && (
-              <label className='error-reference' htmlFor={`work-error-values-${seriesNumber}-${errorBarNumber}-plus`}>
+              <div className='work-office-field error-reference'>
                 <span>正误差值</span>
                 <CustomErrorValuesInput
                   label={`${labelPrefix} 正误差值`}
@@ -165,10 +170,10 @@ export function SpreadsheetErrorBarEditor({
                   }
                 />
                 {item.plusReference && <small title={item.plusReference}>已保留导入引用：{item.plusReference}</small>}
-              </label>
+              </div>
             )}
             {item.valueType === 'custom' && item.barType !== 'plus' && customInput === 'values' && (
-              <label className='error-reference' htmlFor={`work-error-values-${seriesNumber}-${errorBarNumber}-minus`}>
+              <div className='work-office-field error-reference'>
                 <span>负误差值</span>
                 <CustomErrorValuesInput
                   label={`${labelPrefix} 负误差值`}
@@ -185,17 +190,16 @@ export function SpreadsheetErrorBarEditor({
                 {item.minusReference && (
                   <small title={item.minusReference}>已保留导入引用：{item.minusReference}</small>
                 )}
-              </label>
+              </div>
             )}
-            <label className='check'>
-              <input
-                type='checkbox'
-                aria-label={`${labelPrefix} 显示端帽`}
-                checked={item.showEndCaps !== false}
-                onChange={(event) => replaceErrorBars(index, { showEndCaps: event.target.checked })}
-              />
-              <span>显示端帽</span>
-            </label>
+            <OfficeCheckbox
+              className='check'
+              ariaLabel={`${labelPrefix} 显示端帽`}
+              checked={item.showEndCaps !== false}
+              onCheckedChange={(showEndCaps) => replaceErrorBars(index, { showEndCaps })}
+            >
+              显示端帽
+            </OfficeCheckbox>
             <button
               type='button'
               className='remove-error-bars'
@@ -240,7 +244,7 @@ function CustomErrorValuesInput({
   const [draft, setDraft] = useState(serialized);
   useEffect(() => setDraft(serialized), [serialized]);
   return (
-    <input
+    <OfficeTextField
       id={id}
       aria-label={label}
       value={draft}

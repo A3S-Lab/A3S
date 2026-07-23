@@ -71,7 +71,7 @@ export function useDialogFocusScope<T extends HTMLElement>({
     }
     if (event.key !== 'Tab') {
       const commandKey = event.metaKey || event.ctrlKey;
-      if (commandKey && ['f', 'h', 'p', 's'].includes(event.key.toLocaleLowerCase())) event.preventDefault();
+      if (commandKey && ['f', 'h', 'k', 'n', 'p', 's'].includes(event.key.toLocaleLowerCase())) event.preventDefault();
       if (commandKey || event.altKey) event.stopPropagation();
       return;
     }

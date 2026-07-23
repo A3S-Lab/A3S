@@ -1,13 +1,13 @@
 import { ChevronLeft, ChevronRight, FileQuestion } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Dialog } from '../../../design-system/primitives';
+import { Button, Dialog, StateView } from '../../../design-system/primitives';
 import { formatApiError } from '../../../state/app-state';
 import type { WorkspaceEntry } from '../../../types/api';
-import { WorkDocumentPreview } from './work-document-pages';
 import { PresentationEditor } from '../editors/presentation-editor';
 import { formatWorkFileDate, formatWorkFileSize, isWorkImportablePath, workFileKindLabel } from '../work-local-files';
 import { loadWorkQuickLook, type WorkQuickLookContent } from '../work-quick-look-loader';
 import type { WorkArtifact } from '../work-types';
+import { WorkDocumentPreview } from './work-document-pages';
 import { WorkFileIcon } from './work-file-icon';
 
 const SpreadsheetEditor = lazy(() =>
@@ -90,7 +90,7 @@ export function WorkQuickLook({
                 void onOpen(entry);
               }}
             >
-              {entry.isDirectory ? '打开文件夹' : '在 Work 中打开'}
+              {entry.isDirectory ? '打开文件夹' : '打开'}
             </Button>
           )}
         </div>
@@ -119,18 +119,19 @@ export function WorkQuickLook({
           {entry.path}
         </span>
         {error ? (
-          <section className='work-quick-look-state error' role='alert'>
-            <FileQuestion size={30} />
-            <strong>无法生成预览</strong>
-            <p>{error}</p>
-          </section>
+          <StateView
+            className='work-quick-look-state'
+            size='compact'
+            tone='danger'
+            role='alert'
+            icon={<FileQuestion size={30} />}
+            title='无法生成预览'
+            description={error}
+          />
         ) : preview ? (
           <QuickLookContent entry={entry} preview={preview} />
         ) : (
-          <output className='work-quick-look-state'>
-            <span className='work-state-spinner' />
-            正在生成预览…
-          </output>
+          <StateView className='work-quick-look-state' size='compact' role='status' title='正在生成预览…' />
         )}
       </section>
     </Dialog>
@@ -140,20 +141,24 @@ export function WorkQuickLook({
 function QuickLookContent({ entry, preview }: { entry: WorkspaceEntry; preview: WorkQuickLookContent }) {
   if (preview.kind === 'directory') {
     return (
-      <section className='work-quick-look-state directory'>
-        <WorkFileIcon path={entry.path} directory size={72} />
-        <strong>{entry.name}</strong>
-        <p>Quick Look 不会递归读取文件夹内容；打开文件夹后可以继续浏览。</p>
-      </section>
+      <StateView
+        className='work-quick-look-state directory'
+        size='compact'
+        icon={<WorkFileIcon path={entry.path} directory size={32} />}
+        title={entry.name}
+        description='快速查看不会读取文件夹内的内容；打开文件夹后可以继续浏览。'
+      />
     );
   }
   if (preview.kind === 'unsupported') {
     return (
-      <section className='work-quick-look-state unsupported'>
-        <FileQuestion size={38} />
-        <strong>没有内容预览</strong>
-        <p>{preview.reason}</p>
-      </section>
+      <StateView
+        className='work-quick-look-state unsupported'
+        size='compact'
+        icon={<FileQuestion size={38} />}
+        title='没有内容预览'
+        description={preview.reason}
+      />
     );
   }
   if (preview.kind === 'text') {
@@ -181,7 +186,11 @@ function QuickLookImage({ blob, name }: { blob: Blob; name: string }) {
 function QuickLookPdf({ blob }: { blob: Blob }) {
   const loadSource = useCallback(async () => blob, [blob]);
   return (
-    <Suspense fallback={<output className='work-quick-look-state'>正在准备 PDF 预览器…</output>}>
+    <Suspense
+      fallback={
+        <StateView className='work-quick-look-state' size='compact' role='status' title='正在准备 PDF 预览器…' />
+      }
+    >
       <PdfViewer loadSource={loadSource} />
     </Suspense>
   );
@@ -192,12 +201,16 @@ function QuickLookArtifact({ artifact }: { artifact: WorkArtifact }) {
     <section className={`work-quick-look-artifact ${artifact.kind}`} aria-label={`${artifact.title} 预览`}>
       {artifact.compatibility?.issues.length ? (
         <output className='work-quick-look-compatibility'>
-          此文件有 {artifact.compatibility.issues.length} 条兼容性提示；Quick Look 不会保存转换结果。
+          此文件有 {artifact.compatibility.issues.length} 条兼容性提示；快速查看不会保存转换结果。
         </output>
       ) : null}
       {artifact.content.type === 'document' && <WorkDocumentPreview content={artifact.content} />}
       {artifact.content.type === 'spreadsheet' && (
-        <Suspense fallback={<output className='work-quick-look-state'>正在准备表格预览器…</output>}>
+        <Suspense
+          fallback={
+            <StateView className='work-quick-look-state' size='compact' role='status' title='正在准备表格预览器…' />
+          }
+        >
           <SpreadsheetEditor content={artifact.content} preview onChange={ignoreArtifactChange} />
         </Suspense>
       )}

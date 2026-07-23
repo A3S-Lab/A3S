@@ -1,18 +1,7 @@
-import {
-  Clock3,
-  Files,
-  Folder,
-  FolderOpen,
-  HardDrive,
-  Home,
-  PanelLeftClose,
-  Presentation,
-  Sheet,
-  Star,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { Clock3, Files, FolderOpen, HardDrive, Home, Presentation, Sheet, Star, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
+import { SidebarProductHeader } from '../../../components/sidebar-product-header';
+import { Button, IconButton } from '../../../design-system/primitives';
 import { hasDraggedWorkspaceFiles } from '../../workspace/workspace-drop-import';
 import {
   canMoveLocalPaths,
@@ -22,12 +11,15 @@ import {
   sameLocalPath,
 } from '../work-local-files';
 import type { WorkFolder, WorkLibraryView } from '../work-types';
+import { WorkFileIcon } from './work-file-icon';
+import { WorkWorkspaceSwitcher } from './work-workspace-switcher';
 
 interface WorkSidebarProps {
   surface: 'files' | 'library';
   localRootName: string;
   localRootPath: string;
   localCurrentPath: string;
+  recentRootPaths: string[];
   localFavoritePaths: string[];
   view: WorkLibraryView;
   totalCount: number;
@@ -38,11 +30,13 @@ interface WorkSidebarProps {
   onChangeView: (view: WorkLibraryView) => void;
   onOpenFolder: (id: string) => void;
   onOpenLocalFiles: () => void;
+  onSelectWorkspace: (path: string) => Promise<string | null>;
+  onPickWorkspace: () => Promise<string | null>;
   onOpenLocalFavorite: (path: string) => void;
   onRemoveLocalFavorite: (path: string) => void;
   onMoveLocalEntries: (paths: string[], destinationDirectory: string) => void | Promise<void>;
   onImportLocalDrop: (dataTransfer: DataTransfer, destinationDirectory: string) => void | Promise<unknown>;
-  onPickWorkspace: () => void;
+  onCollapse: () => void;
   onCreate: (templateId: string) => void;
   onImport: () => void;
 }
@@ -52,6 +46,7 @@ export function WorkSidebar({
   localRootName,
   localRootPath,
   localCurrentPath,
+  recentRootPaths,
   localFavoritePaths,
   view,
   totalCount,
@@ -62,11 +57,13 @@ export function WorkSidebar({
   onChangeView,
   onOpenFolder,
   onOpenLocalFiles,
+  onSelectWorkspace,
+  onPickWorkspace,
   onOpenLocalFavorite,
   onRemoveLocalFavorite,
   onMoveLocalEntries,
   onImportLocalDrop,
-  onPickWorkspace,
+  onCollapse,
   onCreate,
   onImport,
 }: WorkSidebarProps) {
@@ -115,21 +112,15 @@ export function WorkSidebar({
     setExternalDropTargetPath(null);
   };
   return (
-    <aside className='work-sidebar' aria-label='Work 文件导航'>
-      <header>
-        <div>
-          <strong>A3S Work</strong>
-          <span>本地文件工作台</span>
-        </div>
-        <button type='button' className='work-icon-button' aria-label='Work 文件导航保持展开' disabled>
-          <PanelLeftClose size={16} />
-        </button>
-      </header>
+    <aside className='work-sidebar' aria-label='办公文件导航'>
+      <SidebarProductHeader title='办公' onCollapse={onCollapse} />
 
-      <button type='button' className='work-create-primary' onClick={onPickWorkspace}>
-        <FolderOpen size={16} />
-        {localRootPath ? '切换工作区' : '打开文件夹'}
-      </button>
+      <WorkWorkspaceSwitcher
+        rootPath={localRootPath}
+        recentPaths={recentRootPaths}
+        onSelect={onSelectWorkspace}
+        onPick={onPickWorkspace}
+      />
 
       <nav aria-label='文件范围'>
         <span className='work-sidebar-section-label'>位置</span>
@@ -142,7 +133,7 @@ export function WorkSidebar({
           onDrop={(event) => finishDrop(event, localRootPath)}
         >
           <HardDrive size={16} />
-          <span>{localRootName || '本地文件'}</span>
+          <span>{localRootName ? '全部文件' : '本地文件'}</span>
         </button>
         {localFavoritePaths.length > 0 && (
           <section className='work-sidebar-local-favorites' aria-label='本地收藏文件夹'>
@@ -161,31 +152,30 @@ export function WorkSidebar({
                     onDragLeave={clearDropTarget}
                     onDrop={(event) => finishDrop(event, path)}
                   >
-                    <Folder size={15} />
+                    <WorkFileIcon path={path} directory size={17} />
                     <span>{label}</span>
                   </button>
-                  <button
-                    type='button'
+                  <IconButton
                     className='work-sidebar-favorite-remove'
-                    aria-label={`从侧边栏移除 ${label}`}
-                    title='从侧边栏移除'
+                    label={`从侧边栏移除 ${label}`}
+                    tooltip='从侧边栏移除'
                     onClick={() => onRemoveLocalFavorite(path)}
                   >
                     <X size={12} />
-                  </button>
+                  </IconButton>
                 </div>
               );
             })}
           </section>
         )}
-        <span className='work-sidebar-section-label library'>恢复与副本</span>
+        <span className='work-sidebar-section-label library'>我的文件</span>
         <button
           type='button'
           className={surface === 'library' && view === 'home' ? 'active' : ''}
           onClick={() => onChangeView('home')}
         >
           <Home size={16} />
-          <span>工作副本</span>
+          <span>我的文档</span>
         </button>
         <button
           type='button'
@@ -226,7 +216,7 @@ export function WorkSidebar({
               className={surface === 'library' && view === 'folder' && activeFolderId === folder.id ? 'active' : ''}
               onClick={() => onOpenFolder(folder.id)}
             >
-              <Folder size={15} />
+              <WorkFileIcon path={folder.name} directory size={17} />
               <span>{folder.name}</span>
             </button>
           ))}
@@ -235,24 +225,24 @@ export function WorkSidebar({
 
       <section className='work-sidebar-create' aria-label='快速新建'>
         <span>快速新建</span>
-        <button type='button' onClick={() => onCreate('blank-document')}>
+        <Button tone='quiet' onClick={() => onCreate('blank-document')}>
           <Files size={15} />
           文字
-        </button>
-        <button type='button' onClick={() => onCreate('blank-spreadsheet')}>
+        </Button>
+        <Button tone='quiet' onClick={() => onCreate('blank-spreadsheet')}>
           <Sheet size={15} />
           表格
-        </button>
-        <button type='button' onClick={() => onCreate('blank-presentation')}>
+        </Button>
+        <Button tone='quiet' onClick={() => onCreate('blank-presentation')}>
           <Presentation size={15} />
           演示
-        </button>
+        </Button>
       </section>
 
-      <button type='button' className='work-sidebar-import' onClick={onImport}>
+      <Button tone='secondary' className='work-sidebar-import' onClick={onImport}>
         <FolderOpen size={15} />
-        导入到 Work 副本
-      </button>
+        导入文件
+      </Button>
     </aside>
   );
 }

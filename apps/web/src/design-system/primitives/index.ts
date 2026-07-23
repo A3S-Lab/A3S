@@ -1,4 +1,4 @@
-export { Button, type ButtonTone } from './button/button';
+export { Button, type ButtonSize, type ButtonTone } from './button/button';
 export { IconButton } from './button/icon-button';
 export { ModelCombobox } from './combobox/model-combobox';
 export { Dialog } from './dialog/dialog';
@@ -10,6 +10,7 @@ export { SearchField } from './form/search-field';
 export { PageHeader } from './layout/page-header';
 export { SplitHandle } from './layout/split-handle';
 export { type TabNavigationItem, useTabNavigation } from './navigation/tab-navigation';
+export { SegmentedControl, type SegmentedControlItem } from './navigation/segmented-control';
 export { type TabItem, Tabs } from './navigation/tabs';
 export { type DialogFocusScopeOptions, useDialogFocusScope } from './overlay/dialog-focus-scope';
 export { Popover, type PopoverTriggerProps } from './overlay/popover';

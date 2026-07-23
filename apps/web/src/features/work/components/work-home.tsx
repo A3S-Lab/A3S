@@ -6,20 +6,25 @@ import {
   FolderPlus,
   Grid2X2,
   List,
+  LoaderCircle,
   MoreHorizontal,
   Pencil,
   Presentation,
   RotateCcw,
-  Search,
   Sheet,
   Star,
   Trash2,
   Upload,
 } from 'lucide-react';
-import { type CSSProperties, useMemo, useState } from 'react';
+import { type CSSProperties, useMemo, useRef, useState } from 'react';
+import { Button, IconButton, SearchField, StateView } from '../../../design-system/primitives';
+import { OfficeSelect } from '../editors/office-controls';
 import { WORK_TEMPLATES } from '../work-templates';
 import type { WorkArtifact, WorkArtifactKind, WorkFolder, WorkLibraryView } from '../work-types';
 import { workArtifactExtension, workArtifactKindLabel } from '../work-types';
+import { WorkFileIcon } from './work-file-icon';
+import { type WorkLibraryOperation, WorkLibraryOperationDialog } from './work-library-operation-dialog';
+import { WorkSidebarOpenButton } from './work-sidebar-open-button';
 
 interface WorkHomeProps {
   artifacts: WorkArtifact[];
@@ -28,6 +33,8 @@ interface WorkHomeProps {
   activeFolderId: string | null;
   loading: boolean;
   error: string | null;
+  sidebarOpen: boolean;
+  onOpenSidebar: () => void;
   onCreate: (templateId: string) => void;
   onOpen: (id: string) => void;
   onImport: () => void;
@@ -52,6 +59,8 @@ export function WorkHome({
   activeFolderId,
   loading,
   error,
+  sidebarOpen,
+  onOpenSidebar,
   onCreate,
   onOpen,
   onImport,
@@ -70,6 +79,7 @@ export function WorkHome({
 }: WorkHomeProps) {
   const [query, setQuery] = useState('');
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
+  const [operation, setOperation] = useState<WorkLibraryOperation | null>(null);
   const visibleArtifacts = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return artifacts.filter((artifact) => {
@@ -98,43 +108,44 @@ export function WorkHome({
           ? '回收站'
           : view === 'folder'
             ? (activeFolder?.name ?? '文件夹')
-            : '工作副本';
+            : '我的文档';
+  const confirmOperation = (value?: string) => {
+    if (!operation) return;
+    if (operation.kind === 'create-folder' && value) onCreateFolder(value);
+    else if (operation.kind === 'rename-folder' && value && value !== operation.folder.name) {
+      onRenameFolder(operation.folder.id, value);
+    } else if (operation.kind === 'rename-artifact' && value && value !== operation.artifact.title) {
+      onRename(operation.artifact.id, value);
+    } else if (operation.kind === 'delete-folder') onDeleteFolder(operation.folder);
+    else if (operation.kind === 'delete-artifact') onDelete(operation.artifact);
+    setOperation(null);
+  };
 
   return (
     <section className='work-home'>
       <header className='work-home-header'>
-        <div>
-          <p>WORKSPACE</p>
+        <div className='work-home-title'>
+          {!sidebarOpen && <WorkSidebarOpenButton onOpen={onOpenSidebar} />}
           <h1>{heading}</h1>
-          <span>{view === 'home' ? '用于兼容编辑、自动保存与版本恢复' : '继续处理上次的内容'}</span>
         </div>
         <div className='work-home-header-actions'>
-          <label className='work-search'>
-            <Search size={15} />
-            <input
-              type='search'
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder='搜索文件'
-              aria-label='搜索 Work 文件'
-            />
-          </label>
-          <button type='button' className='work-secondary-button' onClick={onImport}>
+          <SearchField
+            className='work-search'
+            label='搜索文件'
+            clearLabel='清除文件搜索'
+            value={query}
+            placeholder='搜索文件'
+            onValueChange={setQuery}
+          />
+          <Button onClick={onImport}>
             <Upload size={15} />
             打开文件
-          </button>
+          </Button>
           {(view === 'home' || view === 'folder') && (
-            <button
-              type='button'
-              className='work-secondary-button'
-              onClick={() => {
-                const name = window.prompt('文件夹名称');
-                if (name?.trim()) onCreateFolder(name);
-              }}
-            >
+            <Button onClick={() => setOperation({ kind: 'create-folder' })}>
               <FolderPlus size={15} />
               新建文件夹
-            </button>
+            </Button>
           )}
         </div>
       </header>
@@ -185,12 +196,9 @@ export function WorkHome({
                 key={folder.id}
                 folder={folder}
                 onOpen={() => onOpenFolder(folder.id)}
-                onRename={() => {
-                  const name = window.prompt('重命名文件夹', folder.name);
-                  if (name?.trim() && name.trim() !== folder.name) onRenameFolder(folder.id, name);
-                }}
+                onRename={() => setOperation({ kind: 'rename-folder', folder })}
                 onRestore={() => onRestoreFolder(folder.id)}
-                onDelete={() => onDeleteFolder(folder)}
+                onDelete={() => setOperation({ kind: 'delete-folder', folder })}
               />
             ))}
           </div>
@@ -205,38 +213,44 @@ export function WorkHome({
           </div>
           <fieldset className='work-layout-toggle'>
             <legend className='sr-only'>文件布局</legend>
-            <button
-              type='button'
+            <IconButton
+              label='网格视图'
+              selected={layout === 'grid'}
               className={layout === 'grid' ? 'active' : ''}
-              aria-label='网格视图'
               onClick={() => setLayout('grid')}
             >
               <Grid2X2 size={14} />
-            </button>
-            <button
-              type='button'
+            </IconButton>
+            <IconButton
+              label='列表视图'
+              selected={layout === 'list'}
               className={layout === 'list' ? 'active' : ''}
-              aria-label='列表视图'
               onClick={() => setLayout('list')}
             >
               <List size={15} />
-            </button>
+            </IconButton>
           </fieldset>
         </div>
 
         {loading ? (
-          <output className='work-files-state'>
-            <span className='work-state-spinner' />
-            正在读取文件…
-          </output>
+          <StateView
+            className='work-home-state'
+            size='compact'
+            role='status'
+            icon={<LoaderCircle className='spin' size={18} />}
+            title='正在读取文件…'
+          />
         ) : error ? (
-          <div className='work-files-state error'>
-            <strong>无法读取 Work 文件</strong>
-            <span>{error}</span>
-            <button type='button' onClick={onRetry}>
-              重试
-            </button>
-          </div>
+          <StateView
+            className='work-home-state'
+            size='compact'
+            tone='danger'
+            role='alert'
+            icon={<FileText size={22} />}
+            title='无法读取 Work 文件'
+            description={error}
+            actions={<Button onClick={onRetry}>重试</Button>}
+          />
         ) : visibleArtifacts.length ? (
           <div className={`work-artifact-${layout}`}>
             {visibleArtifacts.map((artifact) => (
@@ -246,33 +260,33 @@ export function WorkHome({
                 layout={layout}
                 onOpen={() => onOpen(artifact.id)}
                 onFavorite={() => onToggleFavorite(artifact.id)}
-                onRename={() => {
-                  const title = window.prompt('重命名文件', artifact.title);
-                  if (title?.trim() && title.trim() !== artifact.title) onRename(artifact.id, title);
-                }}
+                onRename={() => setOperation({ kind: 'rename-artifact', artifact })}
                 onCopy={() => onCopy(artifact.id)}
                 onMove={(folderId) => onMove(artifact.id, folderId)}
                 onRestore={() => onRestore(artifact.id)}
-                onDelete={() => onDelete(artifact)}
+                onDelete={() => setOperation({ kind: 'delete-artifact', artifact })}
                 folders={folders.filter((folder) => !folder.trashedAt)}
               />
             ))}
           </div>
         ) : (
-          <div className='work-files-state empty'>
-            <span className='work-empty-icon'>
-              <FileText size={24} />
-            </span>
-            <strong>{query ? '没有匹配的文件' : view === 'favorites' ? '还没有收藏文件' : '还没有文件'}</strong>
-            <span>{query ? '换一个关键词试试' : '创建或打开一个 Office 文件开始工作'}</span>
-            {!query && (
-              <button type='button' onClick={() => onCreate('blank-document')}>
-                新建文字
-              </button>
-            )}
-          </div>
+          <StateView
+            className='work-home-state'
+            size='compact'
+            icon={<FileText size={24} />}
+            title={query ? '没有匹配的文件' : view === 'favorites' ? '还没有收藏文件' : '还没有文件'}
+            description={query ? '换一个关键词试试' : '创建或打开一个 Office 文件开始工作'}
+            actions={!query && <Button onClick={() => onCreate('blank-document')}>新建文字</Button>}
+          />
         )}
       </section>
+      {operation && (
+        <WorkLibraryOperationDialog
+          operation={operation}
+          onClose={() => setOperation(null)}
+          onConfirm={confirmOperation}
+        />
+      )}
     </section>
   );
 }
@@ -301,6 +315,10 @@ function ArtifactCard({
   folders: WorkFolder[];
 }) {
   const trashed = Boolean(artifact.trashedAt);
+  const menuRef = useRef<HTMLDetailsElement>(null);
+  const closeMenu = () => {
+    if (menuRef.current) menuRef.current.open = false;
+  };
   return (
     <article className={`work-artifact-card ${artifact.kind} ${layout}`}>
       <button type='button' className='work-artifact-open' onClick={onOpen} aria-label={`打开 ${artifact.title}`}>
@@ -316,16 +334,16 @@ function ArtifactCard({
       </button>
       <div className='work-artifact-actions'>
         {!trashed && (
-          <button
-            type='button'
+          <IconButton
+            label={artifact.favorite ? `取消收藏 ${artifact.title}` : `收藏 ${artifact.title}`}
+            selected={artifact.favorite}
             className={artifact.favorite ? 'active' : ''}
             onClick={onFavorite}
-            aria-label={artifact.favorite ? `取消收藏 ${artifact.title}` : `收藏 ${artifact.title}`}
           >
             <Star size={14} fill={artifact.favorite ? 'currentColor' : 'none'} />
-          </button>
+          </IconButton>
         )}
-        <details>
+        <details ref={menuRef}>
           <summary aria-label={`${artifact.title} 更多操作`}>
             <MoreHorizontal size={15} />
           </summary>
@@ -335,41 +353,73 @@ function ArtifactCard({
             </span>
             {trashed ? (
               <>
-                <button type='button' onClick={onRestore}>
+                <button
+                  type='button'
+                  onClick={() => {
+                    closeMenu();
+                    onRestore();
+                  }}
+                >
                   <RotateCcw size={13} />
                   恢复
                 </button>
-                <button type='button' className='danger' onClick={onDelete}>
+                <button
+                  type='button'
+                  className='danger'
+                  onClick={() => {
+                    closeMenu();
+                    onDelete();
+                  }}
+                >
                   <Trash2 size={13} />
                   永久删除
                 </button>
               </>
             ) : (
               <>
-                <button type='button' onClick={onRename}>
+                <button
+                  type='button'
+                  onClick={() => {
+                    closeMenu();
+                    onRename();
+                  }}
+                >
                   <Pencil size={13} />
                   重命名
                 </button>
-                <button type='button' onClick={onCopy}>
+                <button
+                  type='button'
+                  onClick={() => {
+                    closeMenu();
+                    onCopy();
+                  }}
+                >
                   <Copy size={13} />
                   创建副本
                 </button>
-                <label className='work-move-control'>
+                <div className='work-move-control'>
                   <Folder size={13} />
-                  <select
-                    aria-label={`移动 ${artifact.title}`}
+                  <OfficeSelect
+                    ariaLabel={`移动 ${artifact.title}`}
                     value={artifact.folderId ?? ''}
-                    onChange={(event) => onMove(event.target.value || null)}
-                  >
-                    <option value=''>全部文件</option>
-                    {folders.map((folder) => (
-                      <option key={folder.id} value={folder.id}>
-                        {folder.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button type='button' className='danger' onClick={onDelete}>
+                    options={[
+                      { value: '', label: '全部文件' },
+                      ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
+                    ]}
+                    onValueChange={(folderId) => {
+                      closeMenu();
+                      onMove(folderId || null);
+                    }}
+                  />
+                </div>
+                <button
+                  type='button'
+                  className='danger'
+                  onClick={() => {
+                    closeMenu();
+                    onDelete();
+                  }}
+                >
                   <Trash2 size={13} />
                   移到回收站
                 </button>
@@ -396,38 +446,68 @@ function FolderCard({
   onDelete: () => void;
 }) {
   const trashed = Boolean(folder.trashedAt);
+  const menuRef = useRef<HTMLDetailsElement>(null);
+  const closeMenu = () => {
+    if (menuRef.current) menuRef.current.open = false;
+  };
   return (
     <article className='work-folder-card'>
       <button type='button' onClick={onOpen} disabled={trashed} aria-label={`打开文件夹 ${folder.name}`}>
-        <Folder size={24} fill='currentColor' />
+        <WorkFileIcon path={folder.name} directory size={32} />
         <span>
           <strong>{folder.name}</strong>
           <small>{formatRecentTime(folder.updatedAt)}</small>
         </span>
       </button>
-      <details>
+      <details ref={menuRef}>
         <summary aria-label={`${folder.name} 更多操作`}>
           <MoreHorizontal size={15} />
         </summary>
         <div>
           {trashed ? (
             <>
-              <button type='button' onClick={onRestore}>
+              <button
+                type='button'
+                onClick={() => {
+                  closeMenu();
+                  onRestore();
+                }}
+              >
                 <RotateCcw size={13} />
                 恢复
               </button>
-              <button type='button' className='danger' onClick={onDelete}>
+              <button
+                type='button'
+                className='danger'
+                onClick={() => {
+                  closeMenu();
+                  onDelete();
+                }}
+              >
                 <Trash2 size={13} />
                 永久删除
               </button>
             </>
           ) : (
             <>
-              <button type='button' onClick={onRename}>
+              <button
+                type='button'
+                onClick={() => {
+                  closeMenu();
+                  onRename();
+                }}
+              >
                 <Pencil size={13} />
                 重命名
               </button>
-              <button type='button' className='danger' onClick={onDelete}>
+              <button
+                type='button'
+                className='danger'
+                onClick={() => {
+                  closeMenu();
+                  onDelete();
+                }}
+              >
                 <Trash2 size={13} />
                 移到回收站
               </button>

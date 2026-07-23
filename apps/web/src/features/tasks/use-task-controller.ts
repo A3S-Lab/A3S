@@ -9,16 +9,16 @@ import {
   isWorkspaceContextCurrent,
   persistSessionTitle,
   promoteActiveTask,
-  reportTaskPersistenceResult,
-  removeWorkspaceTaskSnapshot,
   removePersistedSessionTitle,
+  removeWorkspaceTaskSnapshot,
   replaceActiveWorkspace,
+  reportTaskPersistenceResult,
   showModelChangeNotice,
   showToast,
   switchActiveTask,
 } from '../../state/app-state';
 import type { AgentEvent, ChatMessage, CodeSession, QueuedTurn, SessionControls, TurnQueue } from '../../types/api';
-import { parseGoalCommand, type GoalCommand } from './goal-command';
+import { type GoalCommand, parseGoalCommand } from './goal-command';
 import {
   beginSessionControlsRequest,
   beginSessionMessagesRequest,

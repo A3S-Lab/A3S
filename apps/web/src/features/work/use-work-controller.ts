@@ -57,6 +57,11 @@ interface WorkImportOptions {
   localPath?: string;
 }
 
+interface QueuedWorkSave {
+  artifact: WorkArtifact;
+  visible: boolean;
+}
+
 export function useWorkController() {
   const [artifacts, setArtifacts] = useState<WorkArtifact[]>([]);
   const [folders, setFolders] = useState<WorkFolder[]>([]);
@@ -78,16 +83,26 @@ export function useWorkController() {
   const [localSaveState, setLocalSaveState] = useState<WorkLocalSaveState>('idle');
   const [localConflict, setLocalConflict] = useState<WorkLocalFileConflict | null>(null);
   const [, setLocalBindingVersion] = useState(0);
-  const pendingSave = useRef<WorkArtifact | null>(null);
+  const pendingSaves = useRef<QueuedWorkSave[]>([]);
+  const activeSave = useRef<QueuedWorkSave | null>(null);
+  const saveDrain = useRef<Promise<boolean> | null>(null);
   const saveTimer = useRef<number | null>(null);
-  const saveSequence = useRef(0);
+  const persistedRevisions = useRef(new Map<string, number>());
+  const activeArtifactRef = useRef<WorkArtifact | null>(activeArtifact);
+  activeArtifactRef.current = activeArtifact;
   const activeLocalBinding = activeArtifact ? readWorkLocalFileBinding(activeArtifact.id) : null;
+
+  const rememberPersistedArtifact = (artifact: WorkArtifact) => {
+    const previous = persistedRevisions.current.get(artifact.id) ?? 0;
+    persistedRevisions.current.set(artifact.id, Math.max(previous, artifact.revision));
+  };
 
   const refresh = useMemoizedFn(async () => {
     setLoading(true);
     setLoadError(null);
     try {
       const library = await loadWorkLibrary();
+      persistedRevisions.current = new Map(library.artifacts.map((artifact) => [artifact.id, artifact.revision]));
       setArtifacts(library.artifacts);
       setFolders(library.folders);
       setStorageMode(library.storage);
@@ -99,58 +114,121 @@ export function useWorkController() {
   });
 
   useEffect(() => {
-    void refresh();
-    return () => {
-      if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
-      if (pendingSave.current) void saveWorkArtifact(pendingSave.current);
-    };
-  }, [refresh]);
-
-  useEffect(() => {
     setLocalSaveState('idle');
     setLocalConflict(null);
   }, [activeArtifact?.id]);
 
-  const persistNow = useMemoizedFn(async (artifact?: WorkArtifact | null) => {
-    const snapshot = artifact ?? pendingSave.current;
-    if (!snapshot) return true;
-    if (saveTimer.current !== null) {
-      window.clearTimeout(saveTimer.current);
-      saveTimer.current = null;
-    }
-    pendingSave.current = null;
-    saveSequence.current += 1;
-    const sequence = saveSequence.current;
-    setSaveState('saving');
-    try {
-      const saved = await saveWorkArtifact(snapshot);
-      setArtifacts((items) =>
-        items.map((item) => (item.id === saved.id && item.revision <= snapshot.revision ? cloneArtifact(saved) : item))
-      );
-      if (sequence === saveSequence.current && !pendingSave.current) {
-        setActiveArtifact((current) =>
-          current?.id === saved.id && current.revision <= snapshot.revision ? cloneArtifact(saved) : current
-        );
-        setSaveState('saved');
+  const enqueueSave = useMemoizedFn((artifact: WorkArtifact, visible: boolean) => {
+    const snapshot = cloneArtifact(artifact);
+    const saving = activeSave.current;
+    if (saving?.artifact.id === snapshot.id) {
+      if (saving.artifact.revision >= snapshot.revision) {
+        if (visible && !saving.visible) {
+          saving.visible = true;
+          setSaveState('saving');
+        }
+        return;
       }
-      return true;
-    } catch (error) {
-      if (sequence === saveSequence.current) setSaveState('error');
-      showToast(saveErrorMessage(error), 'error');
-      pendingSave.current = snapshot;
-      return false;
     }
+
+    const queuedIndex = pendingSaves.current.findIndex((request) => request.artifact.id === snapshot.id);
+    if (queuedIndex >= 0) {
+      const queued = pendingSaves.current[queuedIndex];
+      if (queued.artifact.revision > snapshot.revision) {
+        if (visible) queued.visible = true;
+      } else {
+        pendingSaves.current[queuedIndex] = {
+          artifact: snapshot,
+          visible: visible || queued.visible,
+        };
+      }
+    } else if ((persistedRevisions.current.get(snapshot.id) ?? 0) >= snapshot.revision) {
+      if (visible) setSaveState('saved');
+      return;
+    } else {
+      pendingSaves.current.push({ artifact: snapshot, visible });
+    }
+    if (visible) setSaveState('dirty');
   });
 
-  const scheduleSave = useMemoizedFn((artifact: WorkArtifact) => {
-    pendingSave.current = artifact;
-    setSaveState('dirty');
+  const drainSaveQueue = useMemoizedFn(async () => {
+    let savedVisibleChange = false;
+    while (pendingSaves.current.length > 0) {
+      const request = pendingSaves.current.shift();
+      if (!request) break;
+      activeSave.current = request;
+      if (request.visible) {
+        savedVisibleChange = true;
+        setSaveState('saving');
+      }
+      try {
+        const response = await saveWorkArtifact(request.artifact);
+        const saved =
+          response.revision < request.artifact.revision
+            ? { ...cloneArtifact(response), revision: request.artifact.revision }
+            : cloneArtifact(response);
+        rememberPersistedArtifact(saved);
+        setArtifacts((items) =>
+          items.map((item) =>
+            item.id === saved.id && item.revision <= request.artifact.revision ? cloneArtifact(saved) : item
+          )
+        );
+        setActiveArtifact((current) =>
+          current?.id === saved.id && current.revision <= request.artifact.revision ? cloneArtifact(saved) : current
+        );
+        savedVisibleChange ||= request.visible;
+      } catch (error) {
+        if (!request.visible) continue;
+        const newerIndex = pendingSaves.current.findIndex((candidate) => candidate.artifact.id === request.artifact.id);
+        if (newerIndex < 0) {
+          pendingSaves.current.unshift(request);
+        } else {
+          pendingSaves.current[newerIndex].visible = true;
+        }
+        setSaveState('error');
+        showToast(saveErrorMessage(error), 'error');
+        return false;
+      } finally {
+        activeSave.current = null;
+      }
+    }
+    if (savedVisibleChange) setSaveState('saved');
+    return true;
+  });
+
+  const startSaveDrain = useMemoizedFn(() => {
+    if (saveDrain.current) return saveDrain.current;
+    if (pendingSaves.current.length === 0) return Promise.resolve(true);
+    const drain = drainSaveQueue().finally(() => {
+      if (saveDrain.current === drain) saveDrain.current = null;
+    });
+    saveDrain.current = drain;
+    return drain;
+  });
+
+  const persistNow = useMemoizedFn(async (artifact?: WorkArtifact | null) => {
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+    saveTimer.current = null;
+    if (artifact) enqueueSave(artifact, true);
+    return startSaveDrain();
+  });
+
+  const scheduleSave = useMemoizedFn((artifact: WorkArtifact, options: { visible?: boolean } = {}) => {
+    enqueueSave(artifact, options.visible !== false);
     if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
       saveTimer.current = null;
       void persistNow();
     }, SAVE_DELAY_MS);
   });
+
+  useEffect(() => {
+    void refresh();
+    return () => {
+      if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+      void persistNow();
+    };
+  }, [persistNow, refresh]);
 
   const setLibraryView = useMemoizedFn((view: WorkLibraryView) => {
     setLibraryViewState(view);
@@ -171,6 +249,7 @@ export function useWorkController() {
     setSaveState('saving');
     try {
       const saved = await saveWorkArtifact(artifact);
+      rememberPersistedArtifact(saved);
       replaceArtifact(saved, setArtifacts, setActiveArtifact);
       setSaveState('saved');
     } catch (error) {
@@ -186,6 +265,7 @@ export function useWorkController() {
       setLocalConflict(null);
       try {
         const result = await createWorkLocalArtifact(templateId, directory, requestedName);
+        rememberPersistedArtifact(result.artifact);
         saveWorkLocalFileBinding(result.binding);
         setLocalBindingVersion((value) => value + 1);
         setArtifacts((current) => [cloneArtifact(result.artifact), ...current]);
@@ -218,7 +298,8 @@ export function useWorkController() {
     };
     setActiveArtifact(opened);
     setArtifacts((current) => sortArtifacts(current.map((item) => (item.id === id ? opened : item))));
-    scheduleSave(opened);
+    setSaveState('saved');
+    scheduleSave(opened, { visible: false });
   });
 
   const closeArtifact = useMemoizedFn(async () => {
@@ -292,6 +373,7 @@ export function useWorkController() {
     };
     try {
       const saved = await saveWorkArtifact(next);
+      rememberPersistedArtifact(saved);
       replaceArtifact(saved, setArtifacts, setActiveArtifact);
     } catch (error) {
       showToast(saveErrorMessage(error, '无法更新文件'), 'error');
@@ -381,6 +463,7 @@ export function useWorkController() {
     try {
       imported = await saveWorkArtifact(imported);
       imported = await saveWorkSource(imported, file);
+      rememberPersistedArtifact(imported);
       if (options?.localPath) {
         const bytes = new Uint8Array(await file.arrayBuffer());
         saveWorkLocalFileBinding({
@@ -453,10 +536,12 @@ export function useWorkController() {
 
   const exportArtifact = useMemoizedFn(async () => {
     if (!activeArtifact || exporting) return;
+    const artifactId = activeArtifact.id;
     setExporting(true);
     try {
       await persistNow(activeArtifact);
-      await exportWorkArtifact(activeArtifact);
+      const current = activeArtifactRef.current;
+      await exportWorkArtifact(current?.id === artifactId ? current : activeArtifact);
       showToast('文件已导出', 'success');
     } catch (error) {
       showToast(saveErrorMessage(error, '文件导出失败'), 'error');
@@ -494,13 +579,15 @@ export function useWorkController() {
 
   const saveLocalFile = useMemoizedFn(async (options: { force?: boolean } = {}) => {
     if (!activeArtifact) return false;
-    const binding = readWorkLocalFileBinding(activeArtifact.id);
+    const artifactId = activeArtifact.id;
+    const binding = readWorkLocalFileBinding(artifactId);
     if (!binding) return false;
     if (!(await persistNow(activeArtifact))) return false;
     setLocalSaveState('saving');
     setLocalConflict(null);
     try {
-      const bytes = await artifactBytes(activeArtifact);
+      const current = activeArtifactRef.current;
+      const bytes = await artifactBytes(current?.id === artifactId ? current : activeArtifact);
       const snapshot = await writeWorkLocalFileAtomically(codeApi, binding.path, bytes, {
         expectedFingerprint: options.force ? undefined : binding.fingerprint,
         allowOverwrite: options.force,
@@ -521,7 +608,7 @@ export function useWorkController() {
           missing: error.actualFingerprint === null,
         });
         setLocalSaveState('conflict');
-        showToast('本地文件已在 A3S Work 外部更改，请先确认如何处理。', 'info');
+        showToast('本地文件已被其他应用修改，请先确认要保留哪个版本。', 'info');
         return false;
       }
       setLocalSaveState('error');
@@ -537,6 +624,7 @@ export function useWorkController() {
       options: { allowOverwrite?: boolean } = {}
     ): Promise<'saved' | 'exists' | 'error'> => {
       if (!activeArtifact) return 'error';
+      const artifactId = activeArtifact.id;
       setLocalSaveState('saving');
       setLocalConflict(null);
       try {
@@ -546,23 +634,25 @@ export function useWorkController() {
           setLocalSaveState('error');
           return 'error';
         }
-        const bytes = await artifactBytes(activeArtifact);
+        const current = activeArtifactRef.current;
+        const artifactForWrite = current?.id === artifactId ? current : activeArtifact;
+        const bytes = await artifactBytes(artifactForWrite);
         const snapshot = await writeWorkLocalFileAtomically(codeApi, path, bytes, {
           allowOverwrite: Boolean(options.allowOverwrite),
         });
         saveWorkLocalFileBinding({
-          artifactId: activeArtifact.id,
+          artifactId,
           path,
           ...snapshot,
           updatedAt: Date.now(),
         });
         setLocalBindingVersion((value) => value + 1);
         const title = fileNameWithoutExtension(fileName);
-        if (title !== activeArtifact.title) {
+        if (title !== artifactForWrite.title) {
           const renamed = {
-            ...cloneArtifact(activeArtifact),
+            ...cloneArtifact(artifactForWrite),
             title,
-            revision: activeArtifact.revision + 1,
+            revision: artifactForWrite.revision + 1,
             updatedAt: Date.now(),
           };
           setActiveArtifact(renamed);
@@ -591,11 +681,13 @@ export function useWorkController() {
 
   const exportPdf = useMemoizedFn(async (options: WorkPdfExportOptions = {}) => {
     if (!activeArtifact || activeArtifact.kind === 'pdf' || exportingPdf) return;
+    const artifactId = activeArtifact.id;
     setExportingPdf(true);
     try {
       if (!(await persistNow(activeArtifact))) return;
       const { exportWorkArtifactPdf } = await import('./work-pdf-export');
-      await exportWorkArtifactPdf(activeArtifact, options);
+      const current = activeArtifactRef.current;
+      await exportWorkArtifactPdf(current?.id === artifactId ? current : activeArtifact, options);
       showToast('PDF 已导出', 'success');
     } catch (error) {
       showToast(saveErrorMessage(error, 'PDF 导出失败'), 'error');
@@ -613,6 +705,7 @@ export function useWorkController() {
     if (!activeArtifact || !(await persistNow())) return false;
     try {
       const restored = await restoreWorkArtifactVersion(activeArtifact, version);
+      rememberPersistedArtifact(restored);
       replaceArtifact(restored, setArtifacts, setActiveArtifact);
       setSaveState('saved');
       showToast(`已恢复到第 ${version} 版`, 'success');
@@ -648,6 +741,7 @@ export function useWorkController() {
       const fileName = artifact.source?.name ?? `${artifact.title}.pdf`;
       const source = new File([pdf], fileName, { type: 'application/pdf' });
       const saved = await saveWorkSource(artifact, source);
+      rememberPersistedArtifact(saved);
       replaceArtifact(saved, setArtifacts, setActiveArtifact);
       setSaveState('saved');
 

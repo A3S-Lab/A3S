@@ -1,0 +1,446 @@
+.work-office-field {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  color: var(--a3s-muted);
+  font-size: 9px;
+}
+
+.work-office-field > .work-office-select,
+.work-office-field > .work-office-color-picker,
+.work-office-field > .work-office-number-field,
+.work-office-field > .work-office-text-field,
+.work-office-field > .work-office-text-area {
+  width: 100%;
+}
+
+.work-office-field > .work-office-color-picker .work-office-color-trigger {
+  width: 100%;
+}
+
+.work-office-select,
+.work-office-color-picker {
+  position: relative;
+  min-width: 0;
+}
+
+.work-office-select > button[role="combobox"],
+.work-office-color-trigger,
+.work-office-text-field,
+.work-office-text-area,
+.work-office-number-field {
+  border: 1px solid var(--a3s-line);
+  border-radius: 6px;
+  outline: 0;
+  background: var(--a3s-panel);
+  color: var(--a3s-ink);
+  font: inherit;
+  font-size: 10px;
+}
+
+.work-office-select > button[role="combobox"] {
+  display: flex;
+  width: 100%;
+  min-width: 104px;
+  height: 28px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 8px 0 9px;
+  cursor: pointer;
+}
+
+.work-office-select > button[role="combobox"] > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-office-select > button[role="combobox"]:hover:not(:disabled),
+.work-office-select.open > button[role="combobox"],
+.work-office-color-trigger:hover:not(:disabled),
+.work-office-color-picker.open .work-office-color-trigger {
+  border-color: color-mix(in srgb, var(--a3s-blue) 48%, var(--a3s-line));
+  background: var(--a3s-panel-soft);
+}
+
+.work-office-select > button[role="combobox"]:focus-visible,
+.work-office-color-trigger:focus-visible,
+.work-office-text-field:focus-visible,
+.work-office-text-area:focus-visible,
+.work-office-number-field:focus-within,
+.work-office-slider:focus-visible {
+  border-color: var(--a3s-blue);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--a3s-blue) 18%, transparent);
+}
+
+.work-office-select > button[role="combobox"]:disabled,
+.work-office-color-trigger:disabled,
+.work-office-text-field:disabled,
+.work-office-text-area:disabled,
+.work-office-number-field:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.work-office-select-menu,
+.work-office-color-menu {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 5px);
+  left: 0;
+  min-width: 100%;
+  padding: 5px;
+  border: 1px solid var(--a3s-line-strong);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--a3s-panel) 97%, transparent);
+  box-shadow: 0 12px 34px rgb(15 23 42 / 18%);
+  backdrop-filter: blur(18px);
+}
+
+.work-office-select-menu {
+  display: grid;
+  width: max-content;
+  min-width: max(100%, 150px);
+  max-width: 280px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.work-office-select-menu > button {
+  display: flex;
+  width: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--a3s-ink);
+  font: inherit;
+  font-size: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.work-office-select-menu > button:hover:not(:disabled),
+.work-office-select-menu > button:focus-visible {
+  outline: 0;
+  background: var(--a3s-panel-soft);
+}
+
+.work-office-select-menu > button[aria-selected="true"] {
+  color: var(--a3s-blue);
+  font-weight: 650;
+}
+
+.work-office-select-menu > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.work-office-checkbox {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  min-height: 26px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  padding: 3px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--a3s-muted);
+  font: inherit;
+  font-size: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.work-office-checkbox > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.work-office-checkbox:not(.disabled):hover {
+  color: var(--a3s-ink);
+}
+
+.work-office-checkbox > input:focus-visible + .work-office-checkbox-box {
+  border-color: var(--a3s-blue);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--a3s-blue) 18%, transparent);
+}
+
+.work-office-checkbox.disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.work-office-checkbox-box {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  place-items: center;
+  border: 1px solid var(--a3s-line-strong);
+  border-radius: 4px;
+  background: var(--a3s-panel);
+  color: white;
+}
+
+.work-office-checkbox.checked .work-office-checkbox-box {
+  border-color: var(--a3s-blue);
+  background: var(--a3s-blue);
+}
+
+.work-office-checkbox-label {
+  min-width: 0;
+}
+
+.work-office-number-field {
+  display: grid;
+  min-width: 72px;
+  height: 29px;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  overflow: hidden;
+}
+
+.work-office-number-field > input {
+  min-width: 0;
+  padding: 0 7px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 10px;
+}
+
+.work-office-number-steppers {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  border-left: 1px solid var(--a3s-line);
+}
+
+.work-office-number-steppers > button {
+  display: grid;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--a3s-faint);
+  cursor: pointer;
+}
+
+.work-office-number-steppers > button:first-child {
+  border-bottom: 1px solid var(--a3s-line);
+}
+
+.work-office-number-steppers > button:hover:not(:disabled) {
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-ink);
+}
+
+.work-office-color-trigger {
+  display: flex;
+  min-width: 112px;
+  height: 29px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 7px;
+  cursor: pointer;
+}
+
+.work-office-color-trigger > span:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.work-office-color-picker.compact .work-office-color-trigger {
+  display: grid;
+  width: 29px;
+  min-width: 29px;
+  padding: 0;
+  place-items: center;
+}
+
+.work-office-color-picker.compact .work-office-color-trigger > svg {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+.work-office-color-swatch {
+  width: 20px;
+  height: 14px;
+  flex: 0 0 20px;
+  border: 1px solid var(--a3s-line-strong);
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 28%);
+}
+
+.work-office-color-menu {
+  width: 202px;
+}
+
+.work-office-color-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 24px);
+  gap: 5px;
+  padding: 3px;
+}
+
+.work-office-color-grid > button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--a3s-line-strong);
+  border-radius: 5px;
+  color: white;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 22%);
+}
+
+.work-office-color-grid > button:hover,
+.work-office-color-grid > button:focus-visible,
+.work-office-color-grid > button[aria-selected="true"] {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--a3s-panel), 0 0 0 4px var(--a3s-blue);
+}
+
+.work-office-color-custom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px;
+  padding: 6px 3px 3px;
+  border-top: 1px solid var(--a3s-line);
+}
+
+.work-office-color-custom input,
+.work-office-text-field,
+.work-office-text-area {
+  min-width: 0;
+  padding: 6px 8px;
+}
+
+.work-office-color-custom input {
+  border: 1px solid var(--a3s-line);
+  border-radius: 5px;
+  outline: 0;
+  background: var(--a3s-panel);
+  color: var(--a3s-ink);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.work-office-color-custom > .ds-button {
+  min-width: 42px;
+  min-height: 27px;
+  padding: 0 8px;
+  border-radius: 5px;
+  font-size: 9px;
+}
+
+.work-office-slider {
+  position: relative;
+  width: 88px;
+  height: 18px;
+  border-radius: 999px;
+  outline: 0;
+  cursor: pointer;
+}
+
+.work-office-slider::before,
+.work-office-slider-fill {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  height: 3px;
+  border-radius: 999px;
+  content: "";
+}
+
+.work-office-slider::before {
+  width: 100%;
+  background: var(--a3s-line-strong);
+}
+
+.work-office-slider-fill {
+  background: var(--a3s-blue);
+}
+
+.work-office-slider-thumb {
+  position: absolute;
+  top: 3px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border: 2px solid var(--a3s-blue);
+  border-radius: 50%;
+  background: var(--a3s-panel);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 24%);
+}
+
+.work-office-slider.disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.work-office-dialog-field {
+  display: grid;
+  min-width: min(420px, 72vw);
+}
+
+.work-office-dialog-field .work-office-text-area {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.work-office-collection-empty.ds-collection-state {
+  min-height: 42px;
+  padding: 8px 6px;
+  color: var(--a3s-faint);
+  font-size: 8px;
+}
+
+.work-office-form-error.ds-inline-notice {
+  width: auto;
+  min-width: 0;
+  flex: 1;
+  margin-right: auto;
+  padding: 5px 7px;
+}
+
+.work-office-form-error .ds-inline-notice-copy,
+.work-office-form-warning .ds-inline-notice-copy {
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+.work-office-form-warning.ds-inline-notice {
+  grid-column: 1 / -1;
+  padding: 6px 8px;
+}
+
+.work-office-panel-empty.ds-state-view {
+  min-height: 120px;
+  padding: 20px;
+}
+
+.work-office-panel-empty.ds-state-view h2 {
+  font-size: 10px;
+}

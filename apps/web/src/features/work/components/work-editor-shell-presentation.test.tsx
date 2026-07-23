@@ -26,8 +26,8 @@ describe('Work presentation print controls', () => {
     } as unknown as WorkActions;
 
     render(<WorkEditorShell actions={actions} />);
-    fireEvent.click(screen.getByRole('button', { name: '打开打印预览' }));
-    fireEvent.change(screen.getByLabelText('演示打印版式'), { target: { value: 'handout-2' } });
+    openPrintPreview();
+    chooseOfficeOption('演示打印版式', '讲义 · 每页 2 张');
 
     expect(
       document.querySelectorAll('[data-work-pdf-surface="export"] [data-presentation-print-layout="handout-2"]')
@@ -58,7 +58,7 @@ describe('Work presentation print controls', () => {
 
     render(<WorkEditorShell actions={actions} />);
     fireEvent.keyDown(window, { key: 'p', metaKey: true });
-    fireEvent.click(screen.getByLabelText('自定义范围'));
+    chooseOfficeOption('打印页面范围', '自定义范围');
     fireEvent.change(screen.getByLabelText('自定义页码范围'), { target: { value: '1, 3' } });
     fireEvent.click(screen.getByRole('button', { name: '导出所选页面为 PDF' }));
 
@@ -97,8 +97,8 @@ describe('Work presentation print controls', () => {
     } as unknown as WorkActions;
 
     render(<WorkEditorShell actions={actions} />);
-    fireEvent.click(screen.getByRole('button', { name: '打开打印预览' }));
-    fireEvent.click(screen.getByLabelText('自定义范围'));
+    openPrintPreview();
+    chooseOfficeOption('打印页面范围', '自定义范围');
     fireEvent.change(screen.getByLabelText('自定义页码范围'), { target: { value: '2-3' } });
     fireEvent.click(screen.getByRole('button', { name: '导出所选页面为 PDF' }));
 
@@ -129,7 +129,7 @@ describe('Work presentation print controls', () => {
     } as unknown as WorkActions;
 
     render(<WorkEditorShell actions={actions} />);
-    fireEvent.click(screen.getByRole('button', { name: '打开打印预览' }));
+    openPrintPreview();
     fireEvent.click(screen.getByRole('button', { name: '打印所选页面' }));
 
     await waitFor(() => {
@@ -176,5 +176,164 @@ describe('Work presentation print controls', () => {
     expect(actions.saveLocalFile).toHaveBeenCalled();
     expect(actions.saveNow).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: '保存到原本地文件' })).toHaveAttribute('title', '/docs/Strategy.pptx');
+    expect(screen.queryByText(/本地文件：/)).not.toBeInTheDocument();
+  });
+
+  it('uses Cmd/Ctrl+Shift+S for Save As instead of overwriting the bound file', () => {
+    const artifact = createWorkArtifact('strategy-deck');
+    const actions = {
+      activeArtifact: artifact,
+      activeLocalBinding: {
+        artifactId: artifact.id,
+        path: '/docs/Strategy.pptx',
+        fingerprint: 'sha256:original',
+        size: 12,
+        updatedAt: Date.now(),
+      },
+      localSaveState: 'idle',
+      localConflict: null,
+      saveState: 'saved',
+      storageMode: 'local',
+      exporting: false,
+      exportingPdf: false,
+      closeArtifact: vi.fn(),
+      saveNow: vi.fn(),
+      saveLocalFile: vi.fn().mockResolvedValue(true),
+      saveLocalFileAs: vi.fn(),
+      checkLocalFile: vi.fn().mockResolvedValue(true),
+      dismissLocalConflict: vi.fn(),
+      updateArtifact: vi.fn(),
+      toggleFavorite: vi.fn(),
+      downloadSource: vi.fn(),
+      exportArtifact: vi.fn(),
+      exportPdf: vi.fn(),
+      sourceBlob: vi.fn(),
+    } as unknown as WorkActions;
+
+    render(<WorkEditorShell actions={actions} defaultLocalDirectory='/docs' onPickLocalDirectory={vi.fn()} />);
+    fireEvent.keyDown(window, { key: 's', metaKey: true, shiftKey: true });
+
+    expect(screen.getByRole('dialog', { name: '另存为本地 Office 文件' })).toBeInTheDocument();
+    expect(actions.saveLocalFile).not.toHaveBeenCalled();
+    expect(actions.saveNow).not.toHaveBeenCalled();
+  });
+
+  it('does not replay an Office shortcut already handled by the focused editor', () => {
+    const artifact = createWorkArtifact('strategy-deck');
+    const actions = {
+      activeArtifact: artifact,
+      saveState: 'saved',
+      storageMode: 'local',
+      exporting: false,
+      exportingPdf: false,
+      closeArtifact: vi.fn(),
+      saveNow: vi.fn(),
+      updateArtifact: vi.fn(),
+      toggleFavorite: vi.fn(),
+      downloadSource: vi.fn(),
+      exportArtifact: vi.fn(),
+      exportPdf: vi.fn(),
+      sourceBlob: vi.fn(),
+    } as unknown as WorkActions;
+    render(<WorkEditorShell actions={actions} />);
+    const event = new KeyboardEvent('keydown', {
+      key: 's',
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    event.preventDefault();
+
+    window.dispatchEvent(event);
+
+    expect(actions.saveNow).not.toHaveBeenCalled();
+  });
+
+  it('does not take save or print shortcuts away from an excluded side panel', () => {
+    const artifact = createWorkArtifact('strategy-deck');
+    const actions = {
+      activeArtifact: artifact,
+      saveState: 'saved',
+      storageMode: 'local',
+      exporting: false,
+      exportingPdf: false,
+      closeArtifact: vi.fn(),
+      saveNow: vi.fn(),
+      updateArtifact: vi.fn(),
+      toggleFavorite: vi.fn(),
+      downloadSource: vi.fn(),
+      exportArtifact: vi.fn(),
+      exportPdf: vi.fn(),
+      sourceBlob: vi.fn(),
+    } as unknown as WorkActions;
+
+    render(
+      <>
+        <WorkEditorShell actions={actions} />
+        <aside data-office-shortcuts='ignore'>
+          <input aria-label='AI 指令' />
+        </aside>
+      </>
+    );
+    const prompt = screen.getByRole('textbox', { name: 'AI 指令' });
+
+    expect(fireEvent.keyDown(prompt, { key: 's', metaKey: true })).toBe(true);
+    expect(fireEvent.keyDown(prompt, { key: 'p', metaKey: true })).toBe(true);
+
+    expect(actions.saveNow).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: '打印预览' })).not.toBeInTheDocument();
+  });
+
+  it('does not run background save or print shortcuts while Save As is open', () => {
+    const artifact = createWorkArtifact('strategy-deck');
+    const actions = {
+      activeArtifact: artifact,
+      activeLocalBinding: null,
+      localSaveState: 'idle',
+      localConflict: null,
+      saveState: 'saved',
+      storageMode: 'local',
+      exporting: false,
+      exportingPdf: false,
+      closeArtifact: vi.fn(),
+      saveNow: vi.fn(),
+      saveLocalFile: vi.fn(),
+      saveLocalFileAs: vi.fn(),
+      checkLocalFile: vi.fn(),
+      dismissLocalConflict: vi.fn(),
+      updateArtifact: vi.fn(),
+      toggleFavorite: vi.fn(),
+      downloadSource: vi.fn(),
+      exportArtifact: vi.fn(),
+      exportPdf: vi.fn(),
+      sourceBlob: vi.fn(),
+    } as unknown as WorkActions;
+
+    render(
+      <WorkEditorShell
+        actions={actions}
+        defaultLocalDirectory='/docs'
+        onPickLocalDirectory={vi.fn(async () => '/docs')}
+      />
+    );
+    fireEvent.keyDown(window, { key: 's', metaKey: true, shiftKey: true });
+    const fileName = screen.getByRole('textbox', { name: '本地文件名' });
+
+    expect(fireEvent.keyDown(fileName, { key: 's', metaKey: true })).toBe(false);
+    expect(fireEvent.keyDown(fileName, { key: 'p', metaKey: true })).toBe(false);
+
+    expect(actions.saveNow).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: '另存为本地 Office 文件' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '打印预览' })).not.toBeInTheDocument();
   });
 });
+
+function openPrintPreview() {
+  fireEvent.click(screen.getByRole('button', { name: '文件' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: /^打印/ }));
+}
+
+function chooseOfficeOption(label: string, option: string) {
+  fireEvent.click(screen.getByRole('combobox', { name: label }));
+  fireEvent.click(screen.getByRole('option', { name: option }));
+}

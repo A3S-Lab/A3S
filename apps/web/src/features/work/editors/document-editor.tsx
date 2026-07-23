@@ -21,19 +21,31 @@ import {
   Sparkles,
   TextQuote,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { WorkspaceContextMenu, type WorkspaceContextMenuItem } from '../../workspace/components/workspace-context-menu';
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { showToast } from '../../../state/app-state';
+import { WorkspaceContextMenu, type WorkspaceContextMenuItem } from '../../workspace/components/workspace-context-menu';
+import { WorkDocumentPreview } from '../components/work-document-pages';
+import { WorkEditorLoadingState } from '../components/work-editor-loading-state';
+import {
+  createWorkAgentProposalRequest,
+  type WorkAgentProposalRequest,
+  type WorkAgentProposalTarget,
+} from '../work-agent-proposal';
+import type { WorkEditorAgentRequest } from '../work-agent-request';
 import {
   editorDocumentCaptionTargets,
   insertDocumentCaption,
   insertDocumentCrossReference,
 } from '../work-document-caption-editor';
 import { DocumentCaption, DocumentCrossReference } from '../work-document-caption-nodes';
+import {
+  collectDocumentChanges,
+  DocumentChange,
+  replaceDocumentTextWithTrackedChange,
+  type WorkDocumentChangeKind,
+} from '../work-document-changes';
 import { documentCitationCount } from '../work-document-citation-editor';
 import { DocumentBibliography, DocumentCitation } from '../work-document-citation-nodes';
-import { insertDocumentField, refreshDocumentFields } from '../work-document-field-editor';
-import { DocumentField } from '../work-document-field-node';
 import {
   collectDocumentCommentAnchors,
   DocumentComment,
@@ -42,18 +54,22 @@ import {
   removeDocumentComment,
   retainAnchoredDocumentComments,
 } from '../work-document-comments';
-import {
-  documentInitialSectionLayout,
-  normalizeDocumentHtml,
-  syncDocumentContentFromHtml,
-} from '../work-document-section';
+import { insertDocumentField, refreshDocumentFields } from '../work-document-field-editor';
+import { DocumentField } from '../work-document-field-node';
+import { documentMargins, millimetersToPixels } from '../work-document-layout';
 import { insertDocumentNote } from '../work-document-note-editor';
 import { DocumentNote, DocumentNoteReference } from '../work-document-note-nodes';
+import { DocumentPageBreak } from '../work-document-page-break';
 import {
   documentPageChromeLegacyFields,
   normalizeDocumentPageChrome,
   updateDocumentPageChromeVariant,
 } from '../work-document-page-chrome';
+import {
+  documentInitialSectionLayout,
+  normalizeDocumentHtml,
+  syncDocumentContentFromHtml,
+} from '../work-document-section';
 import {
   activeDocumentSection,
   insertDocumentSection,
@@ -61,33 +77,21 @@ import {
   updateActiveDocumentSection,
 } from '../work-document-section-editor';
 import { DocumentSection } from '../work-document-section-node';
-import { documentMargins, millimetersToPixels } from '../work-document-layout';
-import { DocumentPageBreak } from '../work-document-page-break';
-import type { WorkDocumentContent } from '../work-types';
-import type { WorkEditorAgentRequest } from '../work-agent-request';
-import {
-  createWorkAgentProposalRequest,
-  type WorkAgentProposalRequest,
-  type WorkAgentProposalTarget,
-} from '../work-agent-proposal';
-import {
-  collectDocumentChanges,
-  DocumentChange,
-  replaceDocumentTextWithTrackedChange,
-  type WorkDocumentChangeKind,
-} from '../work-document-changes';
 import { createWorkId } from '../work-templates';
+import type { WorkDocumentContent } from '../work-types';
 import { DocumentChangesPanel } from './document-changes-panel';
 import { DocumentCitationsPanel } from './document-citations-panel';
 import { DocumentCommentsPanel } from './document-comments-panel';
 import { DocumentLayoutPanel } from './document-layout-panel';
 import { DocumentToolbar, type DocumentViewMode } from './document-toolbar';
-import { WorkDocumentPreview } from '../components/work-document-pages';
+import { OfficeFileInput, OfficeSlider, useOfficeDialog } from './office-controls';
+import { type WorkOfficeFileAction, WorkOfficePreviewBar } from './work-office-chrome';
 
 interface DocumentEditorProps {
   content: WorkDocumentContent;
   preview: boolean;
   saveStatus?: string;
+  fileActions?: readonly WorkOfficeFileAction[];
   onChange: (content: WorkDocumentContent) => void;
   onAgentRequest?: (request: WorkEditorAgentRequest) => void | Promise<void>;
 }
@@ -95,16 +99,29 @@ interface DocumentEditorProps {
 const MIN_DOCUMENT_ZOOM = 50;
 const MAX_DOCUMENT_ZOOM = 200;
 
+function createTrackedDocumentChange(_kind: WorkDocumentChangeKind) {
+  return {
+    id: createWorkId('change'),
+    author: 'A3S Work 用户',
+    date: new Date().toISOString(),
+  };
+}
+
 export function DocumentEditor({
   content,
   preview,
   saveStatus = '已自动保存',
+  fileActions,
   onChange,
   onAgentRequest,
 }: DocumentEditorProps) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef(content);
   const trackChangesRef = useRef(Boolean(content.trackChanges));
+  const normalizedContent = useMemo(() => normalizeDocumentHtml(content), [content]);
+  const initialContentRef = useRef(normalizedContent);
+  const appliedContentRef = useRef(normalizedContent);
+  const receivedContentRef = useRef(content);
   const [layoutOpen, setLayoutOpen] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -112,6 +129,7 @@ export function DocumentEditor({
   const [spellcheckEnabled, setSpellcheckEnabled] = useState(true);
   const [viewMode, setViewMode] = useState<DocumentViewMode>('page');
   const [zoom, setZoom] = useState(90);
+  const officeDialog = useOfficeDialog();
   const [agentMenu, setAgentMenu] = useState<{
     x: number;
     y: number;
@@ -123,13 +141,8 @@ export function DocumentEditor({
   const [, setSelectionVersion] = useState(0);
   contentRef.current = content;
   trackChangesRef.current = Boolean(content.trackChanges);
-  const createTrackedChange = (_kind: WorkDocumentChangeKind) => ({
-    id: createWorkId('change'),
-    author: 'A3S Work 用户',
-    date: new Date().toISOString(),
-  });
-  const editor = useEditor({
-    extensions: [
+  const editorExtensions = useMemo(
+    () => [
       StarterKit.configure({
         link: {
           autolink: true,
@@ -163,25 +176,34 @@ export function DocumentEditor({
       DocumentPageBreak,
       DocumentChange.configure({
         isTracking: () => trackChangesRef.current,
-        createChange: createTrackedChange,
+        createChange: createTrackedDocumentChange,
       }),
     ],
-    content: normalizeDocumentHtml(content),
-    editable: !preview,
-    editorProps: {
+    []
+  );
+  const editorProps = useMemo(
+    () => ({
       attributes: {
         'aria-label': '文档正文',
         'aria-multiline': 'true',
         role: 'textbox',
         spellcheck: 'true',
       },
-    },
+    }),
+    []
+  );
+  const editor = useEditor({
+    extensions: editorExtensions,
+    content: initialContentRef.current,
+    editable: !preview,
+    editorProps,
     onUpdate: ({ editor: current }) => {
       const anchors = collectDocumentCommentAnchors(current.state.doc);
       const next = {
         ...syncDocumentContentFromHtml(contentRef.current, current.getHTML()),
         comments: retainAnchoredDocumentComments(contentRef.current.comments ?? [], anchors),
       };
+      appliedContentRef.current = next.html;
       contentRef.current = next;
       onChange(next);
     },
@@ -196,8 +218,20 @@ export function DocumentEditor({
     editor?.view.dom.setAttribute('spellcheck', String(spellcheckEnabled));
   }, [editor, spellcheckEnabled]);
 
+  useEffect(() => {
+    if (!editor || receivedContentRef.current === content) return;
+    receivedContentRef.current = content;
+    const currentContent = normalizeDocumentHtml({ ...content, html: editor.getHTML() });
+    if (currentContent === normalizedContent) {
+      appliedContentRef.current = normalizedContent;
+      return;
+    }
+    appliedContentRef.current = normalizedContent;
+    editor.commands.setContent(normalizedContent, { emitUpdate: false });
+  }, [content, editor, normalizedContent]);
+
   if (!editor) {
-    return <output className='work-editor-loading'>正在准备文字编辑器…</output>;
+    return <WorkEditorLoadingState title='正在准备文字编辑器' />;
   }
 
   const section = activeDocumentSection(editor);
@@ -226,6 +260,13 @@ export function DocumentEditor({
   if (preview) {
     return (
       <section className='work-document-editor preview'>
+        <WorkOfficePreviewBar
+          ariaLabel='文字预览工具'
+          label='只读预览'
+          detail={`${pageCount} 页`}
+          fileActions={fileActions}
+          className='work-document-ribbon'
+        />
         <WorkDocumentPreview content={content} />
         <footer className='work-document-status'>
           <span>{pageCount} 页</span>
@@ -237,10 +278,8 @@ export function DocumentEditor({
 
   return (
     <section className='work-document-editor'>
-      <input
+      <OfficeFileInput
         ref={imageInputRef}
-        className='work-file-input'
-        type='file'
         accept='image/*'
         aria-label='插入文档图片'
         onChange={(event) => {
@@ -248,7 +287,7 @@ export function DocumentEditor({
           event.target.value = '';
           if (!file) return;
           if (file.size > 8 * 1024 * 1024) {
-            window.alert('单张图片不能超过 8 MiB。');
+            void officeDialog.notice({ title: '图片过大', description: '单张图片不能超过 8 MiB。' });
             return;
           }
           void fileToDataUrl(file).then((src) =>
@@ -258,6 +297,7 @@ export function DocumentEditor({
       />
       <DocumentToolbar
         editor={editor}
+        fileActions={fileActions}
         layoutOpen={layoutOpen}
         showPageNumbers={defaultChrome.showPageNumber}
         spellcheckEnabled={spellcheckEnabled}
@@ -276,30 +316,37 @@ export function DocumentEditor({
         }}
         onInsertSection={addSection}
         onInsertNote={(kind) => insertDocumentNote(editor, kind)}
-        onInsertCaption={(kind) => {
-          const title = window.prompt(kind === 'figure' ? '图片题注文字' : '表格题注文字', '');
-          if (title !== null) insertDocumentCaption(editor, kind, title);
-        }}
-        onInsertCrossReference={() => {
-          const targets = editorDocumentCaptionTargets(editor);
-          if (!targets.length) {
-            window.alert('请先插入图片或表格题注。');
-            return;
-          }
-          const choice = window.prompt(
-            `引用题注（${targets.map((target) => target.display).join('、')}）`,
-            targets[0].display
-          );
-          if (choice === null) return;
-          const target = targets.find(
-            (item) => item.display === choice.trim() || `${item.display} ${item.title}`.trim() === choice.trim()
-          );
-          if (!target) {
-            window.alert('没有找到该题注。');
-            return;
-          }
-          insertDocumentCrossReference(editor, target);
-        }}
+        onInsertCaption={(kind) =>
+          void officeDialog
+            .prompt({ title: kind === 'figure' ? '图片题注文字' : '表格题注文字', confirmLabel: '插入题注' })
+            .then((title) => {
+              if (title !== null) insertDocumentCaption(editor, kind, title);
+            })
+        }
+        onInsertCrossReference={() =>
+          void (async () => {
+            const targets = editorDocumentCaptionTargets(editor);
+            if (!targets.length) {
+              await officeDialog.notice({ title: '还没有题注', description: '请先插入图片或表格题注。' });
+              return;
+            }
+            const choice = await officeDialog.prompt({
+              title: '引用题注',
+              description: targets.map((target) => `${target.display} ${target.title}`.trim()).join('；'),
+              initialValue: targets[0].display,
+              confirmLabel: '插入引用',
+            });
+            if (choice === null) return;
+            const target = targets.find(
+              (item) => item.display === choice.trim() || `${item.display} ${item.title}`.trim() === choice.trim()
+            );
+            if (!target) {
+              await officeDialog.notice({ title: '没有找到题注', description: '请选择现有的图片或表格题注。' });
+              return;
+            }
+            insertDocumentCrossReference(editor, target);
+          })()
+        }
         citationsOpen={citationsOpen}
         citationSourceCount={content.bibliography?.sources.length ?? 0}
         onToggleCitations={() => setCitationsOpen((value) => !value)}
@@ -307,38 +354,51 @@ export function DocumentEditor({
         onRefreshFields={() => {
           refreshDocumentFields(editor, contentRef.current);
         }}
-        onInsertComment={() => {
-          if (editor.state.selection.empty) {
-            window.alert('请先选择要批注的文字。');
-            return;
-          }
-          const text = window.prompt('批注内容', '');
-          if (!text?.trim()) return;
-          const comment = {
-            id: createWorkId('comment'),
-            author: 'A3S Work 用户',
-            date: new Date().toISOString(),
-            text: text.trim(),
-            resolved: false,
-          };
-          const previous = contentRef.current;
-          contentRef.current = {
-            ...previous,
-            comments: [...(previous.comments ?? []), comment],
-          };
-          if (!insertDocumentComment(editor, comment.id)) {
-            contentRef.current = previous;
-            window.alert('所选文字已经包含批注，请选择其他文字。');
-            return;
-          }
-          setCommentsOpen(true);
-        }}
+        onInsertComment={() =>
+          void (async () => {
+            if (editor.state.selection.empty) {
+              await officeDialog.notice({ title: '无法添加批注', description: '请先选择要批注的文字。' });
+              return;
+            }
+            const text = await officeDialog.prompt({ title: '批注内容', multiline: true, confirmLabel: '添加批注' });
+            if (!text?.trim()) return;
+            const comment = {
+              id: createWorkId('comment'),
+              author: 'A3S Work 用户',
+              date: new Date().toISOString(),
+              text: text.trim(),
+              resolved: false,
+            };
+            const previous = contentRef.current;
+            contentRef.current = {
+              ...previous,
+              comments: [...(previous.comments ?? []), comment],
+            };
+            if (!insertDocumentComment(editor, comment.id)) {
+              contentRef.current = previous;
+              await officeDialog.notice({
+                title: '无法添加批注',
+                description: '所选文字已经包含批注，请选择其他文字。',
+              });
+              return;
+            }
+            setCommentsOpen(true);
+          })()
+        }
         commentsOpen={commentsOpen}
         commentCount={comments.length}
         onToggleComments={() => setCommentsOpen((value) => !value)}
         trackChanges={Boolean(content.trackChanges)}
         changesOpen={changesOpen}
         changeCount={changes.length}
+        onRibbonTabChange={(tab) => {
+          if (tab !== 'page') setLayoutOpen(false);
+          if (tab !== 'references') setCitationsOpen(false);
+          if (tab !== 'review') {
+            setCommentsOpen(false);
+            setChangesOpen(false);
+          }
+        }}
         onToggleTrackChanges={() => {
           const trackChanges = !trackChangesRef.current;
           trackChangesRef.current = trackChanges;
@@ -348,7 +408,7 @@ export function DocumentEditor({
         onReplaceText={(from, to, replacement) => {
           editor.commands.focus();
           if (trackChangesRef.current) {
-            return replaceDocumentTextWithTrackedChange(editor, from, to, replacement, createTrackedChange);
+            return replaceDocumentTextWithTrackedChange(editor, from, to, replacement, createTrackedDocumentChange);
           }
           return editor
             .chain()
@@ -547,14 +607,13 @@ export function DocumentEditor({
             <Minus size={13} />
           </button>
           <output aria-label='文档缩放比例'>{zoom}%</output>
-          <input
-            type='range'
+          <OfficeSlider
             min={MIN_DOCUMENT_ZOOM}
             max={MAX_DOCUMENT_ZOOM}
             step={5}
             value={zoom}
-            aria-label='文档缩放'
-            onChange={(event) => setZoom(clampDocumentZoom(Number(event.target.value)))}
+            ariaLabel='文档缩放'
+            onValueChange={(value) => setZoom(clampDocumentZoom(value))}
           />
           <button
             type='button'
@@ -600,7 +659,7 @@ export function DocumentEditor({
                     agentMenu.from,
                     agentMenu.to,
                     change.after,
-                    createTrackedChange
+                    createTrackedDocumentChange
                   )
                 : editor
                     .chain()
@@ -625,6 +684,7 @@ export function DocumentEditor({
           onClose={() => setAgentMenu(null)}
         />
       )}
+      {officeDialog.dialog}
     </section>
   );
 }

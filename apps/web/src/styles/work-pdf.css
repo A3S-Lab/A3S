@@ -29,36 +29,22 @@
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
-  color: var(--a3s-faint);
 }
 
-.work-pdf-integration-bar output.saved {
-  color: #17805c;
+.work-pdf-integration-bar output .ds-status-badge {
+  padding: 2px 7px;
+  font-size: 8px;
 }
 
-.work-pdf-integration-bar output.error {
-  color: var(--a3s-red);
-}
-
-.work-pdf-integration-bar > button,
-.work-pdf-state button {
-  display: inline-flex;
-  height: 27px;
-  align-items: center;
+.work-pdf-integration-bar > .ds-button {
+  min-height: 27px;
   gap: 5px;
-  padding: 0 9px;
-  border: 1px solid color-mix(in srgb, var(--a3s-blue) 45%, var(--a3s-line));
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--a3s-blue) 7%, var(--a3s-panel));
-  color: var(--a3s-blue);
+  padding-inline: 9px;
   font-size: 9px;
-  font-weight: 620;
-  cursor: pointer;
 }
 
-.work-pdf-integration-bar > button:disabled {
+.work-pdf-integration-bar > .ds-button:disabled {
   cursor: wait;
-  opacity: 0.5;
 }
 
 .work-pdf-embed,
@@ -73,47 +59,22 @@
   overflow: hidden;
 }
 
-.work-pdf-state {
-  display: grid;
+.work-pdf-state.ds-state-view {
+  width: auto;
+  max-width: none;
   min-width: 0;
   min-height: 0;
   flex: 1;
-  place-items: center;
-  align-content: center;
-  gap: 10px;
   padding: 24px;
   background: var(--a3s-bg);
-  color: var(--a3s-muted);
-  font-size: 11px;
-  text-align: center;
 }
 
-.work-pdf-state.error {
-  color: var(--a3s-red);
-}
-
-.work-pdf-state.error strong {
-  color: var(--a3s-red);
+.work-pdf-state.ds-state-view h2 {
   font-size: 13px;
 }
 
-.work-pdf-state.error span {
+.work-pdf-state.ds-state-view > p {
   max-width: 520px;
-  color: var(--a3s-muted);
-}
-
-.work-pdf-state.error button {
-  display: inline-flex;
-  height: 31px;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 7px;
-  background: var(--a3s-panel);
-  color: var(--a3s-ink);
-  font-size: 10px;
-  cursor: pointer;
 }
 
 .work-pdf-export-surface {
@@ -245,23 +206,17 @@
   font-weight: 650;
 }
 
-.work-print-preview-field select,
-.work-print-preview-range > input[type="text"] {
+.work-print-preview-field .work-office-select > button[role="combobox"],
+.work-print-preview-range > .work-office-select > button[role="combobox"],
+.work-print-preview-range > .work-office-text-field {
   width: 100%;
   height: 34px;
-  padding: 0 9px;
-  border: 1px solid var(--a3s-line-strong);
   border-radius: 7px;
-  outline: 0;
-  background: var(--a3s-panel);
-  color: var(--a3s-ink);
   font-size: 10px;
 }
 
-.work-print-preview-field select:focus,
-.work-print-preview-range > input[type="text"]:focus {
-  border-color: var(--a3s-blue);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--a3s-blue) 12%, transparent);
+.work-print-preview-range > .work-office-select {
+  width: 100%;
 }
 
 .work-print-preview-range {
@@ -276,29 +231,18 @@
   margin-bottom: 2px;
 }
 
-.work-print-preview-range > label {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--a3s-ink);
-  font-size: 10px;
-  cursor: pointer;
-}
-
-.work-print-preview-range input[type="radio"] {
-  margin: 0;
-  accent-color: var(--a3s-blue);
-}
-
-.work-print-preview-range > input[type="text"]:disabled {
+.work-print-preview-range > .work-office-text-field:disabled {
   background: var(--a3s-panel-soft);
   color: var(--a3s-faint);
   cursor: not-allowed;
 }
 
-.work-print-preview-range-error {
+.work-print-preview-range-error.ds-inline-notice {
   margin: 0;
-  color: var(--a3s-red);
+  padding: 7px 8px;
+}
+
+.work-print-preview-range-error .ds-inline-notice-copy {
   font-size: 9px;
   line-height: 1.45;
 }

@@ -45,6 +45,22 @@ describe('Work document tracked changes', () => {
     expect(collectDocumentChanges(editor.state.doc)).toMatchObject([{ kind: 'deletion', text: '文', from: 2, to: 3 }]);
   });
 
+  it('groups consecutive formatted typing into one revision and one undo history step', () => {
+    const editor = createEditor('<p></p>');
+    editor.chain().focus().toggleBold().run();
+
+    typeTrackedText(editor, '快捷键加粗');
+
+    expect(collectDocumentChanges(editor.state.doc)).toMatchObject([
+      { kind: 'insertion', author: 'A3S Reviewer', text: '快捷键加粗' },
+    ]);
+    expect(editor.getHTML()).toContain('<strong>快捷键加粗</strong>');
+    expect(editor.commands.undo()).toBe(true);
+    expect(editor.getText()).toBe('');
+    expect(editor.commands.redo()).toBe(true);
+    expect(editor.getText()).toBe('快捷键加粗');
+  });
+
   it('accepts and rejects individual imported changes without affecting unrelated text', () => {
     const editor = createEditor(
       [
@@ -103,4 +119,14 @@ function createEditor(content: string): Editor {
   });
   editors.push(editor);
   return editor;
+}
+
+function typeTrackedText(editor: Editor, text: string): void {
+  for (const character of Array.from(text)) {
+    const { from, to } = editor.state.selection;
+    const handled = editor.view.someProp('handleTextInput', (handler) =>
+      handler(editor.view, from, to, character, () => editor.state.tr)
+    );
+    expect(handled).toBe(true);
+  }
 }

@@ -51,50 +51,12 @@
   gap: 7px 9px;
 }
 
-.work-spreadsheet-calculation-fields label {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  color: var(--a3s-muted);
-  font-size: 9px;
-}
-
-.work-spreadsheet-calculation-fields input,
-.work-spreadsheet-calculation-fields select {
-  width: 100%;
-  height: 27px;
-  min-width: 0;
-  padding: 0 7px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 5px;
-  outline: 0;
-  background: var(--a3s-bg);
-  color: var(--a3s-ink);
-  font: inherit;
-}
-
-.work-spreadsheet-calculation-fields input:focus,
-.work-spreadsheet-calculation-fields select:focus {
-  border-color: var(--a3s-blue);
-}
-
-.work-spreadsheet-calculation-fields input:disabled {
-  opacity: 0.45;
-}
-
-.work-spreadsheet-calculation-fields label.toggle {
+.work-spreadsheet-calculation-fields .work-office-checkbox.toggle {
   display: flex;
   min-height: 27px;
   align-items: center;
   gap: 6px;
   padding: 0 5px;
-}
-
-.work-spreadsheet-calculation-fields label.toggle input {
-  width: 13px;
-  height: 13px;
-  padding: 0;
-  accent-color: var(--a3s-blue);
 }
 
 .work-spreadsheet-calculation-fields .actions {
@@ -162,8 +124,7 @@
 }
 
 .work-spreadsheet-formula-diagnostics article p,
-.work-spreadsheet-formula-diagnostics article small,
-.work-spreadsheet-formula-diagnostics .empty {
+.work-spreadsheet-formula-diagnostics article small {
   margin: 2px 0 0;
   color: var(--a3s-faint);
   font-size: 8px;
@@ -172,11 +133,6 @@
 
 .work-spreadsheet-formula-diagnostics article small {
   display: block;
-}
-
-.work-spreadsheet-formula-diagnostics .empty {
-  margin: 18px 6px;
-  text-align: center;
 }
 
 @media (max-width: 900px) {

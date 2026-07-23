@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react';
+import { Button, InlineNotice } from '../../../design-system/primitives';
 import {
   formatSpreadsheetColumnPageBreaks,
   formatSpreadsheetRowPageBreaks,
   parseSpreadsheetColumnPageBreaks,
   parseSpreadsheetRowPageBreaks,
 } from '../work-spreadsheet-page-breaks';
+import { type EffectiveSpreadsheetPageSetup, effectiveSpreadsheetPageSetup } from '../work-spreadsheet-page-setup';
 import {
   normalizeSpreadsheetPrintArea,
   normalizeSpreadsheetPrintTitleColumns,
   normalizeSpreadsheetPrintTitleRows,
 } from '../work-spreadsheet-ranges';
-import { effectiveSpreadsheetPageSetup, type EffectiveSpreadsheetPageSetup } from '../work-spreadsheet-page-setup';
 import type { WorkSpreadsheetContent } from '../work-types';
+import { OfficeCheckbox, OfficeNumberField, OfficeSelect, OfficeTextField } from './office-controls';
 import { SpreadsheetHeaderFooterFields } from './spreadsheet-header-footer-fields';
 
 export function spreadsheetPrintSettingCount(content: WorkSpreadsheetContent): number {
@@ -157,146 +159,145 @@ export function SpreadsheetPrintSettingsPanel({
         saveSettings();
       }}
     >
-      <label>
+      <div className='work-office-field'>
         <span>工作表</span>
-        <select aria-label='打印设置工作表' value={sheetId} onChange={(event) => setSheetId(event.target.value)}>
-          {availableSheets.map((sheet) => (
-            <option value={sheet.id} key={sheet.id}>
-              {sheet.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className='reference'>
+        <OfficeSelect
+          ariaLabel='打印设置工作表'
+          value={sheetId}
+          options={availableSheets.map((sheet) => ({ value: sheet.id, label: sheet.name }))}
+          onValueChange={setSheetId}
+        />
+      </div>
+      <div className='work-office-field reference'>
         <span>打印范围</span>
-        <input
+        <OfficeTextField
           aria-label='打印范围'
           value={reference}
           placeholder='$A$1:$J$40'
           onChange={(event) => setReference(event.target.value)}
         />
-      </label>
-      <label className='reference'>
+      </div>
+      <div className='work-office-field reference'>
         <span>重复标题行</span>
-        <input
+        <OfficeTextField
           aria-label='重复标题行'
           value={titleRows}
           placeholder='$1:$2'
           onChange={(event) => setTitleRows(event.target.value)}
         />
-      </label>
-      <label className='reference'>
+      </div>
+      <div className='work-office-field reference'>
         <span>重复标题列</span>
-        <input
+        <OfficeTextField
           aria-label='重复标题列'
           value={titleColumns}
           placeholder='$A:$C'
           onChange={(event) => setTitleColumns(event.target.value)}
         />
-      </label>
-      <label className='reference'>
+      </div>
+      <div className='work-office-field reference'>
         <span>手动水平分页符</span>
-        <input
+        <OfficeTextField
           aria-label='手动水平分页符'
           value={rowPageBreaks}
           placeholder='20, 35'
           onChange={(event) => setRowPageBreaks(event.target.value)}
         />
-      </label>
-      <label className='reference'>
+      </div>
+      <div className='work-office-field reference'>
         <span>手动垂直分页符</span>
-        <input
+        <OfficeTextField
           aria-label='手动垂直分页符'
           value={columnPageBreaks}
           placeholder='E, K'
           onChange={(event) => setColumnPageBreaks(event.target.value)}
         />
-      </label>
+      </div>
       <fieldset className='work-spreadsheet-page-setup-fields'>
         <legend>页面设置与缩放</legend>
-        <label>
+        <div className='work-office-field'>
           <span>纸张大小</span>
-          <select
-            aria-label='纸张大小'
+          <OfficeSelect
+            ariaLabel='纸张大小'
             value={pageSetup.paperSize}
-            onChange={(event) =>
+            options={[
+              { value: 'a3', label: 'A3' },
+              { value: 'a4', label: 'A4' },
+              { value: 'a5', label: 'A5' },
+              { value: 'letter', label: 'Letter' },
+              { value: 'legal', label: 'Legal' },
+              { value: 'tabloid', label: 'Tabloid' },
+            ]}
+            onValueChange={(paperSize) =>
               setPageSetup({
                 ...pageSetup,
-                paperSize: event.target.value as EffectiveSpreadsheetPageSetup['paperSize'],
+                paperSize: paperSize as EffectiveSpreadsheetPageSetup['paperSize'],
               })
             }
-          >
-            <option value='a3'>A3</option>
-            <option value='a4'>A4</option>
-            <option value='a5'>A5</option>
-            <option value='letter'>Letter</option>
-            <option value='legal'>Legal</option>
-            <option value='tabloid'>Tabloid</option>
-          </select>
-        </label>
-        <label>
+          />
+        </div>
+        <div className='work-office-field'>
           <span>页面方向</span>
-          <select
-            aria-label='页面方向'
+          <OfficeSelect
+            ariaLabel='页面方向'
             value={pageSetup.orientation}
-            onChange={(event) =>
+            options={[
+              { value: 'landscape', label: '横向' },
+              { value: 'portrait', label: '纵向' },
+            ]}
+            onValueChange={(orientation) =>
               setPageSetup({
                 ...pageSetup,
-                orientation: event.target.value as EffectiveSpreadsheetPageSetup['orientation'],
+                orientation: orientation as EffectiveSpreadsheetPageSetup['orientation'],
               })
             }
-          >
-            <option value='landscape'>横向</option>
-            <option value='portrait'>纵向</option>
-          </select>
-        </label>
-        <label>
+          />
+        </div>
+        <div className='work-office-field'>
           <span>缩放方式</span>
-          <select
-            aria-label='缩放方式'
+          <OfficeSelect
+            ariaLabel='缩放方式'
             value={pageSetup.fitToPage ? 'fit' : 'scale'}
-            onChange={(event) => setPageSetup({ ...pageSetup, fitToPage: event.target.value === 'fit' })}
-          >
-            <option value='scale'>按比例缩放</option>
-            <option value='fit'>适合指定页数</option>
-          </select>
-        </label>
-        <label>
+            options={[
+              { value: 'scale', label: '按比例缩放' },
+              { value: 'fit', label: '适合指定页数' },
+            ]}
+            onValueChange={(mode) => setPageSetup({ ...pageSetup, fitToPage: mode === 'fit' })}
+          />
+        </div>
+        <div className='work-office-field'>
           <span>缩放比例（10–400%）</span>
-          <input
-            aria-label='缩放比例'
-            type='number'
+          <OfficeNumberField
+            ariaLabel='缩放比例'
             min={10}
             max={400}
             disabled={pageSetup.fitToPage}
             value={pageSetup.scale}
-            onChange={(event) => setPageSetup({ ...pageSetup, scale: Number(event.target.value) })}
+            onValueChange={(scale) => setPageSetup({ ...pageSetup, scale: Number(scale) })}
           />
-        </label>
-        <label>
+        </div>
+        <div className='work-office-field'>
           <span>适合页宽（0 为自动）</span>
-          <input
-            aria-label='适合页宽'
-            type='number'
+          <OfficeNumberField
+            ariaLabel='适合页宽'
             min={0}
             max={32767}
             disabled={!pageSetup.fitToPage}
             value={pageSetup.fitToWidth}
-            onChange={(event) => setPageSetup({ ...pageSetup, fitToWidth: Number(event.target.value) })}
+            onValueChange={(fitToWidth) => setPageSetup({ ...pageSetup, fitToWidth: Number(fitToWidth) })}
           />
-        </label>
-        <label>
+        </div>
+        <div className='work-office-field'>
           <span>适合页高（0 为自动）</span>
-          <input
-            aria-label='适合页高'
-            type='number'
+          <OfficeNumberField
+            ariaLabel='适合页高'
             min={0}
             max={32767}
             disabled={!pageSetup.fitToPage}
             value={pageSetup.fitToHeight}
-            onChange={(event) => setPageSetup({ ...pageSetup, fitToHeight: Number(event.target.value) })}
+            onValueChange={(fitToHeight) => setPageSetup({ ...pageSetup, fitToHeight: Number(fitToHeight) })}
           />
-        </label>
+        </div>
         <PageMarginField
           label='上边距（毫米）'
           value={pageSetup.margins.top}
@@ -327,39 +328,41 @@ export function SpreadsheetPrintSettingsPanel({
           value={pageSetup.margins.footer}
           onChange={(footer) => setPageSetup({ ...pageSetup, margins: { ...pageSetup.margins, footer } })}
         />
-        <label className='toggle'>
-          <input
-            aria-label='水平居中'
-            type='checkbox'
-            checked={pageSetup.horizontalCentered}
-            onChange={(event) => setPageSetup({ ...pageSetup, horizontalCentered: event.target.checked })}
-          />
-          <span>水平居中</span>
-        </label>
-        <label className='toggle'>
-          <input
-            aria-label='垂直居中'
-            type='checkbox'
-            checked={pageSetup.verticalCentered}
-            onChange={(event) => setPageSetup({ ...pageSetup, verticalCentered: event.target.checked })}
-          />
-          <span>垂直居中</span>
-        </label>
+        <OfficeCheckbox
+          className='toggle'
+          ariaLabel='水平居中'
+          checked={pageSetup.horizontalCentered}
+          onCheckedChange={(horizontalCentered) => setPageSetup({ ...pageSetup, horizontalCentered })}
+        >
+          水平居中
+        </OfficeCheckbox>
+        <OfficeCheckbox
+          className='toggle'
+          ariaLabel='垂直居中'
+          checked={pageSetup.verticalCentered}
+          onCheckedChange={(verticalCentered) => setPageSetup({ ...pageSetup, verticalCentered })}
+        >
+          垂直居中
+        </OfficeCheckbox>
       </fieldset>
       <SpreadsheetHeaderFooterFields pageSetup={pageSetup} onChange={setPageSetup} />
       <p>范围、标题、分页符、页眉页脚与页面设置会保留到 XLSX，并共同控制分页 PDF。</p>
       <div className='actions'>
-        {error && <output className='error'>{error}</output>}
-        <button
-          type='button'
+        {error && (
+          <InlineNotice className='work-office-form-error' tone='danger' role='alert'>
+            {error}
+          </InlineNotice>
+        )}
+        <Button
+          tone='secondary'
           disabled={!savedArea && !savedTitles && !savedPageBreaks && !savedPageSetup}
           onClick={clearSettings}
         >
           清除
-        </button>
-        <button type='submit' className='primary' disabled={!sheetId}>
+        </Button>
+        <Button type='submit' tone='primary' disabled={!sheetId}>
           保存打印设置
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -385,18 +388,17 @@ function PageMarginField({
   onChange: (value: number) => void;
 }) {
   return (
-    <label>
+    <div className='work-office-field'>
       <span>{label}</span>
-      <input
-        aria-label={label}
-        type='number'
+      <OfficeNumberField
+        ariaLabel={label}
         min={0}
         max={100}
-        step='0.01'
+        step={0.01}
         value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
+        onValueChange={(nextValue) => onChange(Number(nextValue))}
       />
-    </label>
+    </div>
   );
 }
 

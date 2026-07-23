@@ -59,7 +59,7 @@ describe('Work Quick Look', () => {
 
     await waitFor(() => expect(screen.getByText('测试占位预览')).toBeInTheDocument());
     expect(onOpen).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: '在 Work 中打开' }));
+    fireEvent.click(screen.getByRole('button', { name: '打开' }));
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onOpen).toHaveBeenCalledWith(current);
   });

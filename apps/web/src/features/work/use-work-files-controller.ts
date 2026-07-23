@@ -3,16 +3,17 @@ import { codeApi } from '../../lib/api';
 import { formatApiError, showToast } from '../../state/app-state';
 import type { WorkspaceEntry } from '../../types/api';
 import { importWorkspaceDrop } from '../workspace/workspace-drop-import';
+import { useWorkFileSearch, type WorkFileSearchScope } from './use-work-file-search';
 import {
   persistWorkFilesPreferences,
   readWorkFilesPreferences,
   type WorkFilesPreferences,
 } from './work-files-preferences';
-import { moveWorkLocalFileBindings } from './work-local-file-binding';
+import { moveWorkLocalFileBindings, removeWorkLocalFileBindingsAtPath } from './work-local-file-binding';
 import {
   joinLocalPath,
-  localPathInside,
   localPathBasename,
+  localPathInside,
   localPathParent,
   rebaseLocalPath,
   sameLocalPath,
@@ -21,7 +22,6 @@ import {
   type WorkFilesLayout,
   type WorkFilesSort,
 } from './work-local-files';
-import { useWorkFileSearch, type WorkFileSearchScope } from './use-work-file-search';
 
 interface NavigationHistory {
   paths: string[];
@@ -38,6 +38,9 @@ export function useWorkFilesController(defaultRootPath = '') {
   const [initialRoot] = useState(() => resolveInitialRoot(initialPreferences, defaultRootPath));
   const [rootPath, setRootPath] = useState(initialRoot.rootPath);
   const [rootSource, setRootSource] = useState<WorkFilesPreferences['rootSource']>(initialPreferences.rootSource);
+  const [recentRootPaths, setRecentRootPaths] = useState(() =>
+    rememberRecentRoot(initialPreferences.recentRootPaths, initialRoot.rootPath)
+  );
   const [history, setHistory] = useState<NavigationHistory>(() => {
     const currentPath =
       initialPreferences.currentPath &&
@@ -112,14 +115,24 @@ export function useWorkFilesController(defaultRootPath = '') {
   }, [currentPath, loadDirectory]);
 
   useEffect(() => {
-    persistWorkFilesPreferences({ rootPath, rootSource, currentPath, layout, sort, favoritePaths, searchScope });
-  }, [rootPath, rootSource, currentPath, layout, sort, favoritePaths, searchScope]);
+    persistWorkFilesPreferences({
+      rootPath,
+      rootSource,
+      recentRootPaths,
+      currentPath,
+      layout,
+      sort,
+      favoritePaths,
+      searchScope,
+    });
+  }, [rootPath, rootSource, recentRootPaths, currentPath, layout, sort, favoritePaths, searchScope]);
 
   useEffect(() => {
     if (rootSource !== 'default' || !normalizedDefaultRoot || sameLocalPath(rootPath, normalizedDefaultRoot)) {
       return;
     }
     setRootPath(normalizedDefaultRoot);
+    setRecentRootPaths((current) => rememberRecentRoot(current, normalizedDefaultRoot));
     setHistory({ paths: [normalizedDefaultRoot], index: 0 });
     setFavoritePaths([]);
     setQuery('');
@@ -151,25 +164,55 @@ export function useWorkFilesController(defaultRootPath = '') {
     selectionAnchorRef.current = null;
   }, []);
 
-  const pickRoot = useCallback(async (): Promise<string | null> => {
-    try {
-      const selection = await codeApi.pickWorkspaceDirectory(rootPath || normalizedDefaultRoot || undefined);
-      if (selection.cancelled || !selection.path) return null;
-      const path = selection.path;
+  const activateRoot = useCallback(
+    (path: string) => {
       setFavoritePaths((current) => (rootPath && sameLocalPath(rootPath, path) ? current : []));
       setRootSource('user');
       setRootPath(path);
+      setRecentRootPaths((current) => rememberRecentRoot(current, path));
       setHistory({ paths: [path], index: 0 });
       setQuery('');
       setSelectedPaths(new Set());
       setSelectionFocusPath(null);
       selectionAnchorRef.current = null;
-      return path;
+    },
+    [rootPath]
+  );
+
+  const selectRoot = useCallback(
+    async (candidate: string): Promise<string | null> => {
+      const path = candidate.trim();
+      if (!path) return null;
+      if (rootPath && sameLocalPath(rootPath, path)) {
+        setHistory({ paths: [rootPath], index: 0 });
+        setQuery('');
+        setSelectedPaths(new Set());
+        setSelectionFocusPath(null);
+        selectionAnchorRef.current = null;
+        return rootPath;
+      }
+      try {
+        await codeApi.readDir(path);
+        activateRoot(path);
+        return path;
+      } catch (selectionError) {
+        showToast(`无法打开工作区：${formatApiError(selectionError)}`, 'error');
+        return null;
+      }
+    },
+    [activateRoot, rootPath]
+  );
+
+  const pickRoot = useCallback(async (): Promise<string | null> => {
+    try {
+      const selection = await codeApi.pickWorkspaceDirectory(rootPath || normalizedDefaultRoot || undefined);
+      if (selection.cancelled || !selection.path) return null;
+      return await selectRoot(selection.path);
     } catch (pickError) {
       showToast(formatApiError(pickError), 'error');
       return null;
     }
-  }, [normalizedDefaultRoot, rootPath]);
+  }, [normalizedDefaultRoot, rootPath, selectRoot]);
 
   const navigateTo = useCallback(
     (path: string) => {
@@ -345,6 +388,51 @@ export function useWorkFilesController(defaultRootPath = '') {
     [currentPath, loadDirectory]
   );
 
+  const deleteEntries = useCallback(
+    async (items: readonly WorkspaceEntry[]) => {
+      const paths = uniqueLocalPaths(items.map((entry) => entry.path));
+      if (!paths.length) return;
+      if (!rootPath || paths.some((path) => !localPathInside(rootPath, path) || sameLocalPath(rootPath, path))) {
+        throw new Error('只能删除当前文件夹中的项目，且不能删除已打开的根文件夹。');
+      }
+
+      const deletedPaths: string[] = [];
+      setOperationPaths(new Set(paths));
+      try {
+        for (const path of paths) {
+          await codeApi.deletePath(path);
+          deletedPaths.push(path);
+          removeWorkLocalFileBindingsAtPath(path);
+        }
+        setFavoritePaths((current) =>
+          current.filter((favorite) => !deletedPaths.some((path) => localPathInside(path, favorite)))
+        );
+        setSelectedPaths(new Set());
+        setSelectionFocusPath(null);
+        selectionAnchorRef.current = null;
+        await loadDirectory(currentPath);
+        setFilesystemRevision((current) => current + 1);
+        showToast(`${deletedPaths.length} 项已永久删除`, 'success');
+      } catch (operationError) {
+        if (deletedPaths.length) {
+          setFavoritePaths((current) =>
+            current.filter((favorite) => !deletedPaths.some((path) => localPathInside(path, favorite)))
+          );
+          setSelectedPaths(new Set());
+          setSelectionFocusPath(null);
+          selectionAnchorRef.current = null;
+          setFilesystemRevision((current) => current + 1);
+          await loadDirectory(currentPath).catch(() => undefined);
+        }
+        showToast(formatApiError(operationError), 'error');
+        throw operationError;
+      } finally {
+        setOperationPaths(new Set());
+      }
+    },
+    [currentPath, loadDirectory, rootPath]
+  );
+
   const moveEntries = useCallback(
     async (paths: readonly string[], destinationDirectory: string) => {
       try {
@@ -447,6 +535,7 @@ export function useWorkFilesController(defaultRootPath = '') {
 
   return {
     rootPath,
+    recentRootPaths,
     currentPath,
     entries,
     visibleEntries,
@@ -473,6 +562,7 @@ export function useWorkFilesController(defaultRootPath = '') {
     setSearchScope,
     setLayout,
     setSort,
+    selectRoot,
     pickRoot,
     navigateTo,
     goBack,
@@ -486,6 +576,7 @@ export function useWorkFilesController(defaultRootPath = '') {
     createFolder,
     renameEntry,
     duplicateEntry,
+    deleteEntries,
     moveEntries,
     importDroppedItems,
   };
@@ -512,4 +603,13 @@ function uniqueLocalPaths(paths: readonly string[]): string[] {
     result.push(path);
   }
   return result;
+}
+
+function rememberRecentRoot(paths: readonly string[], path: string): string[] {
+  const normalized = path.trim();
+  if (!normalized) return uniqueLocalPaths(paths).slice(0, 8);
+  return uniqueLocalPaths([normalized, ...paths.filter((candidate) => !sameLocalPath(candidate, normalized))]).slice(
+    0,
+    8
+  );
 }

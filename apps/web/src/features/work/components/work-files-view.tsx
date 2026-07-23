@@ -13,15 +13,17 @@ import {
   Star,
   Tags,
   TextSearch,
+  Trash2,
   Upload,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Button, StateView } from '../../../design-system/primitives';
 import { showToast } from '../../../state/app-state';
 import type { WorkspaceEntry } from '../../../types/api';
 import { WorkspaceContextMenu, type WorkspaceContextMenuItem } from '../../workspace/components/workspace-context-menu';
 import { hasDraggedWorkspaceFiles } from '../../workspace/workspace-drop-import';
-import type { WorkAgentRequest } from '../work-agent-request';
 import type { WorkFilesActions } from '../use-work-files-controller';
+import type { WorkAgentRequest } from '../work-agent-request';
 import {
   canMoveLocalPaths,
   formatWorkFileDate,
@@ -36,7 +38,7 @@ import {
   writeWorkLocalFileDragData,
 } from '../work-local-files';
 import { WorkFileIcon } from './work-file-icon';
-import { WorkFileOperationDialog, type WorkFileOperation } from './work-file-operation-dialog';
+import { type WorkFileOperation, WorkFileOperationDialog } from './work-file-operation-dialog';
 
 interface ContextMenuState {
   entry: WorkspaceEntry | null;
@@ -77,17 +79,20 @@ export function WorkFilesView({
       return;
     }
     if (!isWorkOpenableEntry(entry)) {
-      showToast('此格式暂不能在 Work 中编辑；仍可把它交给 AI 助手处理。', 'info');
+      showToast('这个文件暂不能直接编辑，可以交给 AI 助手处理。', 'info');
       return;
     }
     void onOpenFile(entry);
   };
   const selectedPathsFor = (entry: WorkspaceEntry): string[] =>
     actions.selectedPaths.has(entry.path) ? actions.selectedEntries.map((item) => item.path) : [entry.path];
+  const selectedEntriesFor = (entry: WorkspaceEntry): WorkspaceEntry[] =>
+    actions.selectedPaths.has(entry.path) ? actions.selectedEntries : [entry];
   const contextItems = contextMenuItems({
     entry: contextMenu?.entry ?? null,
     currentPath: actions.currentPath,
     selectedPaths: contextMenu?.entry ? selectedPathsFor(contextMenu.entry) : [],
+    selectedEntries: contextMenu?.entry ? selectedEntriesFor(contextMenu.entry) : [],
     onOpen: openEntry,
     onQuickLook,
     onOperation: setOperation,
@@ -154,6 +159,12 @@ export function WorkFilesView({
           } else if (event.key === 'F2' && actions.selectedEntries.length === 1) {
             event.preventDefault();
             setOperation({ kind: 'rename', entry: actions.selectedEntries[0] });
+          } else if (
+            actions.selectedEntries.length > 0 &&
+            (event.key === 'Delete' || (commandKey && event.key === 'Backspace'))
+          ) {
+            event.preventDefault();
+            setOperation({ kind: 'delete', entries: actions.selectedEntries });
           } else if (event.key === 'Escape') {
             actions.clearSelection();
           } else {
@@ -309,19 +320,21 @@ export function WorkFilesView({
           !actions.searchLoading &&
           !actions.error &&
           !actions.searchError && (
-            <section className='work-files-empty'>
-              <span>
-                <FolderOpen size={24} />
-              </span>
-              <strong>{actions.query ? '没有匹配的文件' : '这个文件夹是空的'}</strong>
-              <p>{actions.query ? '尝试缩短搜索词。' : '你可以直接在这里创建第一个文件夹。'}</p>
-              {!actions.query && (
-                <button type='button' onClick={() => setOperation({ kind: 'create-folder' })}>
-                  <FolderPlus size={14} />
-                  新建文件夹
-                </button>
-              )}
-            </section>
+            <StateView
+              className='work-files-empty-state'
+              size='compact'
+              icon={<FolderOpen size={24} />}
+              title={actions.query ? '没有匹配的文件' : '这个文件夹是空的'}
+              description={actions.query ? '尝试缩短搜索词。' : '你可以直接在这里创建第一个文件夹。'}
+              actions={
+                !actions.query && (
+                  <Button tone='primary' onClick={() => setOperation({ kind: 'create-folder' })}>
+                    <FolderPlus size={14} />
+                    新建文件夹
+                  </Button>
+                )
+              }
+            />
           )}
         {externalDropTargetPath === actions.currentPath && (
           <output className='work-files-drop-hint'>
@@ -368,6 +381,7 @@ function contextMenuItems({
   entry,
   currentPath,
   selectedPaths,
+  selectedEntries,
   onOpen,
   onQuickLook,
   onOperation,
@@ -379,6 +393,7 @@ function contextMenuItems({
   entry: WorkspaceEntry | null;
   currentPath: string;
   selectedPaths: string[];
+  selectedEntries: WorkspaceEntry[];
   onOpen: (entry: WorkspaceEntry) => void;
   onQuickLook: (entry: WorkspaceEntry) => void;
   onOperation: (operation: WorkFileOperation) => void;
@@ -437,7 +452,7 @@ function contextMenuItems({
   const items: WorkspaceContextMenuItem[] = [
     {
       id: 'open',
-      label: entry.isDirectory ? '打开文件夹' : '在 Work 中打开',
+      label: entry.isDirectory ? '打开文件夹' : '打开',
       icon: entry.isDirectory ? <FolderOpen size={14} /> : <FileInput size={14} />,
       disabled: !isWorkOpenableEntry(entry),
       onSelect: () => onOpen(entry),
@@ -527,6 +542,15 @@ function contextMenuItems({
       label: '创建副本',
       icon: <Copy size={14} />,
       onSelect: () => onOperation({ kind: 'duplicate', entry }),
+    },
+    {
+      id: 'delete',
+      label: selectedEntries.length > 1 ? `永久删除 ${selectedEntries.length} 项` : '永久删除',
+      icon: <Trash2 size={14} />,
+      shortcut: 'Delete',
+      ariaKeyShortcut: 'Delete',
+      separatorBefore: true,
+      onSelect: () => onOperation({ kind: 'delete', entries: selectedEntries }),
     }
   );
   return items;

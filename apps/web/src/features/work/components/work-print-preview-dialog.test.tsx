@@ -5,6 +5,11 @@ import { createWorkArtifact } from '../work-templates';
 import type { WorkPresentationPrintLayout } from '../work-types';
 import { WorkPrintPreviewDialog } from './work-print-preview-dialog';
 
+function chooseOfficeOption(label: string, option: string) {
+  fireEvent.click(screen.getByRole('combobox', { name: label }));
+  fireEvent.click(screen.getByRole('option', { name: option }));
+}
+
 describe('Work print preview', () => {
   afterEach(() => {
     cleanup();
@@ -24,7 +29,7 @@ describe('Work print preview', () => {
     expect(document.body).toHaveClass('work-print-preview-open');
 
     fireEvent.click(screen.getByRole('button', { name: '下一打印页' }));
-    fireEvent.click(screen.getByLabelText('当前页面'));
+    chooseOfficeOption('打印页面范围', '当前页面');
     fireEvent.click(screen.getByRole('button', { name: '导出所选页面为 PDF' }));
 
     await waitFor(() => expect(onExportPdf).toHaveBeenCalledWith([1]));
@@ -36,7 +41,7 @@ describe('Work print preview', () => {
     const onPrint = vi.fn().mockResolvedValue(undefined);
     render(<PreviewHarness artifact={artifact} onExportPdf={onExportPdf} onPrint={onPrint} />);
 
-    fireEvent.click(screen.getByLabelText('自定义范围'));
+    chooseOfficeOption('打印页面范围', '自定义范围');
     fireEvent.change(screen.getByLabelText('自定义页码范围'), { target: { value: '1, 3' } });
     fireEvent.click(screen.getByRole('button', { name: '导出所选页面为 PDF' }));
     fireEvent.click(screen.getByRole('button', { name: '打印所选页面' }));
@@ -66,7 +71,7 @@ describe('Work print preview', () => {
       />
     );
 
-    fireEvent.change(screen.getByLabelText('演示打印版式'), { target: { value: 'handout-2' } });
+    chooseOfficeOption('演示打印版式', '讲义 · 每页 2 张');
 
     await waitFor(() => {
       expect(screen.getByLabelText('打印页数')).toHaveTextContent('2 页');

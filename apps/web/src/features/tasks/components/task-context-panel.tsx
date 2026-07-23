@@ -1,7 +1,7 @@
 import { Files, GitBranch, History, Maximize2, Minimize2, PanelRightClose } from 'lucide-react';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
-import { Button, IconButton, SplitHandle } from '../../../design-system/primitives';
+import { Button, IconButton, SplitHandle, Tabs } from '../../../design-system/primitives';
 import { appState, navigateTask } from '../../../state/app-state';
 import type { TaskView } from '../../code/code-state';
 import { WorkspacePage } from '../../code/pages/workspace-page';
@@ -31,8 +31,6 @@ export function TaskContextPanel({ view, actions }: { view: Exclude<TaskView, 'c
   const [width, setWidth] = useState(readPanelWidth);
   const [changesOpen, setChangesOpen] = useState(false);
   const panelRef = useRef<HTMLElement>(null);
-  const workspaceModeButtonRef = useRef<HTMLButtonElement>(null);
-  const activityModeButtonRef = useRef<HTMLButtonElement>(null);
   const presentationButtonRef = useRef<HTMLButtonElement>(null);
   const fullscreen = state.workspacePresentation === 'fullscreen';
   const panelName = view === 'review' ? '任务工作区' : '任务活动面板';
@@ -40,7 +38,7 @@ export function TaskContextPanel({ view, actions }: { view: Exclude<TaskView, 'c
     const frame = window.requestAnimationFrame(() => {
       const panel = panelRef.current;
       if (!panel || panel.contains(document.activeElement)) return;
-      const target = view === 'review' ? workspaceModeButtonRef.current : activityModeButtonRef.current;
+      const target = panel.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]');
       target?.focus({ preventScroll: true });
     });
     return () => window.cancelAnimationFrame(frame);
@@ -88,31 +86,21 @@ export function TaskContextPanel({ view, actions }: { view: Exclude<TaskView, 'c
         onCommit={(value) => updateWidth(value, true)}
       />
       <header className='task-context-header'>
-        <nav aria-label='任务上下文面板'>
-          <button
-            ref={workspaceModeButtonRef}
-            type='button'
-            className={view === 'review' ? 'active' : ''}
-            aria-current={view === 'review' ? 'page' : undefined}
-            onClick={() => navigateTask('review')}
-          >
-            <Files size={14} />
-            工作区
-          </button>
-          <button
-            ref={activityModeButtonRef}
-            type='button'
-            className={view === 'activity' ? 'active' : ''}
-            aria-current={view === 'activity' ? 'page' : undefined}
-            onClick={() => {
-              setChangesOpen(false);
-              navigateTask('activity');
-            }}
-          >
-            <History size={14} />
-            活动
-          </button>
-        </nav>
+        <Tabs<Exclude<TaskView, 'conversation'>>
+          ariaLabel='任务上下文面板'
+          value={view}
+          variant='line'
+          size='compact'
+          className='task-context-tabs'
+          items={[
+            { id: 'review', label: '工作区', icon: <Files size={14} /> },
+            { id: 'activity', label: '活动', icon: <History size={14} /> },
+          ]}
+          onChange={(nextView) => {
+            if (nextView === 'activity') setChangesOpen(false);
+            navigateTask(nextView);
+          }}
+        />
         <div className='task-context-actions'>
           {view === 'review' && (
             <Button

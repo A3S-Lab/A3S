@@ -30,6 +30,10 @@
   border-radius: 5px;
 }
 
+.work-spreadsheet-editor .fortune-sheet-area-right {
+  display: none !important;
+}
+
 .work-spreadsheet-editor.preview .fortune-formula-bar {
   background: #ffffff;
 }
@@ -50,49 +54,6 @@
   color: #32725a;
   font-size: 9px;
   pointer-events: none;
-}
-
-.work-spreadsheet-metadata-toolbar {
-  display: flex;
-  min-height: 33px;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  border-bottom: 1px solid var(--a3s-line);
-  background: var(--a3s-panel);
-}
-
-.work-spreadsheet-metadata-toolbar button {
-  display: inline-flex;
-  height: 26px;
-  align-items: center;
-  gap: 6px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--a3s-muted);
-  font-size: 9px;
-  cursor: pointer;
-}
-
-.work-spreadsheet-metadata-toolbar button:hover,
-.work-spreadsheet-metadata-toolbar button.active {
-  background: var(--a3s-panel-soft);
-  color: var(--a3s-ink);
-}
-
-.work-spreadsheet-metadata-toolbar button.active {
-  box-shadow: inset 0 0 0 1px var(--a3s-line);
-}
-
-.work-spreadsheet-metadata-toolbar button > span {
-  min-width: 16px;
-  padding: 1px 4px;
-  border-radius: 999px;
-  background: var(--a3s-bg);
-  color: var(--a3s-faint);
-  text-align: center;
 }
 
 .work-spreadsheet-workbook-panel {
@@ -161,6 +122,7 @@
   display: inline-flex;
   width: 100%;
   height: 27px;
+  min-height: 27px;
   align-items: center;
   justify-content: center;
   gap: 5px;
@@ -229,53 +191,6 @@
   padding: 10px 12px;
 }
 
-.work-spreadsheet-name-manager label,
-.work-spreadsheet-chart-manager label,
-.work-spreadsheet-conditional-manager label,
-.work-spreadsheet-protection-manager label,
-.work-spreadsheet-print-area-form label {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  color: var(--a3s-muted);
-  font-size: 9px;
-}
-
-.work-spreadsheet-name-manager input,
-.work-spreadsheet-name-manager select,
-.work-spreadsheet-chart-manager input,
-.work-spreadsheet-chart-manager select,
-.work-spreadsheet-conditional-manager input,
-.work-spreadsheet-conditional-manager select,
-.work-spreadsheet-protection-manager input,
-.work-spreadsheet-protection-manager select,
-.work-spreadsheet-print-area-form input,
-.work-spreadsheet-print-area-form select {
-  width: 100%;
-  height: 27px;
-  min-width: 0;
-  padding: 0 7px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 5px;
-  outline: 0;
-  background: var(--a3s-bg);
-  color: var(--a3s-ink);
-  font: inherit;
-}
-
-.work-spreadsheet-name-manager input:focus,
-.work-spreadsheet-name-manager select:focus,
-.work-spreadsheet-chart-manager input:focus,
-.work-spreadsheet-chart-manager select:focus,
-.work-spreadsheet-conditional-manager input:focus,
-.work-spreadsheet-conditional-manager select:focus,
-.work-spreadsheet-protection-manager input:focus,
-.work-spreadsheet-protection-manager select:focus,
-.work-spreadsheet-print-area-form input:focus,
-.work-spreadsheet-print-area-form select:focus {
-  border-color: var(--a3s-blue);
-}
-
 .work-spreadsheet-name-manager .reference,
 .work-spreadsheet-conditional-manager .reference {
   grid-column: 3;
@@ -300,6 +215,7 @@
 .work-spreadsheet-workbook-panel .actions button {
   display: inline-flex;
   height: 27px;
+  min-height: 27px;
   align-items: center;
   gap: 5px;
   padding: 0 9px;
@@ -324,12 +240,6 @@
 .work-spreadsheet-workbook-panel .actions button:disabled {
   opacity: 0.45;
   cursor: default;
-}
-
-.work-spreadsheet-workbook-panel .actions .error {
-  margin-right: auto;
-  color: var(--a3s-red);
-  font-size: 9px;
 }
 
 .work-spreadsheet-print-area-form {
@@ -364,20 +274,12 @@
   font-weight: 600;
 }
 
-.work-spreadsheet-page-setup-fields label.toggle,
-.work-spreadsheet-header-footer-fields label.toggle {
+.work-spreadsheet-page-setup-fields .work-office-checkbox.toggle,
+.work-spreadsheet-header-footer-fields .work-office-checkbox.toggle {
   display: flex;
   min-height: 27px;
   align-items: center;
-  flex-direction: row;
   gap: 6px;
-}
-
-.work-spreadsheet-page-setup-fields label.toggle input,
-.work-spreadsheet-header-footer-fields label.toggle input {
-  width: 13px;
-  height: 13px;
-  margin: 0;
 }
 
 .work-spreadsheet-header-footer-fields .tokens {
@@ -404,6 +306,7 @@
   display: inline-flex;
   width: 100%;
   height: 27px;
+  min-height: 27px;
   align-items: center;
   justify-content: center;
   gap: 5px;
@@ -448,8 +351,7 @@
 
 .work-spreadsheet-conditional-list > button span,
 .work-spreadsheet-conditional-list > button small,
-.work-spreadsheet-conditional-list > p,
-.work-spreadsheet-conditional-empty {
+.work-spreadsheet-conditional-list > p {
   color: var(--a3s-faint);
   font-size: 8px;
 }
@@ -461,8 +363,7 @@
   white-space: nowrap;
 }
 
-.work-spreadsheet-conditional-list > p,
-.work-spreadsheet-conditional-empty {
+.work-spreadsheet-conditional-list > p {
   margin: 12px 4px;
   text-align: center;
 }
@@ -475,26 +376,13 @@
   grid-column: span 2;
 }
 
-.work-spreadsheet-conditional-manager label.color input {
-  padding: 2px 5px;
-  cursor: pointer;
-}
-
-.work-spreadsheet-conditional-manager label.toggle {
+.work-spreadsheet-conditional-manager .work-office-checkbox.toggle {
   display: flex;
   min-height: 27px;
   align-self: end;
   align-items: center;
   gap: 6px;
   padding: 0 4px;
-}
-
-.work-spreadsheet-conditional-manager label.toggle input,
-.work-spreadsheet-conditional-thresholds label.threshold-gte input {
-  width: 13px;
-  height: 13px;
-  padding: 0;
-  accent-color: var(--a3s-blue);
 }
 
 .work-spreadsheet-conditional-thresholds {
@@ -522,7 +410,7 @@
   font-size: 9px;
 }
 
-.work-spreadsheet-conditional-thresholds label.threshold-gte {
+.work-spreadsheet-conditional-thresholds .work-office-checkbox.threshold-gte {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -550,6 +438,7 @@
   display: inline-flex;
   width: 100%;
   height: 27px;
+  min-height: 27px;
   align-items: center;
   justify-content: center;
   gap: 5px;
@@ -612,8 +501,7 @@
   font-size: 8px;
 }
 
-.work-spreadsheet-protection-list > p,
-.work-spreadsheet-protection-empty {
+.work-spreadsheet-protection-list > p {
   margin: 12px 4px;
   color: var(--a3s-faint);
   font-size: 8px;
@@ -625,7 +513,7 @@
   align-items: start;
 }
 
-.work-spreadsheet-protection-manager label.toggle {
+.work-spreadsheet-protection-manager .work-office-checkbox.toggle {
   display: flex;
   height: 27px;
   align-items: center;
@@ -654,17 +542,10 @@
   font-size: 8px;
 }
 
-.work-spreadsheet-protection-manager label.check {
+.work-spreadsheet-protection-manager .work-office-checkbox.check {
   display: flex;
   align-items: center;
   gap: 4px;
-}
-
-.work-spreadsheet-protection-manager label.toggle input,
-.work-spreadsheet-protection-manager label.check input {
-  width: 13px;
-  height: 13px;
-  padding: 0;
 }
 
 .work-spreadsheet-protection-manager .reference {
@@ -677,613 +558,4 @@
   color: var(--a3s-faint);
   font-size: 8px;
   line-height: 1.45;
-}
-
-.work-spreadsheet-protection-manager form > p.warning {
-  color: var(--a3s-warning);
-}
-
-.work-spreadsheet-chart-manager {
-  display: grid;
-  grid-template-columns: minmax(180px, 230px) minmax(720px, 1fr);
-  min-height: 198px;
-}
-
-.work-spreadsheet-chart-manager > aside {
-  padding: 8px;
-  border-right: 1px solid var(--a3s-line);
-}
-
-.work-spreadsheet-chart-manager .create {
-  display: inline-flex;
-  width: 100%;
-  height: 27px;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 5px;
-  background: var(--a3s-bg);
-  color: var(--a3s-muted);
-  font-size: 9px;
-  cursor: pointer;
-}
-
-.work-spreadsheet-chart-list {
-  display: grid;
-  max-height: 153px;
-  gap: 3px;
-  margin-top: 6px;
-  overflow: auto;
-}
-
-.work-spreadsheet-chart-list > button {
-  display: grid;
-  gap: 1px;
-  padding: 6px 7px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--a3s-ink);
-  text-align: left;
-  cursor: pointer;
-}
-
-.work-spreadsheet-chart-list > button:hover,
-.work-spreadsheet-chart-list > button.active {
-  background: var(--a3s-panel-soft);
-}
-
-.work-spreadsheet-chart-list strong {
-  overflow: hidden;
-  font-size: 9px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.work-spreadsheet-chart-list span,
-.work-spreadsheet-chart-list > p {
-  color: var(--a3s-faint);
-  font-size: 8px;
-}
-
-.work-spreadsheet-chart-list > p {
-  margin: 12px 4px;
-  line-height: 1.5;
-  text-align: center;
-}
-
-.work-spreadsheet-chart-manager > form {
-  display: grid;
-  grid-template-columns: minmax(440px, 1.1fr) minmax(320px, 0.9fr);
-  align-content: start;
-  gap: 8px 10px;
-  padding: 9px 12px;
-}
-
-.work-spreadsheet-chart-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(150px, 1fr));
-  align-content: start;
-  gap: 7px 9px;
-}
-
-.work-spreadsheet-chart-fields .alternative-text {
-  grid-column: 1 / -1;
-}
-
-.work-spreadsheet-chart-layout {
-  display: grid;
-  grid-column: 1 / -1;
-  gap: 5px;
-  padding: 6px;
-  border: 1px solid color-mix(in srgb, var(--a3s-line) 82%, transparent);
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--a3s-panel-soft) 58%, transparent);
-}
-
-.work-spreadsheet-chart-layout > header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.work-spreadsheet-chart-layout > header strong,
-.work-spreadsheet-chart-layout > header span,
-.work-spreadsheet-chart-layout > p {
-  font-size: 8px;
-}
-
-.work-spreadsheet-chart-layout > header span,
-.work-spreadsheet-chart-layout > p {
-  color: var(--a3s-faint);
-}
-
-.work-spreadsheet-chart-layout > div {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(120px, 1fr));
-  gap: 5px;
-}
-
-.work-spreadsheet-chart-layout > p {
-  margin: 0;
-  line-height: 1.45;
-}
-
-.work-spreadsheet-chart-axes {
-  display: grid;
-  grid-column: 1 / -1;
-  gap: 5px;
-  padding: 6px;
-  border: 1px solid color-mix(in srgb, var(--a3s-line) 82%, transparent);
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--a3s-panel-soft) 58%, transparent);
-}
-
-.work-spreadsheet-chart-axes > header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.work-spreadsheet-chart-axes > header strong,
-.work-spreadsheet-chart-axes > header span,
-.work-spreadsheet-chart-axes legend {
-  font-size: 8px;
-}
-
-.work-spreadsheet-chart-axes > header span,
-.work-spreadsheet-chart-axes legend {
-  color: var(--a3s-faint);
-}
-
-.work-spreadsheet-chart-axes > div {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(150px, 1fr));
-  gap: 5px;
-}
-
-.work-spreadsheet-chart-axes fieldset {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(90px, 1fr));
-  gap: 5px;
-  margin: 0;
-  padding: 5px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 4px;
-  background: var(--a3s-bg);
-}
-
-.work-spreadsheet-chart-axes label.axis-check {
-  display: flex;
-  min-height: 27px;
-  align-items: center;
-  flex-direction: row;
-  gap: 6px;
-}
-
-.work-spreadsheet-chart-axes label.axis-check input {
-  width: 13px;
-  height: 13px;
-}
-
-.work-spreadsheet-chart-axes legend {
-  padding: 0 3px;
-}
-
-.work-spreadsheet-chart-manager label.check {
-  display: flex;
-  min-height: 27px;
-  align-items: center;
-  align-self: end;
-  flex-direction: row;
-  gap: 6px;
-}
-
-.work-spreadsheet-chart-manager label.check input {
-  width: 13px;
-  height: 13px;
-  padding: 0;
-  accent-color: var(--a3s-blue);
-}
-
-.work-spreadsheet-chart-series {
-  min-width: 0;
-  padding: 7px 8px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 6px;
-}
-
-.work-spreadsheet-chart-series > header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 5px;
-}
-
-.work-spreadsheet-chart-series > header strong {
-  font-size: 9px;
-}
-
-.work-spreadsheet-chart-series > header button {
-  display: inline-flex;
-  height: 23px;
-  align-items: center;
-  gap: 4px;
-  padding: 0 7px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 4px;
-  background: var(--a3s-bg);
-  color: var(--a3s-muted);
-  font-size: 8px;
-  cursor: pointer;
-}
-
-.work-spreadsheet-chart-series .xy-note {
-  margin: 0 0 5px;
-  color: var(--a3s-faint);
-  font-size: 8px;
-  line-height: 1.4;
-}
-
-.work-spreadsheet-chart-series-row {
-  display: grid;
-  grid-template-columns: minmax(90px, 0.7fr) minmax(125px, 0.9fr) minmax(170px, 1.2fr) 26px;
-  align-items: end;
-  gap: 5px;
-  margin-top: 5px;
-}
-
-.work-spreadsheet-chart-series-row.xy {
-  grid-template-columns: repeat(2, minmax(125px, 1fr)) 26px;
-}
-
-.work-spreadsheet-chart-series-row.xy .remove-series {
-  grid-column: 3;
-  grid-row: 1;
-}
-
-.work-spreadsheet-chart-series-row.xy .x-reference {
-  grid-column: 1;
-}
-
-.work-spreadsheet-chart-series-row.xy .y-reference {
-  grid-column: 2;
-}
-
-.work-spreadsheet-chart-series-row.bubble .bubble-reference {
-  grid-column: 1 / 3;
-}
-
-.work-spreadsheet-chart-series-row.combination {
-  grid-template-columns: repeat(2, minmax(125px, 1fr)) 26px;
-}
-
-.work-spreadsheet-chart-series-row.combination .series-name {
-  grid-column: 1;
-  grid-row: 1;
-}
-
-.work-spreadsheet-chart-series-row.combination .name-reference {
-  grid-column: 2;
-  grid-row: 1;
-}
-
-.work-spreadsheet-chart-series-row.combination .reference {
-  grid-column: 1 / 3;
-  grid-row: 2;
-}
-
-.work-spreadsheet-chart-series-row.combination .combination-chart-type {
-  grid-column: 1;
-  grid-row: 3;
-}
-
-.work-spreadsheet-chart-series-row.combination .combination-axis-group {
-  grid-column: 2;
-  grid-row: 3;
-}
-
-.work-spreadsheet-chart-series-row.combination .remove-series {
-  grid-column: 3;
-  grid-row: 1;
-}
-
-.work-spreadsheet-chart-series-row .remove-series {
-  display: grid;
-  width: 26px;
-  height: 27px;
-  place-items: center;
-  border: 1px solid var(--a3s-line);
-  border-radius: 5px;
-  background: var(--a3s-bg);
-  color: var(--a3s-red);
-  cursor: pointer;
-}
-
-.work-spreadsheet-chart-series-row .remove-series:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.work-spreadsheet-chart-series-style {
-  display: grid;
-  grid-column: 1 / -1;
-  gap: 5px;
-  padding: 6px;
-  border: 1px solid color-mix(in srgb, var(--a3s-line) 82%, transparent);
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--a3s-panel-soft) 58%, transparent);
-}
-
-.work-spreadsheet-chart-series-style > .enable-series-style {
-  min-height: 21px;
-  align-self: center;
-  font-weight: 600;
-}
-
-.work-spreadsheet-chart-series-style > div {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(72px, 1fr));
-  align-items: end;
-  gap: 5px;
-  padding-top: 5px;
-  border-top: 1px solid var(--a3s-line);
-}
-
-.work-spreadsheet-chart-series-style input[type='color'] {
-  min-height: 27px;
-  padding: 2px;
-}
-
-.work-spreadsheet-data-labels {
-  display: grid;
-  grid-column: 1 / -1;
-  gap: 5px;
-  padding: 6px;
-  border: 1px solid color-mix(in srgb, var(--a3s-line) 82%, transparent);
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--a3s-panel-soft) 58%, transparent);
-}
-
-.work-spreadsheet-data-labels > .enable-data-labels {
-  min-height: 21px;
-  align-self: center;
-  font-weight: 600;
-}
-
-.work-spreadsheet-data-labels > div {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(72px, 1fr));
-  align-items: end;
-  gap: 5px;
-  padding-top: 5px;
-  border-top: 1px solid var(--a3s-line);
-}
-
-.work-spreadsheet-trendlines {
-  display: grid;
-  grid-column: 1 / -1;
-  gap: 5px;
-  padding: 6px;
-  border: 1px solid color-mix(in srgb, var(--a3s-line) 82%, transparent);
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--a3s-panel-soft) 58%, transparent);
-}
-
-.work-spreadsheet-trendlines > header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.work-spreadsheet-trendlines > header strong {
-  font-size: 8px;
-}
-
-.work-spreadsheet-trendlines > header button {
-  display: inline-flex;
-  height: 21px;
-  align-items: center;
-  gap: 3px;
-  padding: 0 6px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 4px;
-  background: var(--a3s-bg);
-  color: var(--a3s-muted);
-  font-size: 8px;
-  cursor: pointer;
-}
-
-.work-spreadsheet-trendlines > p {
-  margin: 0;
-  color: var(--a3s-faint);
-  font-size: 8px;
-  line-height: 1.4;
-}
-
-.work-spreadsheet-trendlines fieldset {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(72px, 1fr));
-  align-items: end;
-  gap: 5px;
-  margin: 0;
-  padding: 7px 31px 7px 7px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 5px;
-  background: var(--a3s-bg);
-}
-
-.work-spreadsheet-trendlines legend {
-  padding: 0 3px;
-  color: var(--a3s-faint);
-  font-size: 8px;
-}
-
-.work-spreadsheet-trendlines .remove-trendline {
-  position: absolute;
-  top: 7px;
-  right: 6px;
-  display: grid;
-  width: 22px;
-  height: 22px;
-  place-items: center;
-  border: 1px solid var(--a3s-line);
-  border-radius: 4px;
-  background: var(--a3s-bg);
-  color: var(--a3s-red);
-  cursor: pointer;
-}
-
-.work-spreadsheet-trendlines input:disabled {
-  opacity: 0.48;
-}
-
-.work-spreadsheet-error-bars {
-  display: grid;
-  grid-column: 1 / -1;
-  gap: 5px;
-  padding: 6px;
-  border: 1px solid color-mix(in srgb, var(--a3s-line) 82%, transparent);
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--a3s-panel-soft) 58%, transparent);
-}
-
-.work-spreadsheet-error-bars > header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.work-spreadsheet-error-bars > header strong {
-  font-size: 8px;
-}
-
-.work-spreadsheet-error-bars > header > div {
-  display: flex;
-  gap: 4px;
-}
-
-.work-spreadsheet-error-bars > header button {
-  display: inline-flex;
-  height: 21px;
-  align-items: center;
-  gap: 3px;
-  padding: 0 6px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 4px;
-  background: var(--a3s-bg);
-  color: var(--a3s-muted);
-  font-size: 8px;
-  cursor: pointer;
-}
-
-.work-spreadsheet-error-bars > header button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.work-spreadsheet-error-bars > p {
-  margin: 0;
-  color: var(--a3s-faint);
-  font-size: 8px;
-  line-height: 1.4;
-}
-
-.work-spreadsheet-error-bars fieldset {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(72px, 1fr));
-  align-items: end;
-  gap: 5px;
-  margin: 0;
-  padding: 7px 31px 7px 7px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 5px;
-  background: var(--a3s-bg);
-}
-
-.work-spreadsheet-error-bars legend {
-  padding: 0 3px;
-  color: var(--a3s-faint);
-  font-size: 8px;
-}
-
-.work-spreadsheet-error-bars .error-reference {
-  grid-column: span 2;
-}
-
-.work-spreadsheet-error-bars .remove-error-bars {
-  position: absolute;
-  top: 7px;
-  right: 6px;
-  display: grid;
-  width: 22px;
-  height: 22px;
-  place-items: center;
-  border: 1px solid var(--a3s-line);
-  border-radius: 4px;
-  background: var(--a3s-bg);
-  color: var(--a3s-red);
-  cursor: pointer;
-}
-
-.work-spreadsheet-chart-manager .actions {
-  grid-column: 1 / -1;
-}
-
-.work-spreadsheet-chart-empty {
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 5px;
-  min-height: 190px;
-  padding: 24px;
-  color: var(--a3s-muted);
-  text-align: center;
-}
-
-.work-spreadsheet-chart-empty strong {
-  color: var(--a3s-ink);
-  font-size: 11px;
-}
-
-.work-spreadsheet-chart-empty p,
-.work-spreadsheet-chart-empty .error {
-  max-width: 480px;
-  margin: 0;
-  font-size: 9px;
-  line-height: 1.5;
-}
-
-.work-spreadsheet-chart-empty .error {
-  color: var(--a3s-red);
-}
-
-@media (max-width: 900px) {
-  .work-spreadsheet-name-manager {
-    grid-template-columns: 170px minmax(520px, 1fr);
-  }
-
-  .work-spreadsheet-conditional-manager {
-    grid-template-columns: 190px minmax(620px, 1fr);
-  }
-
-  .work-spreadsheet-protection-manager {
-    grid-template-columns: 190px minmax(700px, 1fr);
-  }
-
-  .work-spreadsheet-chart-manager {
-    grid-template-columns: 190px minmax(780px, 1fr);
-  }
-
-  .work-spreadsheet-workbook-panel {
-    overflow-x: auto;
-  }
 }

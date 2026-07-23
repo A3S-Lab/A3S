@@ -1,4 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { X } from 'lucide-react';
+import { useRef } from 'react';
+import { IconButton, useDialogFocusScope } from '../../../design-system/primitives';
 import type { CodeLocation } from '../../../types/api';
 import type { WorkspaceFileSelection } from '../workspace-state';
 
@@ -23,43 +25,26 @@ export function NavigationResultPicker({
   onClose: () => void;
 }) {
   const firstChoiceRef = useRef<HTMLButtonElement | null>(null);
-  useEffect(() => {
-    firstChoiceRef.current?.focus();
-  }, []);
+  const focusScope = useDialogFocusScope<HTMLElement>({
+    onEscape: onClose,
+    initialFocus: () => firstChoiceRef.current,
+  });
 
   return (
     <section
+      ref={focusScope.scopeRef}
       className='code-navigation-picker'
       role='dialog'
       aria-modal='true'
       aria-label={`${state.label}导航结果`}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          onClose();
-          return;
-        }
-        if (event.key === 'Tab') {
-          const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
-          const activeIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
-          const nextIndex = event.shiftKey
-            ? activeIndex <= 0
-              ? buttons.length - 1
-              : activeIndex - 1
-            : activeIndex >= buttons.length - 1
-              ? 0
-              : activeIndex + 1;
-          event.preventDefault();
-          buttons[nextIndex]?.focus();
-        }
-      }}
+      onKeyDown={focusScope.handleKeyDown}
     >
       <header>
         <strong>{state.label}导航结果</strong>
         <span>{state.candidates.length} 处</span>
-        <button type='button' aria-label='关闭导航结果' onClick={onClose}>
-          ×
-        </button>
+        <IconButton label='关闭导航结果' onClick={onClose}>
+          <X size={14} />
+        </IconButton>
       </header>
       <ol>
         {state.candidates.map((candidate, index) => (

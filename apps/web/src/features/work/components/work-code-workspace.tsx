@@ -1,6 +1,7 @@
 import { ArrowLeft, Braces, LoaderCircle, MessageSquareText, RefreshCw, Save, Sparkles, X } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useSnapshot } from 'valtio';
+import { Button, Dialog, InlineNotice } from '../../../design-system/primitives';
 import { appState } from '../../../state/app-state';
 import type { WorkspaceEntry } from '../../../types/api';
 import { MonacoCodeEditor } from '../../workspace/components/monaco-code-editor';
@@ -235,6 +236,27 @@ export function WorkCodeWorkspace({
             <X size={14} />
           </button>
         </section>
+      )}
+      {actions.closeRequest && (
+        <Dialog
+          title='放弃未保存的更改？'
+          description={actions.closeRequest.message}
+          onClose={actions.dismissCloseRequest}
+          footer={
+            <>
+              <Button tone='quiet' onClick={actions.dismissCloseRequest}>
+                继续编辑
+              </Button>
+              <Button tone='danger' onClick={actions.confirmCloseRequest}>
+                放弃更改
+              </Button>
+            </>
+          }
+        >
+          <InlineNotice className='work-library-operation-warning' tone='danger' role='alert'>
+            此操作无法撤销。
+          </InlineNotice>
+        </Dialog>
       )}
     </section>
   );

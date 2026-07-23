@@ -29,6 +29,7 @@ import {
   taskDraftKey,
 } from '../features/tasks/task-state';
 import { rememberTaskContextFocus, restoreTaskContextFocus } from '../features/tasks/task-context-focus';
+import { createWeixinRemoteState, type WeixinRemoteState } from '../features/weixin-remote/weixin-remote-state';
 import {
   captureWorkspaceTaskSnapshot,
   createWorkspaceState,
@@ -38,7 +39,6 @@ import {
   restoreWorkspaceTaskState,
   type WorkspaceState,
 } from '../features/workspace/workspace-state';
-import { createWeixinRemoteState, type WeixinRemoteState } from '../features/weixin-remote/weixin-remote-state';
 import type { CodeSession } from '../types/api';
 export type { ProductId, TaskView, ThemePreference } from '../features/code/code-state';
 

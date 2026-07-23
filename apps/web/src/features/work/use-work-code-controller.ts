@@ -20,10 +20,15 @@ export interface WorkCodeConflict {
   diskContent: string;
 }
 
+export type WorkCodeCloseRequest =
+  | { kind: 'tab'; path: string; message: string }
+  | { kind: 'workspace'; message: string };
+
 export function useWorkCodeController(rootPath: string) {
   const [tabs, setTabs] = useState<WorkCodeTab[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
   const [conflict, setConflict] = useState<WorkCodeConflict | null>(null);
+  const [closeRequest, setCloseRequest] = useState<WorkCodeCloseRequest | null>(null);
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
 
@@ -31,6 +36,7 @@ export function useWorkCodeController(rootPath: string) {
     setTabs((current) => current.filter((tab) => localPathInside(rootPath, tab.path)));
     setActivePath((current) => (current && localPathInside(rootPath, current) ? current : null));
     setConflict(null);
+    setCloseRequest(null);
   }, [rootPath]);
 
   const updateTab = useMemoizedFn((path: string, update: (tab: WorkCodeTab) => WorkCodeTab) => {
@@ -145,25 +151,48 @@ export function useWorkCodeController(rootPath: string) {
     }
   });
 
-  const closeTab = useMemoizedFn((path: string): boolean => {
+  const discardTab = useMemoizedFn((path: string): void => {
     const tab = tabsRef.current.find((candidate) => candidate.path === path);
-    if (!tab) return true;
-    if (tab.content !== tab.draft && !window.confirm(`“${fileName(path)}”有未保存的更改，仍要关闭吗？`)) return false;
+    if (!tab) return;
     const index = tabsRef.current.findIndex((candidate) => candidate.path === path);
     const nextTabs = tabsRef.current.filter((candidate) => candidate.path !== path);
     setTabs(nextTabs);
     if (activePath === path) setActivePath(nextTabs[index]?.path ?? nextTabs[index - 1]?.path ?? null);
     if (conflict?.path === path) setConflict(null);
+  });
+
+  const closeTab = useMemoizedFn((path: string): boolean => {
+    const tab = tabsRef.current.find((candidate) => candidate.path === path);
+    if (!tab) return true;
+    if (tab.content !== tab.draft) {
+      setCloseRequest({ kind: 'tab', path, message: `“${fileName(path)}”有未保存的更改。` });
+      return false;
+    }
+    discardTab(path);
     return true;
   });
 
   const closeWorkspace = useMemoizedFn((): boolean => {
     const dirty = tabsRef.current.filter((tab) => tab.content !== tab.draft);
-    if (dirty.length && !window.confirm(`还有 ${dirty.length} 个文件未保存，仍要返回文件管理器吗？`)) return false;
+    if (dirty.length) {
+      setCloseRequest({ kind: 'workspace', message: `还有 ${dirty.length} 个文件未保存。` });
+      return false;
+    }
     setTabs([]);
     setActivePath(null);
     setConflict(null);
     return true;
+  });
+
+  const confirmCloseRequest = useMemoizedFn(() => {
+    if (!closeRequest) return;
+    if (closeRequest.kind === 'tab') discardTab(closeRequest.path);
+    else {
+      setTabs([]);
+      setActivePath(null);
+      setConflict(null);
+    }
+    setCloseRequest(null);
   });
 
   return {
@@ -171,6 +200,7 @@ export function useWorkCodeController(rootPath: string) {
     activePath,
     activeTab: tabs.find((tab) => tab.path === activePath) ?? null,
     conflict,
+    closeRequest,
     openFile,
     activateTab: setActivePath,
     updateDraft,
@@ -179,6 +209,8 @@ export function useWorkCodeController(rootPath: string) {
     dismissConflict: () => setConflict(null),
     closeTab,
     closeWorkspace,
+    confirmCloseRequest,
+    dismissCloseRequest: () => setCloseRequest(null),
   };
 }
 

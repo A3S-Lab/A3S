@@ -7,6 +7,7 @@ import { useWorkspaceController } from '../use-workspace-controller';
 import type { WorkspaceActions } from '../workspace-actions';
 import { DEFAULT_WORKSPACE_SEARCH_EXCLUDE_PATTERN } from '../workspace-search';
 import { fileEditorTabId, type WorkspaceFileEditorTab } from '../workspace-state';
+import type { WorkspaceChangeEvent } from '../../../types/api';
 import { clearWorkspaceEditorModels, workspaceEditorModelPath } from './monaco-editor-model-store';
 import { WorkspaceEditor } from './workspace-editor';
 import { WorkspaceExplorer } from './workspace-explorer';
@@ -247,7 +248,7 @@ describe('Workspace review flow', () => {
       throw new Error('replacement failed');
     });
     render(<WorkspaceSearchPanel actions={{ replaceWorkspace } as unknown as WorkspaceActions} onClose={vi.fn()} />);
-    fireEvent.change(screen.getByRole('textbox', { name: '全局搜索内容' }), { target: { value: 'oldValue' } });
+    fireEvent.change(screen.getByRole('searchbox', { name: '全局搜索内容' }), { target: { value: 'oldValue' } });
     fireEvent.change(screen.getByRole('textbox', { name: '替换为' }), { target: { value: 'newValue' } });
     fireEvent.click(screen.getByRole('button', { name: '替换全部' }));
     fireEvent.click(screen.getByRole('button', { name: '确认替换' }));
@@ -268,7 +269,7 @@ describe('Workspace review flow', () => {
       },
     ];
     render(<WorkspaceSearchPanel actions={{} as WorkspaceActions} onClose={vi.fn()} />);
-    fireEvent.change(screen.getByRole('textbox', { name: '全局搜索内容' }), { target: { value: 'newValue' } });
+    fireEvent.change(screen.getByRole('searchbox', { name: '全局搜索内容' }), { target: { value: 'newValue' } });
     expect(screen.getByText('当前结果来自“oldValue”；重新搜索后才能替换。')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '替换全部' })).toBeDisabled();
   });
@@ -282,7 +283,7 @@ describe('Workspace review flow', () => {
     const searchWorkspace = vi.fn(async () => undefined);
 
     render(<WorkspaceSearchPanel actions={{ searchWorkspace } as unknown as WorkspaceActions} onClose={vi.fn()} />);
-    fireEvent.change(screen.getByRole('textbox', { name: '全局搜索内容' }), { target: { value: 'target' } });
+    fireEvent.change(screen.getByRole('searchbox', { name: '全局搜索内容' }), { target: { value: 'target' } });
     expect(screen.getByRole('alert')).toHaveTextContent('搜索失败');
     expect(screen.queryByText(/没有匹配结果/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '重新搜索' }));
@@ -294,7 +295,7 @@ describe('Workspace review flow', () => {
     const searchWorkspace = vi.fn(async () => undefined);
 
     render(<WorkspaceSearchPanel actions={{ searchWorkspace } as unknown as WorkspaceActions} onClose={vi.fn()} />);
-    fireEvent.change(screen.getByRole('textbox', { name: '全局搜索内容' }), { target: { value: 'target' } });
+    fireEvent.change(screen.getByRole('searchbox', { name: '全局搜索内容' }), { target: { value: 'target' } });
     fireEvent.click(screen.getByRole('button', { name: '搜索' }));
 
     expect(searchWorkspace).toHaveBeenCalledWith('target', { scope: 'source' });
@@ -463,6 +464,40 @@ describe('Workspace review flow', () => {
     expect(activeFileTab()?.draft).toBe('external edit');
     expect(activeFileTab()?.revision).toBe('sha256:external');
     hook.unmount();
+  });
+
+  it('refreshes the file tree and a clean open preview after a native workspace event', async () => {
+    appState.workspaceRoot = '/repo';
+    appState.filesByDirectory = { '/repo': [] };
+    setOpenFileTab('/repo/app.ts', 'before', 'before');
+    let publishChange: ((event: WorkspaceChangeEvent) => void) | undefined;
+    const closeWatch = vi.fn();
+    vi.spyOn(codeApi, 'watchWorkspace').mockImplementation((_root, onChange) => {
+      publishChange = onChange;
+      return closeWatch;
+    });
+    vi.spyOn(codeApi, 'readDir').mockResolvedValue([
+      {
+        name: 'app.ts',
+        path: '/repo/app.ts',
+        isDirectory: false,
+        isFile: true,
+        size: 12,
+        isBinary: false,
+      },
+    ]);
+    vi.spyOn(codeApi, 'readFile').mockResolvedValue({ content: 'after' });
+    const hook = renderHook(() => useWorkspaceController());
+    await waitFor(() => expect(publishChange).toBeTypeOf('function'));
+
+    act(() => {
+      publishChange?.({ type: 'workspace_change', kind: 'modify', paths: ['/repo/app.ts'] });
+    });
+
+    await waitFor(() => expect(activeFileTab()?.draft).toBe('after'));
+    expect(appState.filesByDirectory['/repo']).toHaveLength(1);
+    hook.unmount();
+    expect(closeWatch).toHaveBeenCalledTimes(1);
   });
 
   it('does not discard a dirty draft when the same file is selected again', async () => {

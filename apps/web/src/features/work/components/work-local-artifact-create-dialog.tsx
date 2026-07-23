@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react';
-import { Button, Dialog } from '../../../design-system/primitives';
+import { Button, Dialog, Field } from '../../../design-system/primitives';
 import { workLocalArtifactFileName } from '../work-local-artifact-create';
 import { WORK_TEMPLATES } from '../work-templates';
 import type { WorkArtifactKind } from '../work-types';
@@ -29,7 +29,7 @@ export function WorkLocalArtifactCreateDialog({
   return (
     <Dialog
       title={dialogTitle(kind)}
-      description='文件会直接写入当前本地文件夹，并立即在 Work 中打开。'
+      description='文件会直接保存到当前文件夹并打开。'
       closeDisabled={submitting}
       onClose={onClose}
       footer={
@@ -78,12 +78,10 @@ export function WorkLocalArtifactCreateDialog({
             .finally(() => setSubmitting(false));
         }}
       >
-        <label>
-          <span>创建到</span>
+        <Field label='创建到'>
           <input aria-label='本地创建文件夹' value={directory} readOnly />
-        </label>
-        <label>
-          <span>文件名</span>
+        </Field>
+        <Field label='文件名' error={error}>
           <input
             data-autofocus
             aria-label='本地 Office 文件名'
@@ -95,12 +93,7 @@ export function WorkLocalArtifactCreateDialog({
             }}
             onFocus={(event) => selectFileBaseName(event.currentTarget)}
           />
-        </label>
-        {error && (
-          <p className='work-local-save-message error' role='alert'>
-            {error}
-          </p>
-        )}
+        </Field>
       </form>
     </Dialog>
   );

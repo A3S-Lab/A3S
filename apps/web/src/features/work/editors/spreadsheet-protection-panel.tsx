@@ -1,6 +1,7 @@
 import type { Sheet } from '@fortune-sheet/core';
 import { KeyRound, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Button, CollectionState, InlineNotice, StateView } from '../../../design-system/primitives';
 import {
   editableRangeCellCount,
   editableRangeRequiresCredentials,
@@ -13,6 +14,7 @@ import {
 } from '../work-spreadsheet-protection';
 import { formatSpreadsheetCellRanges, parseSpreadsheetCellRanges } from '../work-spreadsheet-ranges';
 import type { WorkSpreadsheetContent } from '../work-types';
+import { OfficeCheckbox, OfficeSelect, OfficeTextField } from './office-controls';
 
 interface SpreadsheetProtectionPanelProps {
   content: WorkSpreadsheetContent;
@@ -53,7 +55,13 @@ export function SpreadsheetProtectionPanel({ content, onChange }: SpreadsheetPro
   }, [content.sheets, sheetId, selectedIndex]);
 
   if (!sheet || !authority) {
-    return <p className='work-spreadsheet-protection-empty'>当前工作簿没有可保护的工作表。</p>;
+    return (
+      <StateView
+        className='work-office-panel-empty work-spreadsheet-protection-empty'
+        size='compact'
+        title='当前工作簿没有可保护的工作表'
+      />
+    );
   }
 
   const updateSheet = (nextSheet: Sheet) => {
@@ -146,10 +154,10 @@ export function SpreadsheetProtectionPanel({ content, onChange }: SpreadsheetPro
   return (
     <div className='work-spreadsheet-protection-manager'>
       <aside aria-label='允许编辑的区域'>
-        <button type='button' className='create' onClick={startNew}>
+        <Button className='create' tone='secondary' onClick={startNew}>
           <Plus size={13} />
           新建可编辑区域
-        </button>
+        </Button>
         <div className='work-spreadsheet-protection-list'>
           {ranges.map((range, index) => (
             <button
@@ -168,7 +176,11 @@ export function SpreadsheetProtectionPanel({ content, onChange }: SpreadsheetPro
               <small>{range.sqref}</small>
             </button>
           ))}
-          {!ranges.length && <p>还没有命名的可编辑区域。</p>}
+          {!ranges.length && (
+            <CollectionState className='work-office-collection-empty' role='status'>
+              还没有命名的可编辑区域。
+            </CollectionState>
+          )}
         </div>
       </aside>
       <form
@@ -177,81 +189,83 @@ export function SpreadsheetProtectionPanel({ content, onChange }: SpreadsheetPro
           saveRange();
         }}
       >
-        <label>
+        <div className='work-office-field'>
           <span>工作表</span>
-          <select aria-label='保护工作表' value={sheet.id} onChange={(event) => changeSheet(event.target.value)}>
-            {sheets.map((item) => (
-              <option value={item.id} key={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className='toggle'>
-          <input
-            type='checkbox'
-            aria-label='启用工作表保护'
-            checked={authority.sheet === 1}
-            onChange={(event) => updateSheet(withSheetProtection(sheet, event.target.checked))}
+          <OfficeSelect
+            ariaLabel='保护工作表'
+            value={sheet.id}
+            options={sheets.map((item) => ({ value: item.id, label: item.name }))}
+            onValueChange={changeSheet}
           />
-          <span>保护工作表和锁定单元格</span>
-        </label>
+        </div>
+        <OfficeCheckbox
+          className='toggle'
+          ariaLabel='启用工作表保护'
+          checked={authority.sheet === 1}
+          onCheckedChange={(checked) => updateSheet(withSheetProtection(sheet, checked))}
+        >
+          保护工作表和锁定单元格
+        </OfficeCheckbox>
         <fieldset>
           <legend>允许选择</legend>
-          <label className='check'>
-            <input
-              type='checkbox'
-              aria-label='允许选择锁定单元格'
-              checked={authority.selectLockedCells === 1}
-              onChange={(event) => setSelectLocked(event.target.checked)}
-            />
-            <span>锁定单元格</span>
-          </label>
-          <label className='check'>
-            <input
-              type='checkbox'
-              aria-label='允许选择未锁定单元格'
-              checked={authority.selectunLockedCells === 1}
-              onChange={(event) => setSelectUnlocked(event.target.checked)}
-            />
-            <span>未锁定单元格</span>
-          </label>
+          <OfficeCheckbox
+            className='check'
+            ariaLabel='允许选择锁定单元格'
+            checked={authority.selectLockedCells === 1}
+            onCheckedChange={setSelectLocked}
+          >
+            锁定单元格
+          </OfficeCheckbox>
+          <OfficeCheckbox
+            className='check'
+            ariaLabel='允许选择未锁定单元格'
+            checked={authority.selectunLockedCells === 1}
+            onCheckedChange={setSelectUnlocked}
+          >
+            未锁定单元格
+          </OfficeCheckbox>
         </fieldset>
-        <label>
+        <div className='work-office-field'>
           <span>区域名称</span>
-          <input
+          <OfficeTextField
             aria-label='可编辑区域名称'
             value={draft.name}
             maxLength={255}
             placeholder='例如 InputCells'
             onChange={(event) => setDraft({ ...draft, name: event.target.value })}
           />
-        </label>
-        <label className='reference'>
+        </div>
+        <div className='work-office-field reference'>
           <span>可编辑范围</span>
-          <input
+          <OfficeTextField
             aria-label='可编辑区域范围'
             value={draft.reference}
             placeholder='B2:B20'
             onChange={(event) => setDraft({ ...draft, reference: event.target.value })}
           />
-        </label>
+        </div>
         <p>
           当前有 {unlockedCellCount(sheet)} 个未锁定单元格。密码和账户权限验证器会保留到 XLSX，但 Work
           不会尝试破解或代替源应用验证。
         </p>
         {selectedRange && editableRangeRequiresCredentials(selectedRange) && (
-          <p className='warning'>保存对此区域的修改会将它转换为无需源凭据的可编辑区域。</p>
+          <InlineNotice className='work-office-form-warning' tone='warning' role='note'>
+            保存对此区域的修改会将它转换为无需源凭据的可编辑区域。
+          </InlineNotice>
         )}
         <div className='actions'>
-          {error && <output className='error'>{error}</output>}
-          <button type='button' className='danger' disabled={selectedIndex === null} onClick={deleteRange}>
+          {error && (
+            <InlineNotice className='work-office-form-error' tone='danger' role='alert'>
+              {error}
+            </InlineNotice>
+          )}
+          <Button tone='danger' disabled={selectedIndex === null} onClick={deleteRange}>
             <Trash2 size={13} />
             删除区域
-          </button>
-          <button type='submit' className='primary'>
+          </Button>
+          <Button type='submit' tone='primary'>
             保存区域
-          </button>
+          </Button>
         </div>
       </form>
     </div>

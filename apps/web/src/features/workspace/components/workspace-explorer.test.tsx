@@ -49,6 +49,20 @@ describe('WorkspaceExplorer', () => {
     await waitFor(() => expect(renameWorkspaceEntry).toHaveBeenCalledWith('/repo/app.ts', 'main.ts'));
   });
 
+  it('associates an invalid inline name with the workspace name field', () => {
+    render(<WorkspaceExplorer actions={{} as WorkspaceActions} onOpenSearch={vi.fn()} />);
+
+    fireEvent.contextMenu(screen.getByRole('treeitem', { name: 'app.ts' }), { clientX: 48, clientY: 72 });
+    fireEvent.click(screen.getByRole('menuitem', { name: '重命名' }));
+    const input = screen.getByRole('textbox', { name: '文件或文件夹名称' });
+    fireEvent.change(input, { target: { value: 'invalid/name.ts' } });
+
+    const error = screen.getByRole('alert');
+    expect(error).toHaveTextContent('名称不能包含路径分隔符。');
+    expect(input).toHaveAttribute('aria-describedby', error.id);
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+  });
+
   it('starts an in-place rename with F2 on the focused file row', () => {
     render(<WorkspaceExplorer actions={{} as WorkspaceActions} onOpenSearch={vi.fn()} />);
     const row = screen.getByRole('treeitem', { name: 'app.ts' });

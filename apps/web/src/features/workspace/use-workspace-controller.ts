@@ -1,5 +1,6 @@
 import { useMemoizedFn } from 'ahooks';
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
+import { useSnapshot } from 'valtio';
 import { ApiError, codeApi } from '../../lib/api';
 import {
   appState,
@@ -28,6 +29,7 @@ import {
   type WorkspaceFileSelection,
   workspaceRelativePath,
 } from './workspace-state';
+import type { WorkspaceChangeEvent } from '../../types/api';
 
 function parentPath(path: string): string {
   const normalized = path.replace(/[\\/]$/, '');
@@ -155,6 +157,8 @@ function updateDiffTab(tabId: string, update: (tab: WorkspaceDiffEditorTab) => v
 }
 
 export function useWorkspaceController() {
+  const state = useSnapshot(appState);
+  const watchedWorkspaceRoot = state.workspaceRoot;
   const pendingCloseQueueRef = useRef<{ generation: number; ids: string[] }>({
     generation: appState.workspaceGeneration,
     ids: [],
@@ -190,6 +194,102 @@ export function useWorkspaceController() {
       }
     }
   });
+
+  const refreshWorkspaceChanges = useMemoizedFn(async (changes: readonly WorkspaceChangeEvent[]) => {
+    const paths = [...new Set(changes.flatMap((change) => change.paths).map(normalizePath))];
+    if (!paths.length) return;
+
+    const cachedDirectories = new Set<string>();
+    for (const path of paths) {
+      const originalPath = workspacePathStyle(path, appState.workspaceRoot);
+      const parent = parentPath(originalPath);
+      if (appState.filesByDirectory[parent]) cachedDirectories.add(parent);
+      if (appState.filesByDirectory[originalPath]) cachedDirectories.add(originalPath);
+    }
+    await Promise.all(
+      [...cachedDirectories].map(async (directory) => {
+        try {
+          appState.filesByDirectory[directory] = await codeApi.readDir(directory);
+          delete appState.directoryErrors[directory];
+        } catch {
+          // A renamed or removed directory is refreshed through its parent entry.
+        }
+      })
+    );
+
+    const fileTabs = appState.editorTabs.filter(
+      (tab): tab is WorkspaceFileEditorTab =>
+        tab.kind === 'file' && paths.some((path) => changeAffectsPath(path, normalizePath(tab.path)))
+    );
+    await Promise.all(
+      fileTabs.map(async (tab) => {
+        if (isFileEditorTabDirty(tab)) return;
+        try {
+          const disk = await codeApi.readFile(tab.path);
+          updateFileTab(tab.id, (current) => {
+            if (isFileEditorTabDirty(current)) return;
+            current.content = disk.content;
+            current.draft = disk.content;
+            current.loadError = null;
+            current.configValidation = null;
+          });
+        } catch {
+          updateFileTab(tab.id, (current) => {
+            if (!isFileEditorTabDirty(current)) current.loadError = '文件已被删除或移动。';
+          });
+        }
+      })
+    );
+
+    const diffTabs = appState.editorTabs.filter(
+      (tab): tab is WorkspaceDiffEditorTab =>
+        tab.kind === 'diff' &&
+        paths.some((path) => changeAffectsPath(path, normalizePath(absoluteWorkspacePath(tab.path))))
+    );
+    await Promise.all(
+      diffTabs.map(async (tab) => {
+        try {
+          const diff = await codeApi.gitDiff(appState.workspaceRoot, tab.path, tab.staged);
+          updateDiffTab(tab.id, (current) => {
+            current.original = diff.original;
+            current.modified = diff.modified;
+            current.unified = diff.content;
+            current.isBinary = diff.isBinary;
+            current.loadError = null;
+          });
+        } catch {
+          // The diff panel keeps its last readable version until the next change.
+        }
+      })
+    );
+
+    if (appState.gitStatus) {
+      try {
+        appState.gitStatus = await codeApi.gitStatus(appState.workspaceRoot);
+      } catch {
+        // The foreground Git action remains the place for actionable errors.
+      }
+    }
+  });
+
+  useEffect(() => {
+    if (!watchedWorkspaceRoot) return;
+    let timer: number | undefined;
+    const pending: WorkspaceChangeEvent[] = [];
+    const close = codeApi.watchWorkspace(watchedWorkspaceRoot, (change) => {
+      pending.push(change);
+      if (timer !== undefined) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = undefined;
+        const batch = pending.splice(0, pending.length);
+        void refreshWorkspaceChanges(batch);
+      }, 90);
+    });
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      close();
+    };
+  }, [refreshWorkspaceChanges, watchedWorkspaceRoot]);
 
   const toggleDirectory = useMemoizedFn(async (path: string) => {
     const next = !appState.expandedDirectories[path];
@@ -894,4 +994,17 @@ export function useWorkspaceController() {
 
 function basename(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() || path;
+}
+
+function workspacePathStyle(path: string, root: string): string {
+  return root.includes('\\') && !root.includes('/') ? path.replaceAll('/', '\\') : path;
+}
+
+function changeAffectsPath(changedPath: string, targetPath: string): boolean {
+  const changed = normalizePath(changedPath).replace(/\/$/, '');
+  const target = normalizePath(targetPath).replace(/\/$/, '');
+  const windows = /^[A-Za-z]:\//.test(changed) || /^[A-Za-z]:\//.test(target);
+  const source = windows ? changed.toLowerCase() : changed;
+  const candidate = windows ? target.toLowerCase() : target;
+  return candidate === source || candidate.startsWith(`${source}/`);
 }
