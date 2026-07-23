@@ -1,6 +1,7 @@
 import { Download, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSnapshot } from 'valtio';
+import { Button, InlineNotice } from '../../../design-system/primitives';
 import { appState } from '../../../state/app-state';
 import type { SettingsActions } from '../settings-actions';
 
@@ -48,17 +49,17 @@ export function UpdateCard({ actions }: { actions: SettingsActions }) {
                       : '当前已是最新版本'}
           </span>
         </div>
-        <button
-          type='button'
-          className='btn-outline'
+        <Button
+          tone='secondary'
           disabled={loading || installing}
+          loading={loading}
           onClick={() => {
             void check();
           }}
         >
-          <RefreshCw size={14} className={loading ? 'spin' : ''} />
+          {!loading && <RefreshCw size={14} />}
           检查更新
-        </button>
+        </Button>
       </header>
       {status && (
         <div className='update-versions'>
@@ -74,19 +75,19 @@ export function UpdateCard({ actions }: { actions: SettingsActions }) {
         </div>
       )}
       {error && (
-        <p className='update-error' role='alert'>
+        <InlineNotice className='update-notice' tone='danger' role='alert'>
           {error} 当前版本未发生更改，可稍后重试。
-        </p>
+        </InlineNotice>
       )}
       {installError && (
-        <p className='update-error' role='alert'>
+        <InlineNotice className='update-notice' tone='danger' role='alert'>
           安装失败：{installError}。已保留当前版本，可重试或取消。
-        </p>
+        </InlineNotice>
       )}
       {installedVersion && (
-        <output className='update-success'>
+        <InlineNotice className='update-notice' tone='success' role='status'>
           {installedVersion} 已安装。请重启 A3S Code Web 服务后再检查更新，不要重复安装。
-        </output>
+        </InlineNotice>
       )}
       {status?.updateAvailable && !installedVersion && (
         <div className='update-action'>
@@ -94,32 +95,30 @@ export function UpdateCard({ actions }: { actions: SettingsActions }) {
           {!status.canSelfUpdate && <p>当前安装方式不支持应用内更新，请使用原安装渠道升级 A3S。</p>}
           {confirming ? (
             <div>
-              <button
-                type='button'
-                className='btn-outline'
+              <Button
+                tone='quiet'
                 disabled={installing}
                 onClick={() => {
                   setConfirming(false);
                 }}
               >
                 取消
-              </button>
-              <button
-                type='button'
-                className='btn'
+              </Button>
+              <Button
+                tone='primary'
                 disabled={installing || !status.canSelfUpdate}
+                loading={installing}
                 onClick={() => {
                   void install();
                 }}
               >
-                <Download size={14} />
+                {!installing && <Download size={14} />}
                 {installing ? '安装中…' : `确认安装 ${status.latestVersion}`}
-              </button>
+              </Button>
             </div>
           ) : (
-            <button
-              type='button'
-              className='btn'
+            <Button
+              tone='primary'
               disabled={!status.canSelfUpdate}
               onClick={() => {
                 setConfirming(true);
@@ -127,7 +126,7 @@ export function UpdateCard({ actions }: { actions: SettingsActions }) {
             >
               <Download size={14} />
               安装更新
-            </button>
+            </Button>
           )}
         </div>
       )}

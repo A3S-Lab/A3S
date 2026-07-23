@@ -37,7 +37,7 @@
   line-height: 15px;
 }
 
-.memory-filter-heading > button {
+.memory-filter-heading > .memory-filter-clear {
   display: inline-flex;
   min-height: 28px;
   align-items: center;
@@ -51,65 +51,13 @@
   font-size: 11px;
 }
 
-.memory-filter-heading > button:hover {
+.memory-filter-heading > .memory-filter-clear:hover {
   background: color-mix(in srgb, var(--a3s-blue) 7%, transparent);
 }
 
 .memory-search {
-  display: flex;
-  height: 32px;
   flex: 0 0 32px;
-  align-items: center;
-  gap: 8px;
   margin: 6px 0 14px;
-  padding: 0 8px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 8px;
-  background: var(--a3s-panel);
-  color: var(--a3s-muted);
-}
-
-.memory-search:focus-within {
-  border-color: color-mix(in srgb, var(--a3s-blue) 58%, var(--a3s-line));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--a3s-blue) 8%, transparent);
-  color: var(--a3s-blue);
-}
-
-.memory-search input {
-  min-width: 0;
-  flex: 1;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--a3s-ink);
-  font-size: 12px;
-  line-height: 18px;
-}
-
-.memory-search input::placeholder {
-  color: var(--a3s-muted);
-}
-
-.memory-search input::-webkit-search-cancel-button {
-  display: none;
-}
-
-.memory-search button {
-  display: grid;
-  width: 24px;
-  height: 24px;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--a3s-muted);
-  cursor: pointer;
-}
-
-.memory-search button:hover {
-  background: var(--a3s-panel-soft);
-  color: var(--a3s-ink);
 }
 
 .memory-filter-group {
@@ -331,7 +279,7 @@
   display: block;
 }
 
-.memory-graph-loading,
+.memory-graph-loading.ds-state-view,
 .memory-graph-webgl-fallback {
   position: absolute;
   z-index: 1;
@@ -348,17 +296,10 @@
   text-align: center;
 }
 
-.memory-graph-loading > span {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--a3s-line-strong);
-  border-top-color: var(--a3s-blue);
-  border-radius: 50%;
-  animation: memory-graph-spin 0.8s linear infinite;
-}
-
-@keyframes memory-graph-spin {
-  to { transform: rotate(360deg); }
+.memory-graph-loading.ds-state-view {
+  width: 100%;
+  min-height: 0;
+  margin: 0;
 }
 
 .memory-graph-controls {
@@ -491,7 +432,7 @@
   color: var(--a3s-ink);
 }
 
-.memory-graph-node-browser > label {
+.memory-graph-node-browser > .memory-graph-node-search {
   display: flex;
   height: 36px;
   flex: 0 0 36px;
@@ -503,7 +444,7 @@
   color: var(--a3s-muted);
 }
 
-.memory-graph-node-browser > label:focus-within {
+.memory-graph-node-browser > .memory-graph-node-search:focus-within {
   border-color: color-mix(in srgb, var(--a3s-blue) 58%, var(--a3s-line));
   color: var(--a3s-blue);
 }
@@ -575,16 +516,13 @@
   line-height: 18px;
 }
 
-.memory-graph-node-list > p {
-  margin: 18px 8px;
-  color: var(--a3s-muted);
-  font-size: 13px;
-  text-align: center;
+.memory-graph-node-empty.ds-collection-state {
+  min-height: 58px;
+  margin: 8px 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .memory-more-filters-toggle > svg,
-  .memory-graph-loading > span {
+  .memory-more-filters-toggle > svg {
     animation: none;
     transition: none;
   }

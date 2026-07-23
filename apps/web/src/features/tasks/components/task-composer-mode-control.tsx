@@ -32,7 +32,7 @@ export function TaskComposerModeControl({ actions }: { actions: TaskActions }) {
   const value = task ? task.permissionMode : state.newTaskConfig.permissionMode;
   const selected = EXECUTION_MODES.find((mode) => mode.id === value) ?? EXECUTION_MODES[0];
   const SelectedIcon = selected.icon;
-  const disabled = Boolean(state.streamingSessionId || state.taskConfigSaving);
+  const disabled = Boolean(state.streamingSessionId || state.taskConfigSaving || state.taskSubmissionState);
 
   return (
     <ComposerPopover

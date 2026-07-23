@@ -52,20 +52,8 @@
   white-space: nowrap;
 }
 
-.about-settings dd .status-dot {
-  width: 5px;
-  height: 5px;
-  flex-basis: 5px;
-}
-
-.about-settings dd .status-dot.checking {
-  background: var(--a3s-warning, #d97706);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--a3s-warning, #d97706) 13%, transparent);
-}
-
-.about-settings dd .status-dot.disconnected {
-  background: var(--a3s-red);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--a3s-red) 13%, transparent);
+.about-settings dd .ds-status-badge {
+  font-size: 10px;
 }
 
 .about-settings a {
@@ -111,15 +99,6 @@
   font-size: 11px;
 }
 
-.update-card .btn-outline,
-.update-card .btn {
-  display: inline-flex;
-  min-height: 34px;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
 .update-versions {
   display: grid;
   grid-template-columns: 1fr 24px 1fr;
@@ -155,24 +134,13 @@
   gap: 7px;
 }
 
-.update-error,
-.update-success {
-  display: block;
+.update-notice.ds-inline-notice {
   margin: 12px 0 0;
   padding: 10px;
   border-radius: 8px;
+}
+
+.update-notice .ds-inline-notice-copy {
   font-size: 11px;
   line-height: 1.55;
-}
-
-.update-error {
-  border: 1px solid color-mix(in srgb, var(--a3s-red) 25%, var(--a3s-line));
-  background: color-mix(in srgb, var(--a3s-red) 5%, var(--a3s-panel));
-  color: var(--a3s-red);
-}
-
-.update-success {
-  border: 1px solid color-mix(in srgb, var(--a3s-green) 25%, var(--a3s-line));
-  background: color-mix(in srgb, var(--a3s-green) 6%, var(--a3s-panel));
-  color: var(--a3s-green);
 }

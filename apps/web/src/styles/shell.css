@@ -68,14 +68,14 @@
   font-size: 10px;
 }
 
-.code-boot-state {
-  display: flex;
+.code-boot-state.ds-state-view {
   align-items: flex-start;
   gap: 11px;
   padding: 22px 0 18px;
+  text-align: left;
 }
 
-.code-boot-state > span {
+.code-boot-state .ds-state-view-icon {
   display: grid;
   width: 30px;
   height: 30px;
@@ -86,12 +86,12 @@
   color: var(--a3s-ink);
 }
 
-.code-boot-state > span.error {
+.code-boot-state.warning .ds-state-view-icon {
   background: color-mix(in srgb, var(--a3s-warning) 9%, var(--a3s-panel));
   color: var(--a3s-warning);
 }
 
-.code-boot-state h1 {
+.code-boot-state.ds-state-view h2 {
   margin: 1px 0 4px;
   color: var(--a3s-ink);
   font-size: 14px;
@@ -99,11 +99,16 @@
   letter-spacing: -0.01em;
 }
 
-.code-boot-state p {
+.code-boot-state.ds-state-view > p {
   margin: 0;
   color: var(--a3s-muted);
   font-size: 11px;
   line-height: 1.65;
+}
+
+.code-boot-state .ds-state-view-details,
+.code-boot-state .ds-state-view-actions {
+  width: 100%;
 }
 
 .code-boot-progress {
@@ -129,7 +134,7 @@
   flex-direction: column;
 }
 
-.code-boot-recovery .ds-button {
+.code-boot-state .ds-state-view-actions .ds-button {
   width: 100%;
 }
 

@@ -380,6 +380,13 @@ export function workspaceRelativePath(path: string, root: string): string {
   return candidate.startsWith(`${base}/`) ? normalizedPath.slice(normalizedRoot.length + 1) : normalizedPath;
 }
 
+export function workspaceAbsolutePath(path: string, root: string): string {
+  if (path.startsWith('/') || /^[A-Za-z]:[\\/]/.test(path)) return path;
+  if (!root) return path;
+  const separator = root.includes('\\') && !root.includes('/') ? '\\' : '/';
+  return `${root.replace(/[\\/]$/, '')}${separator}${path}`;
+}
+
 export function normalizePath(path: string): string {
   return path.replace(/\\/g, '/');
 }

@@ -98,4 +98,27 @@ describe('CommandPalette', () => {
     expect(appState.commandPaletteOpen).toBe(false);
     expect(appState.workspacePresentation).toBe('fullscreen');
   });
+
+  it('contains keyboard focus and restores the invoker after dismissal', () => {
+    const invoker = document.createElement('button');
+    document.body.append(invoker);
+    invoker.focus();
+    appState.commandPaletteOpen = true;
+    const view = render(<CommandPalette actions={{ newConversation: vi.fn() } as unknown as CodeActions} />);
+
+    const dialog = screen.getByRole('dialog', { name: '快速导航' });
+    const input = screen.getByRole('combobox', { name: '搜索页面或操作' });
+    const options = screen.getAllByRole('option');
+    expect(input).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true });
+    expect(options.at(-1)).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: 'Tab' });
+    expect(input).toHaveFocus();
+
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(appState.commandPaletteOpen).toBe(false);
+    view.unmount();
+    expect(invoker).toHaveFocus();
+    invoker.remove();
+  });
 });

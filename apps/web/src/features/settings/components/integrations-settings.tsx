@@ -5,10 +5,11 @@ import type { IntegrationsSettings } from '../../../types/settings';
 import type { SettingsActions } from '../settings-actions';
 import { useSettingsDraft } from '../use-settings-draft';
 import { SettingsEffectBadge } from './config/settings-effect-badge';
+import { SettingsEmptyNotice } from './config/settings-empty-notice';
 import { SettingsTextField } from './config/settings-fields';
 import { SettingsRow } from './config/settings-row';
 import { SettingsSection } from './config/settings-section';
-import { SettingsLoadState, SettingsSaveState } from './config/settings-state-view';
+import { SettingsCategoryError, SettingsLoadState, SettingsSaveState } from './config/settings-state-view';
 import { DocumentParserSettingsEditor, defaultDocumentParserSettings } from './integrations/document-parser-settings';
 import { McpSettingsEditor } from './integrations/mcp-settings';
 import {
@@ -68,9 +69,7 @@ export function IntegrationsSettingsView({
               onSave={() => void save()}
             />
           </div>
-          {state.settingsCategoryErrors.integrations && (
-            <p className='settings-inline-error'>{state.settingsCategoryErrors.integrations}</p>
-          )}
+          <SettingsCategoryError message={state.settingsCategoryErrors.integrations} />
 
           <SettingsSection
             title='A3S OS'
@@ -92,7 +91,7 @@ export function IntegrationsSettingsView({
                 />
               </SettingsRow>
             ) : (
-              <div className='config-empty-inline'>未配置 A3S OS，A3S Code 继续以纯本地模式运行。</div>
+              <SettingsEmptyNotice>未配置 A3S OS，A3S Code 继续以纯本地模式运行。</SettingsEmptyNotice>
             )}
           </SettingsSection>
 
@@ -108,7 +107,7 @@ export function IntegrationsSettingsView({
             {draft.search ? (
               <SearchSettingsEditor value={draft.search} onChange={(search) => setDraft({ ...draft, search })} />
             ) : (
-              <div className='config-empty-inline'>未声明搜索配置，运行时不会注册自定义搜索引擎。</div>
+              <SettingsEmptyNotice>未声明搜索配置，运行时不会注册自定义搜索引擎。</SettingsEmptyNotice>
             )}
           </SettingsSection>
 
@@ -128,7 +127,7 @@ export function IntegrationsSettingsView({
                 onChange={(documentParser) => setDraft({ ...draft, documentParser })}
               />
             ) : (
-              <div className='config-empty-inline'>未配置文档解析器。</div>
+              <SettingsEmptyNotice>未配置文档解析器。</SettingsEmptyNotice>
             )}
           </SettingsSection>
 

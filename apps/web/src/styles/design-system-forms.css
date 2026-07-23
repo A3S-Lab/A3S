@@ -1,0 +1,323 @@
+.ds-dialog-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  width: auto;
+  max-width: none;
+  height: auto;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  background: rgb(9 12 22 / 42%);
+  backdrop-filter: blur(3px);
+}
+
+.ds-dialog {
+  width: 440px;
+  overflow: hidden;
+  border: 1px solid var(--a3s-line);
+  border-radius: var(--a3s-radius);
+  background: var(--a3s-panel);
+  box-shadow: var(--a3s-shadow);
+}
+
+.ds-dialog > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+}
+
+.ds-dialog h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.ds-dialog header p {
+  margin: 5px 0 0;
+  color: var(--a3s-muted);
+  font-size: 12px;
+}
+
+.ds-dialog-body {
+  padding: 4px 24px 20px;
+}
+
+.ds-dialog > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--a3s-line);
+  background: var(--a3s-panel-soft);
+}
+
+.ds-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ds-field-label {
+  color: var(--a3s-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ds-field input,
+.ds-field select {
+  width: 100%;
+  height: 40px;
+  padding: 0 11px;
+  border: 1px solid var(--a3s-line-strong);
+  border-radius: var(--a3s-radius-sm);
+  outline: 0;
+  background: var(--a3s-panel);
+  color: var(--a3s-ink);
+}
+
+.ds-field textarea {
+  width: 100%;
+  min-height: 92px;
+  padding: 10px 11px;
+  resize: vertical;
+  border: 1px solid var(--a3s-line-strong);
+  border-radius: var(--a3s-radius-sm);
+  outline: 0;
+  background: var(--a3s-panel);
+  color: var(--a3s-ink);
+  font: 13px/1.6 inherit;
+}
+
+.ds-field input:focus,
+.ds-field select:focus,
+.ds-field textarea:focus {
+  border-color: var(--a3s-blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--a3s-blue) 11%, transparent);
+}
+
+.ds-field.invalid input,
+.ds-field.invalid select,
+.ds-field.invalid textarea {
+  border-color: color-mix(in srgb, var(--a3s-red) 62%, var(--a3s-line));
+}
+
+.ds-field-description,
+.ds-field-error {
+  color: var(--a3s-muted);
+  font-size: 11px;
+  line-height: 17px;
+}
+
+.ds-field-error {
+  color: var(--a3s-red);
+}
+
+.ds-combobox {
+  position: relative;
+}
+
+.ds-combobox-trigger {
+  display: flex;
+  min-width: 190px;
+  height: 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 11px;
+  border: 1px solid var(--a3s-line);
+  border-radius: var(--a3s-radius-sm);
+  background: var(--a3s-panel);
+  color: var(--a3s-ink);
+}
+
+.ds-combobox-trigger-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  text-align: left;
+}
+
+.ds-combobox-trigger-copy strong,
+.ds-combobox-trigger-copy small,
+.ds-combobox-option-copy strong,
+.ds-combobox-option-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ds-combobox-model-mark {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-ink);
+}
+
+.ds-combobox-trigger small,
+.ds-combobox-popover [role="option"] small,
+.ds-combobox-popover [role="option"] i,
+.ds-combobox-popover [role="option"] em {
+  color: var(--a3s-faint);
+  font-size: 11px;
+}
+
+.ds-combobox-popover {
+  width: 420px;
+  padding: 8px;
+}
+
+.ds-combobox-popover.has-source-tabs {
+  display: flex;
+  min-height: min(320px, var(--ds-combobox-available-height, calc(100dvh - 32px)));
+  max-height: var(--ds-combobox-available-height, calc(100dvh - 32px));
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ds-combobox-popover.has-source-tabs > .ds-combobox-source-tabs,
+.ds-combobox-popover.has-source-tabs > .ds-combobox-search,
+.ds-combobox-popover.has-source-tabs > .ds-combobox-footer {
+  flex: 0 0 auto;
+}
+
+.ds-combobox-popover.has-source-tabs > [role="listbox"] {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.ds-combobox-source-tabs.ds-tabs {
+  display: flex;
+  gap: 4px;
+  margin: -1px -1px 8px;
+  padding: 1px 1px 8px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--a3s-line);
+  border-radius: 0;
+  background: transparent;
+  scrollbar-width: none;
+}
+
+.ds-combobox-source-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.ds-combobox-source-tabs.ds-tabs > button {
+  height: 28px;
+  min-height: 28px;
+  flex: 0 0 auto;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--a3s-muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.ds-combobox-source-tabs.ds-tabs > button:hover {
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-ink);
+}
+
+.ds-combobox-source-tabs.ds-tabs > button[aria-selected="true"] {
+  background: var(--a3s-action);
+  color: var(--a3s-action-ink);
+}
+
+.ds-combobox-popover > .ds-combobox-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid var(--a3s-line);
+  border-radius: var(--a3s-radius-sm);
+}
+
+.ds-combobox-popover input {
+  width: 100%;
+  height: 36px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--a3s-ink);
+}
+
+.ds-combobox-popover [role="listbox"] {
+  max-height: 340px;
+  padding-top: 6px;
+  overflow: auto;
+}
+
+.ds-combobox-popover [role="option"] {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 24px minmax(120px, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--a3s-ink);
+  text-align: left;
+}
+
+.ds-combobox-popover [role="option"]:hover,
+.ds-combobox-popover [role="option"][aria-selected="true"],
+.ds-combobox-popover [role="option"].active {
+  background: var(--a3s-panel-soft);
+}
+
+.ds-combobox-option-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.ds-combobox-popover [role="option"] i,
+.ds-combobox-popover [role="option"] em {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--a3s-muted);
+  font-style: normal;
+}
+
+.ds-combobox-popover [role="option"] em {
+  color: var(--a3s-blue);
+}
+
+.ds-combobox-footer {
+  margin: 6px -2px -2px;
+  padding: 7px 2px 2px;
+  border-top: 1px solid var(--a3s-line);
+}
+
+.ds-combobox-footer > button {
+  display: flex;
+  width: 100%;
+  height: 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--a3s-muted);
+  font-size: 11px;
+  text-align: left;
+}
+
+.ds-combobox-footer > button:hover {
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-ink);
+}

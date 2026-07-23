@@ -42,6 +42,8 @@ describe('plugin host page', () => {
         sha256: contribution.sha256,
         mediaType: 'text/html',
         html: '<!doctype html><html><head><title>Science</title></head><body><script>void 0</script></body></html>',
+        styles: ['body { color: rebeccapurple; }'],
+        scripts: ["window.parent.postMessage({ protocol: 'a3s.activity.v1', type: 'activity.ready' }, '*');"],
       },
     };
     appState.pluginContentStatus = 'ready';
@@ -62,6 +64,8 @@ describe('plugin host page', () => {
     expect(iframe).toHaveAttribute('referrerpolicy', 'no-referrer');
     expect(iframe.getAttribute('srcdoc')).toContain('Content-Security-Policy');
     expect(iframe.getAttribute('srcdoc')).toContain("connect-src 'none'");
+    expect(iframe.getAttribute('srcdoc')).toContain('rebeccapurple');
+    expect(iframe.getAttribute('srcdoc')).toContain('activity.ready');
     expect(actions.loadActivityContent).toHaveBeenCalledWith(contribution.key);
   });
 

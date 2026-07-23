@@ -251,10 +251,12 @@ URLs、evidence requirements 与可观察 completion criteria。固定 stage gra
 assessment，以及一次 durable report transaction。运行路径中不存在 maker/checker loop、
 adaptive route、生成新 query 的 follow-up wave 或隐藏 continuation。
 
-Web query 会逐字节发送给固定的 AnySearch、Tavily 与 DuckDuckGo 组合。Web plan 固定拥有
-八个初始 fetch slots，local-only plan 为零。Seed URL 与 provider result
-进入同一个语义 candidate catalog，不会预占 slot。当候选足够时，candidate-ID 决策会填满
-可用的初始 slots，并保留覆盖机会与有用的权威备用来源。
+Web query 会逐字节交给 `web_search`，并继承当前 `config.acl` 的默认引擎配置。未配置
+engine block 时使用 DuckDuckGo 与 Wikipedia；AnySearch 和 Tavily 均为显式启用。结构化的
+provider failure 与空结果会进入同一套通用降级策略，降级提示也会保留在 partial research
+metadata 中。Web plan 固定拥有八个初始 fetch slots，local-only plan 为零。Seed URL 与
+provider result 进入同一个语义 candidate catalog，不会预占 slot。当候选足够时，
+candidate-ID 决策会填满可用的初始 slots，并保留覆盖机会与有用的权威备用来源。
 Provider rank、title、snippet、engine 与 date 仅属于发现元数据；只有实际抓取的 source text
 能进入 evidence 或证明报告中的日期。抓取页面、bounded document ranges 与 Host 重新读取的
 本地 ranges 会进入同一个闭包、多语言 chunk catalog。

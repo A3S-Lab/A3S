@@ -3,11 +3,11 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
 import { appState } from '../../../state/app-state';
 import type { AgentEvent, ChatMessage } from '../../../types/api';
+import { useTaskRuntimeFloatingPlacement } from './task-runtime-floating-placement';
+import { TaskRuntimePlanList } from './task-runtime-plan-list';
 import { presentTaskRuntime } from './task-runtime-presentation';
 import { formatElapsedDuration, projectSubagents, projectTaskPlan } from './task-runtime-projection';
-import { TaskRuntimePlanList } from './task-runtime-plan-list';
 import { TaskRuntimeSubagentList } from './task-runtime-subagent-list';
-import { useTaskRuntimeFloatingPlacement } from './task-runtime-floating-placement';
 import { useLiveNow } from './use-live-now';
 
 export function TaskRuntimeFloatingPanel() {
@@ -15,6 +15,8 @@ export function TaskRuntimeFloatingPanel() {
   const sessionId = state.activeSessionId;
   const messages = sessionId ? (state.messagesBySession[sessionId] ?? []) : [];
   const streamOpen = Boolean(sessionId && state.streamingSessionId === sessionId);
+  const preparing = Boolean(state.taskSubmissionState);
+  const starting = state.taskSubmissionState === 'creating';
   const runtime = latestRuntimeContext(
     messages as unknown as readonly ChatMessage[],
     state.streamEvents as unknown as readonly AgentEvent[],
@@ -38,7 +40,9 @@ export function TaskRuntimeFloatingPanel() {
   const presentation = presentTaskRuntime({
     steps: plan.steps,
     agents,
-    running: turnRunning,
+    running: turnRunning || preparing,
+    planning: plan.planning,
+    starting,
     executionStatus: execution?.status,
   });
   const now = useLiveNow(presentation.live);
@@ -53,7 +57,8 @@ export function TaskRuntimeFloatingPanel() {
   const progress = plan.steps.length ? Math.round((completedSteps / plan.steps.length) * 100) : 0;
   const hasPlan = plan.steps.length > 0;
   const hasAgents = agents.length > 0;
-  const visible = hasPlan || hasAgents;
+  const tracksTask = hasPlan || plan.planning || preparing || (turnRunning && !hasAgents);
+  const visible = preparing || streamOpen || hasPlan || hasAgents;
   const attentionIdentity = runtimeAttentionIdentity(plan.steps, agents);
   const { layout, panelRef, style } = useTaskRuntimeFloatingPlacement(turnIdentity, expanded, visible);
 
@@ -87,7 +92,7 @@ export function TaskRuntimeFloatingPanel() {
       style={style}
       className={`task-runtime-floating-panel ${layout} ${expanded ? 'expanded' : 'collapsed'} ${hasPlan ? 'with-plan' : 'agent-only'} ${presentation.tone}`}
       data-layout={layout}
-      aria-label={hasPlan ? '任务进度浮窗' : '并行子智能体浮窗'}
+      aria-label={tracksTask ? '任务进度浮窗' : '并行子智能体浮窗'}
     >
       <button
         type='button'
@@ -115,7 +120,7 @@ export function TaskRuntimeFloatingPanel() {
         <section
           id='task-runtime-floating-content'
           className='task-runtime-floating-content'
-          aria-label={hasPlan ? '任务规划与执行' : '并行执行详情'}
+          aria-label={tracksTask ? '任务规划与执行' : '并行执行详情'}
         >
           {hasPlan && (
             <div
@@ -131,6 +136,7 @@ export function TaskRuntimeFloatingPanel() {
             </div>
           )}
           {hasPlan && <TaskRuntimePlanList steps={plan.steps} />}
+          {!hasPlan && !hasAgents && <RuntimeAwaitingState starting={starting} planning={plan.planning} />}
           {agents.length > 0 && (
             <TaskRuntimeSubagentList
               agents={agents}
@@ -142,6 +148,22 @@ export function TaskRuntimeFloatingPanel() {
         </section>
       )}
     </aside>
+  );
+}
+
+function RuntimeAwaitingState({ starting, planning }: { starting: boolean; planning: boolean }) {
+  const title = starting ? '正在启动任务会话' : planning ? '正在生成执行计划' : '正在分析任务';
+  const description = planning
+    ? '计划生成后会在这里持续更新任务进度和并行子智能体。'
+    : '任务计划和并行子智能体开始后会在这里实时更新。';
+  return (
+    <output className='task-runtime-awaiting'>
+      <LoaderCircle className='spin' size={15} />
+      <span>
+        <strong>{title}</strong>
+        <small>{description}</small>
+      </span>
+    </output>
   );
 }
 

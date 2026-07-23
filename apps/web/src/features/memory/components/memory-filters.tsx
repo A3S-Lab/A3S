@@ -1,6 +1,7 @@
-import { ChevronDown, FilterX, Search, SlidersHorizontal, X } from 'lucide-react';
+import { ChevronDown, FilterX, SlidersHorizontal } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useSnapshot } from 'valtio';
+import { Button, SearchField } from '../../../design-system/primitives';
 import { appState } from '../../../state/app-state';
 import type { MemoryForgetSignal, MemoryOverview, MemoryTier } from '../../../types/api';
 import { forgetSignalLabel, memorySourceLabel, memoryTypeLabel, tierLabel } from '../memory-format';
@@ -42,34 +43,22 @@ export function MemoryFiltersPanel({ data }: { data: MemoryOverview }) {
       <div className='memory-filter-heading'>
         <strong>筛选</strong>
         {activeCount > 0 && (
-          <button type='button' onClick={clearAll}>
+          <Button tone='quiet' className='memory-filter-clear' onClick={clearAll}>
             <FilterX size={13} /> 清除
-          </button>
+          </Button>
         )}
       </div>
-      <label className='memory-search'>
-        <Search size={14} />
-        <input
-          type='search'
-          value={state.memoryQuery}
-          onChange={(event) => {
-            appState.memoryQuery = event.target.value;
-          }}
-          placeholder='搜索记忆'
-          aria-label='搜索记忆'
-        />
-        {state.memoryQuery && (
-          <button
-            type='button'
-            aria-label='清除搜索'
-            onClick={() => {
-              appState.memoryQuery = '';
-            }}
-          >
-            <X size={13} />
-          </button>
-        )}
-      </label>
+      <SearchField
+        className='memory-search'
+        size='compact'
+        label='搜索记忆'
+        clearLabel='清除搜索'
+        value={state.memoryQuery}
+        placeholder='搜索记忆'
+        onValueChange={(value) => {
+          appState.memoryQuery = value;
+        }}
+      />
       <FilterGroup title='时间'>
         <div className='memory-filter-segments'>
           {(

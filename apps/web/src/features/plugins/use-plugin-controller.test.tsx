@@ -1,4 +1,4 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { codeApi } from '../../lib/api';
 import { appState } from '../../state/app-state';
@@ -156,6 +156,69 @@ describe('usePluginController', () => {
     expect(appState.pluginContextProposal).toBeNull();
     hook.unmount();
   });
+
+  it('converges Marketplace state after uninstall removes the live contribution', async () => {
+    const removedCatalog: PluginActivityCatalog = {
+      ...catalog,
+      generation: 3,
+      revision: 'c'.repeat(64),
+      items: [],
+    };
+    const activities = vi
+      .spyOn(codeApi, 'pluginActivities')
+      .mockResolvedValueOnce(catalog)
+      .mockResolvedValue(removedCatalog);
+    const marketplace = vi.spyOn(codeApi, 'pluginMarketplace').mockResolvedValue({
+      schemaVersion: 1,
+      verifiedAt: '2026-07-22T00:00:00Z',
+      registries: [],
+      items: [],
+    });
+    vi.spyOn(codeApi, 'applyPluginOperation').mockResolvedValue({
+      planDigest: 'd'.repeat(64),
+      operations: [{ component: contribution.packageId, changed: true, message: 'Uninstalled.' }],
+    });
+    appState.activeProduct = 'plugin';
+    appState.activePluginKey = contribution.key;
+    appState.pluginContextProposal = {
+      sourceKey: contribution.key,
+      title: 'Pending research context',
+      summary: 'Pending.',
+      prompt: 'Must be discarded.',
+      fields: [],
+      usePackageSkill: true,
+    };
+    appState.pluginOperationReview = {
+      request: { action: 'uninstall', componentId: contribution.packageId },
+      plan: {
+        dryRun: true,
+        planSchemaVersion: 1,
+        planCommand: `a3s uninstall ${contribution.packageId} --dry-run`,
+        planDigest: 'd'.repeat(64),
+        plans: [
+          {
+            component: contribution.packageId,
+            action: 'uninstall',
+            source: 'installed',
+            mutates: true,
+            message: 'Uninstall the research plugin.',
+          },
+        ],
+      },
+    };
+    const hook = renderHook(() => usePluginController());
+    await waitFor(() => expect(activities).toHaveBeenCalledOnce());
+
+    await act(() => hook.result.current.applyReviewedOperation());
+
+    await waitFor(() => expect(marketplace.mock.calls.length).toBeGreaterThanOrEqual(2));
+    expect(appState.pluginCatalog).toEqual(removedCatalog);
+    expect(appState.pluginContextProposal).toBeNull();
+    expect(appState.pluginOperationReview).toBeNull();
+    expect(appState.activeProduct).toBe('code');
+    expect(appState.toast?.message).toBe('科研插件已卸载。');
+    hook.unmount();
+  });
 });
 
 function activityContent(html: string): PluginActivityContent {
@@ -167,6 +230,8 @@ function activityContent(html: string): PluginActivityContent {
     sha256: contribution.sha256,
     mediaType: 'text/html',
     html,
+    styles: [],
+    scripts: [],
   };
 }
 

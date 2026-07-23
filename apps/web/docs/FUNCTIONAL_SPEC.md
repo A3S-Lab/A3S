@@ -163,10 +163,12 @@ tabs without writing them to disk.
   English values and Chinese descriptions, goal state, context usage, and a
   directly adjacent manual compaction action.
 - Keep persisted live `/goal` duration as a passive footer status. Expose the
-  upper-right task-runtime floating panel only after the runtime publishes a
-  non-empty plan or a real subagent lifecycle; project its checklist,
+  upper-right task-runtime floating panel immediately while the first task
+  session is being created, then keep it visible for analysis, planning, a
+  non-empty plan, or a real subagent lifecycle. Project its checklist,
   completed/total state, elapsed time, and parallel subagent evidence without
-  placeholders or invented plan rows. A wide Conversation reserves a
+  invented plan rows. The pre-session surface is a truthful startup state, not
+  a synthetic plan. A wide Conversation reserves a
   non-overlapping transcript rail and expands new runtime evidence there. A
   narrow Conversation or side-by-side Result Workspace uses a docked compact
   summary whose detail opens only on explicit request, while collapse never

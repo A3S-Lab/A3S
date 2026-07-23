@@ -307,18 +307,24 @@ invent progress.
 **Role:** keep the current plan, completion, elapsed time, and associated
 parallel subagents visible without turning the Composer into a status toolbar.
 
-**Contract:** positioned at the upper-right of the active Conversation and
-absent until the active turn contains either a non-empty task list from
-`PlanningEnd` / `TaskUpdated` or a real subagent lifecycle. Layout uses the
-measured Conversation pane, not the global viewport. A pane at least 1040 px
-wide reserves a message-safe transcript rail for the floating surface; the
-first evidence in a turn, the first available plan, and a new failed or
-interrupted branch expand it automatically. Additional healthy branches respect
-a manual collapse and update in place. A narrower pane, including Conversation
-beside Result Workspace, uses a docked summary between `TaskHeader` and the
-transcript. Compact detail never auto-expands and opens only from its trigger,
-so task attention cannot hide the answer the user is reading. Expanding compact
-detail reduces the transcript viewport while leaving `TaskComposer` fixed. The
+**Contract:** positioned at the upper-right of the task surface. It appears
+immediately with a bounded startup state while the first session is being
+created, then follows analysis and planning before projecting a non-empty task
+list from `PlanningEnd` / `TaskUpdated` or a real subagent lifecycle. Startup
+never invents a plan row or subagent. Active-Conversation layout uses the
+measured Conversation pane, not the global viewport. A pane at least 1600 px
+wide has enough natural right-side whitespace for the floating surface beside
+the centered content; the panel never reserves a side rail or changes the
+transcript and Composer centering. The first evidence in a turn, the first
+available plan, and a new failed or interrupted branch expand it automatically.
+Additional healthy branches respect a manual collapse and update in place. The
+pre-session preparation surface uses the same measured-width behavior and docks
+a collapsed tracker when a floating panel would cover the task prompt. A
+narrower pane, including Conversation beside Result Workspace, uses a docked
+summary between `TaskHeader` and the transcript. Compact detail never
+auto-expands and opens only from its trigger, so task attention cannot hide the
+answer the user is reading. Expanding compact detail reduces the transcript
+viewport while leaving `TaskComposer` fixed. The
 collapsed trigger shows the current step and completed/total for a plan.
 Agent-only execution shows the most important active, failed, interrupted, or
 completed metric without counting a failed branch as completed. The expanded

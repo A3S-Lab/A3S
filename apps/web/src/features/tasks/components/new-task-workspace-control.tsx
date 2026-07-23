@@ -1,6 +1,7 @@
-import { Check, ChevronUp, Folder, FolderOpen, LoaderCircle, Search } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { Check, ChevronUp, Folder, FolderOpen, LoaderCircle } from 'lucide-react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { useSnapshot } from 'valtio';
+import { CollectionState, InlineNotice, SearchField } from '../../../design-system/primitives';
 import { appState, formatApiError } from '../../../state/app-state';
 import type { CodeSession } from '../../../types/api';
 import type { TaskActions } from '../task-actions';
@@ -34,7 +35,7 @@ export function NewTaskWorkspaceControl({ actions }: { actions: TaskActions }) {
       label={`工作区：${workspaceName(selectedPath)}`}
       panelLabel='选择新任务工作区'
       className='new-task-workspace-control'
-      disabled={Boolean(state.streamingSessionId)}
+      disabled={Boolean(state.streamingSessionId || state.taskSubmissionState)}
       onOpenChange={(open) => {
         if (open) return;
         setQuery('');
@@ -81,17 +82,15 @@ export function NewTaskWorkspaceControl({ actions }: { actions: TaskActions }) {
         };
         return (
           <>
-            <label className='new-task-workspace-search'>
-              <Search size={14} />
-              <input
-                type='search'
-                aria-label='搜索工作区'
-                ref={(input) => input?.focus({ preventScroll: true })}
-                placeholder='搜索工作区'
-                value={query}
-                onChange={(event) => setQuery(event.currentTarget.value)}
-              />
-            </label>
+            <SearchField
+              className='new-task-workspace-search'
+              size='compact'
+              label='搜索工作区'
+              ref={(input) => input?.focus({ preventScroll: true })}
+              placeholder='搜索工作区'
+              value={query}
+              onValueChange={setQuery}
+            />
             <div className='new-task-workspace-list' role='listbox' aria-label='最近工作区'>
               {visibleWorkspaces.map((workspace) => {
                 const selected = sameWorkspace(workspace.path, selectedPath);
@@ -115,7 +114,11 @@ export function NewTaskWorkspaceControl({ actions }: { actions: TaskActions }) {
                   </button>
                 );
               })}
-              {!visibleWorkspaces.length && <p>没有匹配的工作区</p>}
+              {!visibleWorkspaces.length && (
+                <CollectionState className='new-task-workspace-empty' role='status'>
+                  没有匹配的工作区
+                </CollectionState>
+              )}
             </div>
             <div className='new-task-workspace-actions'>
               <button type='button' disabled={busy} onClick={() => void openLocalFolder()}>
@@ -128,9 +131,9 @@ export function NewTaskWorkspaceControl({ actions }: { actions: TaskActions }) {
               </button>
             </div>
             {error && (
-              <p className='new-task-workspace-error' role='alert'>
+              <InlineNotice className='new-task-workspace-error' tone='danger' role='alert'>
                 {error}
-              </p>
+              </InlineNotice>
             )}
           </>
         );

@@ -1,4 +1,5 @@
 .new-task-product {
+  position: relative;
   background: var(--a3s-bg);
 }
 
@@ -72,11 +73,16 @@
     transform 150ms ease;
 }
 
-.task-starters button:hover {
+.task-starters button:hover:not(:disabled) {
   transform: translateY(-1px);
   border-color: var(--a3s-line-strong);
   background: var(--a3s-panel-soft);
   color: var(--a3s-ink);
+}
+
+.task-starters button:disabled {
+  cursor: wait;
+  opacity: 0.52;
 }
 
 .task-starters button > svg {

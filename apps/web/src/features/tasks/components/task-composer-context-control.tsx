@@ -1,4 +1,5 @@
 import { Gauge, LoaderCircle, Minimize2 } from 'lucide-react';
+import { Button } from '../../../design-system/primitives';
 import type { SessionControls } from '../../../types/api';
 import { ComposerPopover } from './composer-popover';
 
@@ -55,8 +56,8 @@ export function TaskComposerContextControl({
           {context.compacted ? '，较早内容已压缩。' : '。'}
         </p>
       </ComposerPopover>
-      <button
-        type='button'
+      <Button
+        tone='quiet'
         className='composer-context-compact'
         aria-label={compacting ? '正在压缩上下文' : '压缩上下文'}
         title='压缩上下文'
@@ -65,7 +66,7 @@ export function TaskComposerContextControl({
       >
         {compacting ? <LoaderCircle className='spin' size={13} /> : <Minimize2 size={13} />}
         <span>{compacting ? '压缩中' : '压缩'}</span>
-      </button>
+      </Button>
     </section>
   );
 }

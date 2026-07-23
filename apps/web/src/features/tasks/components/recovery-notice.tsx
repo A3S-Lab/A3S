@@ -1,6 +1,6 @@
 import { AlertTriangle, ChevronDown, RefreshCw, Wrench } from 'lucide-react';
 import { useId, useState } from 'react';
-import { Button } from '../../../design-system/primitives';
+import { Button, InlineNotice } from '../../../design-system/primitives';
 import { appendTaskInstruction } from '../../../state/app-state';
 import type { AgentEvent } from '../../../types/api';
 
@@ -15,34 +15,37 @@ export function RecoveryNotice({ events, retryContent }: { events: AgentEvent[];
     appendTaskInstruction(recoveryAction.instruction);
   };
   return (
-    <section className={`recovery-notice ${details.tone}`} aria-label='任务恢复操作'>
-      <header>
-        {details.icon}
-        <div>
-          <strong>{details.title}</strong>
-          <p>{summary}</p>
-          {hasTechnicalDetails && <TechnicalDetailsDisclosure message={details.message} />}
-        </div>
-      </header>
-      <footer>
-        {retryContent && (failure.type === 'error' || failure.type === 'cancelled') && (
-          <Button
-            tone='secondary'
-            onClick={() => {
-              appendTaskInstruction(retryContent);
-            }}
-          >
-            <RefreshCw size={13} />
-            添加重试指令
-          </Button>
-        )}
-        {failure.type !== 'cancelled' && (
-          <Button tone='primary' onClick={askToFix}>
-            <Wrench size={13} />
-            {recoveryAction.label}
-          </Button>
-        )}
-      </footer>
+    <section className='recovery-notice' aria-label='任务恢复操作'>
+      <InlineNotice
+        tone={details.tone}
+        role='alert'
+        icon={details.icon}
+        title={details.title}
+        actions={
+          <>
+            {retryContent && (failure.type === 'error' || failure.type === 'cancelled') && (
+              <Button
+                tone='secondary'
+                onClick={() => {
+                  appendTaskInstruction(retryContent);
+                }}
+              >
+                <RefreshCw size={13} />
+                添加重试指令
+              </Button>
+            )}
+            {failure.type !== 'cancelled' && (
+              <Button tone='primary' onClick={askToFix}>
+                <Wrench size={13} />
+                {recoveryAction.label}
+              </Button>
+            )}
+          </>
+        }
+      >
+        <p>{summary}</p>
+        {hasTechnicalDetails && <TechnicalDetailsDisclosure message={details.message} />}
+      </InlineNotice>
     </section>
   );
 }
@@ -159,13 +162,13 @@ function classify(event: AgentEvent) {
     return {
       title: '任务已停止',
       message: String(event.message || '已保留完成的输出，可以修改指令后继续。'),
-      tone: 'cancelled',
+      tone: 'warning' as const,
       icon: <AlertTriangle size={16} />,
     };
   return {
     title: event.type === 'command_dead_lettered' ? '任务重试已耗尽' : '任务运行失败',
     message: String(event.message || event.error || '连接或模型请求失败。'),
-    tone: 'error',
+    tone: 'danger' as const,
     icon: <AlertTriangle size={16} />,
   };
 }

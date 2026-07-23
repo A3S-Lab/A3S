@@ -1,8 +1,8 @@
 import { ArrowDown, CircleStop, LoaderCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
+import { Button, StateView } from '../../../design-system/primitives';
 import { appState } from '../../../state/app-state';
-import { Button } from '../../../design-system/primitives';
 import type { ChatMessage } from '../../../types/api';
 import type { TaskActions } from '../task-actions';
 import { projectConversation } from './conversation-projection';
@@ -39,6 +39,8 @@ export function ExecutionStream({
       setShowLatest(true);
     }
   }, [streamRevision]);
+  if (sessionId && state.taskSubmissionState && !messages.length)
+    return <TaskLoadState title='正在启动任务' description='正在创建会话、应用运行参数并准备首次执行。' loading />;
   if (sessionId && state.messagesLoading[sessionId] && !messages.length)
     return <TaskLoadState title='正在加载任务记录' description='正在恢复该任务的对话和执行上下文。' loading />;
   if (sessionId && state.messageErrors[sessionId] && !messages.length)
@@ -77,8 +79,8 @@ export function ExecutionStream({
         </div>
       </div>
       {showLatest && (
-        <button
-          type='button'
+        <Button
+          tone='secondary'
           className='execution-jump-latest'
           onClick={() => {
             const element = scrollRef.current;
@@ -90,7 +92,7 @@ export function ExecutionStream({
         >
           <ArrowDown size={14} />
           查看最新内容
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -127,16 +129,21 @@ function TaskLoadState({
   onRetry?: () => void;
 }) {
   return (
-    <section className='task-welcome task-load-state' role={loading ? 'status' : 'alert'}>
-      {loading ? <LoaderCircle className='spin' size={26} /> : <CircleStop size={26} />}
-      <h1>{title}</h1>
-      <p>{description}</p>
-      {onRetry && (
-        <Button tone='primary' onClick={onRetry}>
-          重新加载任务
-        </Button>
-      )}
-    </section>
+    <StateView
+      className='task-load-state'
+      tone={loading ? 'info' : 'danger'}
+      role={loading ? 'status' : 'alert'}
+      icon={loading ? <LoaderCircle className='spin' size={24} /> : <CircleStop size={24} />}
+      title={title}
+      description={description}
+      actions={
+        onRetry ? (
+          <Button tone='primary' onClick={onRetry}>
+            重新加载任务
+          </Button>
+        ) : undefined
+      }
+    />
   );
 }
 

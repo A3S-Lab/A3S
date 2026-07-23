@@ -1,5 +1,6 @@
 import { CheckCircle2, CirclePause, RotateCcw, Target } from 'lucide-react';
 import { useSnapshot } from 'valtio';
+import { Button, InlineNotice } from '../../../design-system/primitives';
 import { appState } from '../../../state/app-state';
 import type { TaskActions } from '../task-actions';
 import { newTaskDraftKey } from '../task-state';
@@ -73,26 +74,30 @@ export function TaskComposerGoalTiming({ actions }: { actions?: TaskActions } = 
                 <dd>{progress}%</dd>
               </div>
             </dl>
-            {goalState.lastError && <small className='composer-goal-error'>{goalState.lastError}</small>}
+            {goalState.lastError && (
+              <InlineNotice className='composer-goal-error' tone='danger' role='alert' title='目标执行遇到问题'>
+                {goalState.lastError}
+              </InlineNotice>
+            )}
           </>
         )}
         {sessionId && actions && status !== 'achieved' && (
           <footer>
             {status === 'paused' ? (
-              <button type='button' onClick={() => void actions.updateGoalAction('resume')}>
+              <Button tone='quiet' onClick={() => void actions.updateGoalAction('resume')}>
                 <RotateCcw size={12} />
                 继续目标
-              </button>
+              </Button>
             ) : (
-              <button type='button' onClick={() => void actions.updateGoalAction('pause')}>
+              <Button tone='quiet' onClick={() => void actions.updateGoalAction('pause')}>
                 <CirclePause size={12} />
                 暂停目标
-              </button>
+              </Button>
             )}
             {status === 'retrying' && (
-              <button type='button' onClick={() => void actions.updateGoalAction('retry')}>
+              <Button tone='secondary' onClick={() => void actions.updateGoalAction('retry')}>
                 立即重试
-              </button>
+              </Button>
             )}
           </footer>
         )}

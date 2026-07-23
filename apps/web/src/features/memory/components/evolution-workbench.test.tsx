@@ -159,6 +159,21 @@ describe('EvolutionWorkbench', () => {
     expect(screen.getByRole('button', { name: /Focused verification/ })).toHaveClass('selected');
   });
 
+  it('uses shared collection and detail states when no content needs attention', () => {
+    const data = evolutionTestData();
+    for (const candidate of data.candidates) {
+      candidate.state = 'materialized';
+      candidate.updateAvailable = false;
+    }
+    appState.evolutionData = data;
+
+    render(<EvolutionWorkbench actions={actions()} />);
+
+    expect(screen.getByText('当前没有待处理内容').closest('.ds-collection-state')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '目前没有需要处理的内容' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '查看全部' })).toBeInTheDocument();
+  });
+
   it('uses plain-language labels for internal source names', () => {
     const data = evolutionTestData();
     data.candidates[0].evidence[0].source = 'workflow';

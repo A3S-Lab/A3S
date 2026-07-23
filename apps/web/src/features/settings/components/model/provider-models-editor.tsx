@@ -1,6 +1,6 @@
 import { BrainCircuit, Check, Cpu, Plus, Wrench } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Button } from '../../../../design-system/primitives';
+import { Button, StateView } from '../../../../design-system/primitives';
 import type { ModelInfo, ProviderInfo } from '../../../../types/api';
 import { createModel } from './model-catalog';
 import { ModelEditor } from './model-editor';
@@ -81,14 +81,18 @@ export function ProviderModelsEditor({
           })}
         </div>
       ) : (
-        <div className='provider-model-empty'>
-          <Cpu size={20} />
-          <strong>这个 Provider 还没有模型</strong>
-          <span>添加模型后，它才会出现在默认模型和任务模型选择器中。</span>
-          <Button tone='secondary' onClick={addModel}>
-            <Plus size={13} /> 添加第一个模型
-          </Button>
-        </div>
+        <StateView
+          className='provider-model-empty'
+          size='compact'
+          icon={<Cpu size={20} />}
+          title='这个 Provider 还没有模型'
+          description='添加模型后，它才会出现在默认模型和任务模型选择器中。'
+          actions={
+            <Button tone='secondary' onClick={addModel}>
+              <Plus size={13} /> 添加第一个模型
+            </Button>
+          }
+        />
       )}
 
       {selectedModel && (

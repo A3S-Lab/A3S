@@ -1,5 +1,6 @@
 import { ChevronRight, FolderOpen, LoaderCircle } from 'lucide-react';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { CollectionState } from '../../../design-system/primitives';
 import { codeApi } from '../../../lib/api';
 import { formatApiError } from '../../../state/app-state';
 import type { WorkspaceEntry } from '../../../types/api';
@@ -186,17 +187,23 @@ export const ComposerWorkspaceTree = forwardRef<
           );
         })}
         {loadingPaths.has(workspaceRoot) && !rows.length && (
-          <output className='composer-suggestion-state'>
-            <LoaderCircle className='spin' size={14} /> 正在读取工作区…
-          </output>
+          <CollectionState
+            className='composer-suggestion-state'
+            role='status'
+            icon={<LoaderCircle className='spin' size={14} />}
+          >
+            正在读取工作区…
+          </CollectionState>
         )}
         {!loadingPaths.has(workspaceRoot) && firstError && (
-          <p className='composer-suggestion-state error' role='alert'>
+          <CollectionState className='composer-suggestion-state' tone='danger' role='alert'>
             {firstError}
-          </p>
+          </CollectionState>
         )}
         {!loadingPaths.has(workspaceRoot) && !firstError && !rows.length && (
-          <p className='composer-suggestion-state'>{query ? '没有匹配的已加载文件' : '工作区中没有可选文件'}</p>
+          <CollectionState className='composer-suggestion-state' role='status'>
+            {query ? '没有匹配的已加载文件' : '工作区中没有可选文件'}
+          </CollectionState>
         )}
       </div>
       <footer>

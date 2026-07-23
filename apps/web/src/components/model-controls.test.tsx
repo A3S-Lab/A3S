@@ -1,10 +1,10 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ModelCombobox } from '../design-system/primitives';
 import type { CodeActions } from '../features/code/use-code-controller';
-import { appState } from '../state/app-state';
 import { SettingsDialog } from '../features/settings/components/settings-dialog';
 import { useSettingsController } from '../features/settings/use-settings-controller';
-import { ModelCombobox } from '../design-system/primitives';
+import { appState } from '../state/app-state';
 
 function modelState() {
   appState.settingsTab = 'general';
@@ -167,8 +167,15 @@ describe('model controls', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: '任务模型' }));
+    expect(screen.getByRole('dialog', { name: '选择任务模型' })).toBeInTheDocument();
     expect(screen.getByRole('listbox', { name: '可用模型' }).closest('section')).toHaveClass('has-source-tabs');
-    fireEvent.click(screen.getByRole('tab', { name: 'WorkBuddy' }));
+    const codexTab = screen.getByRole('tab', { name: 'Codex' });
+    const workBuddyTab = screen.getByRole('tab', { name: 'WorkBuddy' });
+    codexTab.focus();
+    fireEvent.keyDown(codexTab, { key: 'ArrowRight' });
+
+    expect(workBuddyTab).toHaveFocus();
+    expect(workBuddyTab).toHaveAttribute('aria-selected', 'true');
     fireEvent.click(screen.getByRole('option', { name: /glm-5\.1/ }));
 
     expect(onChange).toHaveBeenCalledWith('workbuddy/glm-5.1');

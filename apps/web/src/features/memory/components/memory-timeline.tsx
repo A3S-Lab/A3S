@@ -1,5 +1,6 @@
 import { Bookmark, Clock3, TriangleAlert } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { Button } from '../../../design-system/primitives';
 import type { MemoryEntry, MemoryOverview } from '../../../types/api';
 import {
   memoryDayLabel,
@@ -103,12 +104,12 @@ export function MemoryTimeline({
           <span>
             {visibleEntries.length} / {entries.length} 条
           </span>
-          <button
-            type='button'
+          <Button
+            tone='quiet'
             onClick={() => setVisibleCount((count) => Math.min(entries.length, count + TIMELINE_BATCH_SIZE))}
           >
             继续显示
-          </button>
+          </Button>
         </footer>
       )}
     </section>

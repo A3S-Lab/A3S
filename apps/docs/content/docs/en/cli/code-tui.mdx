@@ -498,15 +498,19 @@ obligation-review stage, Host assessment, and one durable report transaction.
 There is no maker/checker loop, adaptive route, query-generating follow-up wave,
 or hidden continuation.
 
-Web queries are sent byte-for-byte to the fixed AnySearch, Tavily, and
-DuckDuckGo ensemble. Web plans have eight initial fetch slots and local-only
-plans have zero. Seed URLs enter the same semantic catalog as provider results
-without reserving a slot. A semantic candidate-ID decision fills the available
-initial slots with coverage opportunities and useful authoritative alternatives
-when enough candidates exist. Provider rank, title, snippet, engine, and date are
-discovery metadata only; only fetched source text can become evidence or
-establish a report date. Fetched pages, bounded document ranges, and
-Host-reread local ranges enter one closed multilingual chunk catalog.
+Web queries are sent byte-for-byte through `web_search`, which inherits the
+active `config.acl` engine selection. Without an engine block it uses
+DuckDuckGo and Wikipedia; AnySearch and Tavily are opt-in. Structured provider
+failures and empty results use the generic fallback policy, and degradation
+notices remain visible in partial research metadata. Web plans have eight
+initial fetch slots and local-only plans have zero. Seed URLs enter the same
+semantic catalog as provider results without reserving a slot. A semantic
+candidate-ID decision fills the available initial slots with coverage
+opportunities and useful authoritative alternatives when enough candidates
+exist. Provider rank, title, snippet, engine, and date are discovery metadata
+only; only fetched source text can become evidence or establish a report date.
+Fetched pages, bounded document ranges, and Host-reread local ranges enter one
+closed multilingual chunk catalog.
 
 Selectors return only closed chunk IDs plus typed source/obligation relevance
 edges and full criterion/role coverage edges. Relevance keeps useful partial

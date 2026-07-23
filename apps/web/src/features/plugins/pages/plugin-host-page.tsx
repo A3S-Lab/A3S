@@ -1,7 +1,7 @@
 import { AlertTriangle, Box, LoaderCircle, RefreshCw, ShieldCheck, Store } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
-import { Button, Dialog } from '../../../design-system/primitives';
+import { Button, Dialog, PageHeader, StateView, StatusBadge } from '../../../design-system/primitives';
 import { appState, navigatePlugins } from '../../../state/app-state';
 import { buildPluginDocument } from '../plugin-document';
 import { activityHostInit, parsePluginMessage } from '../plugin-protocol';
@@ -17,7 +17,10 @@ export function PluginHostPage({ actions }: { actions: PluginActions }) {
   const key = state.activePluginKey;
   const contribution = state.pluginCatalog.items.find((item) => item.key === key && item.enabled);
   const content = key ? state.pluginContentByKey[key] : undefined;
-  const document = useMemo(() => (content ? buildPluginDocument(content.html) : ''), [content]);
+  const document = useMemo(
+    () => (content ? buildPluginDocument(content.html, [...content.styles], [...content.scripts]) : ''),
+    [content]
+  );
   const contentToken = content ? `${content.registryRevision}:${content.sha256}:${frameGeneration}` : '';
 
   useEffect(() => {
@@ -55,6 +58,7 @@ export function PluginHostPage({ actions }: { actions: PluginActions }) {
         icon={<LoaderCircle className='spin' size={22} />}
         title='正在解析插件…'
         message={state.pluginCatalogError ?? '正在核对已安装插件及其资产摘要。'}
+        role='status'
       />
     );
   }
@@ -67,26 +71,23 @@ export function PluginHostPage({ actions }: { actions: PluginActions }) {
 
   return (
     <section className='plugin-host-page' aria-label={`${contribution.title} 插件`}>
-      <header className='plugin-page-header'>
-        <div>
-          <span className='plugin-page-icon'>
-            <Box size={17} />
-          </span>
-          <div>
-            <h1>{contribution.title}</h1>
-            <p>{contribution.description || `${contribution.packageId} 提供的工作台视图`}</p>
-          </div>
-        </div>
-        <div className='plugin-header-meta'>
-          <span title={contribution.sha256}>
-            <ShieldCheck size={13} /> 已校验 · {contribution.version}
-          </span>
-          <Button tone='quiet' onClick={navigatePlugins}>
-            <Store size={14} />
-            插件市场
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        className='plugin-page-header'
+        icon={<Box size={17} />}
+        title={contribution.title}
+        description={contribution.description || `${contribution.packageId} 提供的工作台视图`}
+        actions={
+          <>
+            <StatusBadge tone='success'>
+              <ShieldCheck size={13} /> 已校验 · {contribution.version}
+            </StatusBadge>
+            <Button tone='quiet' onClick={navigatePlugins}>
+              <Store size={14} />
+              市场
+            </Button>
+          </>
+        }
+      />
 
       <div className='plugin-frame-shell'>
         {state.pluginContentStatus === 'loading' && !content && (
@@ -94,6 +95,7 @@ export function PluginHostPage({ actions }: { actions: PluginActions }) {
             icon={<LoaderCircle className='spin' size={22} />}
             title='正在加载插件资产'
             message='宿主正在核对注册表 revision、包归属和 SHA-256 摘要。'
+            role='status'
           />
         )}
         {state.pluginContentStatus === 'error' && !content && (
@@ -101,6 +103,8 @@ export function PluginHostPage({ actions }: { actions: PluginActions }) {
             icon={<AlertTriangle size={22} />}
             title='无法加载插件资产'
             message={state.pluginContentError ?? '插件内容不可用。'}
+            tone='danger'
+            role='alert'
             action={
               <Button tone='primary' onClick={() => void actions.loadActivityContent(key, true)}>
                 <RefreshCw size={14} />
@@ -129,21 +133,30 @@ export function PluginHostPage({ actions }: { actions: PluginActions }) {
               }}
             />
             {frameStatus === 'loading' && (
-              <div className='plugin-frame-overlay' aria-live='polite'>
-                <LoaderCircle className='spin' size={20} />
-                正在启动隔离视图…
-              </div>
+              <StateView
+                className='plugin-frame-overlay'
+                size='compact'
+                role='status'
+                icon={<LoaderCircle className='spin' size={20} />}
+                title='正在启动隔离视图…'
+              />
             )}
             {(frameStatus === 'error' || state.pluginRuntimeError) && (
-              <div className='plugin-frame-overlay error' role='alert'>
-                <AlertTriangle size={22} />
-                <strong>插件视图报告了错误</strong>
-                <p>{state.pluginRuntimeError ?? '插件未能完成初始化。'}</p>
-                <Button onClick={retryFrame}>
-                  <RefreshCw size={14} />
-                  重新启动视图
-                </Button>
-              </div>
+              <StateView
+                className='plugin-frame-overlay'
+                size='compact'
+                tone='danger'
+                role='alert'
+                icon={<AlertTriangle size={22} />}
+                title='插件视图报告了错误'
+                description={state.pluginRuntimeError ?? '插件未能完成初始化。'}
+                actions={
+                  <Button onClick={retryFrame}>
+                    <RefreshCw size={14} />
+                    重新启动视图
+                  </Button>
+                }
+              />
             )}
           </>
         )}
@@ -222,19 +235,26 @@ function PluginStateView({
   title,
   message,
   action,
+  tone = 'info',
+  role,
 }: {
   icon: React.ReactNode;
   title: string;
   message: string;
   action?: React.ReactNode;
+  tone?: 'info' | 'danger';
+  role?: 'alert' | 'status';
 }) {
   return (
-    <div className='plugin-state-view'>
-      <span>{icon}</span>
-      <h2>{title}</h2>
-      <p>{message}</p>
-      {action}
-    </div>
+    <StateView
+      className='plugin-state-view'
+      icon={icon}
+      title={title}
+      description={message}
+      actions={action}
+      tone={tone}
+      role={role}
+    />
   );
 }
 

@@ -1,5 +1,6 @@
 import { ExternalLink } from 'lucide-react';
 import { useSnapshot } from 'valtio';
+import { StatusBadge } from '../../../design-system/primitives';
 import { appState } from '../../../state/app-state';
 import type { SettingsActions } from '../settings-actions';
 import { UpdateCard } from './update-card';
@@ -19,12 +20,21 @@ export function AboutSettings({ actions }: { actions: SettingsActions }) {
         <div>
           <dt>API 状态</dt>
           <dd>
-            <span className={`status-dot ${state.serviceStatus}`} />{' '}
-            {state.serviceStatus === 'connected'
-              ? '已连接'
-              : state.serviceStatus === 'checking'
-                ? '正在检查'
-                : '连接中断'}
+            <StatusBadge
+              tone={
+                state.serviceStatus === 'connected'
+                  ? 'success'
+                  : state.serviceStatus === 'checking'
+                    ? 'warning'
+                    : 'danger'
+              }
+            >
+              {state.serviceStatus === 'connected'
+                ? '已连接'
+                : state.serviceStatus === 'checking'
+                  ? '正在检查'
+                  : '连接中断'}
+            </StatusBadge>
           </dd>
         </div>
         <div>

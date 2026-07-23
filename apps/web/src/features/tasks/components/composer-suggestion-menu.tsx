@@ -1,5 +1,6 @@
 import { FileCode2, LoaderCircle, Sparkles, Target } from 'lucide-react';
 import { Fragment } from 'react';
+import { CollectionState } from '../../../design-system/primitives';
 import { splitComposerMatchText } from './composer-match-highlight';
 
 export interface ComposerSuggestionItem {
@@ -75,16 +76,24 @@ export function ComposerSuggestionMenu({
           );
         })}
         {loading && (
-          <output className='composer-suggestion-state'>
-            <LoaderCircle className='spin' size={14} /> 正在加载…
-          </output>
+          <CollectionState
+            className='composer-suggestion-state'
+            role='status'
+            icon={<LoaderCircle className='spin' size={14} />}
+          >
+            正在加载…
+          </CollectionState>
         )}
         {!loading && error && (
-          <p className='composer-suggestion-state error' role='alert'>
+          <CollectionState className='composer-suggestion-state' tone='danger' role='alert'>
             {error}
-          </p>
+          </CollectionState>
         )}
-        {!loading && !error && !items.length && <p className='composer-suggestion-state'>{empty}</p>}
+        {!loading && !error && !items.length && (
+          <CollectionState className='composer-suggestion-state' role='status'>
+            {empty}
+          </CollectionState>
+        )}
       </div>
       <footer>
         <span>↑↓ 选择</span>

@@ -3,7 +3,7 @@ import type { HealthResponse } from '../../types/api';
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type BootPhase = 'loading' | 'ready' | 'error';
 export type ServiceStatus = 'connected' | 'checking' | 'disconnected';
-export type ProductId = 'work' | 'code' | 'plugin' | 'plugins';
+export type ProductId = 'work' | 'code' | 'knowledge' | 'plugin' | 'plugins';
 export type TaskView = 'conversation' | 'review' | 'activity';
 export type CodeSurface = 'tasks' | 'memory';
 export interface ToastState {
@@ -38,6 +38,7 @@ function readCodeSurface(): CodeSurface {
 function readActiveProduct(): ProductId {
   if (window.location.hash.startsWith('#plugin/')) return 'plugin';
   if (window.location.hash === '#plugins') return 'plugins';
+  if (window.location.hash === '#knowledge') return 'knowledge';
   return window.location.hash.startsWith('#work') ? 'work' : 'code';
 }
 function readTheme(): ThemePreference {
@@ -51,6 +52,7 @@ function readTheme(): ThemePreference {
 function readSettingsOpen() {
   return (
     window.location.hash === '#help' ||
+    window.location.hash === '#weixin' ||
     window.location.hash === '#settings' ||
     window.location.hash.startsWith('#settings/')
   );

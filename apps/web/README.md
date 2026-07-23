@@ -1,10 +1,10 @@
 # A3S Web
 
 A3S Web is a desktop super-app shell. Code is the first and default Activity
-Bar destination, and Work is the second built-in product. Installed A3S Use
-packages can add reviewed workbench views for vertical capabilities such as
-Research and Finance. Code is a task workspace, not a slash-command launcher
-or a generic chat client.
+Bar destination, Work is the second built-in product, and the standalone
+Knowledge destination follows Work. Installed A3S Use packages can add reviewed
+workbench views for vertical capabilities such as Research and Finance. Code is
+a task workspace, not a slash-command launcher or a generic chat client.
 
 Product implementation is governed by the
 [super-app plan](docs/SUPER_APP.md),
@@ -17,14 +17,50 @@ Product implementation is governed by the
 [core user journeys](docs/USER_JOURNEYS.md), and
 [TUI-to-Web product mapping](TUI_PARITY.md). The signed package, contribution,
 sandbox, messaging, and review contracts are defined in
-[A3S Web Plugin System](docs/PLUGINS.md).
+[A3S Web Plugin System](docs/PLUGINS.md). The separate, local knowledge-base
+library, editor, and external-import lifecycle are defined in
+[A3S Web Knowledge](docs/KNOWLEDGE.md). Native Rust WeChat/Weixin iLink
+remote management is defined by the
+[product and architecture](docs/WEIXIN_REMOTE_CONTROL.md), tracked in the
+[development plan](docs/WEIXIN_REMOTE_CONTROL_DEVELOPMENT_PLAN.md), and guarded
+by the
+[security and operations contract](docs/WEIXIN_REMOTE_CONTROL_OPERATIONS.md).
 
 ## Current product surface
 
-- A VS Code-style Activity Bar with built-in Code and Work entries followed by
-  enabled package contributions ordered from the live A3S Use registry. Memory,
-  the signed plugin Marketplace, and Settings share the pinned bottom section.
+- A VS Code-style Activity Bar with built-in Code, Work, and Knowledge entries;
+  Knowledge sits immediately below Work, followed by enabled package
+  contributions ordered from the live A3S Use registry. Memory, the verified
+  plugin Market (A3S Use release bundles plus signed TUF sources), and Settings
+  share the pinned bottom section.
+  Remote messaging channels live behind one Settings → Channels entry rather
+  than occupying top-level product slots. The Channels page contains internal
+  WeChat and Feishu tabs; Feishu currently displays only “Coming soon”.
   Research and Finance are not hardcoded entries.
+- A standalone, local-only Knowledge page lets users create, search, and pin
+  personal knowledge bases; import Obsidian Vaults and other local folders; and
+  open each base in an Obsidian-inspired file-tree, Markdown editing, and live
+  reading workspace. Import copies content into the managed workspace without
+  changing the source folder. Market remains focused on signed Plugins and
+  their verified Sources.
+- A single **Settings → Channels** page with internal WeChat and Feishu tabs.
+  The WeChat tab is backed only by the native Rust `WeixinModule` in A3S Boot.
+  `#settings/channels/weixin` is the canonical route; the legacy
+  `#settings/weixin` and `#weixin` deep links open the same internal tab. The
+  Feishu tab is a “Coming soon” placeholder and performs no credential or
+  network activity. The read-only Beta exposes
+  truthful entitlement, binding, account, monitor, and
+  bounded remote target state; covers mock-tested QR, verification,
+  pause/resume, deterministic inventory pages, restart-safe opaque selection,
+  redacted latest replies, and remove-from-this-machine flows; and keeps tokens,
+  cursors, owner identifiers, source IDs, PIDs, and authenticated iLink URLs out
+  of the browser. A3S Boot now constructs the native Tencent runtime when an
+  A3S-specific iLink app identity and permitted bot type are injected at build
+  time, through the process environment, or through local ACL. It then enables
+  real QR binding and the supervised read-only monitor. Missing or invalid
+  identity, unsafe storage, and unapproved hosts fail closed without creating a
+  QR code or sending Tencent traffic. Public release injection and live Tencent
+  validation remain gated on A3S entitlement and security review.
 - A Finder-inspired A3S Work local-files workspace backed by the real filesystem:
   it initially follows the default A3S Code workspace shown in Settings, while
   an explicit Work “Switch workspace” choice is persisted as a user override.
@@ -53,9 +89,9 @@ sandbox, messaging, and review contracts are defined in
   not read. The first slice deliberately omits local deletion because the
   current service deletes permanently rather than moving items to the
   operating-system Trash.
-- A Work-native WebIDE for every non-binary code or text file in the selected
-  root. It provides a lazy file tree, multiple editor tabs, Monaco syntax
-  highlighting, diagnostics, definitions/references/implementations, safe
+- A single-file detail editor for every non-binary code or text file in the
+  selected root. It uses the same header and return flow as Office details while
+  keeping Monaco syntax highlighting, diagnostics, semantic navigation, safe
   Cmd/Ctrl+S writes with external-change conflict review, and editor context
   actions for the AI Assistant. Markdown uses a fixed left-source/right-live-
   preview layout instead of a mode switch.
@@ -74,7 +110,7 @@ sandbox, messaging, and review contracts are defined in
   the user select individual changes, and applies only targets whose live
   source still matches. Layout and formatting advice remains review-only.
 - A Work-specific visual icon language with compact framed command glyphs and
-  color-coded, extension-badged file tiles shared by Finder and WebIDE views.
+  color-coded, extension-badged file tiles shared by Finder and file-detail views.
 - A compatibility-preserved A3S Work artifact library with templates, recent
   files, favorites, server-owned autosave, folders, move/copy/rename,
   recoverable trash, imported source-file recovery, version history,
@@ -345,12 +381,14 @@ sandbox, messaging, and review contracts are defined in
 - Visible task execution mode with a mode-specific icon, provider-tabbed model
   selection, an independent Effort slider with English values and Chinese
   guidance, task goal timing, context usage, manual context compaction, and an
-  upper-right task-runtime panel that appears for a real plan or subagent
-  lifecycle and shows only the checklist, completion, elapsed time, and
-  parallel work actually published by the runtime. Dedicated Use workers are
-  identified by their observed standard MCP routes (`Use · Browser`,
-  `Use · Office`, or multiple deduplicated routes), while their evidence uses
-  readable domain actions instead of raw MCP tool names.
+  upper-right task-runtime panel that appears as soon as task creation starts,
+  tracks startup, analysis, planning, and real subagent lifecycles, then shows
+  only the checklist, completion, elapsed time, and parallel work actually
+  published by the runtime. First submission locks its controls and shows
+  creating or queueing feedback before the initial API round trip completes.
+  Dedicated Use workers are identified by their observed standard MCP routes
+  (`Use · Browser`, `Use · Office`, or multiple deduplicated routes), while
+  their evidence uses readable domain actions instead of raw MCP tool names.
 - A bounded startup transition with explicit loading, version-mismatch,
   disconnected, retry, and technical-detail states. Older local services that
   lack the model-catalog route fall back to their configured Provider models
@@ -543,10 +581,11 @@ affected live sessions rebuild successfully. Existing versions, audit history,
 and recovery actions remain available in a collapsed History section without
 crowding the review flow.
 
-Memory visualization is intentionally non-destructive. Manual consolidation,
-forgetting, and knowledge-base mutation remain excluded until those actions
-have explicit review and recovery journeys. Knowledge management, task
-branching, automation authoring, and global processes are also deferred.
+Memory visualization is intentionally non-destructive. Manual consolidation
+and forgetting remain excluded until those actions have explicit review and
+recovery journeys. Task branching, automation authoring, and global processes
+are also deferred. Local knowledge management is handled by the separate
+Knowledge product and does not mutate Memory entries.
 Plugin workbench views and signed lifecycle management are supported, while
 callable plugin actions remain CLI/MCP/Skill surfaces.
 

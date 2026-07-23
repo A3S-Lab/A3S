@@ -1,4 +1,5 @@
 import { FileCode2, Sparkles, X } from 'lucide-react';
+import { IconButton } from '../../../design-system/primitives';
 
 export function ComposerResourceChips({
   files,
@@ -22,9 +23,9 @@ export function ComposerResourceChips({
           <span key={`file:${path}`} title={label}>
             <FileCode2 size={12} />
             <span>{label}</span>
-            <button type='button' aria-label={`移除上下文 ${label}`} onClick={() => onRemoveFile(path)}>
+            <IconButton label={`移除上下文 ${label}`} onClick={() => onRemoveFile(path)}>
               <X size={11} />
-            </button>
+            </IconButton>
           </span>
         );
       })}
@@ -32,9 +33,9 @@ export function ComposerResourceChips({
         <span className='skill' key={`skill:${name}`} title={`Skill：${name}`}>
           <Sparkles size={12} />
           <span>/{name}</span>
-          <button type='button' aria-label={`移除 Skill ${name}`} onClick={() => onRemoveSkill(name)}>
+          <IconButton label={`移除 Skill ${name}`} onClick={() => onRemoveSkill(name)}>
             <X size={11} />
-          </button>
+          </IconButton>
         </span>
       ))}
     </section>

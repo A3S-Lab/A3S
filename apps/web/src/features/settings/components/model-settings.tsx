@@ -5,7 +5,7 @@ import type { LlmSettings, ProviderInfo } from '../../../types/api';
 import type { SettingsActions } from '../settings-actions';
 import { useSettingsDraft } from '../use-settings-draft';
 import { SettingsEffectBadge } from './config/settings-effect-badge';
-import { SettingsLoadState, SettingsSaveState } from './config/settings-state-view';
+import { SettingsCategoryError, SettingsLoadState, SettingsSaveState } from './config/settings-state-view';
 import { DefaultModelSetting } from './model/default-model-setting';
 import { buildModelCatalog, validDefaultModel } from './model/model-catalog';
 import { ModelRuntimeSettings } from './model/model-runtime-settings';
@@ -68,7 +68,7 @@ export function ModelSettings({
           onSave={() => void save()}
         />
       </div>
-      {state.settingsCategoryErrors.llm && <p className='settings-inline-error'>{state.settingsCategoryErrors.llm}</p>}
+      <SettingsCategoryError message={state.settingsCategoryErrors.llm} />
 
       <DefaultModelSetting
         models={catalog}

@@ -1,6 +1,6 @@
 import { useSnapshot } from 'valtio';
-import type { CodeActions } from '../../code/use-code-controller';
 import { appState } from '../../../state/app-state';
+import type { CodeActions } from '../../code/use-code-controller';
 import { ExecutionStream } from '../components/execution-stream';
 import { NewTaskPreparation } from '../components/new-task-preparation';
 import { TaskComposer } from '../components/task-composer';
@@ -14,6 +14,7 @@ export function TasksPage({ actions }: { actions: CodeActions }) {
   if (!state.activeSessionId) {
     return (
       <section className='code-page task-product new-task-product'>
+        <TaskRuntimeFloatingPanel />
         <NewTaskPreparation actions={actions} />
       </section>
     );

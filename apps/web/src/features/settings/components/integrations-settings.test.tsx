@@ -149,7 +149,9 @@ describe('IntegrationsSettingsView', () => {
     fireEvent.click(screen.getByRole('button', { name: '接入 OOMOL 托管版' }));
     expect(screen.getByLabelText('OOMOL MCP 地址')).toHaveValue('https://connector.oomol.com/mcp');
     expect(screen.getByLabelText('OOMOL MCP 地址')).toBeDisabled();
-    expect(screen.getByText('启用 OOMOL 托管版前必须配置 API Key。')).toBeInTheDocument();
+    const authorizationError = screen.getByText('启用 OOMOL 托管版前必须配置 API Key。');
+    expect(screen.getByLabelText('OOMOL API Key')).toHaveAttribute('aria-describedby', authorizationError.id);
+    expect(screen.getByLabelText('OOMOL API Key')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByRole('button', { name: '保存更改' })).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText('OOMOL API Key'), { target: { value: 'oomol-api-key' } });
@@ -181,7 +183,9 @@ describe('IntegrationsSettingsView', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '接入自部署版' }));
     fireEvent.change(screen.getByLabelText('OOMOL MCP 地址'), { target: { value: 'not-an-endpoint' } });
-    expect(screen.getByText(/请输入以 http:\/\/ 或 https:\/\/ 开头并以 \/mcp 结尾/)).toBeInTheDocument();
+    const endpointError = screen.getByText(/请输入以 http:\/\/ 或 https:\/\/ 开头并以 \/mcp 结尾/);
+    expect(screen.getByLabelText('OOMOL MCP 地址')).toHaveAttribute('aria-describedby', endpointError.id);
+    expect(screen.getByLabelText('OOMOL MCP 地址')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByRole('button', { name: '保存更改' })).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText('OOMOL MCP 地址'), {

@@ -8,6 +8,7 @@
 @import "./styles/workspace-quick-open.css";
 @import "./styles/settings.css";
 @import "./styles/settings-config.css";
+@import "./styles/settings-models.css";
 @import "./styles/settings-sections.css";
 @import "./styles/settings-about.css";
 @import "./styles/toast.css";
@@ -16,9 +17,11 @@
 @import "./styles/help.css";
 @import "./styles/activity-bar.css";
 @import "./styles/design-system.css";
+@import "./styles/design-system-forms.css";
 @import "./styles/code-product.css";
 @import "./styles/tasks.css";
 @import "./styles/task-composer.css";
+@import "./styles/task-composer-queue.css";
 @import "./styles/new-task-workspace-control.css";
 @import "./styles/task-library.css";
 @import "./styles/new-task-preparation.css";
@@ -53,3 +56,6 @@
 @import "./styles/memory-filters-graph.css";
 @import "./styles/memory-details.css";
 @import "./styles/plugins.css";
+@import "./styles/knowledge.css";
+@import "./styles/weixin-remote.css";
+@import "./styles/weixin-login.css";

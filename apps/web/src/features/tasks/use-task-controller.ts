@@ -28,12 +28,13 @@ import {
   isSessionMessagesRequestCurrent,
 } from './session-resource-order';
 import {
+  createTaskDraft,
+  newTaskDraftKey,
   persistGoalTimings,
   persistNewTaskConfig,
   persistTaskDrafts,
-  newTaskDraftKey,
-  taskDraftKey,
   type TaskProduct,
+  taskDraftKey,
 } from './task-state';
 import { applyTurnQueueSnapshot } from './turn-queue-state';
 
@@ -159,11 +160,12 @@ export function useTaskController() {
   };
   const persistCurrentDraft = useMemoizedFn(() => {
     const key = taskDraftKey(appState.activeSessionId, activeTaskProduct());
-    appState.draftsByTask[key] = {
-      content: appState.composerValue,
-      contextFiles: [...appState.composerContextFiles],
-      skillNames: [...appState.composerSkills],
-    };
+    appState.draftsByTask[key] = createTaskDraft(
+      appState.composerValue,
+      appState.composerContextFiles,
+      appState.composerSkills,
+      appState.composerMode
+    );
     reportTaskPersistenceResult(persistTaskDrafts(appState.draftsByTask));
   });
   useEffect(() => {
@@ -171,10 +173,12 @@ export function useTaskController() {
     const unsubscribeValue = subscribeKey(appState, 'composerValue', persist, true);
     const unsubscribeContext = subscribeKey(appState, 'composerContextFiles', persist, true);
     const unsubscribeSkills = subscribeKey(appState, 'composerSkills', persist, true);
+    const unsubscribeMode = subscribeKey(appState, 'composerMode', persist, true);
     return () => {
       unsubscribeValue();
       unsubscribeContext();
       unsubscribeSkills();
+      unsubscribeMode();
     };
   }, [persistCurrentDraft]);
   const loadMessages = useMemoizedFn(async (sessionId: string) => {
@@ -470,7 +474,7 @@ export function useTaskController() {
   });
   const sendMessage = useMemoizedFn(async () => {
     const content = appState.composerValue.trim();
-    if (!content) return;
+    if (!content || appState.taskSubmissionState) return;
     const goalCommand = parseGoalCommand(content);
     if (goalCommand) {
       await applyGoalCommand(goalCommand);
@@ -478,20 +482,28 @@ export function useTaskController() {
     }
     const contextFiles = [...appState.composerContextFiles];
     const skillNames = [...appState.composerSkills];
+    const mode = activeTaskProduct() === 'code' ? appState.composerMode : 'standard';
     let sessionId = appState.activeSessionId;
-    if (!sessionId) sessionId = (await createSession(promptTitle(content))).sessionId;
-    else if ((appState.messagesBySession[sessionId]?.length ?? 0) === 0)
-      reportTaskPersistenceResult(persistSessionTitle(sessionId, promptTitle(content)));
-    if (appState.streamingSessionId && appState.streamingSessionId !== sessionId) return;
+    const submittedDraftKey = taskDraftKey(sessionId, activeTaskProduct());
+    appState.taskSubmissionState = sessionId ? 'queueing' : 'creating';
     try {
-      const queue = await codeApi.enqueueTurn(sessionId, { content, contextFiles, skillNames });
+      if (!sessionId) sessionId = (await createSession(promptTitle(content))).sessionId;
+      else if ((appState.messagesBySession[sessionId]?.length ?? 0) === 0)
+        reportTaskPersistenceResult(persistSessionTitle(sessionId, promptTitle(content)));
+      if (appState.streamingSessionId && appState.streamingSessionId !== sessionId) return;
+      const queue = await codeApi.enqueueTurn(sessionId, { content, contextFiles, skillNames, mode });
       applyTurnQueueSnapshot(queue);
-      clearComposer();
+      clearComposer(submittedDraftKey);
+      let execution: Promise<void> | undefined;
       if (!appState.streamingSessionId && !queue.paused && queue.items[0]) {
-        await executeQueuedTurn(sessionId, queue.items[0]);
+        execution = executeQueuedTurn(sessionId, queue.items[0]);
       }
+      appState.taskSubmissionState = null;
+      if (execution) await execution;
     } catch (error) {
       showToast(formatApiError(error), 'error');
+    } finally {
+      appState.taskSubmissionState = null;
     }
   });
   const applyGoalCommand = useMemoizedFn(async (command: GoalCommand) => {
@@ -771,8 +783,16 @@ export function useTaskController() {
   };
 }
 
-function clearComposer() {
+function clearComposer(submittedDraftKey?: string) {
   appState.composerValue = '';
   appState.composerContextFiles = [];
   appState.composerSkills = [];
+  appState.composerMode = 'standard';
+  if (!submittedDraftKey) return;
+  appState.draftsByTask[submittedDraftKey] = {
+    content: '',
+    contextFiles: [],
+    skillNames: [],
+  };
+  reportTaskPersistenceResult(persistTaskDrafts(appState.draftsByTask));
 }

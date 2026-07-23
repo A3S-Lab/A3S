@@ -46,29 +46,6 @@
   font-size: 9px;
 }
 
-.task-stage-switcher {
-  gap: 2px;
-  padding: 4px;
-  border: 0;
-  border-radius: 11px;
-  background: var(--a3s-panel-soft);
-}
-
-.task-stage-switcher button {
-  height: 32px;
-  gap: 6px;
-  padding: 0 12px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 550;
-}
-
-.task-stage-switcher button.active {
-  background: var(--a3s-panel);
-  color: var(--a3s-blue);
-  box-shadow: 0 1px 4px rgb(20 24 40 / 8%);
-}
-
 .task-workspace {
   background: var(--a3s-panel);
 }
@@ -116,6 +93,10 @@
   color: var(--a3s-ink);
 }
 
+.execution-jump-latest.ds-button:hover:not(:disabled) {
+  transform: translateX(-50%) translateY(-1px);
+}
+
 .execution-column {
   width: min(780px, calc(100% - 64px));
   padding: 26px 0 280px;
@@ -135,9 +116,10 @@
   max-width: min(82%, 650px);
   align-self: flex-end;
   padding: 11px 13px 7px;
-  border: 1px solid var(--a3s-line);
+  border: 1px solid color-mix(in srgb, var(--a3s-blue) 34%, var(--a3s-line));
   border-radius: 12px;
-  background: color-mix(in srgb, var(--a3s-panel-soft) 74%, var(--a3s-panel));
+  background: color-mix(in srgb, var(--a3s-blue) 14%, var(--a3s-panel));
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--a3s-blue) 8%, transparent);
 }
 
 .execution-instruction-body {
@@ -212,6 +194,14 @@
   color: var(--a3s-faint);
   cursor: pointer;
   font-size: 10px;
+}
+
+.conversation-message-actions .ds-icon-button {
+  width: 24px;
+}
+
+.conversation-message-actions .conversation-copy-action:not(.idle) {
+  width: auto;
 }
 
 .conversation-message-actions button:hover,
@@ -448,43 +438,8 @@
   }
 }
 
-.interrupted-turn-notice {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 11px 12px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--a3s-warning) 3%, var(--a3s-panel));
-}
-
-.interrupted-turn-icon {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  place-items: center;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--a3s-warning) 10%, var(--a3s-panel));
-  color: var(--a3s-warning);
-}
-
-.interrupted-turn-notice > div {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.interrupted-turn-notice strong {
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.interrupted-turn-notice p {
-  margin: 1px 0 0;
-  color: var(--a3s-muted);
-  font-size: 11px;
-  line-height: 1.5;
+.interrupted-turn-status {
+  display: block;
 }
 
 .artifact-entries {
@@ -719,6 +674,80 @@
   display: none;
 }
 
+.deep-research-report-card {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--a3s-blue) 30%, var(--a3s-line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--a3s-blue) 6%, var(--a3s-panel));
+}
+
+.deep-research-report-card.degraded {
+  border-color: color-mix(in srgb, var(--a3s-warning) 42%, var(--a3s-line));
+  background: color-mix(in srgb, var(--a3s-warning) 7%, var(--a3s-panel));
+}
+
+.deep-research-report-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--a3s-blue) 12%, var(--a3s-panel));
+  color: var(--a3s-blue);
+}
+
+.deep-research-report-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.deep-research-report-copy strong {
+  font-size: 12px;
+}
+
+.deep-research-report-copy small {
+  color: var(--a3s-muted);
+  font-size: 10px;
+}
+
+.deep-research-report-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.deep-research-report-actions > a {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--a3s-action);
+  color: var(--a3s-action-ink);
+  font-size: 10px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (max-width: 620px) {
+  .deep-research-report-card {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .deep-research-report-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+}
+
 .task-composer-dock.active {
   padding: 20px 30px 18px;
   background: linear-gradient(0deg, var(--a3s-panel) 74%, transparent);
@@ -784,6 +813,21 @@
   font-size: 11px;
 }
 
+.task-composer.submitting {
+  border-color: color-mix(in srgb, var(--a3s-blue) 50%, var(--a3s-line));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--a3s-blue) 8%, transparent), var(--a3s-shadow-composer);
+}
+
+.composer-running.submission-pending {
+  border-color: color-mix(in srgb, var(--a3s-blue) 28%, var(--a3s-line));
+  background: color-mix(in srgb, var(--a3s-blue) 8%, var(--a3s-panel));
+  color: var(--a3s-ink);
+}
+
+.composer-running.submission-pending > svg {
+  color: var(--a3s-blue);
+}
+
 @media (max-width: 1250px) {
   .execution-column {
     width: min(740px, calc(100% - 44px));
@@ -792,6 +836,56 @@
   .task-composer-dock.active {
     padding-right: 22px;
     padding-left: 22px;
+  }
+}
+
+@container (max-width: 420px) {
+  .task-composer > footer {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 8px 6px;
+  }
+
+  .task-composer > footer > div {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .task-composer > footer > div:last-child {
+    justify-content: flex-end;
+  }
+
+  .composer-trailing-controls {
+    flex: 1;
+    justify-content: flex-end;
+  }
+
+  .composer-trailing-controls .composer-quick-trigger,
+  .composer-model-control .ds-combobox-trigger {
+    width: 34px;
+    max-width: 34px;
+    justify-content: center;
+    gap: 0;
+    padding: 0;
+  }
+
+  .composer-context-status .composer-context-control .composer-quick-trigger {
+    padding: 0;
+  }
+
+  .composer-context-compact {
+    width: 28px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .composer-trailing-controls .composer-quick-trigger > span,
+  .composer-trailing-controls .composer-quick-trigger > svg:last-child,
+  .composer-context-compact > span,
+  .composer-model-control .ds-combobox-trigger strong,
+  .composer-model-control .ds-combobox-trigger > svg:last-child {
+    display: none;
   }
 }
 
@@ -805,4 +899,8 @@
   .recovery-technical-details > button svg {
     transition: none;
   }
+}
+
+.task-load-state.ds-state-view .ds-button {
+  margin-top: 0;
 }

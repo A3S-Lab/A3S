@@ -1,5 +1,5 @@
 import { Cpu } from 'lucide-react';
-import { ModelCombobox } from '../../../../design-system/primitives';
+import { ModelCombobox, StateView } from '../../../../design-system/primitives';
 import type { CatalogModel } from '../../../../types/api';
 import { SettingsSection } from '../config/settings-section';
 
@@ -48,15 +48,13 @@ export function DefaultModelSetting({
           </div>
         </div>
       ) : (
-        <div className='model-default-empty'>
-          <span className='model-default-icon' aria-hidden='true'>
-            <Cpu size={17} />
-          </span>
-          <div>
-            <strong>还没有可用模型</strong>
-            <span>先在下方添加 Provider，再为它添加至少一个模型。</span>
-          </div>
-        </div>
+        <StateView
+          className='model-default-empty'
+          size='compact'
+          icon={<Cpu size={17} />}
+          title='还没有可用模型'
+          description='先在下方添加 Provider，再为它添加至少一个模型。'
+        />
       )}
     </SettingsSection>
   );

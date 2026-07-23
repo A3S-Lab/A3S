@@ -1,7 +1,7 @@
 import { BrainCircuit, Database, Focus, ListTree, Network, RefreshCw, Settings2, Sparkles } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { useSnapshot } from 'valtio';
-import { Button } from '../../../design-system/primitives';
+import { Button, InlineNotice, PageHeader, StateView, Tabs } from '../../../design-system/primitives';
 import { appState, navigateSettings } from '../../../state/app-state';
 import type { CodeActions } from '../../code/use-code-controller';
 import { EvolutionWorkbench } from '../components/evolution-workbench';
@@ -58,75 +58,67 @@ export function MemoryPage({ actions }: { actions: CodeActions }) {
 
   return (
     <section className='memory-page' aria-label='记忆与学习'>
-      <header className='memory-page-header'>
-        <div className='memory-page-title'>
-          <span className='memory-title-mark'>
-            <BrainCircuit size={19} />
-          </span>
-          <div>
-            <h1>记忆</h1>
-          </div>
-        </div>
-        <div className='memory-section-switcher' role='tablist' aria-label='记忆页面'>
-          <button
-            type='button'
-            role='tab'
-            aria-selected={state.memorySection === 'memory'}
-            className={state.memorySection === 'memory' ? 'active' : ''}
-            onClick={() => {
-              appState.memorySection = 'memory';
+      <PageHeader
+        className='memory-page-header'
+        icon={<BrainCircuit size={19} />}
+        title='记忆'
+        navigation={
+          <Tabs
+            ariaLabel='记忆页面'
+            value={state.memorySection}
+            className='memory-section-switcher'
+            items={[
+              { id: 'memory', label: '已保存', icon: <Database size={14} /> },
+              {
+                id: 'evolution',
+                label: '学习',
+                icon: <Sparkles size={14} />,
+                badge:
+                  state.memorySection === 'memory' && state.evolutionData && state.evolutionData.stats.ready > 0
+                    ? state.evolutionData.stats.ready
+                    : undefined,
+              },
+            ]}
+            onChange={(section) => {
+              appState.memorySection = section;
             }}
-          >
-            <Database size={14} /> 已保存
-          </button>
-          <button
-            type='button'
-            role='tab'
-            aria-selected={state.memorySection === 'evolution'}
-            className={state.memorySection === 'evolution' ? 'active' : ''}
-            onClick={() => {
-              appState.memorySection = 'evolution';
-            }}
-          >
-            <Sparkles size={14} /> 学习
-            {state.memorySection === 'memory' && state.evolutionData && state.evolutionData.stats.ready > 0 && (
-              <i title={`${state.evolutionData.stats.ready} 项待确认`}>{state.evolutionData.stats.ready}</i>
+          />
+        }
+        actions={
+          <>
+            <Button tone='quiet' className='memory-settings-action' onClick={() => navigateSettings('context')}>
+              <Settings2 size={14} /> 设置
+            </Button>
+            {state.memorySection === 'memory' ? (
+              <Button
+                tone='secondary'
+                loading={state.memoryRefreshing}
+                disabled={state.memoryPhase === 'loading' || state.memoryRefreshing}
+                onClick={() => {
+                  void actions.loadMemory(true);
+                }}
+              >
+                {!state.memoryRefreshing && <RefreshCw size={14} />}
+                刷新
+              </Button>
+            ) : (
+              <Button
+                tone='secondary'
+                loading={state.evolutionRefreshing}
+                disabled={
+                  state.evolutionPhase === 'loading' || state.evolutionRefreshing || Boolean(state.evolutionBusyId)
+                }
+                onClick={() => {
+                  void actions.scanEvolution();
+                }}
+              >
+                {!state.evolutionRefreshing && <RefreshCw size={14} />}
+                检查新内容
+              </Button>
             )}
-          </button>
-        </div>
-        <div className='memory-page-actions'>
-          <Button tone='quiet' className='memory-settings-action' onClick={() => navigateSettings('context')}>
-            <Settings2 size={14} /> 设置
-          </Button>
-          {state.memorySection === 'memory' ? (
-            <Button
-              tone='secondary'
-              loading={state.memoryRefreshing}
-              disabled={state.memoryPhase === 'loading' || state.memoryRefreshing}
-              onClick={() => {
-                void actions.loadMemory(true);
-              }}
-            >
-              {!state.memoryRefreshing && <RefreshCw size={14} />}
-              刷新
-            </Button>
-          ) : (
-            <Button
-              tone='secondary'
-              loading={state.evolutionRefreshing}
-              disabled={
-                state.evolutionPhase === 'loading' || state.evolutionRefreshing || Boolean(state.evolutionBusyId)
-              }
-              onClick={() => {
-                void actions.scanEvolution();
-              }}
-            >
-              {!state.evolutionRefreshing && <RefreshCw size={14} />}
-              检查新内容
-            </Button>
-          )}
-        </div>
-      </header>
+          </>
+        }
+      />
 
       {state.memorySection === 'evolution' ? (
         <EvolutionWorkbench actions={actions} />
@@ -144,12 +136,18 @@ export function MemoryPage({ actions }: { actions: CodeActions }) {
           {data && (
             <>
               {state.memoryError && (
-                <output className='memory-stale-notice'>
+                <InlineNotice
+                  className='memory-stale-notice'
+                  tone='warning'
+                  role='status'
+                  actions={
+                    <Button tone='quiet' onClick={() => void actions.loadMemory(true)}>
+                      重试
+                    </Button>
+                  }
+                >
                   <span title={state.memoryError}>刷新失败，当前显示上次结果。</span>
-                  <button type='button' onClick={() => void actions.loadMemory(true)}>
-                    重试
-                  </button>
-                </output>
+                </InlineNotice>
               )}
               {data.stats.entries === 0 ? (
                 <MemoryEmptyState />
@@ -159,30 +157,18 @@ export function MemoryPage({ actions }: { actions: CodeActions }) {
                     <MemoryFiltersPanel data={data} />
                     <main className='memory-visualization'>
                       <header className='memory-visualization-toolbar'>
-                        <div className='memory-view-switcher' role='tablist' aria-label='记忆视图'>
-                          <button
-                            type='button'
-                            role='tab'
-                            aria-selected={state.memoryView === 'graph'}
-                            className={state.memoryView === 'graph' ? 'active' : ''}
-                            onClick={() => {
-                              appState.memoryView = 'graph';
-                            }}
-                          >
-                            <Network size={14} /> 关系图
-                          </button>
-                          <button
-                            type='button'
-                            role='tab'
-                            aria-selected={state.memoryView === 'timeline'}
-                            className={state.memoryView === 'timeline' ? 'active' : ''}
-                            onClick={() => {
-                              appState.memoryView = 'timeline';
-                            }}
-                          >
-                            <ListTree size={14} /> 按时间
-                          </button>
-                        </div>
+                        <Tabs
+                          ariaLabel='记忆视图'
+                          value={state.memoryView}
+                          className='memory-view-switcher'
+                          items={[
+                            { id: 'graph', label: '关系图', icon: <Network size={14} /> },
+                            { id: 'timeline', label: '按时间', icon: <ListTree size={14} /> },
+                          ]}
+                          onChange={(view) => {
+                            appState.memoryView = view;
+                          }}
+                        />
                         <div className='memory-visualization-context'>
                           <span>
                             {entries.length === data.stats.entries
@@ -306,45 +292,55 @@ function MemoryLoadingState() {
 
 function MemoryErrorState({ error, onRetry }: { error: string | null; onRetry: () => void }) {
   return (
-    <div className='memory-state-card' role='alert'>
-      <span>
-        <BrainCircuit size={22} />
-      </span>
-      <h2>无法加载记忆</h2>
-      <p title={error || undefined}>暂时无法读取，请稍后重试。</p>
-      <Button onClick={onRetry}>
-        <RefreshCw size={14} />
-        重新加载
-      </Button>
-    </div>
+    <StateView
+      className='memory-state-card'
+      role='alert'
+      tone='danger'
+      icon={<BrainCircuit size={22} />}
+      title='无法加载记忆'
+      description='暂时无法读取，请稍后重试。'
+      descriptionTitle={error || undefined}
+      actions={
+        <Button onClick={onRetry}>
+          <RefreshCw size={14} />
+          重新加载
+        </Button>
+      }
+    />
   );
 }
 
 function MemoryEmptyState() {
   return (
-    <div className='memory-state-card memory-empty'>
-      <span>
-        <BrainCircuit size={24} />
-      </span>
-      <h2>还没有记忆</h2>
-      <p>完成任务后，A3S 会把值得保留的内容放在这里。</p>
-      <Button tone='secondary' onClick={() => navigateSettings('context')}>
-        <Settings2 size={14} />
-        查看记忆设置
-      </Button>
-    </div>
+    <StateView
+      className='memory-state-card memory-empty'
+      tone='info'
+      icon={<BrainCircuit size={24} />}
+      title='还没有记忆'
+      description='完成任务后，A3S 会把值得保留的内容放在这里。'
+      actions={
+        <Button tone='secondary' onClick={() => navigateSettings('context')}>
+          <Settings2 size={14} />
+          查看记忆设置
+        </Button>
+      }
+    />
   );
 }
 
 function MemoryNoResults() {
   return (
-    <div className='memory-no-results'>
-      <BrainCircuit size={22} />
-      <h2>没有符合条件的记忆</h2>
-      <p>调整搜索内容、时间或状态后再试。</p>
-      <button type='button' onClick={clearMemoryFilters}>
-        清除全部筛选
-      </button>
-    </div>
+    <StateView
+      className='memory-no-results'
+      size='compact'
+      icon={<BrainCircuit size={22} />}
+      title='没有符合条件的记忆'
+      description='调整搜索内容、时间或状态后再试。'
+      actions={
+        <Button tone='quiet' onClick={clearMemoryFilters}>
+          清除全部筛选
+        </Button>
+      }
+    />
   );
 }

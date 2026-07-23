@@ -1,7 +1,10 @@
 import { CheckCircle2, ChevronDown, Eye, EyeOff, X } from 'lucide-react';
 import { type CSSProperties, useId, useState } from 'react';
+import { type FieldControlProps, IconButton } from '../../../../design-system/primitives';
 
 export const configuredSecret = '[configured]';
+
+type SettingsFieldControlProps = Partial<FieldControlProps>;
 
 export function SettingsTextField({
   value,
@@ -10,6 +13,10 @@ export function SettingsTextField({
   placeholder,
   type = 'text',
   disabled = false,
+  id,
+  'aria-describedby': ariaDescribedBy,
+  'aria-invalid': ariaInvalid,
+  'aria-required': ariaRequired,
 }: {
   value?: string | null;
   onChange(value: string): void;
@@ -17,13 +24,17 @@ export function SettingsTextField({
   placeholder?: string;
   type?: 'text' | 'url';
   disabled?: boolean;
-}) {
+} & SettingsFieldControlProps) {
   return (
     <input
       className='config-input'
+      id={id}
       type={type}
       value={value ?? ''}
       aria-label={label}
+      aria-describedby={ariaDescribedBy}
+      aria-invalid={ariaInvalid}
+      aria-required={ariaRequired}
       placeholder={placeholder}
       disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
@@ -248,21 +259,29 @@ export function SettingsSecretField({
   onChange,
   label,
   disabled = false,
+  id,
+  'aria-describedby': ariaDescribedBy,
+  'aria-invalid': ariaInvalid,
+  'aria-required': ariaRequired,
 }: {
   value?: string | null;
   onChange(value: string | null): void;
   label: string;
   disabled?: boolean;
-}) {
+} & SettingsFieldControlProps) {
   const [visible, setVisible] = useState(false);
   const configured = value === configuredSecret;
   return (
     <div className='config-secret-field'>
       <input
         className='config-input'
+        id={id}
         type={visible ? 'text' : 'password'}
         value={configured ? '' : (value ?? '')}
         aria-label={label}
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
+        aria-required={ariaRequired}
         disabled={disabled}
         placeholder={configured ? '已配置；输入新值可替换' : '未配置'}
         onChange={(event) => onChange(event.target.value)}
@@ -274,19 +293,18 @@ export function SettingsSecretField({
       )}
       <span className='config-secret-actions'>
         {!configured && (
-          <button
-            type='button'
+          <IconButton
+            label={`${visible ? '隐藏' : '显示'}${label}`}
             disabled={disabled}
-            aria-label={`${visible ? '隐藏' : '显示'}${label}`}
             onClick={() => setVisible(!visible)}
           >
             {visible ? <EyeOff size={14} /> : <Eye size={14} />}
-          </button>
+          </IconButton>
         )}
         {value && (
-          <button type='button' aria-label={`清除${label}`} disabled={disabled} onClick={() => onChange(null)}>
+          <IconButton label={`清除${label}`} disabled={disabled} onClick={() => onChange(null)}>
             <X size={14} />
-          </button>
+          </IconButton>
         )}
       </span>
     </div>

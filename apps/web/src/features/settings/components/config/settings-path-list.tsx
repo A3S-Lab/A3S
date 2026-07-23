@@ -1,5 +1,6 @@
 import { Folder, Plus, X } from 'lucide-react';
 import { useState } from 'react';
+import { IconButton } from '../../../../design-system/primitives';
 
 export function SettingsPathList({
   value,
@@ -26,13 +27,9 @@ export function SettingsPathList({
         <div className='settings-path-item' key={path}>
           <Folder size={13} />
           <code title={path}>{path}</code>
-          <button
-            type='button'
-            aria-label={`移除 ${path}`}
-            onClick={() => onChange(value.filter((item) => item !== path))}
-          >
+          <IconButton label={`移除 ${path}`} onClick={() => onChange(value.filter((item) => item !== path))}>
             <X size={13} />
-          </button>
+          </IconButton>
         </div>
       ))}
       <div className='settings-path-add'>
@@ -49,9 +46,9 @@ export function SettingsPathList({
             }
           }}
         />
-        <button type='button' aria-label={`添加${label}`} disabled={!draft.trim()} onClick={add}>
+        <IconButton label={`添加${label}`} disabled={!draft.trim()} onClick={add}>
           <Plus size={14} />
-        </button>
+        </IconButton>
       </div>
     </fieldset>
   );

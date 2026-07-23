@@ -7,11 +7,11 @@ import {
   ListChecks,
   Maximize2,
   Minimize2,
-  Search,
   Settings,
 } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
+import { CollectionState, SearchField, useDialogFocusScope } from '../../design-system/primitives';
 import type { CodeActions } from '../../features/code/use-code-controller';
 import { appState, navigateMemory, navigateSettings, navigateTask } from '../../state/app-state';
 
@@ -20,8 +20,6 @@ export function CommandPalette({ actions }: { actions: CodeActions }) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const dialogRef = useRef<HTMLElement>(null);
-  const restoreFocusRef = useRef<HTMLElement | null>(null);
   const resultId = useId();
   const commands = useMemo(
     () => [
@@ -117,17 +115,16 @@ export function CommandPalette({ actions }: { actions: CodeActions }) {
   const close = () => {
     appState.commandPaletteOpen = false;
   };
+  const focusScope = useDialogFocusScope<HTMLElement>({
+    onEscape: close,
+    initialFocus: () => inputRef.current,
+  });
   const run = (index: number) => {
     const command = visible[index];
     if (!command) return;
     command.run();
     close();
   };
-  useEffect(() => {
-    restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    inputRef.current?.focus();
-    return () => restoreFocusRef.current?.focus();
-  }, []);
   useEffect(() => setSelectedIndex(0), [query]);
   return (
     <dialog
@@ -140,59 +137,37 @@ export function CommandPalette({ actions }: { actions: CodeActions }) {
       }}
     >
       <section
-        ref={dialogRef}
+        ref={focusScope.scopeRef}
         className='command-palette'
         role='dialog'
         aria-modal='true'
         aria-label='快速导航'
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            event.preventDefault();
-            event.stopPropagation();
-            close();
-          }
-          if (event.key !== 'Tab') return;
-          const focusable = [
-            ...(dialogRef.current?.querySelectorAll<HTMLElement>('input, button:not(:disabled), [tabindex="0"]') ?? []),
-          ];
-          if (!focusable.length) return;
-          const first = focusable[0];
-          const last = focusable[focusable.length - 1];
-          if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-          } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-          }
-        }}
+        onKeyDown={focusScope.handleKeyDown}
       >
-        <label>
-          <Search size={16} />
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder='搜索页面或操作'
-            aria-label='搜索页面或操作'
-            role='combobox'
-            aria-controls={resultId}
-            aria-expanded='true'
-            aria-activedescendant={visible[selectedIndex] ? `${resultId}-${selectedIndex}` : undefined}
-            onKeyDown={(event) => {
-              if (event.key === 'ArrowDown') {
-                event.preventDefault();
-                setSelectedIndex((index) => Math.min(index + 1, visible.length - 1));
-              } else if (event.key === 'ArrowUp') {
-                event.preventDefault();
-                setSelectedIndex((index) => Math.max(index - 1, 0));
-              } else if (event.key === 'Enter') {
-                event.preventDefault();
-                run(selectedIndex);
-              }
-            }}
-          />
-        </label>
+        <SearchField
+          ref={inputRef}
+          className='palette-search'
+          label='搜索页面或操作'
+          value={query}
+          onValueChange={setQuery}
+          placeholder='搜索页面或操作'
+          role='combobox'
+          aria-controls={resultId}
+          aria-expanded='true'
+          aria-activedescendant={visible[selectedIndex] ? `${resultId}-${selectedIndex}` : undefined}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown') {
+              event.preventDefault();
+              setSelectedIndex((index) => Math.min(index + 1, visible.length - 1));
+            } else if (event.key === 'ArrowUp') {
+              event.preventDefault();
+              setSelectedIndex((index) => Math.max(index - 1, 0));
+            } else if (event.key === 'Enter') {
+              event.preventDefault();
+              run(selectedIndex);
+            }
+          }}
+        />
         <div className='palette-results' id={resultId} role='listbox' aria-label='可用操作'>
           <span>CODE</span>
           {visible.map(({ label, description, icon: Icon, run }) => (
@@ -216,7 +191,7 @@ export function CommandPalette({ actions }: { actions: CodeActions }) {
               </span>
             </button>
           ))}
-          {!visible.length && query && <p>没有匹配的操作</p>}
+          {!visible.length && query && <CollectionState role='status'>没有匹配的操作</CollectionState>}
         </div>
         <footer>
           <kbd>Esc</kbd> 关闭

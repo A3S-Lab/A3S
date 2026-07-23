@@ -1,9 +1,19 @@
 import { ArrowUpRight } from 'lucide-react';
-import { appState, navigateTask } from '../../../state/app-state';
+import { appState } from '../../../state/app-state';
+import { workspaceAbsolutePath } from '../../workspace/workspace-state';
+import type { TaskActions } from '../task-actions';
 import { isFileEditCall, toolFilePath, type ToolCallProjection } from './tool-call-projection';
 import { WorkspaceEntryIcon } from './workspace-entry-icon';
 
-export function ArtifactEntries({ calls, sessionId }: { calls: ToolCallProjection[]; sessionId: string }) {
+export function ArtifactEntries({
+  calls,
+  sessionId,
+  actions,
+}: {
+  calls: ToolCallProjection[];
+  sessionId: string;
+  actions: TaskActions;
+}) {
   const paths = [
     ...new Set(
       calls
@@ -14,11 +24,15 @@ export function ArtifactEntries({ calls, sessionId }: { calls: ToolCallProjectio
   ];
   if (!paths.length) return null;
 
-  const openReview = () => {
+  const openReview = async (path: string) => {
     appState.reviewSourceTaskId = sessionId;
     appState.reviewIntent = 'review';
     appState.gitStatus = null;
-    navigateTask('review');
+    const sessionRoot = appState.sessions.find((session) => session.sessionId === sessionId)?.workspace;
+    await actions.selectFile({
+      path: workspaceAbsolutePath(path, sessionRoot || appState.workspaceRoot),
+      isBinary: false,
+    });
   };
 
   return (
@@ -31,13 +45,20 @@ export function ArtifactEntries({ calls, sessionId }: { calls: ToolCallProjectio
         {paths.map((path) => {
           const presentation = artifactPathPresentation(path);
           return (
-            <button key={path} type='button' aria-label={`查看 ${path} 的变更`} onClick={openReview}>
+            <button
+              key={path}
+              type='button'
+              aria-label={`打开产物 ${path}`}
+              onClick={() => {
+                void openReview(path);
+              }}
+            >
               <span className='artifact-entry-icon'>
                 <WorkspaceEntryIcon name={presentation.name} isDirectory={false} size={16} />
               </span>
               <span>
                 <strong>{presentation.name}</strong>
-                <small>{presentation.parent} · 查看 Diff</small>
+                <small>{presentation.parent}</small>
               </span>
               <ArrowUpRight size={14} />
             </button>

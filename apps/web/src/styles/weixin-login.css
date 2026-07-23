@@ -1,0 +1,206 @@
+.weixin-login-dialog {
+  width: min(500px, calc(100vw - 32px));
+}
+
+.weixin-login-content {
+  display: flex;
+  max-height: min(670px, calc(100vh - 190px));
+  flex-direction: column;
+  gap: 14px;
+  overflow: auto;
+}
+
+.weixin-login-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 11px;
+  border: 1px solid var(--a3s-line);
+  border-radius: 9px;
+  background: var(--a3s-panel-soft);
+}
+
+.weixin-login-status > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--a3s-panel);
+  color: var(--a3s-blue);
+}
+
+.weixin-login-status.success > span {
+  color: var(--a3s-green);
+}
+
+.weixin-login-status.warning > span {
+  color: var(--a3s-warning);
+}
+
+.weixin-login-status.danger > span {
+  color: var(--a3s-red);
+}
+
+.weixin-login-status strong,
+.weixin-login-status p {
+  margin: 0;
+}
+
+.weixin-login-status strong {
+  font-size: 12px;
+}
+
+.weixin-login-status p {
+  color: var(--a3s-muted);
+  font-size: 11px;
+}
+
+.weixin-qr-frame {
+  position: relative;
+  display: grid;
+  width: 240px;
+  height: 240px;
+  flex: 0 0 240px;
+  margin: 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--a3s-line-strong);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.weixin-qr-frame > img,
+.weixin-qr-frame > svg {
+  display: block;
+  width: 216px;
+  height: 216px;
+  object-fit: contain;
+}
+
+.weixin-qr-frame.scanned > img,
+.weixin-qr-frame.scanned > svg {
+  opacity: 0.22;
+}
+
+.weixin-qr-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 5px;
+  background: rgb(255 255 255 / 62%);
+  color: #087a51;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.weixin-login-countdown {
+  margin: -5px 0 0;
+  color: var(--a3s-muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  text-align: center;
+}
+
+.weixin-verification-form {
+  display: flex;
+  padding: 12px;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--a3s-warning) 25%, var(--a3s-line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--a3s-warning) 6%, var(--a3s-panel));
+}
+
+.weixin-verification-form label {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.weixin-verification-form small {
+  margin: 0;
+  color: var(--a3s-muted);
+  font-size: 10px;
+}
+
+.weixin-verification-form > .ds-field {
+  gap: 6px;
+}
+
+.weixin-verification-control {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.weixin-verification-form input {
+  min-width: 0;
+  height: 36px;
+  flex: 1;
+  padding: 0 10px;
+  border: 1px solid var(--a3s-line-strong);
+  border-radius: 8px;
+  background: var(--a3s-panel);
+  color: var(--a3s-ink);
+}
+
+.weixin-login-assurance {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 11px;
+  border-radius: 9px;
+  background: var(--a3s-panel-soft);
+  color: var(--a3s-muted);
+  font-size: 10px;
+}
+
+.weixin-login-assurance svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--a3s-green);
+}
+
+.weixin-login-assurance p {
+  margin: 0;
+}
+
+.weixin-disconnect-dialog {
+  width: min(460px, calc(100vw - 32px));
+}
+
+.weixin-disconnect-review {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid color-mix(in srgb, var(--a3s-red) 24%, var(--a3s-line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--a3s-red) 5%, var(--a3s-panel));
+}
+
+.weixin-disconnect-review > svg {
+  flex: 0 0 auto;
+  color: var(--a3s-red);
+}
+
+.weixin-disconnect-review strong {
+  font-size: 12px;
+}
+
+.weixin-disconnect-review p {
+  margin: 2px 0 0;
+  color: var(--a3s-muted);
+  font-size: 11px;
+}
+
+@media (max-width: 540px) {
+  .weixin-verification-control {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

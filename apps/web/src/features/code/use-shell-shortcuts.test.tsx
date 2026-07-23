@@ -13,6 +13,7 @@ describe('shell location synchronization', () => {
     appState.sidebarOpen = true;
     appState.activeProduct = 'code';
     appState.codeSurface = 'tasks';
+    appState.settingsChannel = 'weixin';
     appState.activeSessionId = null;
     appState.composerValue = '';
     appState.workspaceRoot = '';
@@ -52,6 +53,42 @@ describe('shell location synchronization', () => {
     window.location.hash = '#code/conversation';
     window.dispatchEvent(new HashChangeEvent('hashchange'));
     expect(appState.taskView).toBe('conversation');
+  });
+
+  it('opens the standalone Knowledge route from browser navigation', () => {
+    renderHook(() => useShellShortcuts(() => undefined));
+    window.location.hash = '#knowledge';
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+
+    expect(appState.settingsOpen).toBe(false);
+    expect(appState.activeProduct).toBe('knowledge');
+  });
+
+  it('maps the legacy Weixin hash to its Settings tab without changing task drafts', () => {
+    appState.activeSessionId = 'task-keep';
+    appState.composerValue = 'keep this draft';
+    window.history.replaceState(null, '', '#weixin');
+
+    renderHook(() => useShellShortcuts(() => undefined));
+
+    expect(appState.activeProduct).toBe('code');
+    expect(appState.settingsOpen).toBe(true);
+    expect(appState.settingsTab).toBe('channels');
+    expect(appState.settingsChannel).toBe('weixin');
+    expect(window.location.hash).toBe('#weixin');
+    expect(appState.activeSessionId).toBe('task-keep');
+    expect(appState.composerValue).toBe('keep this draft');
+  });
+
+  it('opens a nested Feishu channel route inside Settings', () => {
+    window.history.replaceState(null, '', '#settings/channels/feishu');
+
+    renderHook(() => useShellShortcuts(() => undefined));
+
+    expect(appState.settingsOpen).toBe(true);
+    expect(appState.settingsTab).toBe('channels');
+    expect(appState.settingsChannel).toBe('feishu');
+    expect(window.location.hash).toBe('#settings/channels/feishu');
   });
 
   it('opens Help inside Settings from the question-mark shortcut', () => {

@@ -1,6 +1,7 @@
 import { Bug, FileCheck2, SearchCode, Sparkles } from 'lucide-react';
+import { useSnapshot } from 'valtio';
+import { appendTaskInstruction, appState } from '../../../state/app-state';
 import type { TaskActions } from '../task-actions';
-import { appendTaskInstruction } from '../../../state/app-state';
 import { TaskComposer } from './task-composer';
 
 const starters = [
@@ -27,6 +28,7 @@ const starters = [
 ] as const;
 
 export function NewTaskPreparation({ actions }: { actions: TaskActions }) {
+  const state = useSnapshot(appState);
   return (
     <main className='new-task-preparation'>
       <div className='new-task-preparation-inner'>
@@ -37,7 +39,12 @@ export function NewTaskPreparation({ actions }: { actions: TaskActions }) {
         </header>
         <div className='task-starters'>
           {starters.map(({ label, icon: Icon, content }) => (
-            <button type='button' key={label} onClick={() => appendTaskInstruction(content)}>
+            <button
+              type='button'
+              key={label}
+              disabled={Boolean(state.taskSubmissionState)}
+              onClick={() => appendTaskInstruction(content)}
+            >
               <Icon size={15} />
               {label}
             </button>

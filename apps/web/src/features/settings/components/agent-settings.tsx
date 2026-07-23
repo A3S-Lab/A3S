@@ -6,11 +6,12 @@ import type { SettingsActions } from '../settings-actions';
 import { useSettingsDraft } from '../use-settings-draft';
 import { defaultQueueSettings, QueueSettingsEditor } from './agent/queue-settings';
 import { SettingsEffectBadge } from './config/settings-effect-badge';
+import { SettingsEmptyNotice } from './config/settings-empty-notice';
 import { SettingsNumberField, SettingsSliderField } from './config/settings-fields';
 import { SettingsPathList } from './config/settings-path-list';
 import { SettingsRow } from './config/settings-row';
-import { SettingsSaveState, SettingsLoadState } from './config/settings-state-view';
 import { SettingsSection } from './config/settings-section';
+import { SettingsCategoryError, SettingsLoadState, SettingsSaveState } from './config/settings-state-view';
 import { SettingsSwitch } from './config/settings-switch';
 
 export function AgentSettingsView({
@@ -61,9 +62,7 @@ export function AgentSettingsView({
               onSave={() => void save()}
             />
           </div>
-          {state.settingsCategoryErrors.agent && (
-            <p className='settings-inline-error'>{state.settingsCategoryErrors.agent}</p>
-          )}
+          <SettingsCategoryError message={state.settingsCategoryErrors.agent} />
 
           <SettingsSection title='执行边界' description='限制单轮工具调用和并行分支，避免失控执行与意外成本。'>
             <SettingsRow label='最大工具轮次' description='单轮任务允许的工具执行回合数。'>
@@ -190,7 +189,7 @@ export function AgentSettingsView({
             {draft.queue ? (
               <QueueSettingsEditor value={draft.queue} onChange={(queue) => setDraft({ ...draft, queue })} />
             ) : (
-              <div className='config-empty-inline'>未启用高级队列，任务使用直接执行路径。</div>
+              <SettingsEmptyNotice>未启用高级队列，任务使用直接执行路径。</SettingsEmptyNotice>
             )}
           </SettingsSection>
         </div>

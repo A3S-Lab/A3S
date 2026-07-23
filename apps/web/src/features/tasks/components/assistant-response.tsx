@@ -3,13 +3,15 @@ import { lazy, Suspense } from 'react';
 import type { ChatMessage } from '../../../types/api';
 import type { TaskActions } from '../task-actions';
 import { ArtifactEntries } from './artifact-entries';
+import { projectAssistantResponseSegments, visibleAssistantContent } from './assistant-response-projection';
 import { ConversationMessageActions } from './conversation-message-actions';
+import { DeepResearchReportCard } from './deep-research-report-card';
 import { DeliverySummary } from './delivery-summary';
 import { ReasoningDisclosure } from './reasoning-disclosure';
 import { RecoveryNotice } from './recovery-notice';
 import { projectSubagents } from './task-runtime-projection';
 import { projectToolCalls } from './tool-call-projection';
-import { ToolCallTimeline } from './tool-call-timeline';
+import { ToolCallItem } from './tool-call-timeline';
 
 const StreamingMarkdown = lazy(() => import('./streaming-markdown'));
 
@@ -27,7 +29,9 @@ export function AssistantResponse({
   const toolCalls = projectToolCalls(message.events ?? [], message.contentBlocks ?? [], {
     settleOpen: !message.pending,
   });
+  const segments = projectAssistantResponseSegments(message, toolCalls);
   const stateLabel = pendingResponseState(message, toolCalls);
+  const visibleContent = visibleAssistantContent(message.content, toolCalls);
 
   return (
     <article
@@ -45,21 +49,27 @@ export function AssistantResponse({
             {stateLabel}
           </output>
         )}
-        <ConversationMessageActions content={message.content} createdAt={message.createdAt} />
+        <ConversationMessageActions content={visibleContent} createdAt={message.createdAt} />
       </header>
       {message.reasoning?.trim() && (
         <ReasoningDisclosure content={message.reasoning.trim()} pending={Boolean(message.pending)} />
       )}
-      <ToolCallTimeline calls={toolCalls} sessionId={message.sessionId} actions={actions} />
-      {message.content ? (
-        <div className='execution-markdown execution-answer'>
-          <Suspense fallback={<p className='execution-markdown-fallback'>{message.content}</p>}>
-            <StreamingMarkdown content={message.content} streaming={Boolean(message.pending)} />
-          </Suspense>
-        </div>
-      ) : null}
+      <div className='execution-response-flow'>
+        {segments.map((segment) =>
+          segment.kind === 'tool' ? (
+            <ToolCallItem key={segment.id} call={segment.call} sessionId={message.sessionId} actions={actions} />
+          ) : (
+            <div className='execution-markdown execution-answer' key={segment.id}>
+              <Suspense fallback={<p className='execution-markdown-fallback'>{segment.content}</p>}>
+                <StreamingMarkdown content={segment.content} streaming={Boolean(message.pending)} />
+              </Suspense>
+            </div>
+          )
+        )}
+      </div>
       <DeliverySummary sessionId={message.sessionId} events={message.events ?? []} />
-      <ArtifactEntries calls={toolCalls} sessionId={message.sessionId} />
+      <DeepResearchReportCard calls={toolCalls} sessionId={message.sessionId} actions={actions} />
+      <ArtifactEntries calls={toolCalls} sessionId={message.sessionId} actions={actions} />
       <RecoveryNotice events={message.events ?? []} retryContent={retryContent} />
     </article>
   );
@@ -76,7 +86,7 @@ function pendingResponseState(message: ChatMessage, calls: ReturnType<typeof pro
   if (eventTypes.has('planning_start') && !eventTypes.has('planning_end')) return '正在规划';
   if (eventTypes.has('planning_end') || eventTypes.has('task_updated') || eventTypes.has('step_start'))
     return '正在执行计划';
-  if (message.content.trim()) return '正在回答';
+  if (visibleAssistantContent(message.content, calls).trim()) return '正在回答';
   if (message.reasoning?.trim()) return '正在思考';
   return '正在准备';
 }

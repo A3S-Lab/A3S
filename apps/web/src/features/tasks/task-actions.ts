@@ -1,3 +1,5 @@
+import type { WorkspaceFileSelection } from '../workspace/workspace-state';
+
 export interface TaskActions {
   selectSession(sessionId: string): Promise<void>;
   selectNewTaskWorkspace(workspace: string): Promise<void>;
@@ -19,4 +21,5 @@ export interface TaskActions {
   updateSessionModel(model: string): Promise<void>;
   updateEffort(effort: string): Promise<void>;
   updatePermissionMode(permissionMode: string): Promise<void>;
+  selectFile(file: WorkspaceFileSelection): Promise<boolean>;
 }

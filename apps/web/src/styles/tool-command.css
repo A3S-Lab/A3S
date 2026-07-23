@@ -1,4 +1,5 @@
-.tool-call-timeline {
+.tool-call-stream,
+.tool-call-item {
   --tool-syntax-program: #386fc4;
   --tool-syntax-argument: #646a74;
   --tool-syntax-flag: #c04f73;
@@ -12,7 +13,8 @@
   --tool-syntax-key: #386fc4;
 }
 
-:root.dark .tool-call-timeline {
+:root.dark .tool-call-stream,
+:root.dark .tool-call-item {
   --tool-syntax-program: #89b4fa;
   --tool-syntax-argument: #b2b5bb;
   --tool-syntax-flag: #e891a4;
@@ -30,110 +32,6 @@
   display: inline;
   font-family: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
   font-size: 0.96em;
-}
-
-.tool-command-preview {
-  overflow: hidden;
-  border: 1px solid var(--a3s-line);
-  border-radius: 8px;
-  background: var(--a3s-panel);
-}
-
-.tool-command-preview.running {
-  border-color: color-mix(in srgb, var(--a3s-blue) 23%, var(--a3s-line));
-  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--a3s-blue) 72%, transparent);
-}
-
-.tool-command-preview > header {
-  display: flex;
-  min-height: 29px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 5px 0 9px;
-  border-bottom: 1px solid var(--a3s-line);
-  background: color-mix(in srgb, var(--a3s-panel-soft) 72%, var(--a3s-panel));
-}
-
-.tool-command-preview > header > span,
-.tool-command-preview-actions,
-.tool-command-preview-actions output {
-  display: inline-flex;
-  align-items: center;
-}
-
-.tool-command-preview > header > span:first-child {
-  gap: 6px;
-  color: var(--a3s-muted);
-}
-
-.tool-command-preview > header strong {
-  color: var(--a3s-muted);
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 0.04em;
-}
-
-.tool-command-preview-actions {
-  gap: 3px;
-}
-
-.tool-command-preview-actions output {
-  min-height: 21px;
-  gap: 4px;
-  padding: 0 6px;
-  color: var(--a3s-blue);
-  font-size: 9px;
-}
-
-.tool-command-preview-actions .conversation-copy-action {
-  background: transparent;
-}
-
-.tool-command-line {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: 17px minmax(0, 1fr);
-  gap: 6px;
-  padding: 10px 11px 9px;
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--a3s-blue) 3%, transparent), transparent 45%),
-    var(--a3s-panel);
-}
-
-.tool-command-prompt {
-  color: var(--a3s-green);
-  font: 650 11px/1.7 "SFMono-Regular", "Cascadia Code", Consolas, monospace;
-  user-select: none;
-}
-
-.tool-command-line > code {
-  min-width: 0;
-  color: var(--a3s-ink);
-  font: 11px/1.7 "SFMono-Regular", "Cascadia Code", Consolas, monospace;
-  overflow-wrap: anywhere;
-  tab-size: 2;
-  white-space: pre-wrap;
-}
-
-.tool-command-preview > footer {
-  display: flex;
-  min-height: 25px;
-  align-items: center;
-  gap: 5px;
-  padding: 0 10px;
-  border-top: 1px solid color-mix(in srgb, var(--a3s-line) 75%, transparent);
-  color: var(--a3s-faint);
-  font-size: 9px;
-}
-
-.tool-command-preview > footer code {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--a3s-muted);
-  font: 9px/1.4 "SFMono-Regular", "Cascadia Code", Consolas, monospace;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 [data-syntax-role="program"] {
@@ -190,13 +88,23 @@
   color: inherit;
 }
 
-.tool-call-collapsed-preview {
+.tool-call-output-preview,
+.tool-call-empty-output {
   display: grid;
   min-width: 0;
-  grid-template-columns: 16px minmax(0, 1fr);
+  grid-template-columns: 13px minmax(0, 1fr);
   gap: 5px;
-  padding: 0 31px 8px 43px;
+  color: var(--a3s-muted);
+}
+
+.tool-call-output-preview.error,
+.tool-call-output-preview.error > code {
+  color: var(--a3s-red);
+}
+
+.tool-call-empty-output {
   color: var(--a3s-faint);
+  font: 10px/1.55 "SFMono-Regular", "Cascadia Code", Consolas, monospace;
 }
 
 .tool-output-connector {
@@ -204,7 +112,7 @@
   font: 12px/1.55 "SFMono-Regular", "Cascadia Code", Consolas, monospace;
 }
 
-.tool-call-collapsed-preview > code {
+.tool-call-output-preview > code {
   display: flex;
   min-width: 0;
   overflow: hidden;
@@ -213,24 +121,20 @@
   flex-direction: column;
 }
 
-.tool-call-collapsed-preview > code > span {
+.tool-call-output-preview > code > span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.tool-call-collapsed-preview .tool-output-omitted {
+.tool-call-output-preview .tool-output-omitted {
   color: var(--a3s-faint);
   font-size: 9px;
   font-style: italic;
 }
 
 @media (max-width: 720px) {
-  .tool-call-collapsed-preview {
-    padding-right: 12px;
-  }
-
-  .tool-command-preview-actions output {
-    display: none;
+  .tool-call-output-preview > code {
+    font-size: 9.5px;
   }
 }

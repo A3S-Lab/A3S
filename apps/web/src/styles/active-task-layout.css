@@ -57,33 +57,6 @@
   left: -3px;
   width: 6px;
   height: auto;
-  margin: 0;
-  border: 0;
-  cursor: col-resize;
-  touch-action: none;
-}
-
-.task-context-resizer::after {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 2px;
-  width: 1px;
-  background: transparent;
-  content: "";
-  transition: background-color 140ms ease;
-}
-
-.task-context-resizer:hover::after,
-.task-context-resizer:focus-visible::after,
-.resizing-task-context .task-context-resizer::after {
-  background: var(--a3s-blue);
-}
-
-.resizing-task-context,
-.resizing-task-context * {
-  cursor: col-resize !important;
-  user-select: none !important;
 }
 
 .task-context-header {
@@ -97,41 +70,22 @@
   background: var(--a3s-panel);
 }
 
-.task-context-header nav {
-  display: flex;
+.task-context-tabs.ds-tabs.line {
   height: 100%;
-  align-items: stretch;
   gap: 2px;
+  border-bottom: 0;
 }
 
-.task-context-header nav button {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.task-context-tabs.ds-tabs.line > button {
+  min-height: 100%;
   padding: 0 11px;
-  border: 0;
-  background: transparent;
-  color: var(--a3s-muted);
   font-size: 12px;
   font-weight: 550;
-  cursor: pointer;
 }
 
-.task-context-header nav button:hover,
-.task-context-header nav button.active {
-  color: var(--a3s-ink);
-}
-
-.task-context-header nav button.active::after {
-  position: absolute;
+.task-context-tabs.ds-tabs.line > button::after {
   right: 9px;
-  bottom: -1px;
   left: 9px;
-  height: 2px;
-  border-radius: 999px 999px 0 0;
-  background: var(--a3s-blue);
-  content: "";
 }
 
 .task-context-actions {

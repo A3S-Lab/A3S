@@ -1,5 +1,6 @@
-import { Search } from 'lucide-react';
+import { SearchX } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { SearchField, StateView } from '../../../design-system/primitives';
 
 const entries = [
   {
@@ -87,15 +88,13 @@ export function HelpSettings() {
 
   return (
     <section className='help-settings' aria-label='帮助内容'>
-      <label className='help-search'>
-        <Search size={15} />
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder='搜索功能、安全策略或快捷键'
-          aria-label='搜索帮助'
-        />
-      </label>
+      <SearchField
+        className='help-search'
+        label='搜索帮助'
+        value={query}
+        placeholder='搜索功能、安全策略或快捷键'
+        onValueChange={setQuery}
+      />
       <div className='help-content'>
         {groups.map((group) => (
           <section key={group}>
@@ -119,7 +118,15 @@ export function HelpSettings() {
               ))}
           </section>
         ))}
-        {!visible.length && <div className='help-empty'>没有匹配的帮助内容</div>}
+        {!visible.length && (
+          <StateView
+            className='help-empty'
+            size='compact'
+            icon={<SearchX size={22} />}
+            title='没有匹配的帮助内容'
+            description='换一个关键词，或清空搜索后重试。'
+          />
+        )}
       </div>
     </section>
   );

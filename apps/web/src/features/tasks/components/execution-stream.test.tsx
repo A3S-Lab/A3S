@@ -256,15 +256,9 @@ describe('ExecutionStream permission decisions', () => {
     expect(screen.getByText('Current workspace')).toBeInTheDocument();
     expect(screen.getByText('Executes a local process')).toBeInTheDocument();
     expect(screen.getByText('30 秒')).toBeInTheDocument();
-    const argumentsDisclosure = screen.getByRole('button', { name: '调用参数' });
-    const rawArguments = document.querySelector<HTMLElement>('.tool-json-preview');
-    expect(rawArguments).toHaveTextContent('"command": "cargo test"');
-    expect(argumentsDisclosure).toHaveAttribute('aria-expanded', 'false');
-    expect(rawArguments).not.toBeVisible();
-    fireEvent.click(argumentsDisclosure);
-    expect(argumentsDisclosure).toHaveAttribute('aria-expanded', 'true');
-    expect(rawArguments).toBeVisible();
-    expect(screen.getByRole('region', { name: '命令预览' })).toHaveTextContent('cargo test');
+    const toolCall = screen.getByRole('region', { name: '正在执行命令，cargo test，待确认' });
+    expect(toolCall).toHaveTextContent('cargo test');
+    expect(toolCall.querySelector('[data-syntax-role="program"]')).toHaveTextContent('cargo');
     fireEvent.click(screen.getByRole('button', { name: '允许一次' }));
     expect(confirmToolUse).toHaveBeenCalledWith('session-approval', 'tool-7', true);
   });
@@ -491,14 +485,15 @@ describe('ExecutionStream permission decisions', () => {
       },
     ];
 
-    render(<ExecutionStream actions={{} as TaskActions} />);
+    const selectFile = vi.fn(async () => undefined);
+    render(<ExecutionStream actions={{ selectFile } as unknown as TaskActions} />);
 
     expect(screen.getByLabelText('任务产物')).toHaveTextContent('app.ts');
-    expect(screen.getByLabelText('任务产物')).toHaveTextContent('src · 查看 Diff');
-    fireEvent.click(screen.getByRole('button', { name: '查看 src/app.ts 的变更' }));
+    expect(screen.getByLabelText('任务产物')).toHaveTextContent('src');
+    fireEvent.click(screen.getByRole('button', { name: '打开产物 src/app.ts' }));
     expect(appState.reviewSourceTaskId).toBe('session-artifact');
     expect(appState.reviewIntent).toBe('review');
-    expect(appState.taskView).toBe('review');
+    expect(selectFile).toHaveBeenCalledTimes(1);
   });
 
   it('keeps successful tool output complete and collapsed until requested', () => {
@@ -525,16 +520,14 @@ describe('ExecutionStream permission decisions', () => {
     ];
 
     const { container } = render(<ExecutionStream actions={{} as TaskActions} />);
-    const details = container.querySelector('.tool-call-item');
-    const disclosure = details?.querySelector('button[aria-expanded]');
-    expect(disclosure).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByLabelText('输出预览')).toHaveTextContent('final line must remain visible');
+    expect(screen.getByLabelText('工具输出')).toHaveTextContent('final line must remain visible');
     expect(container.querySelector('.tool-call-output')).not.toBeInTheDocument();
-    fireEvent.click(disclosure!);
+    const disclosure = screen.getByRole('button', { name: '完整输出 · 2 行' });
+    expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(disclosure);
     expect(disclosure).toHaveAttribute('aria-expanded', 'true');
     expect(container.querySelector('.tool-call-output')?.textContent).toBe(completeOutput);
-    expect(screen.getByRole('region', { name: '执行过程' })).toHaveTextContent('1 项操作已完成');
-    expect(screen.getByLabelText('执行信息')).toHaveTextContent('bash');
+    expect(screen.getByRole('region', { name: '已执行命令，bun test，已完成' })).toBeInTheDocument();
   });
 
   it('renders the shell command, parameters, cwd, and incremental output as the primary execution preview', () => {
@@ -575,16 +568,19 @@ describe('ExecutionStream permission decisions', () => {
 
     const { container } = render(<ExecutionStream actions={{} as TaskActions} />);
 
-    const command = screen.getByRole('region', { name: '命令预览' });
-    expect(command).toHaveTextContent('cargo test -p a3s-cli --test web_cli');
-    expect(command).toHaveTextContent('/repo/crates/cli');
-    expect(command.querySelector('[data-syntax-role="program"]')).toHaveTextContent('cargo');
-    expect(command.querySelectorAll('[data-syntax-role="flag"]')).toHaveLength(2);
+    const toolCall = screen.getByRole('region', {
+      name: '正在执行命令，cargo test -p a3s-cli --test web_cli，执行中',
+    });
+    expect(toolCall).toHaveTextContent('cargo test -p a3s-cli --test web_cli');
+    expect(toolCall.querySelector('[data-syntax-role="program"]')).toHaveTextContent('cargo');
+    expect(toolCall.querySelectorAll('[data-syntax-role="flag"]')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: '参数' }));
+    expect(toolCall.querySelector('.tool-json-preview')).toHaveTextContent('/repo/crates/cli');
     expect(screen.getByRole('log', { name: '实时工具输出' })).toHaveTextContent('test result: ok');
     expect(container.querySelector('.tool-call-result')).toHaveTextContent('实时输出 · 2 行');
   });
 
-  it('compacts older successful tool calls without hiding active evidence', () => {
+  it('keeps chronological tool calls visible without hiding earlier evidence', () => {
     appState.activeSessionId = 'session-tool-density';
     appState.messagesBySession['session-tool-density'] = [
       {
@@ -606,12 +602,11 @@ describe('ExecutionStream permission decisions', () => {
 
     const { container } = render(<ExecutionStream actions={{} as TaskActions} />);
 
-    expect(container.querySelectorAll('.tool-call-item')).toHaveLength(4);
-    fireEvent.click(screen.getByRole('button', { name: '查看之前 4 项已完成操作' }));
     expect(container.querySelectorAll('.tool-call-item')).toHaveLength(8);
+    expect(screen.queryByRole('button', { name: /查看之前/ })).not.toBeInTheDocument();
   });
 
-  it('collapses a running tool in place when it succeeds', async () => {
+  it('settles a running tool in place when it succeeds', async () => {
     appState.activeSessionId = 'session-tool-transition';
     appState.messagesBySession['session-tool-transition'] = [
       {
@@ -633,9 +628,8 @@ describe('ExecutionStream permission decisions', () => {
     ];
 
     const { container } = render(<ExecutionStream actions={{} as TaskActions} />);
-    const details = container.querySelector('.tool-call-item');
-    const disclosure = details?.querySelector('button[aria-expanded]');
-    expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+    const toolCall = container.querySelector('.tool-call-item');
+    expect(toolCall).toHaveClass('running');
 
     appState.messagesBySession['session-tool-transition'][0].pending = false;
     appState.messagesBySession['session-tool-transition'][0].events = [
@@ -648,7 +642,8 @@ describe('ExecutionStream permission decisions', () => {
       },
     ];
 
-    await waitFor(() => expect(disclosure).toHaveAttribute('aria-expanded', 'false'));
+    await waitFor(() => expect(toolCall).toHaveClass('succeeded'));
+    expect(toolCall).toHaveTextContent('passed');
   });
 
   it('offers a direct way back to the latest content after the user scrolls upward', () => {
@@ -1069,7 +1064,9 @@ describe('ExecutionStream permission decisions', () => {
     const { container } = render(<ExecutionStream actions={{} as TaskActions} />);
 
     expect(screen.getByText('查看技术详情')).toBeInTheDocument();
-    expect(container.querySelector('.recovery-notice > header p')?.textContent?.length).toBeLessThan(error.length);
+    expect(container.querySelector('.recovery-notice .ds-inline-notice-copy p')?.textContent?.length).toBeLessThan(
+      error.length
+    );
     const technicalDetails = container.querySelector('.recovery-technical-details') as HTMLElement;
     const disclosure = within(technicalDetails).getByRole('button', { name: '查看技术详情' });
     expect(disclosure).toHaveAttribute('aria-expanded', 'false');

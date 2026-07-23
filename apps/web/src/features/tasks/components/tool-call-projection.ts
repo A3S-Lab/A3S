@@ -14,6 +14,8 @@ export interface ToolCallProjection {
   id: string;
   name: string;
   state: ToolCallState;
+  firstEventIndex?: number;
+  firstBlockIndex?: number;
   args?: Record<string, unknown>;
   inputText: string;
   output: string;
@@ -44,6 +46,7 @@ export interface ToolTimelineSummary {
 }
 
 const terminalStates = new Set<ToolCallState>(['succeeded', 'failed', 'denied', 'timed-out', 'interrupted']);
+const DEEP_RESEARCH_CANCELLED_MESSAGE = 'DeepResearch was cancelled by the user.';
 const toolNameAliases: Readonly<Record<string, string>> = {
   append_to_file: 'write',
   cat_file: 'read',
@@ -83,16 +86,24 @@ export function projectToolCalls(
   const calls = new Map<string, ToolCallProjection>();
   const order: string[] = [];
 
-  const ensure = (id: string, name: string): ToolCallProjection => {
+  const ensure = (
+    id: string,
+    name: string,
+    source: { eventIndex?: number; blockIndex?: number } = {}
+  ): ToolCallProjection => {
     const existing = calls.get(id);
     if (existing) {
       if (existing.name === 'tool' && name !== 'tool') existing.name = name;
+      existing.firstEventIndex ??= source.eventIndex;
+      existing.firstBlockIndex ??= source.blockIndex;
       return existing;
     }
     const call: ToolCallProjection = {
       id,
       name: name || 'tool',
       state: 'preparing',
+      firstEventIndex: source.eventIndex,
+      firstBlockIndex: source.blockIndex,
       inputText: '',
       output: '',
     };
@@ -105,7 +116,7 @@ export function projectToolCalls(
     if (!isToolEvent(event.type)) return;
     const name = eventName(event);
     const id = eventId(event, name, index, order, calls);
-    const call = ensure(id, name);
+    const call = ensure(id, name, { eventIndex: index });
 
     switch (event.type) {
       case 'tool_start':
@@ -149,16 +160,29 @@ export function projectToolCalls(
         break;
       case 'tool_end': {
         const exitCode = numberValue(event.exit_code);
-        const errorKind = stringValue(event.error_kind);
+        const errorKind = toolErrorKind(event.error_kind);
+        const metadata = recordValue(event.metadata) ?? call.metadata;
+        const output = stringValue(event.output) ?? call.output;
+        const cancelled = isCancelledToolCall(call, errorKind, metadata, output);
         const failed = Boolean(event.is_error) || (exitCode !== undefined && exitCode !== 0) || Boolean(errorKind);
         const settledDecision = call.state === 'denied' || call.state === 'timed-out' ? call.state : undefined;
-        call.state = settledDecision ?? (failed ? 'failed' : 'succeeded');
+        call.state = settledDecision ?? (cancelled ? 'interrupted' : failed ? 'failed' : 'succeeded');
         call.args = recordValue(event.args) ?? call.args;
-        call.output = stringValue(event.output) ?? call.output;
+        call.output = cancelled && isCancellationTransportMessage(output, metadata) ? '' : output;
         call.exitCode = exitCode;
-        call.metadata = recordValue(event.metadata) ?? call.metadata;
+        call.metadata = cancelled
+          ? {
+              ...metadata,
+              cancelled: true,
+              message: cancellationMessage(metadata) ?? cancellationFallbackMessage(call),
+            }
+          : metadata;
         call.errorKind = errorKind;
         call.durationMs = numberValue(event.duration_ms) ?? numberFromRecord(call.metadata, 'duration_ms');
+        if (cancelled) {
+          call.reason =
+            canonicalToolName(call.name) === 'deep_research' ? '用户已停止深度研究。' : '用户已停止该操作。';
+        }
         break;
       }
       default:
@@ -169,7 +193,7 @@ export function projectToolCalls(
   contentBlocks.forEach((block, index) => {
     if (!isToolBlock(block)) return;
     const id = block.toolUseId || block.id || `content-tool-${index}`;
-    const call = ensure(id, block.name || 'tool');
+    const call = ensure(id, block.name || 'tool', { blockIndex: index });
     if (block.input) call.args = block.input;
     if (block.content !== undefined) {
       if (!call.output) call.output = block.content;
@@ -297,6 +321,9 @@ export function toolActionLabel(call: Pick<ToolCallProjection, 'name' | 'state'>
       return statefulLabel(call.state, '正在搜索网页', '已搜索网页', '搜索网页失败', '未搜索网页');
     case 'web_fetch':
       return statefulLabel(call.state, '正在读取网页', '已读取网页', '读取网页失败', '未读取网页');
+    case 'deep_research':
+      if (call.state === 'interrupted') return '深度研究已停止';
+      return statefulLabel(call.state, '正在深度研究', '深度研究已完成', '深度研究失败', '深度研究未执行');
     case 'task':
     case 'parallel_task':
       return statefulLabel(call.state, '正在委派任务', '已完成委派', '委派任务失败', '任务未委派');
@@ -342,6 +369,8 @@ export function toolOperationLabel(call: Pick<ToolCallProjection, 'name'>): stri
       return '搜索外部网页';
     case 'web_fetch':
       return '访问外部网页';
+    case 'deep_research':
+      return '生成来源可追溯的研究报告';
     case 'task':
     case 'parallel_task':
       return '委派子任务';
@@ -492,6 +521,35 @@ function recordValue(value: unknown): Record<string, unknown> | undefined {
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
+}
+
+function toolErrorKind(value: unknown): string | undefined {
+  return stringValue(value) ?? stringValue(recordValue(value)?.type);
+}
+
+function isCancelledToolCall(
+  call: Pick<ToolCallProjection, 'name'>,
+  errorKind: string | undefined,
+  metadata: Record<string, unknown> | undefined,
+  output: string
+): boolean {
+  if (errorKind?.toLowerCase() === 'cancelled' || metadata?.cancelled === true) return true;
+  return canonicalToolName(call.name) === 'deep_research' && output.trim() === DEEP_RESEARCH_CANCELLED_MESSAGE;
+}
+
+function isCancellationTransportMessage(output: string, metadata: Record<string, unknown> | undefined): boolean {
+  const normalized = output.trim();
+  return normalized === DEEP_RESEARCH_CANCELLED_MESSAGE || normalized === cancellationMessage(metadata)?.trim();
+}
+
+function cancellationMessage(metadata: Record<string, unknown> | undefined): string | undefined {
+  return stringValue(metadata?.message);
+}
+
+function cancellationFallbackMessage(call: Pick<ToolCallProjection, 'name'>): string {
+  return canonicalToolName(call.name) === 'deep_research'
+    ? DEEP_RESEARCH_CANCELLED_MESSAGE
+    : 'Tool execution was cancelled by the user.';
 }
 
 function numberValue(value: unknown): number | undefined {

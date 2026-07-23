@@ -14,68 +14,6 @@
   background: var(--a3s-panel);
 }
 
-.memory-page-header {
-  display: flex;
-  min-height: 64px;
-  flex: 0 0 64px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--a3s-line);
-  background: color-mix(in srgb, var(--a3s-panel-soft) 24%, var(--a3s-panel));
-}
-
-.memory-page-title,
-.memory-page-actions {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-}
-
-.memory-page-title {
-  gap: 9px;
-}
-
-.memory-title-mark {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  flex: 0 0 30px;
-  place-items: center;
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--a3s-blue) 8%, var(--a3s-panel));
-  color: var(--a3s-blue);
-}
-
-.memory-page-title > div {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.memory-page-title h1 {
-  margin: 0;
-  color: var(--a3s-ink);
-  font-size: 15px;
-  font-weight: 680;
-  letter-spacing: -0.015em;
-  line-height: 21px;
-}
-
-.memory-page-actions {
-  flex: 0 0 auto;
-  gap: 4px;
-}
-
-.memory-page-actions .ds-button {
-  min-height: 34px;
-  gap: 6px;
-  padding-inline: 10px;
-  border-radius: 8px;
-  font-size: 12px;
-}
-
 .memory-workbench {
   position: relative;
   display: grid;
@@ -114,7 +52,6 @@
   border-bottom: 1px solid var(--a3s-line);
 }
 
-.memory-view-switcher,
 .memory-scope-switcher {
   display: flex;
   align-items: center;
@@ -126,7 +63,6 @@
   background: var(--a3s-panel-soft);
 }
 
-.memory-view-switcher button,
 .memory-scope-switcher button {
   display: inline-flex;
   height: 32px;
@@ -142,20 +78,14 @@
   font-weight: 550;
 }
 
-.memory-view-switcher button:hover,
 .memory-scope-switcher button:hover {
   color: var(--a3s-ink);
 }
 
-.memory-view-switcher button.active,
 .memory-scope-switcher button.active {
   background: var(--a3s-panel);
   box-shadow: 0 1px 3px rgb(20 24 40 / 8%);
   color: var(--a3s-ink);
-}
-
-.memory-view-switcher button.active {
-  color: var(--a3s-blue);
 }
 
 .memory-visualization-context {
@@ -204,85 +134,28 @@
   white-space: nowrap;
 }
 
-.memory-stale-notice {
-  display: flex;
+.memory-stale-notice.ds-inline-notice {
   min-height: 40px;
   flex: 0 0 40px;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 24px;
+  padding: 5px 24px;
   border-bottom: 1px solid color-mix(in srgb, var(--a3s-warning) 25%, var(--a3s-line));
-  background: color-mix(in srgb, var(--a3s-warning) 6%, var(--a3s-panel));
-  color: var(--a3s-warning);
+  border-radius: 0;
+}
+
+.memory-stale-notice .ds-inline-notice-copy {
   font-size: 12px;
   line-height: 18px;
 }
 
-.memory-stale-notice button {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font-weight: 650;
-}
-
-.memory-state-card,
-.memory-no-results {
-  display: flex;
-  width: min(480px, calc(100% - 48px));
-  align-items: center;
-  justify-content: center;
-  margin: auto;
-  padding: 40px;
-  flex-direction: column;
-  text-align: center;
-}
-
-.memory-state-card > span {
-  display: grid;
-  width: 48px;
-  height: 48px;
-  margin-bottom: 16px;
-  place-items: center;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--a3s-blue) 8%, var(--a3s-panel));
-  color: var(--a3s-blue);
-}
-
-.memory-state-card h2,
-.memory-no-results h2 {
-  margin: 0 0 6px;
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 24px;
-}
-
-.memory-state-card p,
-.memory-no-results p {
-  margin: 0 0 20px;
-  color: var(--a3s-muted);
-  font-size: 13px;
-  line-height: 21px;
+.memory-stale-notice .ds-button {
+  min-height: 28px;
+  padding-inline: 8px;
 }
 
 .memory-no-results {
   min-height: 0;
   flex: 1;
-}
-
-.memory-no-results > svg {
-  margin-bottom: 12px;
-  color: var(--a3s-muted);
-}
-
-.memory-no-results button {
-  border: 0;
-  background: transparent;
-  color: var(--a3s-blue);
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
 }
 
 .memory-loading {
@@ -331,10 +204,6 @@
 }
 
 @media (max-width: 1200px) {
-  .memory-page-header {
-    padding-inline: 14px;
-  }
-
   .memory-workbench,
   .memory-workbench.with-inspector,
   .memory-loading-workbench {

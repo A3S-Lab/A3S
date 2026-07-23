@@ -28,6 +28,12 @@ export function usePluginController() {
       if (!next || next.sha256 !== digest || !next.enabled) delete appState.pluginContentByKey[key];
     }
     if (
+      appState.pluginContextProposal &&
+      !items.some((item) => item.key === appState.pluginContextProposal?.sourceKey && item.enabled)
+    ) {
+      appState.pluginContextProposal = null;
+    }
+    if (
       appState.activeProduct === 'plugin' &&
       (!appState.activePluginKey || !items.some((item) => item.key === appState.activePluginKey && item.enabled))
     ) {
@@ -144,10 +150,10 @@ export function usePluginController() {
       appState.pluginOperationReview = null;
       appState.pluginOperationStatus = 'ready';
       const changed = result.operations.some((operation) => operation.changed);
-      showToast(changed ? '插件操作已应用。' : '插件已处于目标状态。', 'success');
       await refreshActivities(true);
-      void refreshUntilRevisionChanges(previousRevision, refreshActivities);
+      showToast(pluginOperationSuccessMessage(review.request, changed), 'success');
       void refreshMarketplace();
+      void refreshMarketplaceAfterRevisionSettles(previousRevision, refreshActivities, refreshMarketplace);
     } catch (error) {
       appState.pluginOperationStatus = 'error';
       appState.pluginOperationError = formatApiError(error);
@@ -161,10 +167,10 @@ export function usePluginController() {
     try {
       await codeApi.setPluginPackageEnabled(componentId, enabled);
       appState.pluginOperationStatus = 'ready';
-      showToast(enabled ? '插件已启用。' : '插件已停用。', 'success');
       await refreshActivities(true);
-      void refreshUntilRevisionChanges(previousRevision, refreshActivities);
+      showToast(enabled ? '插件已启用。' : '插件已停用。', 'success');
       void refreshMarketplace();
+      void refreshMarketplaceAfterRevisionSettles(previousRevision, refreshActivities, refreshMarketplace);
     } catch (error) {
       appState.pluginOperationStatus = 'error';
       appState.pluginOperationError = formatApiError(error);
@@ -254,8 +260,27 @@ async function refreshUntilRevisionChanges(
   }
 }
 
+async function refreshMarketplaceAfterRevisionSettles(
+  previousRevision: string,
+  refreshActivities: (silent?: boolean) => Promise<void>,
+  refreshMarketplace: () => Promise<void>
+): Promise<void> {
+  await refreshUntilRevisionChanges(previousRevision, refreshActivities);
+  await refreshMarketplace();
+}
+
 function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function pluginOperationSuccessMessage(request: PluginOperationRequest, changed: boolean): string {
+  if (!changed) return '插件已处于目标状态。';
+  const isScience = request.componentId === 'use/a3s/science';
+  if (request.action === 'install') {
+    return isScience ? '科研插件已安装并启用，可从市场或活动栏打开。' : '插件已安装并启用。';
+  }
+  if (request.action === 'uninstall') return isScience ? '科研插件已卸载。' : '插件已卸载。';
+  return isScience ? '科研插件已升级。' : '插件已升级。';
 }
 
 export type PluginActions = ReturnType<typeof usePluginController>;

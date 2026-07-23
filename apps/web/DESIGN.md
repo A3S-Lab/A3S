@@ -724,17 +724,18 @@ Composer visual contract:
   than another Composer footer control. It is absent until a non-empty
   `PlanningEnd` / `TaskUpdated` payload publishes real tasks or a real subagent
   lifecycle begins. Layout follows the actual Conversation pane rather than the
-  browser viewport. At 1040 px or wider, the transcript reserves a readable
-  message-safe rail and the panel floats in that rail without covering user or
-  assistant content. It expands for the first real evidence in a turn, when a
-  plan first becomes available, or when work escalates to failed or
-  interrupted. Additional healthy parallel branches update quietly and respect
-  a manual collapse without moving the transcript or Composer. Below 1040 px,
-  including when Result Workspace narrows Conversation, the panel becomes a
-  top-right docked summary between the task header and transcript. Its detail is
-  collapsed by default even for new or failed work and opens only on explicit
-  user action; expanding it contracts the transcript viewport without moving
-  the Composer or obscuring message content. The wide floating surface treats
+  browser viewport. At 1600 px or wider, the panel floats in the natural
+  right-side whitespace beside the centered transcript without changing the
+  transcript or Composer width, margins, or horizontal position. It expands for
+  the first real evidence in a turn, when a plan first becomes available, or
+  when work escalates to failed or interrupted. Additional healthy parallel
+  branches update quietly and respect a manual collapse without moving the
+  transcript or Composer. Below 1600 px, including when Result Workspace
+  narrows Conversation, the panel becomes a top-right docked summary between
+  the task header and transcript. Its detail is collapsed by default even for
+  new or failed work and opens only on explicit user action; expanding it
+  contracts the transcript viewport without moving the Composer or obscuring
+  message content. The wide floating surface treats
   the latest user instruction as a collision anchor: at mount, resize, and
   transcript scroll it moves below that instruction when their visible regions
   would overlap. When vertical room becomes limited, only the panel's detail

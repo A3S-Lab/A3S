@@ -28,4 +28,18 @@ describe('plugin document isolation', () => {
     expect(output).toContain('<head><meta http-equiv="Content-Security-Policy"');
     expect(output).toContain('<body><main>Activity</main></body>');
   });
+
+  it('injects only host-verified package styles and scripts as inline assets', () => {
+    const output = buildPluginDocument(
+      '<link rel="stylesheet" href="./ignored.css"><main>Activity</main><script src="./ignored.js"></script>',
+      ['main { color: rebeccapurple; }'],
+      ["window.parent.postMessage({ type: 'ready' }, '*');"]
+    );
+    const document = new DOMParser().parseFromString(output, 'text/html');
+
+    expect(document.querySelector('link[rel~="stylesheet"]')).toBeNull();
+    expect(document.querySelector('script[src]')).toBeNull();
+    expect(document.querySelector('style[data-a3s-package-asset="style"]')?.textContent).toContain('rebeccapurple');
+    expect(document.querySelector('script[data-a3s-package-asset="script"]')?.textContent).toContain('postMessage');
+  });
 });

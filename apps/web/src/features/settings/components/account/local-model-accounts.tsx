@@ -1,6 +1,6 @@
 import { RefreshCw } from 'lucide-react';
 import { useSnapshot } from 'valtio';
-import { Button, StatusBadge } from '../../../../design-system/primitives';
+import { Button, InlineNotice, StatusBadge } from '../../../../design-system/primitives';
 import { appState } from '../../../../state/app-state';
 import type { CatalogModel } from '../../../../types/api';
 import type { SettingsActions } from '../../settings-actions';
@@ -62,9 +62,9 @@ export function LocalModelAccounts({ actions }: { actions: SettingsActions }) {
       }
     >
       {state.modelCatalogRefreshError && (
-        <p className='account-model-refresh-error' role='alert'>
+        <InlineNotice className='account-model-refresh-error' tone='danger' role='alert'>
           刷新失败：{state.modelCatalogRefreshError}。已保留当前可用模型。
-        </p>
+        </InlineNotice>
       )}
 
       <ul className='local-model-account-list'>

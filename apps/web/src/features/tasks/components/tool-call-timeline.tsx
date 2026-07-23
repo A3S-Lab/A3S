@@ -1,50 +1,26 @@
-import {
-  Activity,
-  ArrowDown,
-  Braces,
-  CheckCircle2,
-  ChevronDown,
-  CircleX,
-  Clock3,
-  FileDiff,
-  FilePenLine,
-  FileText,
-  FolderSearch2,
-  GitBranch,
-  Globe2,
-  LoaderCircle,
-  Network,
-  Search,
-  ShieldAlert,
-  Sparkles,
-  SquareTerminal,
-  Wrench,
-} from 'lucide-react';
+import { ArrowDown, Braces, FileDiff } from 'lucide-react';
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
 import { Button } from '../../../design-system/primitives';
 import { appendTaskInstruction, appState, navigateTask } from '../../../state/app-state';
+import { workspaceAbsolutePath } from '../../workspace/workspace-state';
 import type { TaskActions } from '../task-actions';
 import { CopyButton } from './conversation-message-actions';
 import { PermissionDecision, type ToolDecisionState } from './permission-decision';
 import {
-  outputLineCount,
-  ToolCollapsedOutputPreview,
-  ToolCommandPreview,
-  ToolInvocationInline,
-  ToolJsonPreview,
-} from './tool-command-preview';
-import {
-  canonicalToolName,
   isFileEditCall,
-  selectToolCallsForDisplay,
-  summarizeToolCalls,
   type ToolCallProjection,
-  type ToolTimelineTone,
   toolActionLabel,
   toolArgumentSummary,
   toolFilePath,
 } from './tool-call-projection';
+import {
+  outputLineCount,
+  ToolInvocationInline,
+  ToolJsonPreview,
+  ToolOutputPreview,
+  toolOutputNeedsDisclosure,
+} from './tool-command-preview';
 
 export function ToolCallTimeline({
   calls,
@@ -55,100 +31,79 @@ export function ToolCallTimeline({
   sessionId: string;
   actions: TaskActions;
 }) {
-  const state = useSnapshot(appState);
-  const [showAll, setShowAll] = useState(false);
   if (!calls.length) return null;
-  const summary = summarizeToolCalls(calls);
-  const compact = selectToolCallsForDisplay(calls);
-  const visibleCalls = showAll ? calls : compact.calls;
   return (
-    <section className={`tool-call-timeline ${summary.tone}`} aria-label='执行过程'>
-      <header className='tool-call-timeline-header'>
-        <span className='tool-call-timeline-icon' aria-hidden='true'>
-          <Activity size={14} />
-        </span>
-        <strong>执行过程</strong>
-        <output className='tool-call-timeline-summary' aria-live='polite'>
-          <TimelineStateIcon tone={summary.tone} />
-          {summary.label}
-        </output>
-      </header>
-      <div className='tool-call-list'>
-        {compact.hiddenCount > 0 && (
-          <button
-            type='button'
-            className='tool-call-history-toggle'
-            aria-expanded={showAll}
-            onClick={() => setShowAll((value) => !value)}
-          >
-            {showAll ? '收起较早的已完成操作' : `查看之前 ${compact.hiddenCount} 项已完成操作`}
-            <ChevronDown size={13} />
-          </button>
-        )}
-        {visibleCalls.map((call) => (
-          <ToolCallItem
-            key={call.id}
-            call={call}
-            sessionId={sessionId}
-            decision={state.toolDecisionState[`${sessionId}:${call.id}`] as ToolDecisionState | undefined}
-            decisionError={state.toolDecisionErrors[`${sessionId}:${call.id}`]}
-            actions={actions}
-          />
-        ))}
-      </div>
+    <section className='tool-call-stream' aria-label='工具调用'>
+      {calls.map((call) => (
+        <ToolCallItem key={call.id} call={call} sessionId={sessionId} actions={actions} />
+      ))}
     </section>
   );
 }
 
-function ToolCallItem({
+export function ToolCallItem({
   call,
   sessionId,
-  decision,
-  decisionError,
   actions,
 }: {
   call: ToolCallProjection;
   sessionId: string;
-  decision?: ToolDecisionState;
-  decisionError?: string;
   actions: TaskActions;
 }) {
-  const shouldOpen = call.state !== 'succeeded';
-  const [open, setOpen] = useState(shouldOpen);
-  const bodyId = useId();
-  const previousState = useRef(call.state);
+  const state = useSnapshot(appState);
+  const decision = state.toolDecisionState[`${sessionId}:${call.id}`] as ToolDecisionState | undefined;
+  const decisionError = state.toolDecisionErrors[`${sessionId}:${call.id}`];
   const target = toolArgumentSummary(call);
   const argumentsText =
     call.args && Object.keys(call.args).length ? JSON.stringify(call.args, null, 2) : call.inputText;
+  const argumentDetailsAvailable = shouldShowArgumentDetails(call, argumentsText, target);
   const fileEdit = isFileEditCall(call);
+  const cancelled = call.state === 'interrupted' && call.metadata?.cancelled === true;
   const reviewAvailable = fileEdit && call.state === 'succeeded';
   const filePath = toolFilePath(call);
-
-  useEffect(() => {
-    if (call.state === 'succeeded' && previousState.current !== 'succeeded') setOpen(false);
-    else if (call.state !== 'succeeded' && previousState.current !== call.state) setOpen(true);
-    previousState.current = call.state;
-  }, [call.state]);
+  const running = call.state === 'preparing' || call.state === 'running';
+  const outputNeedsDisclosure = Boolean(call.output && toolOutputNeedsDisclosure(call.output));
+  const outcomeMessage = terminalOutcomeMessage(call);
+  const showBody = Boolean(
+    call.state === 'awaiting' ||
+      call.output ||
+      call.state === 'succeeded' ||
+      outcomeMessage ||
+      argumentDetailsAvailable ||
+      reviewAvailable ||
+      ['failed', 'denied', 'timed-out'].includes(call.state)
+  );
+  const eventMeta =
+    call.state === 'succeeded'
+      ? call.durationMs !== undefined
+        ? formatDuration(call.durationMs)
+        : null
+      : call.state === 'awaiting'
+        ? stateLabel(call.state)
+        : null;
 
   const openReview = () => {
     appState.reviewSourceTaskId = sessionId;
     appState.reviewIntent = 'review';
-    navigateTask('review');
+    appState.gitStatus = null;
+    if (!filePath) {
+      navigateTask('review');
+      return;
+    }
+    void actions.selectFile({
+      path: workspaceAbsolutePath(filePath, appState.workspaceRoot),
+      isBinary: false,
+    });
   };
 
   return (
-    <section className={`tool-call-item ${call.state} ${open ? 'open' : ''}`}>
-      <button
-        type='button'
-        className='tool-call-summary'
-        aria-label={`${toolActionLabel(call)}${target ? `，${target}` : ''}，${stateLabel(call.state)}`}
-        aria-expanded={open}
-        aria-controls={bodyId}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <span className='tool-call-icon'>
-          <ToolIcon name={call.name} />
-        </span>
+    <section
+      className={`tool-call-item ${call.state}`}
+      data-outcome={cancelled ? 'cancelled' : undefined}
+      aria-label={`${toolActionLabel(call)}${target ? `，${target}` : ''}，${stateLabel(call.state)}`}
+    >
+      <header className='tool-call-event'>
+        <span className='tool-call-status-dot' aria-hidden='true' />
         <span className='tool-call-title'>
           <strong>{toolActionLabel(call)}</strong>
           {target && (
@@ -157,70 +112,64 @@ function ToolCallItem({
             </small>
           )}
         </span>
-        <span className='tool-call-state'>
-          <StateIcon state={call.state} />
-          {call.state === 'succeeded'
-            ? call.durationMs !== undefined && formatDuration(call.durationMs)
-            : stateLabel(call.state)}
-        </span>
-        <ChevronDown className='tool-call-chevron' size={14} />
-      </button>
-      {!open && call.output && <ToolCollapsedOutputPreview output={call.output} />}
-      <div className='tool-call-body' id={bodyId} hidden={!open}>
-        {open && (
-          <>
-            {call.state === 'awaiting' && (
-              <PermissionDecision
-                call={call}
-                sessionId={sessionId}
-                decision={decision}
-                error={decisionError}
-                actions={actions}
-              />
-            )}
-            {call.state === 'denied' && call.reason && <p className='tool-call-message denied'>{call.reason}</p>}
-            {call.state === 'timed-out' && call.reason && <p className='tool-call-message timed-out'>{call.reason}</p>}
-            {call.state === 'interrupted' && call.reason && (
-              <p className='tool-call-message interrupted'>{call.reason}</p>
-            )}
-            <ToolCommandPreview call={call} />
-            <ToolExecutionMeta call={call} />
-            {argumentsText && (
-              <ToolInlineDisclosure className='tool-call-arguments' label='调用参数' icon={<Braces size={12} />}>
-                <ToolJsonPreview content={argumentsText} />
-              </ToolInlineDisclosure>
-            )}
-            {reviewAvailable ? (
-              <div className='tool-call-review'>
-                <span>
-                  <FileDiff size={15} />
-                  <span>
-                    <strong>{filePath || '工作区文件已变更'}</strong>
-                    <small>在工作区中查看完整 Diff，并决定是否保留变更。</small>
-                  </span>
-                </span>
-                <Button tone='secondary' onClick={openReview}>
-                  审阅变更
-                </Button>
-              </div>
+        {eventMeta && <span className='tool-call-event-meta'>{eventMeta}</span>}
+      </header>
+      {showBody && (
+        <div className='tool-call-body'>
+          {call.state === 'awaiting' && (
+            <PermissionDecision
+              call={call}
+              sessionId={sessionId}
+              decision={decision}
+              error={decisionError}
+              actions={actions}
+            />
+          )}
+          {call.output &&
+            (running ? (
+              <ToolCallResult call={call} />
             ) : (
-              call.output && <ToolCallResult call={call} />
-            )}
-            {reviewAvailable && call.output && (
-              <ToolInlineDisclosure className='tool-call-raw-output' label='查看原始工具输出'>
-                <pre>{call.output}</pre>
-              </ToolInlineDisclosure>
-            )}
-            {!call.output && call.state === 'running' && (
-              <p className='tool-call-message running'>工具正在执行，输出会在这里持续更新。</p>
-            )}
-            {call.state === 'failed' && !call.output && (
-              <p className='tool-call-message failed'>{call.reason || call.errorKind || '工具没有返回可用结果。'}</p>
-            )}
-            {['failed', 'denied', 'timed-out'].includes(call.state) && <ToolCallRecovery call={call} />}
-          </>
-        )}
-      </div>
+              <ToolOutputPreview output={call.output} error={call.state === 'failed'} />
+            ))}
+          {!call.output && call.state === 'succeeded' && <ToolEmptyOutput />}
+          {outcomeMessage && <p className={`tool-call-message ${call.state}`}>{outcomeMessage}</p>}
+          {(argumentDetailsAvailable || outputNeedsDisclosure || reviewAvailable) && (
+            <div className='tool-call-detail-actions'>
+              {argumentDetailsAvailable && (
+                <ToolInlineDisclosure className='tool-call-arguments' label='参数' icon={<Braces size={12} />}>
+                  <ToolJsonPreview content={argumentsText} />
+                </ToolInlineDisclosure>
+              )}
+              {outputNeedsDisclosure && (
+                <ToolInlineDisclosure
+                  className='tool-call-raw-output'
+                  label={`完整输出 · ${outputLineCount(call.output)} 行`}
+                >
+                  <pre className={`tool-call-output ${call.state === 'failed' ? 'error' : ''}`}>{call.output}</pre>
+                </ToolInlineDisclosure>
+              )}
+              {reviewAvailable && (
+                <Button tone='secondary' onClick={openReview}>
+                  <FileDiff size={14} />
+                  打开文件
+                </Button>
+              )}
+            </div>
+          )}
+          {['failed', 'denied', 'timed-out'].includes(call.state) && <ToolCallRecovery call={call} />}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ToolEmptyOutput() {
+  return (
+    <section className='tool-call-empty-output' aria-label='工具输出'>
+      <span className='tool-output-connector' aria-hidden='true'>
+        └
+      </span>
+      <span>(无输出)</span>
     </section>
   );
 }
@@ -251,36 +200,12 @@ function ToolInlineDisclosure({
     <div className={`${className} ${open ? 'open' : ''}`}>
       <button type='button' aria-expanded={open} aria-controls={contentId} onClick={() => setOpen((value) => !value)}>
         {icon}
-        {label}
-        <ChevronDown size={12} />
+        {open ? `收起${label}` : label}
       </button>
       <div className='tool-call-inline-content' id={contentId} hidden={!open}>
-        {children}
+        {open && children}
       </div>
     </div>
-  );
-}
-
-function ToolExecutionMeta({ call }: { call: ToolCallProjection }) {
-  return (
-    <section className='tool-call-metadata' aria-label='执行信息'>
-      <span>
-        <Wrench size={11} />
-        <code>{call.name}</code>
-      </span>
-      {call.durationMs !== undefined && (
-        <span>
-          <Clock3 size={11} />
-          {formatDuration(call.durationMs)}
-        </span>
-      )}
-      {call.exitCode !== undefined && (
-        <span>
-          <SquareTerminal size={11} />
-          退出码 {call.exitCode}
-        </span>
-      )}
-    </section>
   );
 }
 
@@ -364,62 +289,18 @@ function truncateEvidence(value: string): string {
   return value.length > 1200 ? `${value.slice(0, 1200)}\n…` : value;
 }
 
-function ToolIcon({ name }: { name: string }) {
-  switch (canonicalToolName(name)) {
-    case 'bash':
-    case 'shell':
-    case 'run':
-    case 'exec':
-      return <SquareTerminal size={15} />;
-    case 'read':
-    case 'cat':
-      return <FileText size={15} />;
-    case 'write':
-    case 'create':
-    case 'edit':
-    case 'patch':
-    case 'apply_patch':
-      return <FilePenLine size={15} />;
-    case 'delete':
-    case 'remove':
-    case 'unlink':
-      return <CircleX size={15} />;
-    case 'grep':
-    case 'search':
-    case 'search_skills':
-      return <Search size={15} />;
-    case 'ls':
-    case 'glob':
-    case 'find':
-      return <FolderSearch2 size={15} />;
-    case 'web_search':
-      return <Globe2 size={15} />;
-    case 'web_fetch':
-      return <Network size={15} />;
-    case 'task':
-    case 'parallel_task':
-      return <Sparkles size={15} />;
-    case 'git':
-      return <GitBranch size={15} />;
-    default:
-      return <Wrench size={15} />;
-  }
-}
-
-function StateIcon({ state }: { state: ToolCallProjection['state'] }) {
-  if (state === 'preparing' || state === 'running') return <LoaderCircle className='spin' size={12} />;
-  if (state === 'awaiting') return <ShieldAlert size={12} />;
-  if (state === 'succeeded') return <CheckCircle2 size={12} />;
-  if (state === 'timed-out') return <Clock3 size={12} />;
-  return <CircleX size={12} />;
-}
-
-function TimelineStateIcon({ tone }: { tone: ToolTimelineTone }) {
-  if (tone === 'running') return <LoaderCircle className='spin' size={12} />;
-  if (tone === 'attention') return <ShieldAlert size={12} />;
-  if (tone === 'problem') return <CircleX size={12} />;
-  if (tone === 'complete') return <CheckCircle2 size={12} />;
+function terminalOutcomeMessage(call: ToolCallProjection): string | null {
+  if (call.state === 'failed' && !call.output) return call.reason || call.errorKind || '工具没有返回可用结果。';
+  if (['denied', 'timed-out', 'interrupted'].includes(call.state)) return call.reason || stateLabel(call.state);
   return null;
+}
+
+function shouldShowArgumentDetails(call: ToolCallProjection, argumentsText: string, target: string): boolean {
+  if (!argumentsText) return false;
+  const entries = Object.entries(call.args ?? {});
+  if (entries.length > 1 || argumentsText.length > 220 || !target) return true;
+  const primaryKeys = new Set(['command', 'cmd', 'file_path', 'path', 'pattern', 'query', 'url']);
+  return entries.length === 1 && !primaryKeys.has(entries[0][0]);
 }
 
 function stateLabel(state: ToolCallProjection['state']): string {

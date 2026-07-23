@@ -1,41 +1,50 @@
 import type {
   AgentEvent,
-  CodeSession,
-  EffortLevel,
-  HealthResponse,
-  LlmSettings,
-  ModelCatalog,
-  MessageList,
-  OsAccount,
-  SessionControls,
-  SessionCompaction,
-  SessionOutput,
-  SessionList,
-  WorkspaceEntry,
-  WorkspaceDirectorySelection,
-  WorkspaceFileCatalog,
-  WorkspaceSearchFile,
   CodeDiagnosticsResult,
   CodeIntelligenceStatus,
   CodeNavigationKind,
   CodeNavigationResult,
   CodeOutlineResult,
+  CodeSession,
   CodeWorkspaceSymbolResult,
-  GitStatus,
-  GitDiff,
   ConfigValidation,
-  SkillCatalog,
-  TurnQueue,
-  MemoryOverview,
-  EvolutionOverview,
+  EffortLevel,
   EvolutionCandidate,
   EvolutionMutationResponse,
+  EvolutionOverview,
+  GitDiff,
+  GitStatus,
+  HealthResponse,
+  KnowledgeBaseImportRequest,
+  KnowledgeBaseMutation,
+  KnowledgeMarketplaceCatalog,
+  LlmSettings,
+  MemoryOverview,
+  MessageList,
+  ModelCatalog,
+  OsAccount,
+  PersonalKnowledgeBaseCatalog,
   PluginActivityCatalog,
   PluginActivityContent,
   PluginMarketplaceCatalog,
   PluginOperationPlan,
   PluginOperationRequest,
   PluginOperationResult,
+  RemoteTargetSnapshot,
+  SessionCompaction,
+  SessionControls,
+  SessionList,
+  SessionOutput,
+  SkillCatalog,
+  TurnQueue,
+  WeixinAccount,
+  WeixinCapability,
+  WeixinLoginAttempt,
+  WorkspaceChangeEvent,
+  WorkspaceDirectorySelection,
+  WorkspaceEntry,
+  WorkspaceFileCatalog,
+  WorkspaceSearchFile,
 } from '../types/api';
 import type { AgentSettings, ContextSettings, IntegrationsSettings } from '../types/settings';
 
@@ -325,7 +334,10 @@ export const codeApi = {
     ),
   turnQueue: (sessionId: string) =>
     apiRequest<TurnQueue>(`/api/v1/kernel/sessions/${encodeURIComponent(sessionId)}/turn-queue`),
-  enqueueTurn: (sessionId: string, input: { content: string; contextFiles?: string[]; skillNames?: string[] }) =>
+  enqueueTurn: (
+    sessionId: string,
+    input: { content: string; contextFiles?: string[]; skillNames?: string[]; mode?: 'standard' | 'deepResearch' }
+  ) =>
     apiRequest<TurnQueue>(`/api/v1/kernel/sessions/${encodeURIComponent(sessionId)}/turn-queue`, {
       method: 'POST',
       ...jsonBody(input),
@@ -377,6 +389,69 @@ export const codeApi = {
       method: 'POST',
       ...jsonBody({ componentId, enabled }),
     }),
+  knowledgeMarketplace: (signal?: AbortSignal) =>
+    apiRequest<KnowledgeMarketplaceCatalog>('/api/v1/knowledge/marketplace', { signal }),
+  personalKnowledgeBases: (signal?: AbortSignal) =>
+    apiRequest<PersonalKnowledgeBaseCatalog>('/api/v1/knowledge/bases', { signal }),
+  createPersonalKnowledgeBase: (input: { name: string; description?: string }) =>
+    apiRequest<KnowledgeBaseMutation>('/api/v1/knowledge/bases', {
+      method: 'POST',
+      ...jsonBody(input),
+    }),
+  importPersonalKnowledgeBase: (input: KnowledgeBaseImportRequest) =>
+    apiRequest<KnowledgeBaseMutation>('/api/v1/knowledge/bases/import', {
+      method: 'POST',
+      ...jsonBody(input),
+    }),
+  installKnowledgeMarketplaceItem: (id: string) =>
+    apiRequest<KnowledgeBaseMutation>(`/api/v1/knowledge/marketplace/${encodeURIComponent(id)}/install`, {
+      method: 'POST',
+      ...jsonBody({}),
+    }),
+  setPersonalKnowledgeBasePinned: (id: string, pinned: boolean) =>
+    apiRequest<KnowledgeBaseMutation>(`/api/v1/knowledge/bases/${encodeURIComponent(id)}/pinned`, {
+      method: 'POST',
+      ...jsonBody({ pinned }),
+    }),
+  weixinCapability: (signal?: AbortSignal) => apiRequest<WeixinCapability>('/api/v1/weixin/capability', { signal }),
+  weixinAccount: (signal?: AbortSignal) => apiRequest<WeixinAccount>('/api/v1/weixin/account', { signal }),
+  weixinTargets: (signal?: AbortSignal) => apiRequest<RemoteTargetSnapshot>('/api/v1/weixin/targets', { signal }),
+  startWeixinLogin: (force = false, signal?: AbortSignal) =>
+    apiRequest<WeixinLoginAttempt>('/api/v1/weixin/login-attempts', {
+      method: 'POST',
+      signal,
+      ...jsonBody({ force }),
+    }),
+  pollWeixinLogin: (attemptId: string, signal?: AbortSignal) =>
+    apiRequest<WeixinLoginAttempt>(`/api/v1/weixin/login-attempts/${encodeURIComponent(attemptId)}`, { signal }),
+  submitWeixinVerification: (attemptId: string, code: string, signal?: AbortSignal) =>
+    apiRequest<WeixinLoginAttempt>(`/api/v1/weixin/login-attempts/${encodeURIComponent(attemptId)}/verification`, {
+      method: 'POST',
+      signal,
+      ...jsonBody({ code }),
+    }),
+  cancelWeixinLogin: (attemptId: string, signal?: AbortSignal) =>
+    apiRequest<WeixinAccount>(`/api/v1/weixin/login-attempts/${encodeURIComponent(attemptId)}`, {
+      method: 'DELETE',
+      signal,
+    }),
+  pauseWeixinAccount: (signal?: AbortSignal) =>
+    apiRequest<WeixinAccount>('/api/v1/weixin/account/pause', {
+      method: 'POST',
+      signal,
+      ...jsonBody({}),
+    }),
+  resumeWeixinAccount: (signal?: AbortSignal) =>
+    apiRequest<WeixinAccount>('/api/v1/weixin/account/resume', {
+      method: 'POST',
+      signal,
+      ...jsonBody({}),
+    }),
+  disconnectWeixinAccount: (signal?: AbortSignal) =>
+    apiRequest<WeixinAccount>('/api/v1/weixin/account', {
+      method: 'DELETE',
+      signal,
+    }),
   pickWorkspaceDirectory: (initialPath?: string) =>
     apiRequest<WorkspaceDirectorySelection>('/api/v1/workspace/actions/pick-directory', {
       method: 'POST',
@@ -390,6 +465,26 @@ export const codeApi = {
       ...entry,
       path: joinPath(path, entry.name),
     }));
+  },
+  watchWorkspace: (rootPath: string, onChange: (event: WorkspaceChangeEvent) => void) => {
+    if (typeof EventSource === 'undefined') return () => undefined;
+    const source = new EventSource(`/api/v1/workspace/watch?rootPath=${encodeURIComponent(rootPath)}`);
+    source.onmessage = (message) => {
+      try {
+        const event = JSON.parse(message.data) as Partial<WorkspaceChangeEvent>;
+        if (event.type !== 'workspace_change' || !Array.isArray(event.paths)) return;
+        onChange({
+          type: 'workspace_change',
+          kind: ['create', 'modify', 'remove', 'rename', 'other'].includes(event.kind ?? '')
+            ? (event.kind as WorkspaceChangeEvent['kind'])
+            : 'other',
+          paths: event.paths.filter((path): path is string => typeof path === 'string' && Boolean(path)),
+        });
+      } catch {
+        // EventSource reconnects automatically; malformed frames are ignored.
+      }
+    };
+    return () => source.close();
   },
   workspaceFiles: (rootPath: string, query = '', maxResults = 120) =>
     apiRequest<WorkspaceFileCatalog>(

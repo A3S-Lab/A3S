@@ -1,5 +1,5 @@
 import { LoaderCircle, RefreshCw, ServerOff } from 'lucide-react';
-import { Button } from '../../../design-system/primitives';
+import { Button, StateView } from '../../../design-system/primitives';
 
 interface CodeBootScreenProps {
   phase: 'loading' | 'error';
@@ -16,7 +16,7 @@ export function CodeBootScreen({ phase, error, onRetry }: CodeBootScreenProps) {
       aria-busy={phase === 'loading' || undefined}
       aria-label={phase === 'loading' ? '正在准备 A3S Code' : undefined}
     >
-      <section className='code-boot-card' role={phase === 'error' ? 'alert' : 'status'}>
+      <section className='code-boot-card'>
         <header className='code-boot-brand'>
           <span>
             <img src='/logo.png' alt='' />
@@ -27,37 +27,40 @@ export function CodeBootScreen({ phase, error, onRetry }: CodeBootScreenProps) {
           </div>
         </header>
 
-        <div className='code-boot-state'>
-          <span className={phase === 'error' ? 'error' : ''} aria-hidden='true'>
-            {phase === 'loading' ? <LoaderCircle className='spin' size={18} /> : <ServerOff size={18} />}
-          </span>
-          <div>
-            <h1>{phase === 'loading' ? '正在准备编码工作区' : failure?.title}</h1>
-            <p>{phase === 'loading' ? '连接本地服务，恢复任务与模型配置。' : failure?.description}</p>
-          </div>
-        </div>
-
-        {phase === 'loading' ? (
-          <div className='code-boot-progress' aria-hidden='true'>
-            <span />
-          </div>
-        ) : (
-          <div className='code-boot-recovery'>
-            <Button tone='primary' onClick={onRetry}>
-              <RefreshCw size={14} />
-              重新连接
-            </Button>
-            <p>
-              确认本地服务仍在运行：<code>a3s web</code>
-            </p>
-            {error && (
-              <details>
-                <summary>查看技术详情</summary>
-                <pre>{error}</pre>
-              </details>
-            )}
-          </div>
-        )}
+        <StateView
+          className='code-boot-state'
+          tone={phase === 'error' ? 'warning' : 'neutral'}
+          role={phase === 'error' ? 'alert' : 'status'}
+          icon={phase === 'loading' ? <LoaderCircle className='spin' size={18} /> : <ServerOff size={18} />}
+          title={phase === 'loading' ? '正在准备编码工作区' : failure?.title}
+          description={phase === 'loading' ? '连接本地服务，恢复任务与模型配置。' : failure?.description}
+          actions={
+            phase === 'error' && (
+              <Button tone='primary' onClick={onRetry}>
+                <RefreshCw size={14} />
+                重新连接
+              </Button>
+            )
+          }
+        >
+          {phase === 'loading' ? (
+            <div className='code-boot-progress' aria-hidden='true'>
+              <span />
+            </div>
+          ) : (
+            <div className='code-boot-recovery'>
+              <p>
+                确认本地服务仍在运行：<code>a3s web</code>
+              </p>
+              {error && (
+                <details>
+                  <summary>查看技术详情</summary>
+                  <pre>{error}</pre>
+                </details>
+              )}
+            </div>
+          )}
+        </StateView>
       </section>
       <small className='code-boot-assurance'>本地运行 · 工作区数据保留在当前设备</small>
     </main>

@@ -1,11 +1,13 @@
+import { Sparkles } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useSnapshot } from 'valtio';
+import { Button, CollectionState, InlineNotice, StateView } from '../../../design-system/primitives';
 import { appState } from '../../../state/app-state';
 import type { CodeActions } from '../../code/use-code-controller';
 import {
   EvolutionCandidateDetail,
-  EvolutionConfirmationDialog,
   type EvolutionConfirmation,
+  EvolutionConfirmationDialog,
 } from './evolution-candidate-detail';
 import { CandidateButton, EvolutionEmptyState, EvolutionErrorState, EvolutionLoadingState } from './evolution-shared';
 
@@ -49,12 +51,18 @@ export function EvolutionWorkbench({ actions }: { actions: EvolutionActions }) {
   return (
     <div className='evolution-surface'>
       {state.evolutionError && (
-        <output className='memory-stale-notice'>
+        <InlineNotice
+          className='memory-stale-notice'
+          tone='warning'
+          role='status'
+          actions={
+            <Button tone='quiet' onClick={() => void actions.loadEvolution(true)}>
+              重试
+            </Button>
+          }
+        >
           <span title={state.evolutionError}>更新失败，当前显示上次结果。</span>
-          <button type='button' onClick={() => void actions.loadEvolution(true)}>
-            重试
-          </button>
-        </output>
+        </InlineNotice>
       )}
       {data.candidates.length === 0 ? (
         <EvolutionEmptyState />
@@ -83,17 +91,23 @@ export function EvolutionWorkbench({ actions }: { actions: EvolutionActions }) {
               )}
             </header>
             <div className='evolution-candidate-list'>
-              {candidates.map((candidate) => (
-                <CandidateButton
-                  key={candidate.id}
-                  candidate={candidate}
-                  selected={candidate.id === selected?.id}
-                  busy={candidate.id === state.evolutionBusyId}
-                  onSelect={() => {
-                    appState.evolutionSelectedId = candidate.id;
-                  }}
-                />
-              ))}
+              {candidates.length ? (
+                candidates.map((candidate) => (
+                  <CandidateButton
+                    key={candidate.id}
+                    candidate={candidate}
+                    selected={candidate.id === selected?.id}
+                    busy={candidate.id === state.evolutionBusyId}
+                    onSelect={() => {
+                      appState.evolutionSelectedId = candidate.id;
+                    }}
+                  />
+                ))
+              ) : (
+                <CollectionState className='evolution-candidate-empty' role='status' icon={<Sparkles size={14} />}>
+                  当前没有待处理内容
+                </CollectionState>
+              )}
             </div>
           </aside>
           {selected ? (
@@ -109,7 +123,13 @@ export function EvolutionWorkbench({ actions }: { actions: EvolutionActions }) {
               onRollback={(version) => setConfirmation({ action: 'rollback', candidate: selected, version })}
             />
           ) : (
-            <div className='evolution-detail-placeholder'>目前没有需要处理的内容</div>
+            <StateView
+              className='evolution-detail-placeholder'
+              size='compact'
+              icon={<Sparkles size={21} />}
+              title='目前没有需要处理的内容'
+              description='可以查看全部内容，回顾已经确认或忽略的学习结果。'
+            />
           )}
         </section>
       )}

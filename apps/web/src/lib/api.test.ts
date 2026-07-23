@@ -110,6 +110,38 @@ describe('consumeEventStream', () => {
   });
 });
 
+describe('codeApi workspace watch', () => {
+  it('opens one EventSource and forwards typed native change frames', () => {
+    let source: FakeEventSource | undefined;
+    class FakeEventSource {
+      onmessage: ((event: MessageEvent<string>) => void) | null = null;
+      close = vi.fn();
+
+      constructor(readonly url: string) {
+        source = this;
+      }
+    }
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const onChange = vi.fn();
+
+    const close = codeApi.watchWorkspace('/repo with space', onChange);
+    expect(source?.url).toBe('/api/v1/workspace/watch?rootPath=%2Frepo%20with%20space');
+    source?.onmessage?.(
+      new MessageEvent('message', {
+        data: JSON.stringify({ type: 'workspace_change', kind: 'modify', paths: ['/repo/app.ts'] }),
+      })
+    );
+
+    expect(onChange).toHaveBeenCalledWith({
+      type: 'workspace_change',
+      kind: 'modify',
+      paths: ['/repo/app.ts'],
+    });
+    close();
+    expect(source?.close).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('codeApi session maintenance', () => {
   it('requests manual context compaction for one encoded session', async () => {
     const fetch = vi.fn(
@@ -277,6 +309,82 @@ describe('codeApi local evolution', () => {
     expect(requestJson(fetch, 3)).toEqual({ reason: 'Not reusable' });
     expect(requestJson(fetch, 4)).toEqual({});
     expect(requestJson(fetch, 5)).toEqual({ targetVersion: 2 });
+  });
+});
+
+describe('codeApi knowledge marketplace', () => {
+  it('uses the knowledge catalog and personal knowledge-base lifecycle routes', async () => {
+    const fetch = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify({ code: 200, data: { items: [] } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+    vi.stubGlobal('fetch', fetch);
+
+    await codeApi.knowledgeMarketplace();
+    await codeApi.personalKnowledgeBases();
+    await codeApi.createPersonalKnowledgeBase({ name: 'Project Notes', description: 'Local notes' });
+    await codeApi.importPersonalKnowledgeBase({ path: '/Users/me/Research Vault', name: 'Research' });
+    await codeApi.installKnowledgeMarketplaceItem('research/methods');
+    await codeApi.setPersonalKnowledgeBasePinned('project/notes', false);
+
+    expect(fetch.mock.calls.map(([path]) => path)).toEqual([
+      '/api/v1/knowledge/marketplace',
+      '/api/v1/knowledge/bases',
+      '/api/v1/knowledge/bases',
+      '/api/v1/knowledge/bases/import',
+      '/api/v1/knowledge/marketplace/research%2Fmethods/install',
+      '/api/v1/knowledge/bases/project%2Fnotes/pinned',
+    ]);
+    expect(requestJson(fetch, 2)).toEqual({ name: 'Project Notes', description: 'Local notes' });
+    expect(requestJson(fetch, 3)).toEqual({ path: '/Users/me/Research Vault', name: 'Research' });
+    expect(requestJson(fetch, 4)).toEqual({});
+    expect(requestJson(fetch, 5)).toEqual({ pinned: false });
+  });
+});
+
+describe('codeApi Weixin remote control', () => {
+  it('uses the typed capability, login, verification, monitor, and disconnect routes', async () => {
+    const fetch = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify({ code: 200, data: {} }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+    vi.stubGlobal('fetch', fetch);
+
+    await codeApi.weixinCapability();
+    await codeApi.weixinAccount();
+    await codeApi.weixinTargets();
+    await codeApi.startWeixinLogin(true);
+    await codeApi.pollWeixinLogin('attempt/a');
+    await codeApi.submitWeixinVerification('attempt/a', '123456');
+    await codeApi.cancelWeixinLogin('attempt/a');
+    await codeApi.pauseWeixinAccount();
+    await codeApi.resumeWeixinAccount();
+    await codeApi.disconnectWeixinAccount();
+
+    expect(fetch.mock.calls.map(([path]) => path)).toEqual([
+      '/api/v1/weixin/capability',
+      '/api/v1/weixin/account',
+      '/api/v1/weixin/targets',
+      '/api/v1/weixin/login-attempts',
+      '/api/v1/weixin/login-attempts/attempt%2Fa',
+      '/api/v1/weixin/login-attempts/attempt%2Fa/verification',
+      '/api/v1/weixin/login-attempts/attempt%2Fa',
+      '/api/v1/weixin/account/pause',
+      '/api/v1/weixin/account/resume',
+      '/api/v1/weixin/account',
+    ]);
+    expect(requestJson(fetch, 3)).toEqual({ force: true });
+    expect(requestJson(fetch, 5)).toEqual({ code: '123456' });
+    expect(requestJson(fetch, 7)).toEqual({});
+    expect(requestJson(fetch, 8)).toEqual({});
+    expect(fetch.mock.calls[6]?.[1]?.method).toBe('DELETE');
+    expect(fetch.mock.calls[9]?.[1]?.method).toBe('DELETE');
   });
 });
 

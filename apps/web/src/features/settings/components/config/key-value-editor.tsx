@@ -1,4 +1,5 @@
 import { Plus, X } from 'lucide-react';
+import { Button, IconButton } from '../../../../design-system/primitives';
 
 export function KeyValueEditor({
   value,
@@ -40,9 +41,8 @@ export function KeyValueEditor({
             placeholder={valuePlaceholder}
             onChange={(event) => onChange({ ...value, [key]: event.target.value })}
           />
-          <button
-            type='button'
-            aria-label={`删除${label} ${key || index + 1}`}
+          <IconButton
+            label={`删除${label} ${key || index + 1}`}
             onClick={() => {
               const updated = { ...value };
               delete updated[key];
@@ -50,11 +50,11 @@ export function KeyValueEditor({
             }}
           >
             <X size={13} />
-          </button>
+          </IconButton>
         </div>
       ))}
-      <button
-        type='button'
+      <Button
+        tone='quiet'
         className='key-value-add'
         onClick={() => {
           let key = 'NEW_KEY';
@@ -64,7 +64,7 @@ export function KeyValueEditor({
         }}
       >
         <Plus size={13} /> 添加一项
-      </button>
+      </Button>
     </fieldset>
   );
 }

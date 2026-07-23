@@ -162,24 +162,12 @@
   color: var(--a3s-red);
 }
 
-.task-list-empty {
-  display: flex;
-  align-items: center;
+.task-list-empty.ds-collection-state {
+  min-height: 36px;
+  justify-content: flex-start;
   padding: 8px 10px;
-  color: var(--a3s-faint);
   font-size: 12px;
-}
-
-.task-library-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 0;
-}
-
-.task-library-header-actions .ds-icon-button {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
+  text-align: left;
 }
 
 .task-list-inline-edit {
@@ -251,6 +239,7 @@
 }
 
 .task-list-inline-delete button {
+  min-height: 25px;
   height: 25px;
   padding: 0 6px;
   border: 0;

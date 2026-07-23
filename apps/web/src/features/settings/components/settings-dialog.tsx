@@ -6,15 +6,18 @@ import {
   Database,
   Info,
   type LucideIcon,
+  MessagesSquare,
   Plug,
   Settings2,
   UserRound,
   X,
 } from 'lucide-react';
-import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useSnapshot } from 'valtio';
-import { Button, IconButton } from '../../../design-system/primitives';
+import { Button, IconButton, StatusBadge, useDialogFocusScope } from '../../../design-system/primitives';
 import { appState, closeSettings, navigateSettings } from '../../../state/app-state';
+import { ChannelSettingsPage } from '../../channels/pages/channel-settings-page';
+import type { WeixinRemoteActions } from '../../weixin-remote/use-weixin-remote-controller';
 import type { SettingsActions } from '../settings-actions';
 import type { SettingsTab } from '../settings-state';
 import { AboutSettings } from './about-settings';
@@ -26,23 +29,42 @@ import { HelpSettings } from './help-settings';
 import { IntegrationsSettingsView } from './integrations-settings';
 import { ModelSettings } from './model-settings';
 
-const tabs: Array<{
+interface SettingsTabDefinition {
   id: SettingsTab;
   label: string;
   description: string;
   icon: LucideIcon;
-}> = [
+}
+
+const primaryTabs: SettingsTabDefinition[] = [
   { id: 'account', label: '账户', description: '管理 A3S OS 授权与本地开发工具模型', icon: UserRound },
   { id: 'general', label: '通用', description: '调整外观、工作区与本机偏好', icon: Settings2 },
   { id: 'model', label: '模型与 Provider', description: '管理模型来源、能力、密钥和新任务默认模型', icon: Box },
   { id: 'agent', label: 'Agent 与执行', description: '配置工具边界、自动委派、目录和任务队列', icon: Bot },
   { id: 'context', label: '上下文与存储', description: '配置会话存储、记忆目录与上下文生命周期', icon: Database },
   { id: 'integrations', label: '集成', description: '配置连接器、MCP、搜索与文档解析', icon: Plug },
+  {
+    id: 'channels',
+    label: '渠道',
+    description: '管理微信、飞书等远程消息渠道',
+    icon: MessagesSquare,
+  },
+];
+
+const supportTabs: SettingsTabDefinition[] = [
   { id: 'about', label: '关于与更新', description: '查看版本、连接状态与更新', icon: Info },
   { id: 'help', label: '帮助', description: '查找 Code 工作流、安全说明与键盘操作', icon: CircleHelp },
 ];
 
-export function SettingsDialog({ actions }: { actions: SettingsActions }) {
+const tabs = [...primaryTabs, ...supportTabs];
+
+export function SettingsDialog({
+  actions,
+  weixinActions,
+}: {
+  actions: SettingsActions;
+  weixinActions?: WeixinRemoteActions;
+}) {
   const state = useSnapshot(appState);
   const tab = state.settingsTab;
   const selectedTab = tabs.find((item) => item.id === tab) ?? tabs[0];
@@ -50,12 +72,10 @@ export function SettingsDialog({ actions }: { actions: SettingsActions }) {
   const descriptionId = useId();
   const discardTitleId = useId();
   const discardDescriptionId = useId();
-  const dialogRef = useRef<HTMLElement>(null);
   const contentBodyRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const discardDialogRef = useRef<HTMLElement>(null);
   const continueEditingRef = useRef<HTMLButtonElement>(null);
-  const restoreFocusRef = useRef<HTMLElement | null>(null);
   const discardRestoreFocusRef = useRef<HTMLElement | null>(null);
   const [visitedTabs, setVisitedTabs] = useState<Set<SettingsTab>>(() => new Set([tab]));
   const [dirtyTabs, setDirtyTabs] = useState<Set<SettingsTab>>(() => new Set());
@@ -84,14 +104,15 @@ export function SettingsDialog({ actions }: { actions: SettingsActions }) {
     setDiscardConfirmationOpen(false);
     discardRestoreFocusRef.current?.focus();
   };
-
-  useEffect(() => {
-    restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    closeButtonRef.current?.focus();
-    return () => {
-      if (restoreFocusRef.current?.isConnected) restoreFocusRef.current.focus();
-    };
-  }, []);
+  const focusScope = useDialogFocusScope<HTMLElement>({
+    onEscape: () => {
+      if (discardConfirmationOpen) continueEditing();
+      else requestClose();
+    },
+    escapeDisabled: closeDisabled && !discardConfirmationOpen,
+    initialFocus: () => closeButtonRef.current,
+    getActiveScope: () => discardDialogRef.current,
+  });
 
   useEffect(() => {
     setVisitedTabs((current) => (current.has(tab) ? current : new Set([...current, tab])));
@@ -101,33 +122,6 @@ export function SettingsDialog({ actions }: { actions: SettingsActions }) {
   useEffect(() => {
     if (discardConfirmationOpen) continueEditingRef.current?.focus();
   }, [discardConfirmationOpen]);
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      event.stopPropagation();
-      if (discardConfirmationOpen) continueEditing();
-      else requestClose();
-      return;
-    }
-    if (event.key !== 'Tab') return;
-    const focusScope = discardDialogRef.current ?? dialogRef.current;
-    const focusable = [
-      ...(focusScope?.querySelectorAll<HTMLElement>(
-        'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])'
-      ) ?? []),
-    ].filter((element) => !element.closest('[hidden]'));
-    if (!focusable.length) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
 
   return (
     <dialog
@@ -140,31 +134,39 @@ export function SettingsDialog({ actions }: { actions: SettingsActions }) {
       }}
     >
       <section
-        ref={dialogRef}
+        ref={focusScope.scopeRef}
         className='settings-dialog'
         role='dialog'
         aria-modal='true'
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
-        onKeyDown={handleKeyDown}
+        onKeyDown={focusScope.handleKeyDown}
       >
         <aside className='settings-nav'>
           <nav aria-label='设置分类'>
-            {tabs.map(({ id, label, icon: Icon }) => (
-              <button
-                type='button'
-                className={tab === id ? 'active' : ''}
-                aria-current={tab === id ? 'page' : undefined}
-                key={id}
-                onClick={() => {
-                  setVisitedTabs((current) => (current.has(id) ? current : new Set([...current, id])));
-                  navigateSettings(id);
+            {primaryTabs.map((item) => (
+              <SettingsNavButton
+                key={item.id}
+                item={item}
+                active={tab === item.id}
+                dirty={dirtyTabs.has(item.id)}
+                onSelect={() => {
+                  setVisitedTabs((current) => (current.has(item.id) ? current : new Set([...current, item.id])));
+                  navigateSettings(item.id);
                 }}
-              >
-                <Icon size={16} />
-                <span className='settings-nav-label'>{label}</span>
-                {dirtyTabs.has(id) && <i className='settings-nav-dirty' aria-hidden='true' />}
-              </button>
+              />
+            ))}
+            {supportTabs.map((item) => (
+              <SettingsNavButton
+                key={item.id}
+                item={item}
+                active={tab === item.id}
+                dirty={dirtyTabs.has(item.id)}
+                onSelect={() => {
+                  setVisitedTabs((current) => (current.has(item.id) ? current : new Set([...current, item.id])));
+                  navigateSettings(item.id);
+                }}
+              />
             ))}
           </nav>
           <footer>
@@ -179,7 +181,7 @@ export function SettingsDialog({ actions }: { actions: SettingsActions }) {
               <h2 id={titleId}>{selectedTab.label}</h2>
               <p id={descriptionId}>{selectedTab.description}</p>
             </div>
-            <span className='settings-local-badge'>{tab === 'help' ? '本地帮助' : '设置保存在本机'}</span>
+            <StatusBadge className='settings-local-badge'>{tab === 'help' ? '本地帮助' : '设置保存在本机'}</StatusBadge>
           </header>
           <div ref={contentBodyRef} className='settings-content-body'>
             {visitedTabs.has('general') && (
@@ -213,6 +215,11 @@ export function SettingsDialog({ actions }: { actions: SettingsActions }) {
             {visitedTabs.has('account') && (
               <SettingsTabPanel active={tab === 'account'}>
                 <AccountSettings actions={actions} />
+              </SettingsTabPanel>
+            )}
+            {visitedTabs.has('channels') && (
+              <SettingsTabPanel active={tab === 'channels'}>
+                <ChannelSettingsPage weixinActions={weixinActions} />
               </SettingsTabPanel>
             )}
             {visitedTabs.has('about') && (
@@ -266,6 +273,32 @@ export function SettingsDialog({ actions }: { actions: SettingsActions }) {
         )}
       </section>
     </dialog>
+  );
+}
+
+function SettingsNavButton({
+  item,
+  active,
+  dirty,
+  onSelect,
+}: {
+  item: SettingsTabDefinition;
+  active: boolean;
+  dirty: boolean;
+  onSelect: () => void;
+}) {
+  const Icon = item.icon;
+  return (
+    <button
+      type='button'
+      className={active ? 'active' : ''}
+      aria-current={active ? 'page' : undefined}
+      onClick={onSelect}
+    >
+      <Icon size={16} />
+      <span className='settings-nav-label'>{item.label}</span>
+      {dirty && <i className='settings-nav-dirty' aria-hidden='true' />}
+    </button>
   );
 }
 

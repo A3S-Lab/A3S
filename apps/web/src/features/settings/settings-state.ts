@@ -1,7 +1,18 @@
 import type { LlmSettings, ModelCatalog, OsAccount } from '../../types/api';
 import type { AgentSettings, ConfigCategory, ContextSettings, IntegrationsSettings } from '../../types/settings';
 
-export type SettingsTab = 'account' | 'general' | 'model' | 'agent' | 'context' | 'integrations' | 'about' | 'help';
+export type SettingsTab =
+  | 'account'
+  | 'general'
+  | 'model'
+  | 'agent'
+  | 'context'
+  | 'integrations'
+  | 'channels'
+  | 'about'
+  | 'help';
+
+export type ChannelSettingsTab = 'weixin' | 'feishu';
 
 const settingsTabs: readonly SettingsTab[] = [
   'account',
@@ -10,14 +21,28 @@ const settingsTabs: readonly SettingsTab[] = [
   'agent',
   'context',
   'integrations',
+  'channels',
   'about',
   'help',
 ];
 
 export function settingsTabFromHash(hash: string): SettingsTab | null {
   if (hash === '#help') return 'help';
+  if (settingsChannelFromHash(hash)) return 'channels';
   const value = hash.match(/^#settings\/([^/]+)$/)?.[1];
   return settingsTabs.find((tab) => tab === value) ?? null;
+}
+
+export function settingsChannelFromHash(hash: string): ChannelSettingsTab | null {
+  if (hash === '#weixin' || hash === '#settings/weixin' || hash === '#settings/channels') return 'weixin';
+  if (hash === '#settings/feishu') return 'feishu';
+  const channel = hash.match(/^#settings\/channels\/(weixin|feishu)$/)?.[1];
+  if (channel === 'weixin' || channel === 'feishu') return channel;
+  return null;
+}
+
+export function settingsHashForTab(tab: SettingsTab, channel: ChannelSettingsTab = 'weixin'): string {
+  return tab === 'channels' ? `#settings/channels/${channel}` : `#settings/${tab}`;
 }
 export interface UpdateStatus {
   currentVersion: string;
@@ -49,9 +74,11 @@ export interface SettingsState {
   updateInstallError: string | null;
   updateInstalledVersion: string | null;
   settingsTab: SettingsTab;
+  settingsChannel: ChannelSettingsTab;
 }
 export function createSettingsState(): SettingsState {
   const initialTab = settingsTabFromHash(window.location.hash);
+  const initialChannel = settingsChannelFromHash(window.location.hash);
   return {
     osAccount: null,
     llm: null,
@@ -75,5 +102,6 @@ export function createSettingsState(): SettingsState {
     updateInstallError: null,
     updateInstalledVersion: null,
     settingsTab: initialTab ?? 'general',
+    settingsChannel: initialChannel ?? 'weixin',
   };
 }

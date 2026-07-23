@@ -146,14 +146,6 @@
   color: inherit;
 }
 
-.new-task-workspace-list > p {
-  margin: 0;
-  padding: 18px 8px;
-  color: var(--a3s-faint);
-  font-size: 10px;
-  text-align: center;
-}
-
 .new-task-workspace-actions {
   padding-top: 6px;
   border-top: 1px solid var(--a3s-line);
@@ -163,12 +155,19 @@
   min-height: 48px;
 }
 
-.new-task-workspace-error {
+.new-task-workspace-error.ds-inline-notice {
   margin: 6px 2px 1px;
   padding: 7px 8px;
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--a3s-red) 7%, var(--a3s-panel));
-  color: var(--a3s-red);
   font-size: 9px;
   line-height: 1.45;
+}
+
+.new-task-workspace-error .ds-inline-notice-copy {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.new-task-workspace-empty.ds-collection-state {
+  min-height: 54px;
+  font-size: 10px;
 }

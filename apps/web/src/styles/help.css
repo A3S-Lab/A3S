@@ -5,28 +5,8 @@
 }
 
 .help-search {
-  display: flex;
   min-height: 40px;
-  align-items: center;
-  gap: 8px;
-  padding: 0 11px;
-  border: 1px solid var(--a3s-line);
-  border-radius: 9px;
-  color: var(--a3s-muted);
   background: var(--a3s-panel-soft);
-}
-
-.help-search:focus-within {
-  border-color: var(--a3s-line-strong);
-  background: var(--a3s-panel);
-}
-
-.help-search input {
-  width: 100%;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--a3s-ink);
 }
 
 .help-content {
@@ -92,8 +72,7 @@
   font: 11px ui-monospace, SFMono-Regular, monospace;
 }
 
-.help-empty {
-  padding: 50px;
-  color: var(--a3s-muted);
-  text-align: center;
+.help-empty.ds-state-view {
+  min-height: 180px;
+  padding: 32px;
 }

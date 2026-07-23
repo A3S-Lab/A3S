@@ -53,6 +53,7 @@ describe('A3S activity bar', () => {
     const buttons = screen.getAllByRole('button');
     expect(buttons[0]).toHaveAttribute('aria-label', '编码');
     expect(buttons[1]).toHaveAttribute('aria-label', '办公');
+    expect(buttons[2]).toHaveAttribute('aria-label', '知识');
     expect(buttons[0]).toHaveAttribute('aria-current', 'page');
     expect(appState.activeProduct).toBe('code');
     expect(appState.codeSurface).toBe('tasks');
@@ -69,10 +70,11 @@ describe('A3S activity bar', () => {
     expect(screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
       '编码',
       '办公',
+      '知识',
       'Search',
       '科研',
       '记忆',
-      '插件市场',
+      '市场',
       '设置',
     ]);
     expect(screen.queryByRole('button', { name: /科学/ })).not.toBeInTheDocument();
@@ -80,6 +82,7 @@ describe('A3S activity bar', () => {
     const productSection = screen.getByRole('button', { name: '编码' }).parentElement;
     expect(productSection).toHaveClass('activity-products');
     expect(productSection).toContainElement(screen.getByRole('button', { name: '办公' }));
+    expect(productSection).toContainElement(screen.getByRole('button', { name: '知识' }));
     expect(productSection).toContainElement(screen.getByRole('button', { name: '科研' }));
 
     fireEvent.click(screen.getByRole('button', { name: '科研' }));
@@ -94,15 +97,33 @@ describe('A3S activity bar', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '办公' })).toHaveAttribute('aria-current', 'page'));
   });
 
+  it('opens Knowledge as the built-in destination immediately below Work', async () => {
+    appState.sidebarOpen = false;
+    render(<ActivityBar />);
+    const productButtons = screen
+      .getByRole('button', { name: '编码' })
+      .parentElement?.querySelectorAll<HTMLButtonElement>('.activity-button');
+
+    expect([...productButtons!].map((button) => button.getAttribute('aria-label')).slice(0, 3)).toEqual([
+      '编码',
+      '办公',
+      '知识',
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: '知识' }));
+
+    expect(appState.activeProduct).toBe('knowledge');
+    expect(appState.sidebarOpen).toBe(true);
+    expect(window.location.hash).toBe('#knowledge');
+    await waitFor(() => expect(screen.getByRole('button', { name: '知识' })).toHaveAttribute('aria-current', 'page'));
+  });
+
   it('opens the signed plugin marketplace as a system entry', async () => {
     render(<ActivityBar />);
-    fireEvent.click(screen.getByRole('button', { name: '插件市场' }));
+    fireEvent.click(screen.getByRole('button', { name: '市场' }));
 
     expect(appState.activeProduct).toBe('plugins');
     expect(window.location.hash).toBe('#plugins');
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: '插件市场' })).toHaveAttribute('aria-current', 'page')
-    );
+    await waitFor(() => expect(screen.getByRole('button', { name: '市场' })).toHaveAttribute('aria-current', 'page'));
   });
 
   it('keeps settings in the system section', async () => {
@@ -110,7 +131,7 @@ describe('A3S activity bar', () => {
     const systemSection = screen.getByRole('button', { name: '设置' }).parentElement;
     expect(systemSection).toHaveClass('activity-system');
     expect(systemSection).toContainElement(screen.getByRole('button', { name: '记忆' }));
-    expect(systemSection).toContainElement(screen.getByRole('button', { name: '插件市场' }));
+    expect(systemSection).toContainElement(screen.getByRole('button', { name: '市场' }));
     expect(systemSection?.querySelectorAll('.activity-button')).toHaveLength(3);
     expect(screen.queryByRole('button', { name: '账户与连接' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '设置' })).toHaveAttribute('data-activity-tooltip', '设置');

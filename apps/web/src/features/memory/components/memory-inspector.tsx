@@ -1,5 +1,6 @@
 import { ClipboardCopy, Clock3, Database, Eye, Network, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { CollectionState, IconButton } from '../../../design-system/primitives';
 import { showToast } from '../../../state/app-state';
 import type { MemoryEntry, MemoryGraphEntity, MemoryOverview } from '../../../types/api';
 import {
@@ -124,12 +125,12 @@ function MemoryEntryInspector({
           <h2>{event?.label || entry.preview || entry.id}</h2>
         </div>
         <div className='memory-inspector-actions'>
-          <button type='button' aria-label='复制记忆' title='复制记忆' onClick={() => void copyContent()}>
+          <IconButton label='复制记忆' onClick={() => void copyContent()}>
             <ClipboardCopy size={14} />
-          </button>
-          <button type='button' aria-label='关闭详情' title='关闭详情' onClick={onClear}>
+          </IconButton>
+          <IconButton label='关闭详情' onClick={onClear}>
             <X size={15} />
-          </button>
+          </IconButton>
         </div>
       </header>
       {!visible && <p className='memory-inspector-filter-note'>这条记忆不在当前筛选结果中。</p>}
@@ -246,9 +247,9 @@ function EntityInspector({
           <h2>{entityNameLabel(entity.kind, entity.name)}</h2>
         </div>
         <div className='memory-inspector-actions'>
-          <button type='button' aria-label='关闭详情' title='关闭详情' onClick={onClear}>
+          <IconButton label='关闭详情' onClick={onClear}>
             <X size={15} />
-          </button>
+          </IconButton>
         </div>
       </header>
       <span className='memory-entity-hero' data-tone={entity.kind}>
@@ -298,7 +299,7 @@ function EntityInspector({
               </span>
             </button>
           ))}
-          {!entries.length && <p>相关记忆暂未显示。</p>}
+          {!entries.length && <CollectionState role='status'>相关记忆暂未显示。</CollectionState>}
         </div>
       </section>
     </aside>

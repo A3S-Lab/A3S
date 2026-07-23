@@ -2,8 +2,10 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { Markdown } from '@tiptap/markdown';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { LoaderCircle } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import { findComposerInputTrigger, type ComposerInputTrigger } from './composer-input-trigger';
+import { CollectionState } from '../../../design-system/primitives';
+import { type ComposerInputTrigger, findComposerInputTrigger } from './composer-input-trigger';
 import { SlashCommandHighlight } from './slash-command-highlight';
 
 export interface TaskPromptEditorHandle {
@@ -42,10 +44,14 @@ export const TaskPromptEditor = forwardRef<
   const onSubmitRef = useRef(onSubmit);
   const onTriggerChangeRef = useRef(onTriggerChange);
   const onTriggerKeyDownRef = useRef(onTriggerKeyDown);
+  const disabledRef = useRef(disabled);
+  const valueRef = useRef(value);
   onChangeRef.current = onChange;
   onSubmitRef.current = onSubmit;
   onTriggerChangeRef.current = onTriggerChange;
   onTriggerKeyDownRef.current = onTriggerKeyDown;
+  disabledRef.current = disabled;
+  valueRef.current = value;
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -77,7 +83,14 @@ export const TaskPromptEditor = forwardRef<
       },
     },
     onUpdate: ({ editor: current }) => {
-      onChangeRef.current(current.getMarkdown());
+      const nextValue = current.getMarkdown();
+      if (disabledRef.current) {
+        if (nextValue !== valueRef.current) {
+          current.commands.setContent(valueRef.current, { contentType: 'markdown', emitUpdate: false });
+        }
+        return;
+      }
+      onChangeRef.current(nextValue);
       onTriggerChangeRef.current?.(activeComposerTrigger(current));
     },
     onSelectionUpdate: ({ editor: current }) => {
@@ -120,7 +133,17 @@ export const TaskPromptEditor = forwardRef<
     editor.commands.setContent(value, { contentType: 'markdown', emitUpdate: false });
   }, [editor, value]);
 
-  if (!editor) return <output className='task-prompt-editor-loading' aria-label='正在准备任务编辑器' />;
+  if (!editor) {
+    return (
+      <CollectionState
+        className='task-prompt-editor-loading'
+        role='status'
+        icon={<LoaderCircle className='spin' size={14} />}
+      >
+        正在准备任务编辑器
+      </CollectionState>
+    );
+  }
   return (
     <section className='task-prompt-editor' aria-label='任务指令编辑器'>
       <EditorContent editor={editor} />

@@ -1,5 +1,6 @@
-import { ListTree, LocateFixed, Minus, Plus, Search, X } from 'lucide-react';
+import { ListTree, LoaderCircle, LocateFixed, Minus, Plus, X } from 'lucide-react';
 import { lazy, Suspense, useMemo, useRef, useState } from 'react';
+import { CollectionState, IconButton, SearchField, StateView } from '../../../design-system/primitives';
 import { entityKindLabel } from '../memory-format';
 import { limitMemoryGraphFor3D, selectedMemoryGraphNodeId } from '../memory-graph-3d-data';
 import type { MemoryGraphProjection, MemoryVisualNode } from '../memory-projection';
@@ -48,10 +49,13 @@ export function MemoryGraph({
     <section className='memory-graph' data-has-selection={Boolean(selectedNodeId) || undefined} aria-label='记忆关联图'>
       <Suspense
         fallback={
-          <output className='memory-graph-loading'>
-            <span />
-            正在加载关联图…
-          </output>
+          <StateView
+            className='memory-graph-loading'
+            size='compact'
+            role='status'
+            icon={<LoaderCircle className='spin' size={20} />}
+            title='正在加载关联图'
+          />
         }
       >
         <MemoryGraph3D
@@ -65,34 +69,33 @@ export function MemoryGraph({
 
       <fieldset className='memory-graph-controls'>
         <legend>关系图控制</legend>
-        <button type='button' aria-label='放大关系图' onClick={() => graphRef.current?.zoomIn()}>
+        <IconButton label='放大关系图' onClick={() => graphRef.current?.zoomIn()}>
           <Plus size={15} />
-        </button>
-        <button type='button' aria-label='缩小关系图' onClick={() => graphRef.current?.zoomOut()}>
+        </IconButton>
+        <IconButton label='缩小关系图' onClick={() => graphRef.current?.zoomOut()}>
           <Minus size={15} />
-        </button>
-        <button
-          type='button'
-          aria-label='重新取景'
+        </IconButton>
+        <IconButton
+          label='重新取景'
           onClick={() => {
             onClearSelection();
             graphRef.current?.resetView();
           }}
         >
           <LocateFixed size={15} />
-        </button>
-        <button
+        </IconButton>
+        <IconButton
           id='memory-graph-browser-toggle'
           ref={browserToggleRef}
-          type='button'
           className={browserOpen ? 'active' : undefined}
-          aria-label='浏览图中内容'
+          label='浏览图中内容'
+          selected={browserOpen}
           aria-expanded={browserOpen}
           aria-controls='memory-graph-node-browser'
           onClick={() => setBrowserOpen((open) => !open)}
         >
           <ListTree size={15} />
-        </button>
+        </IconButton>
       </fieldset>
 
       {browserOpen && (
@@ -102,20 +105,19 @@ export function MemoryGraph({
               <strong>图中内容</strong>
               <span>{renderedGraph.nodes.length} 项</span>
             </div>
-            <button type='button' aria-label='关闭列表' onClick={() => setBrowserOpen(false)}>
+            <IconButton label='关闭列表' onClick={() => setBrowserOpen(false)}>
               <X size={15} />
-            </button>
+            </IconButton>
           </header>
-          <label>
-            <Search size={14} />
-            <input
-              type='search'
-              value={nodeQuery}
-              aria-label='搜索图中内容'
-              placeholder='搜索'
-              onChange={(event) => setNodeQuery(event.target.value)}
-            />
-          </label>
+          <SearchField
+            className='memory-graph-node-search'
+            size='compact'
+            label='搜索图中内容'
+            clearLabel='清除图中内容搜索'
+            value={nodeQuery}
+            placeholder='搜索'
+            onValueChange={setNodeQuery}
+          />
           <div className='memory-graph-node-list'>
             {browserNodes.map((node) => (
               <button
@@ -137,7 +139,11 @@ export function MemoryGraph({
                 </span>
               </button>
             ))}
-            {browserNodes.length === 0 && <p>没有匹配内容。</p>}
+            {browserNodes.length === 0 && (
+              <CollectionState className='memory-graph-node-empty' role='status'>
+                没有匹配内容
+              </CollectionState>
+            )}
           </div>
         </aside>
       )}

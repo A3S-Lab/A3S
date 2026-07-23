@@ -10,7 +10,7 @@ export function TaskComposerModelControl({ actions }: { actions: TaskActions }) 
   const model = task
     ? (task.model ?? state.selectedModel)
     : state.newTaskConfig.model || state.selectedModel || state.llm?.defaultModel || '';
-  const busy = Boolean(state.streamingSessionId || state.taskConfigSaving);
+  const busy = Boolean(state.streamingSessionId || state.taskConfigSaving || state.taskSubmissionState);
   const loading = state.taskConfigSaving === 'model';
 
   return (

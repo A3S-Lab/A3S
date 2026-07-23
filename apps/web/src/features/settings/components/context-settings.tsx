@@ -5,10 +5,11 @@ import type { ContextSettings } from '../../../types/settings';
 import type { SettingsActions } from '../settings-actions';
 import { useSettingsDraft } from '../use-settings-draft';
 import { SettingsEffectBadge } from './config/settings-effect-badge';
+import { SettingsEmptyNotice } from './config/settings-empty-notice';
 import { SettingsSecretField, SettingsSegmentedControl, SettingsTextField } from './config/settings-fields';
 import { SettingsRow } from './config/settings-row';
-import { SettingsLoadState, SettingsSaveState } from './config/settings-state-view';
 import { SettingsSection } from './config/settings-section';
+import { SettingsCategoryError, SettingsLoadState, SettingsSaveState } from './config/settings-state-view';
 import { defaultMemorySettings, MemorySettingsEditor } from './context/memory-settings';
 
 export function ContextSettingsView({
@@ -59,9 +60,7 @@ export function ContextSettingsView({
               onSave={() => void save()}
             />
           </div>
-          {state.settingsCategoryErrors.context && (
-            <p className='settings-inline-error'>{state.settingsCategoryErrors.context}</p>
-          )}
+          <SettingsCategoryError message={state.settingsCategoryErrors.context} />
 
           <SettingsSection title='会话存储' description='决定任务会话保存在哪里；自定义后端需要可用的连接地址。'>
             <SettingsRow label='存储后端'>
@@ -115,7 +114,7 @@ export function ContextSettingsView({
             {draft.memory ? (
               <MemorySettingsEditor value={draft.memory} onChange={(memory) => setDraft({ ...draft, memory })} />
             ) : (
-              <div className='config-empty-inline'>未声明显式记忆参数，运行时使用默认行为。</div>
+              <SettingsEmptyNotice>未声明显式记忆参数，运行时使用默认行为。</SettingsEmptyNotice>
             )}
           </SettingsSection>
         </div>

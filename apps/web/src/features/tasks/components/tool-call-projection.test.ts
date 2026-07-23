@@ -116,6 +116,56 @@ describe('projectToolCalls', () => {
     expect(toolActionLabel(call)).toBe('命令未执行');
   });
 
+  it('projects a user-cancelled DeepResearch run as interrupted instead of failed', () => {
+    const [call] = projectToolCalls([
+      { type: 'tool_start', id: 'research-cancelled', name: 'deep_research' },
+      {
+        type: 'tool_end',
+        id: 'research-cancelled',
+        name: 'deep_research',
+        output: 'DeepResearch was cancelled by the user.',
+        exit_code: 1,
+        metadata: { duration_ms: 240 },
+      },
+      { type: 'error', message: 'DeepResearch was cancelled by the user.' },
+    ]);
+
+    expect(call).toMatchObject({
+      state: 'interrupted',
+      output: '',
+      reason: '用户已停止深度研究。',
+      metadata: {
+        cancelled: true,
+        message: 'DeepResearch was cancelled by the user.',
+      },
+    });
+    expect(toolActionLabel(call)).toBe('深度研究已停止');
+  });
+
+  it('recognizes the typed cancellation kind emitted by the DeepResearch runtime', () => {
+    const message = 'DeepResearch was cancelled by the user.';
+    const [call] = projectToolCalls([
+      { type: 'tool_start', id: 'research-typed-cancellation', name: 'deep_research' },
+      {
+        type: 'tool_end',
+        id: 'research-typed-cancellation',
+        name: 'deep_research',
+        output: message,
+        exit_code: 1,
+        error_kind: { type: 'cancelled', op: 'deep_research' },
+        metadata: { duration_ms: 240, cancelled: true, message },
+      },
+      { type: 'agent_end', text: message },
+    ]);
+
+    expect(call).toMatchObject({
+      state: 'interrupted',
+      output: '',
+      errorKind: 'cancelled',
+      reason: '用户已停止深度研究。',
+    });
+  });
+
   it('settles stale confirmations when the parent turn ends', () => {
     const [call] = projectToolCalls([
       {

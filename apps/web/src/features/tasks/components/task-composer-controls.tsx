@@ -16,7 +16,7 @@ export function TaskComposerTrailingControls({ actions }: { actions: TaskActions
         <TaskComposerContextControl
           context={controls.context}
           compacting={Boolean(state.contextCompacting[task.sessionId])}
-          disabled={Boolean(state.streamingSessionId || state.taskConfigSaving)}
+          disabled={Boolean(state.streamingSessionId || state.taskConfigSaving || state.taskSubmissionState)}
           onCompact={() => actions.compactSession()}
         />
       )}

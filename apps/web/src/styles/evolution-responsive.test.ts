@@ -24,7 +24,9 @@ describe('evolution responsive styles', () => {
   });
 
   it('compacts the page header while preserving icon actions', () => {
-    expect(mobileStyles).toMatch(/\.memory-page-title > div\s*\{[^}]*display:\s*none;/s);
-    expect(mobileStyles).toMatch(/\.memory-page-actions \.memory-settings-action\s*\{[^}]*font-size:\s*0;/s);
+    expect(mobileStyles).toMatch(
+      /\.memory-page-header \.ds-page-header-actions \.ds-button\s*\{[^}]*min-height:\s*32px;/s
+    );
+    expect(mobileStyles).toMatch(/\.memory-page-header \.memory-settings-action\s*\{[^}]*font-size:\s*0;/s);
   });
 });

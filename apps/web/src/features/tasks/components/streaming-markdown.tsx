@@ -1,6 +1,7 @@
 import { cjk } from '@streamdown/cjk';
 import { code } from '@streamdown/code';
 import { Streamdown, type StreamdownTranslations } from 'streamdown';
+import { normalizeCollapsedMarkdownTables } from './markdown-normalization';
 
 const translations: StreamdownTranslations = {
   close: '关闭',
@@ -35,6 +36,7 @@ const translations: StreamdownTranslations = {
 };
 
 export default function StreamingMarkdown({ content, streaming }: { content: string; streaming: boolean }) {
+  const normalizedContent = normalizeCollapsedMarkdownTables(content);
   return (
     <div className='streaming-markdown-region' aria-busy={streaming || undefined}>
       <Streamdown
@@ -53,7 +55,7 @@ export default function StreamingMarkdown({ content, streaming }: { content: str
         lineNumbers
         translations={translations}
       >
-        {content}
+        {normalizedContent}
       </Streamdown>
     </div>
   );

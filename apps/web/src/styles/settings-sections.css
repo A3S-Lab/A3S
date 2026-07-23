@@ -198,13 +198,6 @@
   font-size: 10px;
 }
 
-.settings-section > .btn,
-.settings-section > .btn-outline {
-  min-height: 37px;
-  padding: 0 12px;
-  font-size: 12px;
-}
-
 .settings-saving {
   display: block;
   margin: -9px 0 14px;
@@ -372,12 +365,13 @@
   font: 10px/1.4 "SFMono-Regular", Consolas, monospace;
 }
 
-.account-model-refresh-error {
-  margin: 0;
+.account-model-refresh-error.ds-inline-notice {
   padding: 9px 16px;
   border-bottom: 1px solid color-mix(in srgb, var(--a3s-red) 24%, var(--a3s-line));
-  background: color-mix(in srgb, var(--a3s-red) 5%, var(--a3s-panel));
-  color: var(--a3s-red);
+  border-radius: 0;
+}
+
+.account-model-refresh-error .ds-inline-notice-copy {
   font-size: 11px;
   line-height: 1.5;
 }
@@ -392,14 +386,4 @@
   color: var(--a3s-green);
   font-size: 10px;
   font-weight: 600;
-}
-
-.settings-warning {
-  margin: 8px 0;
-  padding: 9px 10px;
-  border: 1px solid color-mix(in srgb, var(--a3s-warning, #d97706) 25%, var(--a3s-line));
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--a3s-warning, #d97706) 5%, var(--a3s-panel));
-  color: var(--a3s-warning, #d97706);
-  font-size: 11px;
 }

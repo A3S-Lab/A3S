@@ -3,15 +3,21 @@
 ## Product model
 
 A3S Web treats an installed A3S Use package as the equivalent of a VS Code
-extension package. Code is the first and default Activity Bar entry, and Work
-is the second built-in entry. An enabled package can add a workbench view
-through the `contributes.activity_bar` contribution point; vertical products
-such as Research and Finance are not hardcoded shell entries.
+extension package. Code is the first and default Activity Bar entry, Work is
+the second built-in entry, and the non-executable Knowledge product follows
+Work. An enabled package can add a workbench view through the
+`contributes.activity_bar` contribution point; vertical products such as
+Research and Finance are not hardcoded shell entries.
 
 The package remains the unit of identity, trust, installation, upgrade,
 disable, and removal. A contribution adds navigation and a non-callable HTML
 view only. Native actions continue to use the package's CLI, standard MCP, and
 Skill surfaces.
+
+Knowledge packages are a separate product contract. A knowledge package installs
+data into the personal knowledge library and never contributes executable UI,
+CLI, MCP, or Skill authority. Its discovery and local lifecycle are documented
+in [A3S Web Knowledge](KNOWLEDGE.md).
 
 The model combines two useful references without copying either runtime:
 
@@ -36,6 +42,8 @@ contributes {
     description = "Prepare reviewable, evidence-backed research tasks across disciplines."
     icon        = "flask-conical"
     entry       = "web/activity.html"
+    styles      = ["web/activity.css"]
+    scripts     = ["web/activity.js"]
     skill       = "a3s-use-science"
     order       = 120
   }
@@ -48,17 +56,21 @@ plugin messages.
 
 ## Asset contract
 
-Activity HTML is validated twice: first by A3S Use while projecting the
-installed package, then independently by A3S Code before it becomes Web API
-content. The asset must be:
+Activity HTML and its explicitly declared CSS/JavaScript resources are validated
+twice: first by A3S Use while projecting the installed package, then
+independently by A3S Code before they become Web API content. Every asset must
+be:
 
 - inside the immutable package root;
 - a regular file rather than a link or special file;
-- UTF-8 `text/html` no larger than 2 MiB;
+- UTF-8 with the declared `text/html`, `text/css`, or `text/javascript` media
+  type and no larger than 2 MiB;
 - bound to the registry snapshot by lowercase SHA-256;
 - associated with the same package and Skill in both catalog and content
   responses.
 
+A3S Web removes undeclared external stylesheet and script references, then
+injects only the verified package resources as inline nodes under the host CSP.
 A changed registry revision or asset digest invalidates cached content. Requests
 carry sequence IDs and abort signals so a stale response cannot replace a newer
 selection. Loading, error, and rendered states remain separate, and late loads
@@ -123,9 +135,17 @@ execution, files, editable artifacts, logs, and final review.
 
 ## Marketplace lifecycle
 
-The Marketplace reads only configured TUF registries. Unconfigured or failed
-registries remain visible with their verification state but contribute no
-installable packages.
+The Marketplace reads two explicit package-source classes:
+
+- optional `release-bundle` packages carried by the verified A3S Use release;
+- configured remote registries verified through TUF.
+
+Release bundles are not built-in capabilities: they remain absent from the
+runtime until the user installs them, and they can be disabled or removed like
+any other extension. A3S Use exposes only validated bundle metadata, while the
+umbrella plan binds the exact expanded-package SHA-256 and A3S Use checks it
+again immediately before activation. Unconfigured or failed registries remain
+visible with their verification state but contribute no installable packages.
 
 The catalog keeps discovery and trust inspection separate. The Plugins view
 provides one complete catalog plus an installed-only view, with text search and
@@ -139,11 +159,27 @@ Every install, upgrade, or uninstall is two phase:
 1. the Web API invokes the current `a3s` executable with `--dry-run`;
 2. the user reviews the exact plan and its SHA-256 digest;
 3. explicit confirmation invokes the same operation with `--plan-digest`;
-4. a changed plan, registry, target, or package fails closed.
+4. a changed plan, release bundle, registry, target, or package fails closed.
 
 Enable and disable operations use the A3S Use extension lifecycle and trigger a
 registry refresh. The Activity Bar polls the immutable registry revision, so
 install, upgrade, disable, and uninstall converge without reloading A3S Web.
+
+The repository-level lifecycle proof is:
+
+```sh
+just marketplace-science-e2e
+```
+
+It builds the real `a3s-use` binary and packaged `a3s-use-science` release, then
+runs both supported source paths: an A3S Use release bundle with no configured
+registry and an ephemeral signed TUF repository. The checks exercise Web API
+install plan/apply, direct Activity opening, verified
+HTML/CSS/JavaScript delivery, reviewed workbench-to-Code handoff, packaged
+`science doctor`, all 13 namespaced Science MCP tools, uninstall plan/apply,
+`release-bundle`/`registry-tuf` receipt provenance, and package-directory
+cleanup. The test is local and does not claim that a package has been published
+to the production registry.
 
 ## Local Web API
 

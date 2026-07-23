@@ -58,14 +58,15 @@ describe('resolveTaskRuntimePanelPlacement', () => {
 });
 
 describe('resolveTaskRuntimePanelLayout', () => {
-  it('uses a docked compact surface when the actual conversation pane cannot fit a readable transcript rail', () => {
+  it('uses a docked compact surface when the panel would overlap centered conversation content', () => {
     expect(resolveTaskRuntimePanelLayout(488)).toBe('compact');
     expect(resolveTaskRuntimePanelLayout(960)).toBe('compact');
+    expect(resolveTaskRuntimePanelLayout(1599)).toBe('compact');
   });
 
-  it('keeps the floating detail surface when the conversation pane can reserve a message-safe rail', () => {
-    expect(resolveTaskRuntimePanelLayout(1040)).toBe('wide');
-    expect(resolveTaskRuntimePanelLayout(1128)).toBe('wide');
+  it('floats only when the panel fits beside the centered conversation content', () => {
+    expect(resolveTaskRuntimePanelLayout(1600)).toBe('wide');
+    expect(resolveTaskRuntimePanelLayout(1800)).toBe('wide');
   });
 
   it('keeps the deterministic wide default when layout geometry is unavailable in non-browser rendering', () => {

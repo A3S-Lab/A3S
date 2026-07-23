@@ -129,9 +129,7 @@
   line-height: 16px;
 }
 
-.memory-type-badge,
-.memory-tier-badge,
-.memory-signal-badge {
+.memory-type-badge {
   display: inline-flex;
   min-height: 20px;
   align-items: center;
@@ -164,13 +162,6 @@
   background: color-mix(in srgb, var(--a3s-blue) 10%, var(--a3s-panel));
   color: var(--a3s-blue);
 }
-
-.memory-tier-badge[data-tier="short"] { color: var(--a3s-blue); }
-.memory-tier-badge[data-tier="mid"] { color: var(--a3s-purple); }
-.memory-tier-badge[data-tier="long"] { color: var(--a3s-green); }
-.memory-signal-badge[data-signal="candidate"],
-.memory-signal-badge[data-signal="cooling"] { color: var(--a3s-warning); }
-.memory-signal-badge[data-signal="protected"] { color: var(--a3s-green); }
 
 .memory-timeline-copy > strong {
   overflow: hidden;
@@ -559,11 +550,11 @@
   opacity: 0.62;
 }
 
-.memory-entity-memory-list > p {
-  margin: 6px 0;
-  color: var(--a3s-muted);
-  font-size: 12px;
-  line-height: 18px;
+.memory-entity-memory-list > .ds-collection-state {
+  min-height: 44px;
+  justify-content: flex-start;
+  padding: 8px 9px;
+  text-align: left;
 }
 
 @media (prefers-reduced-motion: reduce) {

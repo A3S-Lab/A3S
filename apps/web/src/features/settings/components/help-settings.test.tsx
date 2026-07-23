@@ -8,7 +8,7 @@ describe('HelpSettings', () => {
   it('makes the editor focus shortcut searchable', () => {
     render(<HelpSettings />);
 
-    fireEvent.change(screen.getByRole('textbox', { name: '搜索帮助' }), {
+    fireEvent.change(screen.getByRole('searchbox', { name: '搜索帮助' }), {
       target: { value: 'Ctrl B' },
     });
 
@@ -19,7 +19,7 @@ describe('HelpSettings', () => {
   it('makes file quick open discoverable by its shortcut', () => {
     render(<HelpSettings />);
 
-    fireEvent.change(screen.getByRole('textbox', { name: '搜索帮助' }), {
+    fireEvent.change(screen.getByRole('searchbox', { name: '搜索帮助' }), {
       target: { value: 'Ctrl P' },
     });
 
@@ -30,7 +30,7 @@ describe('HelpSettings', () => {
   it('makes the full-screen workspace action searchable', () => {
     render(<HelpSettings />);
 
-    fireEvent.change(screen.getByRole('textbox', { name: '搜索帮助' }), {
+    fireEvent.change(screen.getByRole('searchbox', { name: '搜索帮助' }), {
       target: { value: '全屏工作区' },
     });
 

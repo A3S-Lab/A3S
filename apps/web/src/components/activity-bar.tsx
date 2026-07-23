@@ -17,6 +17,7 @@ import {
 import { useSnapshot } from 'valtio';
 import {
   appState,
+  navigateKnowledge,
   navigateMemory,
   navigatePlugin,
   navigatePlugins,
@@ -65,7 +66,20 @@ export function ActivityBar() {
           tooltip='办公'
           active={state.activeProduct === 'work'}
           icon={BriefcaseBusiness}
-          onClick={() => navigateProduct('work')}
+          onClick={() => {
+            appState.sidebarOpen = true;
+            navigateProduct('work');
+          }}
+        />
+        <ActivityButton
+          label='知识'
+          tooltip='知识'
+          active={state.activeProduct === 'knowledge'}
+          icon={BookOpen}
+          onClick={() => {
+            appState.sidebarOpen = true;
+            navigateKnowledge();
+          }}
         />
         {plugins.map((plugin) => (
           <ActivityButton
@@ -87,8 +101,8 @@ export function ActivityBar() {
           onClick={navigateMemory}
         />
         <ActivityButton
-          label='插件市场'
-          tooltip='插件市场'
+          label='市场'
+          tooltip='市场'
           active={state.activeProduct === 'plugins'}
           icon={Store}
           onClick={navigatePlugins}

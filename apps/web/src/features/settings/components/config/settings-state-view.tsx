@@ -1,6 +1,6 @@
-import { AlertCircle, Check, CircleDot, RotateCw } from 'lucide-react';
+import { AlertCircle, Check, CircleDot, LoaderCircle, RotateCw } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { Button } from '../../../../design-system/primitives';
+import { Button, InlineNotice, StateView, StatusBadge } from '../../../../design-system/primitives';
 import type { ConfigCategory } from '../../../../types/settings';
 import type { SettingsActions } from '../../settings-actions';
 
@@ -20,23 +20,52 @@ export function SettingsLoadState({
   children: ReactNode;
 }) {
   if (loading && !loaded) {
-    return <div className='settings-state-card loading'>正在读取本机配置…</div>;
+    return (
+      <StateView
+        className='settings-state-view'
+        size='compact'
+        role='status'
+        icon={<LoaderCircle className='spin' size={18} />}
+        title='正在读取本机配置…'
+        description='正在从 A3S Boot 同步这一组设置。'
+      />
+    );
   }
   if (!loaded) {
     return (
-      <div className='settings-state-card error'>
-        <AlertCircle size={18} />
-        <div>
-          <strong>无法读取这一组设置</strong>
-          <span>{error || '本地配置服务没有返回数据。'}</span>
-        </div>
-        <Button tone='secondary' onClick={() => void actions.loadSettingsCategory(category, true)}>
-          <RotateCw size={13} /> 重试
-        </Button>
-      </div>
+      <StateView
+        className='settings-state-view'
+        size='compact'
+        tone='danger'
+        role='alert'
+        icon={<AlertCircle size={18} />}
+        title='无法读取这一组设置'
+        description={error || '本地配置服务没有返回数据。'}
+        actions={
+          <Button tone='secondary' onClick={() => void actions.loadSettingsCategory(category, true)}>
+            <RotateCw size={13} /> 重试
+          </Button>
+        }
+      />
     );
   }
   return <>{children}</>;
+}
+
+export function SettingsCategoryError({ message }: { message?: string | null }) {
+  if (!message) return null;
+  return (
+    <InlineNotice
+      className='settings-category-notice'
+      tone='danger'
+      role='alert'
+      icon={<AlertCircle size={17} />}
+      title='设置未同步'
+    >
+      <p>{message}</p>
+      <p>当前草稿仍然保留，可修改后重试。</p>
+    </InlineNotice>
+  );
 }
 
 export function SettingsSaveState({
@@ -57,15 +86,15 @@ export function SettingsSaveState({
   return (
     <div className='settings-save-state' aria-live='polite'>
       {dirty ? (
-        <span className='dirty'>
+        <StatusBadge tone='warning'>
           <CircleDot size={12} /> 有未保存的更改
-        </span>
+        </StatusBadge>
       ) : savedAt ? (
-        <span className='saved'>
+        <StatusBadge tone='success'>
           <Check size={12} /> 已保存
-        </span>
+        </StatusBadge>
       ) : (
-        <span className='synced'>配置已同步</span>
+        <StatusBadge tone='neutral'>配置已同步</StatusBadge>
       )}
       <span className='settings-save-actions'>
         {dirty && onReset && (

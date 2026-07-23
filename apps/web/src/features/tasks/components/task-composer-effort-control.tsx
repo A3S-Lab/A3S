@@ -23,7 +23,7 @@ export function TaskComposerEffortControl({ actions }: { actions: TaskActions })
   const selected = levels[selectedIndex];
   const preview = levels[Math.min(previewIndex, Math.max(0, levels.length - 1))] ?? selected;
   const label = effortLabel(value, selected?.label ?? value);
-  const busy = Boolean(state.streamingSessionId || state.taskConfigSaving);
+  const busy = Boolean(state.streamingSessionId || state.taskConfigSaving || state.taskSubmissionState);
   const disabled = Boolean(!levels.length || controlsError || controlsLoading || busy);
 
   useEffect(() => {

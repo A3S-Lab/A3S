@@ -32,7 +32,11 @@ export function TaskHeader() {
         </div>
       </div>
       <div className='task-header-actions'>
-        {task && state.streamingSessionId === task.sessionId && <StatusBadge tone='info'>运行中</StatusBadge>}
+        {task && state.taskSubmissionState ? (
+          <StatusBadge tone='info'>启动中</StatusBadge>
+        ) : (
+          task && state.streamingSessionId === task.sessionId && <StatusBadge tone='info'>运行中</StatusBadge>
+        )}
         {state.taskView === 'conversation' && (
           <>
             <IconButton

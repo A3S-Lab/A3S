@@ -16,27 +16,40 @@ export function presentTaskRuntime({
   steps,
   agents,
   running,
+  planning = false,
+  starting = false,
   executionStatus,
 }: {
   steps: readonly ExecutionPlanTask[];
   agents: readonly SubagentProjection[];
   running: boolean;
+  planning?: boolean;
+  starting?: boolean;
   executionStatus?: RuntimeExecutionStatus;
 }): TaskRuntimePresentation {
   const plan = countTaskPlan(steps);
   const subagents = countSubagents(agents);
   const hasPlan = plan.total > 0;
   const currentStep = steps.find((step) => step.status === 'in_progress');
-  const title = hasPlan ? '任务进度' : '并行执行';
+  const tracksTask = hasPlan || planning || starting || (running && subagents.total === 0);
+  const title = tracksTask ? '任务进度' : '并行执行';
   const metric = hasPlan
     ? `${plan.completed}/${plan.total}`
-    : subagents.failed > 0
+    : subagents.total > 0 && subagents.failed > 0
       ? `${subagents.failed} 失败`
-      : subagents.interrupted > 0
+      : subagents.total > 0 && subagents.interrupted > 0
         ? `${subagents.interrupted} 中断`
-        : subagents.running > 0
+        : subagents.total > 0 && subagents.running > 0
           ? `${subagents.running}/${subagents.total} 运行`
-          : `${subagents.completed}/${subagents.total}`;
+          : subagents.total > 0
+            ? `${subagents.completed}/${subagents.total}`
+            : starting
+              ? '准备中'
+              : planning
+                ? '规划中'
+                : running
+                  ? '运行中'
+                  : '0/0';
 
   if (plan.failed > 0) {
     return settled('failed', title, `${plan.failed} 项失败`, metric);
@@ -55,6 +68,12 @@ export function presentTaskRuntime({
   }
   if (subagents.interrupted > 0) {
     return settled('interrupted', title, `${subagents.interrupted} 个子智能体中断`, metric);
+  }
+  if (starting && !hasPlan && subagents.total === 0) {
+    return { tone: 'running', live: true, title, summary: '正在创建任务', metric };
+  }
+  if (planning && !hasPlan && subagents.total === 0) {
+    return { tone: 'running', live: true, title, summary: '正在制定执行计划', metric };
   }
   if (running || plan.running > 0 || subagents.running > 0) {
     const summary = currentStep?.content ?? runningSummary(hasPlan, subagents.running);
@@ -118,7 +137,7 @@ export function prioritizeSubagents(agents: readonly SubagentProjection[]): Suba
 
 function runningSummary(hasPlan: boolean, runningAgents: number): string {
   if (runningAgents > 0) return `${runningAgents} 个子智能体运行中`;
-  return hasPlan ? '正在准备下一项' : '并行任务运行中';
+  return hasPlan ? '正在准备下一项' : '正在分析任务';
 }
 
 function settled(

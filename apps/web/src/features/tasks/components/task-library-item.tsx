@@ -1,6 +1,6 @@
 import { Check, LoaderCircle, Pencil, Trash2, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { IconButton } from '../../../design-system/primitives';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Button, IconButton } from '../../../design-system/primitives';
 import type { CodeSession } from '../../../types/api';
 import { formatTaskAge, taskCreatedAtLabel } from './task-library-time';
 
@@ -25,6 +25,7 @@ export function TaskLibraryItem({
   const [name, setName] = useState(title);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const errorId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const age = formatTaskAge(session.createdAt);
   const createdAtLabel = taskCreatedAtLabel(session.createdAt);
@@ -85,6 +86,7 @@ export function TaskLibraryItem({
           maxLength={72}
           disabled={busy}
           aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
           onChange={(event) => setName(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Escape') {
@@ -94,8 +96,9 @@ export function TaskLibraryItem({
           }}
         />
         {error && (
-          <span className='task-inline-error' title={error}>
-            !
+          <span className='task-inline-error' id={errorId} role='alert' title={error}>
+            <span aria-hidden='true'>!</span>
+            <span className='sr-only'>{error}</span>
           </span>
         )}
         <IconButton label='保存任务名称' type='submit' disabled={!name.trim() || name.trim() === title || busy}>
@@ -119,18 +122,12 @@ export function TaskLibraryItem({
           <strong>{error ?? '删除此任务？'}</strong>
           <small>保留工作区文件</small>
         </span>
-        <button type='button' disabled={busy} onClick={close}>
+        <Button tone='quiet' disabled={busy} onClick={close}>
           取消
-        </button>
-        <button
-          type='button'
-          className='danger'
-          aria-label={`确认删除 ${title}`}
-          disabled={busy}
-          onClick={() => void remove()}
-        >
+        </Button>
+        <Button tone='danger' aria-label={`确认删除 ${title}`} disabled={busy} onClick={() => void remove()}>
           {busy ? <LoaderCircle className='spin' size={12} /> : '删除'}
-        </button>
+        </Button>
       </fieldset>
     );
   }

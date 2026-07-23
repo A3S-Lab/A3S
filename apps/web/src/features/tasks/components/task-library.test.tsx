@@ -30,7 +30,10 @@ describe('TaskLibrary management', () => {
     appState.sessions = [{ ...task, createdAt: Date.now() - 7 * 60 * 60 * 1000 }];
     render(<TaskLibrary actions={{} as TaskActions} />);
 
-    expect(screen.getByText('A3S Code')).toBeInTheDocument();
+    expect(screen.getByText('编码')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '收起编码侧边栏' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '收起编码侧边栏' }));
+    expect(appState.sidebarOpen).toBe(false);
     expect(screen.getByRole('button', { name: '任务 (1)' })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('7小时前')).toBeInTheDocument();
     expect(screen.queryByText('codex/gpt')).not.toBeInTheDocument();
@@ -54,6 +57,20 @@ describe('TaskLibrary management', () => {
     expect(screen.getByRole('button', { name: '任务 (1)' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /打开任务 Parser task/ })).toBeInTheDocument();
     expect(screen.queryByText('Work conversation')).not.toBeInTheDocument();
+  });
+
+  it('closes the task overlay after selecting a task on a compact viewport', () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    appState.sidebarOpen = true;
+    const selectSession = vi.fn(async () => undefined);
+    render(<TaskLibrary actions={{ selectSession } as unknown as TaskActions} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /打开任务 Parser task/ }));
+
+    expect(selectSession).toHaveBeenCalledWith('task-1');
+    expect(appState.sidebarOpen).toBe(false);
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth });
   });
 
   it('keeps deletion confirmation open when deleting the task fails', async () => {
@@ -84,5 +101,23 @@ describe('TaskLibrary management', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '任务名称' }), { target: { value: 'Parser follow-up' } });
     fireEvent.click(screen.getByRole('button', { name: '保存任务名称' }));
     expect(renameSession).toHaveBeenCalledWith('task-1', 'Parser follow-up');
+  });
+
+  it('associates an inline rename failure with the task name field', async () => {
+    const renameSession = vi.fn(async () => {
+      throw new Error('rename failed');
+    });
+    render(<TaskLibrary actions={{ renameSession } as unknown as TaskActions} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '重命名 Parser task' }));
+    const input = screen.getByRole('textbox', { name: '任务名称' });
+    fireEvent.change(input, { target: { value: 'Parser follow-up' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存任务名称' }));
+
+    await waitFor(() => expect(renameSession).toHaveBeenCalledWith('task-1', 'Parser follow-up'));
+    const error = screen.getByRole('alert');
+    expect(error).toHaveTextContent('重命名失败，请重试');
+    expect(input).toHaveAttribute('aria-describedby', error.id);
+    expect(input).toHaveAttribute('aria-invalid', 'true');
   });
 });

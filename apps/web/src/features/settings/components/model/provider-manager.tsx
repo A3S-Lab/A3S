@@ -1,6 +1,6 @@
 import { CheckCircle2, Plus, Server } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Button } from '../../../../design-system/primitives';
+import { Button, CollectionState, StateView } from '../../../../design-system/primitives';
 import type { ProviderInfo } from '../../../../types/api';
 import { SettingsSection } from '../config/settings-section';
 import { createProvider } from './model-catalog';
@@ -77,7 +77,11 @@ export function ProviderManager({
               </button>
             );
           })}
-          {!providers.length && <p>尚未添加 Provider</p>}
+          {!providers.length && (
+            <CollectionState className='model-provider-list-empty' role='status'>
+              尚未添加 Provider
+            </CollectionState>
+          )}
         </aside>
 
         <div className='model-provider-workspace'>
@@ -89,14 +93,17 @@ export function ProviderManager({
               onRemove={removeSelectedProvider}
             />
           ) : (
-            <div className='model-provider-empty'>
-              <Server size={22} />
-              <strong>添加第一个 Provider</strong>
-              <span>配置连接信息后，再添加可以用于任务的模型。</span>
-              <Button tone='secondary' onClick={addProvider}>
-                <Plus size={13} /> 添加 Provider
-              </Button>
-            </div>
+            <StateView
+              className='model-provider-empty'
+              icon={<Server size={22} />}
+              title='添加第一个 Provider'
+              description='配置连接信息后，再添加可以用于任务的模型。'
+              actions={
+                <Button tone='secondary' onClick={addProvider}>
+                  <Plus size={13} /> 添加 Provider
+                </Button>
+              }
+            />
           )}
         </div>
       </div>

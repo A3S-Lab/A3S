@@ -5,17 +5,16 @@ import {
   Copy,
   FileCode2,
   RefreshCw,
-  Search,
   TerminalSquare,
   X,
   XCircle,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSnapshot } from 'valtio';
-import type { RunActions } from '../run-actions';
+import { Button, IconButton, SearchField, StateView, StatusBadge } from '../../../design-system/primitives';
 import { appState, formatApiError, navigateTask, showToast } from '../../../state/app-state';
 import type { ToolOutputRecord } from '../../../types/api';
-import { Button, IconButton } from '../../../design-system/primitives';
+import type { RunActions } from '../run-actions';
 
 type OutputFilter = 'all' | 'success' | 'error';
 
@@ -47,14 +46,17 @@ export function RunsPage({ actions }: { actions: RunActions }) {
   if (!state.activeSessionId) {
     return (
       <section className='runs-page' aria-label='任务活动'>
-        <div className='output-empty task-required'>
-          <TerminalSquare size={24} />
-          <strong>开始任务后查看活动</strong>
-          <span>工具调用、耗时、输入和输出会归档到对应任务。</span>
-          <Button tone='primary' onClick={() => navigateTask('conversation')}>
-            返回对话
-          </Button>
-        </div>
+        <StateView
+          className='output-empty task-required'
+          icon={<TerminalSquare size={24} />}
+          title='开始任务后查看活动'
+          description='工具调用、耗时、输入和输出会归档到对应任务。'
+          actions={
+            <Button tone='primary' onClick={() => navigateTask('conversation')}>
+              返回对话
+            </Button>
+          }
+        />
       </section>
     );
   }
@@ -82,16 +84,7 @@ export function RunsPage({ actions }: { actions: RunActions }) {
         </header>
 
         <div className='output-toolbar'>
-          <label>
-            <Search size={15} />
-            <input
-              type='search'
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder='搜索工具、输入或输出'
-              aria-label='搜索工具记录'
-            />
-          </label>
+          <SearchField label='搜索工具记录' value={query} placeholder='搜索工具、输入或输出' onValueChange={setQuery} />
           <fieldset aria-label='工具状态筛选'>
             {(['all', 'success', 'error'] as const).map((id) => (
               <button
@@ -110,23 +103,32 @@ export function RunsPage({ actions }: { actions: RunActions }) {
         <div className={`output-layout ${selected ? 'with-detail' : ''}`}>
           <div className='output-list'>
             {state.sessionOutputLoading ? (
-              <div className='output-empty'>
-                <RefreshCw className='spin' size={18} />
-                正在加载工具记录…
-              </div>
+              <StateView
+                className='output-empty'
+                size='compact'
+                role='status'
+                icon={<RefreshCw className='spin' size={18} />}
+                title='正在加载工具记录'
+              />
             ) : outputError ? (
-              <div className='output-empty output-error' role='alert'>
-                <XCircle size={21} />
-                <strong>无法加载当前任务活动</strong>
-                <span>{outputError} 已保留任务内容，可以重新加载工具记录。</span>
-                <Button
-                  onClick={() => {
-                    void actions.openSessionOutput();
-                  }}
-                >
-                  重新加载活动
-                </Button>
-              </div>
+              <StateView
+                className='output-empty output-error'
+                size='compact'
+                role='alert'
+                tone='danger'
+                icon={<XCircle size={21} />}
+                title='无法加载当前任务活动'
+                description={`${outputError} 已保留任务内容，可以重新加载工具记录。`}
+                actions={
+                  <Button
+                    onClick={() => {
+                      void actions.openSessionOutput();
+                    }}
+                  >
+                    重新加载活动
+                  </Button>
+                }
+              />
             ) : visible.length ? (
               visible.map((item) => (
                 <OutputRow
@@ -137,20 +139,24 @@ export function RunsPage({ actions }: { actions: RunActions }) {
                 />
               ))
             ) : (
-              <div className='output-empty'>
-                <TerminalSquare size={21} />
-                <strong>{items.length ? '没有匹配记录' : '当前任务还没有工具活动'}</strong>
-                <span>
-                  {items.length
+              <StateView
+                className='output-empty'
+                size='compact'
+                icon={<TerminalSquare size={21} />}
+                title={items.length ? '没有匹配记录' : '当前任务还没有工具活动'}
+                description={
+                  items.length
                     ? '尝试修改搜索或筛选条件。'
-                    : '回到对话让 Agent 开始执行；文件读取、命令与修改记录会归档到这个任务。'}
-                </span>
-                {!items.length && (
-                  <Button tone='primary' onClick={() => navigateTask('conversation')}>
-                    返回对话继续任务
-                  </Button>
-                )}
-              </div>
+                    : '回到对话让 Agent 开始执行；文件读取、命令与修改记录会归档到这个任务。'
+                }
+                actions={
+                  !items.length ? (
+                    <Button tone='primary' onClick={() => navigateTask('conversation')}>
+                      返回对话继续任务
+                    </Button>
+                  ) : undefined
+                }
+              />
             )}
           </div>
           {selected && <OutputDetail item={selected} onClose={() => setSelectedId(null)} />}
@@ -192,7 +198,7 @@ function OutputDetail({ item, onClose }: { item: ToolOutputRecord; onClose: () =
       <header>
         <div>
           <strong>{item.toolName}</strong>
-          <span className={item.isError ? 'error' : 'success'}>{item.isError ? '执行失败' : '执行成功'}</span>
+          <StatusBadge tone={item.isError ? 'danger' : 'success'}>{item.isError ? '执行失败' : '执行成功'}</StatusBadge>
         </div>
         <IconButton label='关闭详情' onClick={onClose}>
           <X size={16} />
@@ -255,8 +261,9 @@ function OutputCode({
     <section className='output-code'>
       <header>
         <strong>{title}</strong>
-        <button
-          type='button'
+        <Button
+          className='output-code-copy'
+          tone='quiet'
           aria-label={`复制${title}`}
           onClick={() => {
             void onCopy(value);
@@ -264,7 +271,7 @@ function OutputCode({
         >
           <Copy size={13} />
           复制
-        </button>
+        </Button>
       </header>
       <pre>{value || '—'}</pre>
     </section>

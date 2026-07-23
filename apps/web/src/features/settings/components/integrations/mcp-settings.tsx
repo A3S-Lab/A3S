@@ -3,6 +3,7 @@ import { Button } from '../../../../design-system/primitives';
 import type { McpOAuthSettings, McpServerSettings, McpTransportSettings } from '../../../../types/settings';
 import { KeyValueEditor } from '../config/key-value-editor';
 import { SettingsDisclosure } from '../config/settings-disclosure';
+import { SettingsEmptyNotice } from '../config/settings-empty-notice';
 import {
   SettingsNumberField,
   SettingsSecretField,
@@ -48,7 +49,7 @@ export function McpSettingsEditor({
             onRemove={() => onChange(value.filter((_, itemIndex) => itemIndex !== index))}
           />
         ))}
-        {!editableServers.length && <div className='config-empty-inline'>尚未配置其他 MCP Server。</div>}
+        {!editableServers.length && <SettingsEmptyNotice>尚未配置其他 MCP Server。</SettingsEmptyNotice>}
       </div>
     </div>
   );
@@ -177,9 +178,9 @@ function McpServerEditor({
         )}
       </SettingsDisclosure>
 
-      <button type='button' className='config-delete-button' onClick={onRemove}>
+      <Button tone='danger' className='config-delete-button' onClick={onRemove}>
         <Trash2 size={13} /> 删除 MCP Server
-      </button>
+      </Button>
     </SettingsDisclosure>
   );
 }

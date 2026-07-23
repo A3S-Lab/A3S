@@ -36,6 +36,7 @@
         "mammoth": "^1.12.0",
         "monaco-editor": "^0.55.1",
         "pptxgenjs": "^4.0.1",
+        "qrcode.react": "^4.2.0",
         "react": "^19.2.7",
         "react-dom": "^19.2.7",
         "react-force-graph-3d": "^1.29.1",
@@ -1236,6 +1237,8 @@
     "proxy-compare": ["proxy-compare@3.0.1", "https://registry.npmjs.org/proxy-compare/-/proxy-compare-3.0.1.tgz", {}, "sha512-V9plBAt3qjMlS1+nC8771KNf6oJ12gExvaxnNzN/9yVRLdTv/lc+oJlnSzrdYDAvBfTStPCoiaCOTmTs0adv7Q=="],
 
     "punycode": ["punycode@2.3.1", "https://registry.npmjs.org/punycode/-/punycode-2.3.1.tgz", {}, "sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg=="],
+
+    "qrcode.react": ["qrcode.react@4.2.0", "https://registry.npmjs.org/qrcode.react/-/qrcode.react-4.2.0.tgz", { "peerDependencies": { "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0" } }, "sha512-QpgqWi8rD9DsS9EP3z7BT+5lY5SFhsqGjpgW5DY/i3mK4M9DTBNz3ErMi8BWYEfI3L0d8GIbGmcdFAS1uIRGjA=="],
 
     "queue": ["queue@6.0.2", "https://registry.npmjs.org/queue/-/queue-6.0.2.tgz", { "dependencies": { "inherits": "~2.0.3" } }, "sha512-iHZWu+q3IdFZFX36ro/lKBkSvfkztY5Y7HMiPlOUjhupPcG2JMfst2KKEpu5XndviX/3UhFbRngUPNKtgvtZiA=="],
 

@@ -1,5 +1,5 @@
 import { ShieldAlert } from 'lucide-react';
-import { Button } from '../../../design-system/primitives';
+import { Button, InlineNotice } from '../../../design-system/primitives';
 import type { TaskActions } from '../task-actions';
 import {
   type ToolCallProjection,
@@ -66,9 +66,9 @@ export function PermissionDecision({
         )}
       </dl>
       {error && (
-        <p className='tool-call-decision-error' role='alert'>
-          确认未提交：{error}。你可以重新选择。
-        </p>
+        <InlineNotice className='tool-call-decision-error' tone='danger' role='alert' title='确认未提交'>
+          {error}。你可以重新选择。
+        </InlineNotice>
       )}
       {decided ? (
         <output className={`tool-call-decision ${decision}`}>

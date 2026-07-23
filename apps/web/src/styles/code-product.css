@@ -8,32 +8,38 @@
   background: color-mix(in srgb, var(--a3s-panel-soft) 42%, var(--a3s-panel));
 }
 
-.task-library > header {
+.sidebar-product-header {
   display: flex;
-  height: 38px;
-  flex: 0 0 38px;
+  height: 62px;
+  flex: 0 0 62px;
   align-items: center;
   justify-content: space-between;
-  padding: 5px 8px 0 14px;
+  gap: 8px;
+  padding: 0 8px 0 20px;
 }
 
-.task-library-brand {
-  display: flex;
+.sidebar-product-header > strong {
   min-width: 0;
-  align-items: baseline;
-  gap: 4px;
-  color: var(--a3s-faint);
+  overflow: hidden;
+  color: var(--a3s-ink);
+  font-size: 14px;
+  font-weight: 680;
+  letter-spacing: -0.015em;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.task-library-brand span {
-  font-size: 11px;
-  font-weight: 500;
+.sidebar-product-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0;
 }
 
-.task-library-brand small {
-  font-size: 9px;
-  font-weight: 400;
+.sidebar-product-header-actions .ds-icon-button {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
 }
 
 .task-list {
@@ -100,5 +106,19 @@
   .task-library {
     width: 224px;
     flex-basis: 224px;
+  }
+}
+
+@media (max-width: 620px) {
+  .task-library {
+    position: absolute;
+    z-index: 60;
+    top: 0;
+    bottom: 0;
+    left: 52px;
+    width: min(260px, calc(100% - 52px));
+    height: auto;
+    flex-basis: auto;
+    box-shadow: 16px 0 36px rgb(20 24 40 / 16%);
   }
 }

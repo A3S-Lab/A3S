@@ -1,5 +1,6 @@
 import { Check, Clipboard, PencilLine, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { IconButton } from '../../../design-system/primitives';
 
 type CopyState = 'idle' | 'copied' | 'failed';
 
@@ -17,9 +18,9 @@ export function ConversationMessageActions({
       <time dateTime={createdAt}>{formatMessageTime(createdAt)}</time>
       <span className='conversation-message-action-buttons'>
         {onContinueEditing && (
-          <button type='button' aria-label='继续编辑这条指令' title='继续编辑' onClick={onContinueEditing}>
+          <IconButton label='继续编辑这条指令' tooltip='继续编辑' onClick={onContinueEditing}>
             <PencilLine size={13} />
-          </button>
+          </IconButton>
         )}
         {content.trim() && <CopyButton content={content} label='复制消息' />}
       </span>
@@ -59,13 +60,7 @@ export function CopyButton({
 
   const feedback = state === 'copied' ? '已复制' : state === 'failed' ? '复制失败' : label;
   return (
-    <button
-      type='button'
-      className={`conversation-copy-action ${state}`}
-      aria-label={feedback}
-      title={feedback}
-      onClick={() => void copy()}
-    >
+    <IconButton label={feedback} className={`conversation-copy-action ${state}`} onClick={() => void copy()}>
       {state === 'copied' ? (
         <Check size={13} />
       ) : state === 'failed' ? (
@@ -74,7 +69,7 @@ export function CopyButton({
         <Clipboard size={13} />
       )}
       {(showLabel || state !== 'idle') && <span>{feedback}</span>}
-    </button>
+    </IconButton>
   );
 }
 

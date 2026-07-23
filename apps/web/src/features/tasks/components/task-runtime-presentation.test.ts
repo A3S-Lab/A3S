@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { SubagentProjection, SubagentState } from './task-runtime-projection';
 import { presentTaskRuntime, prioritizeSubagents } from './task-runtime-presentation';
+import type { SubagentProjection, SubagentState } from './task-runtime-projection';
 
 describe('task runtime presentation', () => {
   it('prioritizes failed, interrupted, running, and completed states in that order', () => {
@@ -24,6 +24,27 @@ describe('task runtime presentation', () => {
 
     expect(presentation.summary).toBe('1 个子智能体失败');
     expect(presentation.metric).toBe('1 失败');
+  });
+
+  it('describes startup, planning, and pre-plan execution without hiding the runtime', () => {
+    expect(presentTaskRuntime({ steps: [], agents: [], running: true, starting: true })).toMatchObject({
+      title: '任务进度',
+      summary: '正在创建任务',
+      metric: '准备中',
+      tone: 'running',
+    });
+    expect(presentTaskRuntime({ steps: [], agents: [], running: true, planning: true })).toMatchObject({
+      title: '任务进度',
+      summary: '正在制定执行计划',
+      metric: '规划中',
+      tone: 'running',
+    });
+    expect(presentTaskRuntime({ steps: [], agents: [], running: true })).toMatchObject({
+      title: '任务进度',
+      summary: '正在分析任务',
+      metric: '运行中',
+      tone: 'running',
+    });
   });
 
   it('orders dense parallel work by attention need and then recent completion', () => {

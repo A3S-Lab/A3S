@@ -1,6 +1,6 @@
 import { Server, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { Button } from '../../../../design-system/primitives';
+import { Button, Tabs } from '../../../../design-system/primitives';
 import type { ProviderInfo } from '../../../../types/api';
 import { ProviderConnectionEditor } from './provider-connection-editor';
 import { ProviderModelsEditor } from './provider-models-editor';
@@ -33,24 +33,18 @@ export function ProviderEditor({
         </Button>
       </header>
 
-      <div className='model-provider-tabs' role='tablist' aria-label={`${name} 配置分类`}>
-        <button
-          type='button'
-          role='tab'
-          aria-selected={activeView === 'connection'}
-          onClick={() => setActiveView('connection')}
-        >
-          连接设置
-        </button>
-        <button
-          type='button'
-          role='tab'
-          aria-selected={activeView === 'models'}
-          onClick={() => setActiveView('models')}
-        >
-          模型目录 <span>{provider.models.length}</span>
-        </button>
-      </div>
+      <Tabs
+        ariaLabel={`${name} 配置分类`}
+        value={activeView}
+        variant='line'
+        size='compact'
+        className='model-provider-tabs'
+        items={[
+          { id: 'connection', label: '连接设置' },
+          { id: 'models', label: '模型目录', badge: provider.models.length },
+        ]}
+        onChange={setActiveView}
+      />
 
       <div className='model-provider-detail-body'>
         {activeView === 'connection' ? (

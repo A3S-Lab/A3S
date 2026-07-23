@@ -1,7 +1,7 @@
 import { useEventListener } from 'ahooks';
 import { useEffect } from 'react';
 import { appState, closeSettings, navigateSettings, navigateTask } from '../../state/app-state';
-import { settingsTabFromHash } from '../settings/settings-state';
+import { settingsChannelFromHash, settingsTabFromHash } from '../settings/settings-state';
 
 export function useShellShortcuts(newTask: () => void) {
   const syncLocation = () => {
@@ -13,6 +13,8 @@ export function useShellShortcuts(newTask: () => void) {
       }
       appState.settingsOpen = true;
       appState.settingsTab = settingsTab;
+      const settingsChannel = settingsChannelFromHash(window.location.hash);
+      if (settingsChannel) appState.settingsChannel = settingsChannel;
       return;
     }
     if (window.location.hash === '#settings') {
@@ -22,6 +24,12 @@ export function useShellShortcuts(newTask: () => void) {
     if (window.location.hash === '#plugins') {
       appState.settingsOpen = false;
       appState.activeProduct = 'plugins';
+      return;
+    }
+    if (window.location.hash === '#knowledge') {
+      appState.settingsOpen = false;
+      appState.activeProduct = 'knowledge';
+      appState.commandPaletteOpen = false;
       return;
     }
     const pluginKey = pluginKeyFromHash(window.location.hash);

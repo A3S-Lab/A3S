@@ -2,12 +2,6 @@
   position: relative;
 }
 
-.task-conversation-pane[data-task-runtime-layout="wide"] .execution-column {
-  width: min(780px, calc(100% - 424px));
-  margin-right: auto;
-  margin-left: max(32px, calc((100% - 1172px) / 2));
-}
-
 .task-runtime-floating-panel {
   position: absolute;
   z-index: 36;
@@ -144,6 +138,39 @@
 
 .task-runtime-floating-panel.agent-only .task-runtime-floating-content {
   padding-top: 10px;
+}
+
+.task-runtime-awaiting {
+  display: flex;
+  min-height: 72px;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 13px 4px 4px;
+  color: var(--a3s-blue);
+}
+
+.task-runtime-awaiting > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.task-runtime-awaiting > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.task-runtime-awaiting strong {
+  color: var(--a3s-ink);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.task-runtime-awaiting small {
+  color: var(--a3s-muted);
+  font-size: 10px;
+  line-height: 1.5;
 }
 
 .task-runtime-progress {
