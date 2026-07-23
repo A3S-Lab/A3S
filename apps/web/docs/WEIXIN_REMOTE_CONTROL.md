@@ -1,18 +1,20 @@
 # WeChat Remote Management: Product and Native Rust iLink Architecture
 
-**Status:** Native production wiring implemented; activation is entitlement-gated
-**Last updated:** 2026-07-22
+**Status:** Native Boot protocol client and live QR entry implemented
+**Last updated:** 2026-07-23
 **Decision owner:** A3S Code
-**Production release status:** Code-complete for configured QR/read-only
-monitoring; public identity injection remains blocked on Tencent entitlement
-and a security review
+**Production release status:** Built-in QR/read-only monitoring is enabled by
+default; owner-confirmed binding and mutation phases retain their separate
+security gates
 
 ## Executive decision
 
 A3S Web should provide built-in WeChat Remote Management backed by a native
-Rust `WeixinModule` inside A3S Boot. The runtime must use Tokio and `reqwest`
-directly. It must not launch Node.js, load OpenClaw, embed the OpenClaw plugin,
-or proxy control through a sidecar.
+Rust `IlinkModule` and `IlinkClient` inside A3S Boot. The CLI-owned
+`WeixinModule` composes those protocol providers with credential storage,
+browser-safe controllers, and the A3S remote-agent projection. The runtime uses
+Tokio and `reqwest` directly. It does not launch Node.js, load OpenClaw, embed
+the OpenClaw plugin, or proxy control through a sidecar.
 
 Product-facing English uses **WeChat Remote Management**. In the Chinese UI,
 the channel is labeled **微信** in the internal tab bar of **设置 → 渠道**. The
@@ -110,8 +112,9 @@ native adapter exists. The canonical WeChat route is
 links open the same internal tab. The canonical Feishu route is
 `#settings/channels/feishu`. Channels are not top-level Activity Bar products
 and do not extend `ProductId`. The WeChat tab remains available in an
-“Unavailable” state when the binary lacks entitlement so that the reason is
-visible rather than silently hiding the feature.
+“Unavailable” state when the operator explicitly disables the channel or local
+storage/runtime initialization fails, so the reason is visible rather than
+silently hiding the feature.
 
 ### Page layout
 
@@ -126,7 +129,7 @@ SettingsDialog
 
 WeixinRemotePage
     ├── ConnectionCard
-    │   ├── entitlement and runtime health
+    │   ├── protocol and runtime health
     │   ├── bound owner/account summary
     │   ├── connect, pause/resume, and remove-from-this-machine actions
     │   └── last successful update and last error
@@ -157,8 +160,8 @@ in component memory until submission and must be cleared immediately.
 
 | UI state | Meaning | Available local action |
 | --- | --- | --- |
-| `unavailable` | A3S identity/configuration or secure runtime initialization is unavailable | Read release-blocker guidance |
-| `unbound` | Entitled but no local credential exists | Start QR binding |
+| `unavailable` | The channel is explicitly disabled or secure runtime initialization failed | Read release-blocker guidance |
+| `unbound` | The built-in channel is ready but no local credential exists | Start QR binding |
 | `qr_pending` | QR is valid and awaiting scan | Cancel or wait |
 | `scanned` | WeChat scanned the QR | Wait for confirmation |
 | `verification_required` | Tencent requests a pair code | Submit a bounded pair code |
@@ -207,8 +210,8 @@ agent or shell.
 
 1. The local user opens WeChat Remote and reviews the warning that remote
    access can control this machine.
-2. A3S verifies entitlement, secure credential storage, loopback/admin
-   protection, and the single-monitor lock.
+2. A3S verifies secure credential storage, loopback/admin protection, and the
+   single-monitor lock.
 3. A3S creates one in-memory QR attempt and displays the returned QR content.
 4. The user scans with WeChat. If Tencent requests a pair code, the local page
    accepts a bounded code and sends it only to the Rust backend.
@@ -254,8 +257,12 @@ MIT-licensed `@tencent-weixin/openclaw-weixin` package version `2.4.6`, inspecte
 on 2026-07-22. The inspected npm artifact has SHA-1
 `c7744c5b2d0232703c886b2f4e71681b0170695d` and integrity
 `sha512-qw9k3PLTiMWGNjjsknHgcTManH1w4j+Ji1ArWIaYLKCq3aFRsVwcqnPi127bvOoVMJGW4dbyJ8NECEMgoO+iRw==`.
-That package is evidence of wire behavior, not proof that A3S is entitled to
-identify as OpenClaw or use the same production application ID.
+The source was cross-checked against Tencent's MIT-licensed
+`Tencent/openclaw-weixin` repository at commit
+`cef0bfc390393f716903e16d50408118047f87e0` (release v2.4.6). The fixed
+`iLink-App-Id: bot` and `bot_type=3` values are part of that published channel
+contract. A3S uses those protocol values while declaring `A3S/<version>` as its
+own `bot_agent`; it does not identify itself as OpenClaw.
 
 Observed QR behavior:
 
@@ -293,59 +300,48 @@ The message model exposes `message_id`, `client_id`, `seq`, `from_user_id`,
 types. Media uses Tencent CDN metadata and AES-128-ECB in the observed package,
 which is one reason media is deferred.
 
-### Mandatory production gates
+### Compatibility and release checks
 
-Before a production build enables real iLink traffic, Tencent must provide or
-confirm all of the following:
+The built-in protocol client is active by default. Release work must still
+track:
 
-1. An A3S-specific `iLink-App-Id` and the permitted `bot_type`. A3S must not
-   copy `iLink-App-Id: bot` merely because the OpenClaw package uses it.
-2. The application/client version contract and an A3S-appropriate `bot_agent`
-   identity. A3S must not claim to be OpenClaw.
-3. Service terms permitting an independent Rust implementation, endpoint use,
-   owner binding, message retention, and machine-control use cases.
-4. Hostnames or a verifiable hostname policy for `baseurl`, `redirect_host`,
-   CDN access if later enabled, and any regional routing.
-5. Rate limits, cursor retention behavior, message/client ID idempotency
-   semantics, token lifecycle, revocation behavior, and a test/sandbox account.
-6. A supported response to error `-14`; the observed client pauses requests for
-   one hour, but A3S should not infer that this refreshes or revokes a token.
+1. protocol changes after Tencent `openclaw-weixin` v2.4.6;
+2. regional `baseurl` and `redirect_host` suffixes before broadening the
+   current HTTPS Tencent-domain policy;
+3. rate limits, cursor retention, message/client ID idempotency, token
+   lifecycle, and revocation behavior;
+4. stale-token error `-14` and user-facing rebind behavior; and
+5. privacy and confirmation policy before any write scope is enabled.
 
-The Rust production construction path is now present, but it activates only
-after an explicit A3S app ID and permitted bot type are supplied. Official
-release builds must not inject those values until these gates are satisfied.
-Local development and CI continue to use recorded, secret-free fixtures and a
-local mock server; automated tests never contact Tencent.
+Unit and integration tests use recorded, secret-free fixtures and local mock
+servers. A separate live smoke check may create a temporary QR session and
+verify the `wait` state without scanning, persisting credentials, or logging
+protocol secrets.
 
 ### Activation configuration
 
-Official builds can inject `A3S_WEIXIN_ILINK_APP_ID` and
-`A3S_WEIXIN_ILINK_BOT_TYPE` at compile time. A local operator with an approved
-A3S identity can provide the same process environment variables or reference
-them from `config.acl`:
+No app ID, bot type, client version, hostname, or token is accepted from the
+browser or required in local configuration. The optional ACL block controls
+only whether the channel is enabled:
 
 ```acl
 channels {
   weixin {
     enabled = true
-    app_id = env("A3S_WEIXIN_ILINK_APP_ID")
-    bot_type = env("A3S_WEIXIN_ILINK_BOT_TYPE")
-    allowed_hosts = ["ilinkai.weixin.qq.com"]
   }
 }
 ```
 
-`client_version` defaults to the A3S CLI version and `bot_agent` defaults to
-`A3S/<version>`; both can be supplied by an approved client contract. The QR
-origin remains compiled as `https://ilinkai.weixin.qq.com/`. ACL cannot replace
-that origin. `allowed_hosts` is an exact HTTPS hostname allowlist for validated
-redirect/account hosts, not an arbitrary browser-controlled endpoint list.
-OpenClaw's `app_id = "bot"` and an OpenClaw `bot_agent` are rejected.
+The block may be omitted. `enabled = false` is an explicit local kill switch.
+A3S Boot pins the QR origin, `iLink-App-Id: bot`, `bot_type=3`, protocol version
+`2.4.6`, and the Tencent hostname policy. The CLI supplies only the
+product-specific `A3S/<version>` bot agent.
 
 ### Compatibility rules
 
-- The protocol is isolated behind `IlinkTransport`; no iLink DTO escapes into
-  the A3S control-plane domain.
+- The protocol is implemented and exported by A3S Boot behind
+  `IlinkLoginTransport` and `IlinkMessagingTransport`; no iLink DTO escapes
+  into the A3S control-plane domain.
 - Unknown response states and enum values deserialize safely but fail closed at
   the application boundary.
 - Response bodies and arrays have explicit size/count limits.
@@ -355,9 +351,8 @@ OpenClaw's `app_id = "bot"` and an OpenClaw `bot_agent` are rejected.
   hostname or approved subdomain suffix.
 - Test-only endpoint injection is compiled or constructed separately; a
   production user cannot configure an arbitrary base URL in ACL.
-- The initial QR request sends an empty `local_token_list`. A reconnect may send
-  only the current A3S account token, loaded server-side, and only if Tencent
-  confirms this is required. Tokens never pass through the browser.
+- QR creation supports at most ten server-side `local_token_list` values, in
+  line with the official SDK. Tokens never pass through the browser.
 - Protocol request/response bodies and authentication headers are never logged.
 
 ## Native Rust architecture
@@ -366,8 +361,8 @@ OpenClaw's `app_id = "bot"` and an OpenClaw `bot_agent` are rejected.
 
 ```mermaid
 flowchart LR
-    WX[Owner in WeChat] <-->|iLink HTTPS| IL[IlinkTransport<br/>Rust reqwest]
-    IL <--> WM[WeixinModule<br/>A3S Boot]
+    WX[Owner in WeChat] <-->|iLink HTTPS| IL[IlinkModule + IlinkClient<br/>A3S Boot / Rust reqwest]
+    IL <--> WM[WeixinModule<br/>A3S CLI channel runtime]
     WEB[A3S Web built-in page] <-->|local REST| WM
     WM --> RI[RemoteIntentRouter]
     RI --> PP[Policy + Confirmation]
@@ -379,93 +374,73 @@ flowchart LR
 ```
 
 There is no HTTP loopback from `WeixinService` to existing controllers. A3S
-Boot providers call narrow application ports directly so validation, policy,
-idempotency, and error types remain explicit.
+Boot owns the iLink wire protocol; the CLI channel runtime calls narrow
+application ports directly so validation, policy, idempotency, and error types
+remain explicit.
 
 ### Module placement
 
-The backend belongs under `crates/cli/src/api/code_web/weixin/` and is imported
-by `CodeWebModule`:
+The protocol and product-channel layers are deliberately separate:
 
 ```text
-weixin/
-├── mod.rs
-├── module.rs
-├── dto.rs
-├── account_controller.rs
-├── login_controller.rs
-├── policy_controller.rs
-├── audit_controller.rs
-├── service.rs
-├── login.rs
-├── monitor.rs
-├── credentials.rs
-├── account_store.rs
-├── runtime_store.rs
-├── audit_store.rs
-├── control_plane.rs
-├── intent_router.rs
-├── policy.rs
-├── confirmation.rs
-├── renderer.rs
-├── domain/
-│   ├── mod.rs
-│   ├── account.rs
-│   ├── target.rs
-│   ├── intent.rs
-│   ├── command.rs
-│   └── audit.rs
-└── ilink/
-    ├── mod.rs
-    ├── transport.rs
-    ├── client.rs
-    ├── auth.rs
-    ├── types.rs
-    ├── login.rs
-    ├── updates.rs
-    └── messages.rs
+crates/boot/src/ilink/
+├── mod.rs                 # IlinkModule, defaults, public protocol API
+├── client.rs              # identity, headers, errors
+├── transport.rs           # reqwest client and transport traits
+├── auth.rs                # secret values and version packing
+├── url_policy.rs          # Tencent endpoint validation
+├── types.rs               # wire DTOs
+├── login.rs               # QR create/poll
+├── updates.rs             # updates, config, typing, lifecycle
+└── messages.rs            # outbound text
+
+crates/cli/src/api/code_web/weixin/
+├── module.rs              # imports Boot IlinkModule
+├── channel_config.rs      # optional enabled kill switch
+├── service.rs             # channel use-case facade
+├── login_coordinator.rs   # QR attempt and credential binding
+├── credential_store.rs
+├── runtime_store/
+├── monitor/
+├── remote_handler.rs
+└── *_controller.rs        # browser-safe local REST API
 ```
 
-This is an implementation map, not permission to create empty abstractions.
-Files should be introduced with their phase and split by concern when they
-become real. Media handlers are deliberately absent until the media phase.
+No `ilink/` protocol implementation remains under the CLI. Media handlers are
+deliberately absent until the media phase.
 
 The frontend belongs under `apps/web/src/features/weixin-remote/` with a thin
 page, controller hook, typed API adapter, and state-specific components. It is
 registered in the trusted application shell, never in plugin manifests.
 
-### A3S Boot provider graph
+### Boot and channel provider graph
 
-`WeixinModule` supplies or resolves these providers:
+The implemented provider boundary is:
 
 | Provider | Responsibility |
 | --- | --- |
-| `IlinkEntitlement` | Approved app ID, bot type, client identity/version, and compiled host policy |
-| `IlinkTransport` | Typed protocol port used by application code and mock tests |
-| `TencentIlinkTransport` | `reqwest` implementation, JSON mapping, headers, timeouts, redaction, and URL enforcement |
-| `IlinkClient` | Account-scoped credential loading, endpoint calls, and protocol error mapping |
+| Boot `IlinkModule` | Constructs and exports the validated Tencent-compatible protocol client |
+| Boot `IlinkClient` | Fixed protocol identity/version, `reqwest` calls, DTO mapping, headers, timeouts, redaction, and URL enforcement |
+| Boot `IlinkLoginTransport` | Object-safe QR create/poll boundary used by the CLI coordinator and test doubles |
+| Boot `IlinkMessagingTransport` | Object-safe update/send/config/typing/lifecycle boundary used by the CLI monitor and test doubles |
+| CLI `WeixinChannelConfig` | Optional local `enabled` kill switch; it does not supply protocol identity |
 | `WeixinLoginCoordinator` | One active QR attempt, polling, verification challenge, owner binding, and expiry |
-| `WeixinCredentialStore` | Secret envelope in OS keychain or explicit secure-file fallback |
-| `WeixinAccountStore` | Non-secret account state and local policy reference |
-| `WeixinRuntimeStore` | Cursor, inbox deduplication, outbox, selection, page-local opaque list context, confirmations, and command receipts |
+| `WeixinCredentialStore` | Server-only secret envelope in validated private storage |
+| `WeixinRuntimeStore` | Cursor, inbox deduplication, outbox, selection, page-local opaque list context, and command receipts |
 | `WeixinMonitorSupervisor` | Single-account long poll, cancellation, backoff, ingress/outbox workers, and health |
-| `RemoteAgentControlPlane` | Normalized target inventory and typed query/mutation port |
-| `RemoteIntentRouter` | Deterministic and constrained natural-language mapping to `RemoteIntent` |
-| `RemotePolicyService` | Owner, chat type, scope, target-level, state, and data-release decisions |
-| `RemoteConfirmationService` | One-time, owner-bound, expiring command previews |
-| `RemoteAuditStore` | Sanitized append-only security and action records |
+| `RemoteAgentReadService` and `RemoteReadHandler` | Sanitized target inventory and closed read-only conversation handling |
 | `WeixinService` | Thin use-case facade for controllers and monitor |
 
 `WeixinModule::on_application_bootstrap` resolves the supervisor and starts it
-only when entitlement, binding, policy, secure storage, and the single-monitor
-lock are valid. `on_application_shutdown` cancels in-flight long polls, stops
-new intents, drains a bounded outbox window, persists the final cursor/runtime
-checkpoint, optionally sends `notifystop`, and joins every spawned task.
+only when binding, policy, secure storage, and the single-monitor lock are
+valid. `on_application_shutdown` cancels in-flight long polls, stops new
+intents, persists the final cursor/runtime checkpoint, sends a bounded
+`notifystop`, and joins the monitor task.
 
-Tokio tasks use `CancellationToken` and a supervised `JoinSet`. There must be no
-detached forever-task and no blocking keychain, filesystem, or database call in
-an async executor thread. Any platform API that is inherently blocking runs in
-a bounded `spawn_blocking` call.
+The monitor uses `CancellationToken` and a supervised `JoinHandle`. There must
+be no detached forever-task and no blocking keychain, filesystem, or database
+call in an async executor thread. Any platform API that is inherently blocking
+runs in a bounded `spawn_blocking` call.
 
 ### Existing A3S integration
 
@@ -492,19 +467,57 @@ when idle, queue when running, and return an authoritative receipt.
 
 ### Protocol port
 
-The exact Rust syntax may follow the crate's async-trait convention, but the
-port must be equivalent to:
+Boot exposes two object-safe ports so login and authenticated messaging can be
+injected independently in tests:
 
 ```rust
-pub trait IlinkTransport: Send + Sync {
-    async fn create_qr(&self, request: CreateQrRequest) -> Result<CreateQrResponse>;
-    async fn poll_qr(&self, request: PollQrRequest) -> Result<PollQrResponse>;
-    async fn get_updates(&self, request: GetUpdatesRequest) -> Result<GetUpdatesResponse>;
-    async fn send_message(&self, request: SendMessageRequest) -> Result<SendMessageResponse>;
-    async fn get_config(&self, request: GetConfigRequest) -> Result<GetConfigResponse>;
-    async fn send_typing(&self, request: SendTypingRequest) -> Result<SendTypingResponse>;
-    async fn notify_start(&self, request: NotifyStartRequest) -> Result<()>;
-    async fn notify_stop(&self, request: NotifyStopRequest) -> Result<()>;
+pub trait IlinkLoginTransport: Send + Sync {
+    async fn create_qr(&self, local_tokens: &[SecretValue])
+        -> Result<CreateQrResponse, IlinkError>;
+    async fn poll_qr(
+        &self,
+        base_url: &ValidatedBaseUrl,
+        qrcode: &SecretValue,
+        verify_code: Option<&SecretValue>,
+    ) -> Result<PollQrResponse, IlinkError>;
+}
+
+pub trait IlinkMessagingTransport: Send + Sync {
+    async fn get_updates(
+        &self,
+        auth: &IlinkAuth,
+        update_cursor: &str,
+        long_poll_timeout: Duration,
+    ) -> Result<GetUpdatesResponse, IlinkError>;
+    async fn send_text(
+        &self,
+        auth: &IlinkAuth,
+        recipient: &SecretValue,
+        context_token: Option<&SecretValue>,
+        client_id: &str,
+        run_id: Option<&str>,
+        text: &str,
+    )
+        -> Result<SendMessageResponse, IlinkError>;
+    async fn get_config(
+        &self,
+        auth: &IlinkAuth,
+        owner_id: Option<&SecretValue>,
+        context_token: Option<&SecretValue>,
+    )
+        -> Result<GetConfigResponse, IlinkError>;
+    async fn send_typing(
+        &self,
+        auth: &IlinkAuth,
+        owner_id: &SecretValue,
+        typing_ticket: &SecretValue,
+        status: i32,
+    )
+        -> Result<SendTypingResponse, IlinkError>;
+    async fn notify_start(&self, auth: &IlinkAuth)
+        -> Result<NotifyResponse, IlinkError>;
+    async fn notify_stop(&self, auth: &IlinkAuth)
+        -> Result<NotifyResponse, IlinkError>;
 }
 ```
 
@@ -512,11 +525,12 @@ pub trait IlinkTransport: Send + Sync {
 accepts validated endpoint classes, not arbitrary URL strings. The mock
 transport may use a local origin supplied by test construction.
 
-`reqwest::Client` is built once with Rustls, automatic redirects disabled, a
-bounded connection pool, bounded response size, and proxy inheritance disabled
-by default for authenticated traffic. Normal calls have bounded timeouts. Long
-poll calls use the server-advised timeout within a Tencent-confirmed minimum and
-maximum plus a small client transport margin.
+`reqwest::Client` is built once with Rustls, automatic redirects disabled,
+bounded responses, and proxy inheritance disabled for authenticated traffic.
+Normal calls have bounded timeouts; QR creation follows the official no-fixed-
+timeout behavior. Long polls use the validated server-advised timeout up to 60
+seconds, and an ordinary client timeout becomes an empty healthy poll rather
+than a degraded-channel error.
 
 ### Control-plane contract
 
@@ -772,7 +786,7 @@ Suggested endpoints are:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/v1/weixin/capability` | Entitlement, platform secure-store support, and release blockers |
+| `GET` | `/api/v1/weixin/capability` | Built-in protocol availability, current state, supported scopes, and release blockers |
 | `GET` | `/api/v1/weixin/account` | Masked connection and monitor health |
 | `POST` | `/api/v1/weixin/login-attempts` | Start the sole QR attempt |
 | `GET` | `/api/v1/weixin/login-attempts/{attemptId}` | Read sanitized login state |
@@ -803,7 +817,7 @@ All responses use the repository-wide wrapper. For example:
 }
 ```
 
-Business error codes include `WEIXIN_NOT_ENTITLED`, `WEIXIN_NOT_BOUND`,
+Business error codes include `WEIXIN_CHANNEL_UNAVAILABLE`, `WEIXIN_NOT_BOUND`,
 `WEIXIN_LOGIN_EXPIRED`, `WEIXIN_VERIFICATION_REQUIRED`,
 `ILINK_STALE_CREDENTIAL`, `ILINK_PROTOCOL_CHANGED`,
 `ILINK_UPSTREAM_UNAVAILABLE`, `REMOTE_SCOPE_DISABLED`,

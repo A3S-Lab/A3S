@@ -7,10 +7,9 @@ import { useWeixinRemoteController } from './use-weixin-remote-controller';
 import { createWeixinRemoteState } from './weixin-remote-state';
 
 const capability: WeixinCapability = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   state: 'unbound',
   protocolMode: 'mock',
-  productionEntitled: false,
   supportedScopes: [],
   releaseBlockers: [{ code: 'mock_runtime_only', message: 'Mock runtime only.' }],
 };

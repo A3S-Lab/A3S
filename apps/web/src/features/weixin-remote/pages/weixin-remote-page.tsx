@@ -512,28 +512,31 @@ function UnavailableState({
   onRefresh: () => Promise<void>;
 }) {
   return (
-    <div className='weixin-unavailable'>
-      <span>
-        <ShieldX size={28} />
-      </span>
-      <h2>微信渠道尚未就绪</h2>
-      <p>{error ?? 'A3S Boot 未能启用真实 iLink 连接，请处理下方本机配置或运行时问题。'}</p>
+    <StateView
+      className='weixin-page-state weixin-unavailable'
+      tone='warning'
+      role='status'
+      icon={<ShieldX size={28} />}
+      title='微信渠道尚未就绪'
+      description={error ?? '内置 iLink 渠道被显式关闭，或本机安全存储与运行时初始化失败。'}
+      actions={
+        <Button onClick={() => void onRefresh()}>
+          <RefreshCw size={14} />
+          重新检查
+        </Button>
+      }
+    >
       {blockers.length > 0 && (
-        <ul>
+        <ul className='weixin-unavailable-blockers'>
           {blockers.map((blocker) => (
             <li key={blocker.code}>{safeBlockerMessage(blocker.code, blocker.message)}</li>
           ))}
         </ul>
       )}
-      <div className='weixin-unavailable-note'>
-        <ShieldCheck size={16} />
-        <span>未就绪状态不会创建二维码、保存凭据、启动监控或连接腾讯。</span>
-      </div>
-      <Button onClick={() => void onRefresh()}>
-        <RefreshCw size={14} />
-        重新检查
-      </Button>
-    </div>
+      <InlineNotice className='weixin-unavailable-note' tone='success' role='note' icon={<ShieldCheck size={16} />}>
+        未就绪状态不会创建二维码、保存凭据、启动监控或连接腾讯。
+      </InlineNotice>
+    </StateView>
   );
 }
 
@@ -695,12 +698,10 @@ function remoteWarningLabel(warning: string): string {
 
 function safeBlockerMessage(code: string, fallback: string): string {
   const known: Record<string, string> = {
-    ilink_entitlement_missing: '缺少 A3S 专属 iLink 授权。',
-    ilink_configuration_missing: '缺少 A3S 专属 iLink 应用身份或允许的 Bot 类型。',
-    ilink_configuration_invalid: '本机微信 iLink 配置无效。',
-    ilink_configuration_unreadable: '无法读取本机微信 iLink 配置。',
-    ilink_channel_disabled: '微信渠道已在本机配置中关闭。',
-    ilink_identity_not_a3s: 'iLink 客户端身份不属于 A3S。',
+    ilink_channel_unavailable: '当前运行时未启用内置微信 iLink 渠道。',
+    ilink_channel_disabled: '微信渠道已在本机配置中显式关闭。',
+    ilink_configuration_invalid: '本机微信渠道开关配置无效。',
+    ilink_configuration_unreadable: '无法读取本机微信渠道配置。',
     ilink_state_path_unavailable: '无法安全解析微信渠道状态目录。',
     ilink_runtime_storage_unavailable: '无法安全打开微信渠道运行状态。',
     ilink_credential_storage_unavailable: '无法安全打开微信渠道凭据存储。',

@@ -1,7 +1,7 @@
 # WeChat Remote Management (Weixin iLink) Development Plan
 
-**Status:** Configured production QR/read-only runtime implemented; release validation remains
-**Last updated:** 2026-07-22
+**Status:** Built-in Boot protocol, live QR entry, and read-only runtime implemented; release validation remains
+**Last updated:** 2026-07-23
 **Architecture:** [Product and Native Rust Architecture](WEIXIN_REMOTE_CONTROL.md)
 **Security and release gates:** [Security, Operations, and Delivery](WEIXIN_REMOTE_CONTROL_OPERATIONS.md)
 
@@ -12,27 +12,28 @@ executable backlog for a native Rust iLink integration in A3S Web. It defines
 work packages, dependencies, file ownership, estimates, test gates, merge
 order, and release criteria. It does not expand the v1 scope.
 
-The plan deliberately separates work that can be completed against a local
-mock iLink server from work that requires Tencent entitlement or sandbox
-access. External approval must not force the engineering team to copy OpenClaw
-identity or test against production.
+The plan separates deterministic protocol work against a local mock iLink
+server from optional live Tencent validation. The official channel identity is
+part of the published protocol contract; A3S supplies its own `A3S/<version>`
+product identity through `bot_agent`.
 
-## Implementation checkpoint — 2026-07-22
+## Implementation checkpoint — 2026-07-23
 
 The native Rust protocol foundation, the local disabled/mock Milestone 2 Alpha,
 and the local/mock Milestone 3 read-only Beta are implemented:
 
-- `IL-101` through `IL-107`: typed secrets, identity, strict URL policy, QR,
-  update, text, config, typing, and notify transports are present behind typed
-  Rust transport traits. Local Axum contract tests cover request shapes,
-  authentication, cursor/context behavior, error `-14`, redirects, response
-  bounds, timeouts, and fail-closed unknown QR states;
-- `BE-101`: `WeixinModule` is imported by `CodeWebModule`. The module now loads
-  an A3S-specific iLink identity from compile-time values, the process
-  environment, or local ACL; constructs the Tencent transport, private
-  credential store, durable runtime, read-only handler, and monitor when valid;
-  and exposes a safe blocker without network activity when configuration is
-  missing or invalid. The OpenClaw `app_id = "bot"` identity is rejected;
+- `IL-101` through `IL-107`: A3S Boot exports the feature-gated
+  `IlinkModule`, `IlinkClient`, typed secrets, strict URL policy, QR, update,
+  text, config, typing, and lifecycle transports. Local Axum contract tests
+  cover official request shapes and headers, cursor/context behavior, error
+  `-14`, Tencent IDC redirects, response bounds, normal long-poll timeouts, and
+  fail-closed unknown QR states;
+- `BE-101`: CLI `WeixinModule` is imported by `CodeWebModule` and imports Boot
+  `IlinkModule`. Boot pins the official `iLink-App-Id: bot`, `bot_type=3`, and
+  protocol version `2.4.6`; CLI contributes `bot_agent=A3S/<version>`.
+  No environment variable or ACL identity injection is required. Missing
+  configuration enables the channel, while `enabled = false` is the explicit
+  local kill switch;
 - `ST-201` through `ST-203`: the credential-store interface and fake, a
   zeroizing private-file implementation, and the versioned single-writer
   runtime journal/snapshot are implemented with private permissions, symlink
@@ -85,16 +86,17 @@ and the local/mock Milestone 3 read-only Beta are implemented:
   processes. It labels evidence confidence and stale/degraded state, and always
   identifies observed processes as read-only with unknown execution state; and
 - the inspected protocol artifact is pinned in the architecture document by
-  package version, SHA-1, and npm integrity value. All protocol and browser
-  validation uses synthetic/local mocks and never contacts Tencent.
+  package version, commit, SHA-1, and npm integrity value. Automated tests use
+  synthetic/local mocks. A separate non-binding live smoke check received an
+  actual Tencent QR payload and repeatedly observed the `wait` state without
+  scanning or persisting credentials.
 
-The local/mock Milestone 3 exit gate and the configured production construction
-path are complete. A valid A3S identity now changes capability to
-`protocolMode=tencent`, initializes private state, and exposes real QR binding.
-No A3S production identity is stored in this repository, and automated tests
-still make no Tencent request. Public distribution and live production claims
-remain blocked on the external entitlement, sandbox, credential-vault, and
-platform gates.
+The local/mock Milestone 3 exit gate and the built-in production construction
+path are complete. The default capability is `state=unbound` and
+`protocolMode=tencent`; there is no entitlement or configurable protocol
+identity field. Automated tests make no Tencent request. Cross-platform
+credential storage, security review, and mutation-policy gates remain release
+work.
 
 Focused verification at this checkpoint:
 
@@ -115,25 +117,20 @@ bun run lint:check
 bun run typecheck
 ```
 
-The current read-only slice passes 90 focused Rust tests across the remote
-domain, `WeixinModule`, remote handler, and `system_agents`, plus the complete
-Boot provider-graph test. The complete Web suite passes all 163 files and 879
-tests; the Web build, formatting check, type check, and 23 focused
-Channels/Settings/Weixin tests also pass. All `weixin`/`remote` Rust files pass
-a direct `rustfmt --check`; crate-wide formatting currently reports an unrelated
-concurrent edit in `tests/web_interrupt.rs`. The repository-wide Web lint check
-is likewise blocked by an unrelated semantic-element finding in the
-in-progress Knowledge marketplace view. Existing unrelated workspace changes
-remain untouched. Tencent entitlement items `EXT-01` through `EXT-07` are still
-open, so the official build must not embed production identity values yet.
+The 2026-07-23 protocol migration passes 15 focused Boot iLink tests,
+`cargo check --all-features`, a minimal `--no-default-features --features
+ilink` check, CLI `cargo check -p a3s`, and 38 focused CLI Weixin tests. Existing
+unrelated workspace changes remain untouched.
 
 ## Locked implementation constraints
 
-- iLink runs in the `a3s` Rust process as an A3S Boot `WeixinModule`.
+- iLink runs in the `a3s` Rust process as Boot `IlinkModule`/`IlinkClient`,
+  composed by CLI `WeixinModule`.
 - Tokio and Rust `reqwest` provide all network I/O. Node.js and OpenClaw are not
   build, runtime, or test dependencies.
-- The production client never hard-codes or defaults to OpenClaw's
-  `iLink-App-Id: bot`.
+- The production client uses Tencent's published fixed
+  `iLink-App-Id: bot`, `bot_type=3`, and protocol version `2.4.6`, while
+  `bot_agent=A3S/<version>` identifies the host product.
 - The browser calls only local `/api/v1/weixin/*` endpoints and never receives
   a bot token, context token, owner ID, cursor, control grant, or authenticated
   upstream base URL.
@@ -159,8 +156,8 @@ The recommended delivery team is:
   local API, and Web product surface;
 - a security reviewer and QA engineer available part-time from the binding
   milestone onward; and
-- one product/engineering contact responsible for Tencent entitlement and
-  sandbox coordination.
+- one product/engineering contact responsible for Tencent protocol monitoring
+  and optional live-test coordination.
 
 With this staffing, the production-safe v1 has a base estimate of approximately
 **105 engineer days**, a planning range of **95–120 engineer days**, and a
@@ -200,36 +197,36 @@ Before implementation begins:
 This preparation is a scheduling dependency, not permission to modify or
 commit unrelated user work.
 
-## External dependency track
+## External validation track
 
-External items run in parallel with mock-based engineering. Their wait time is
-not included in engineering estimates.
+These items run in parallel with mock-based engineering. They do not block
+built-in QR creation unless a row explicitly names that capability.
 
-| ID | Required answer or artifact | Blocks |
-| --- | --- | --- |
-| `EXT-01` | A3S-specific `iLink-App-Id`, permitted `bot_type`, and client identity/version contract | Any real Tencent connection |
-| `EXT-02` | Terms allowing an independent Rust client and machine-control use case | Production enablement |
-| `EXT-03` | Approved `baseurl`, `redirect_host`, and future CDN hostname policy | Authenticated real traffic |
-| `EXT-04` | Sandbox/test account and non-production endpoint or approved test procedure | Tencent integration tests |
-| `EXT-05` | Rate limits, maximum message sizes, cursor retention, and long-poll timeout bounds | Monitor production tuning |
-| `EXT-06` | `message_id` and outbound `client_id` idempotency guarantees | Mutation and outbound retry policy |
-| `EXT-07` | Token expiry, error `-14`, unbind, and server-side revocation semantics | Recovery and disconnect copy |
+| ID | Required answer or artifact | Status | Blocks |
+| --- | --- | --- | --- |
+| `EXT-01` | Published iLink identity/version contract | Resolved from Tencent v2.4.6: `bot`, `3`, `2.4.6` | Future compatibility updates |
+| `EXT-02` | Product/legal review for the machine-control use case | Open | Broad public enablement |
+| `EXT-03` | Observed `baseurl`, `redirect_host`, and future CDN hostname inventory | Partially covered by strict Tencent-domain policy | New regions and media |
+| `EXT-04` | Approved test account or live-test procedure | QR wait smoke complete; bound-account matrix open | Authenticated live integration tests |
+| `EXT-05` | Rate limits, maximum message sizes, cursor retention, and long-poll timeout bounds | Open | Monitor production tuning |
+| `EXT-06` | `message_id` and outbound `client_id` idempotency guarantees | Open | Mutation and outbound retry policy |
+| `EXT-07` | Token expiry, error `-14`, unbind, and server-side revocation semantics | Open | Recovery and disconnect copy |
 
-If an answer remains unavailable, the corresponding production capability
-stays disabled. No task may “temporarily” unblock itself by impersonating
-OpenClaw or broadening the hostname allowlist.
+If an answer remains unavailable, the corresponding higher-risk capability
+stays disabled. A3S must not claim the `OpenClaw` bot agent or broaden the
+hostname allowlist to bypass validation.
 
 ## Release train and dependencies
 
 ```mermaid
 flowchart LR
-    P0[0. Baseline and entitlement] --> P1[1. Protocol foundation]
+    P0[0. Baseline and protocol contract] --> P1[1. Protocol foundation]
     P1 --> P2[2. Native binding alpha]
     P2 --> P3[3. Read-only remote beta]
     P3 --> P4[4. Managed control beta]
     P4 --> P5[5. Cooperative controls]
     P5 --> P6[6. Production hardening]
-    EXT[Tencent entitlement track] --> P2
+    EXT[Tencent validation track] --> P2
     EXT --> P6
     P1 --> FE1[Web unavailable/page shell]
     P2 --> FE2[QR and account UI]
@@ -238,10 +235,10 @@ flowchart LR
     FE1 --> FE2 --> FE3 --> FE4 --> P6
 ```
 
-Real entitlement is not required to complete protocol fixtures, mock transport,
-domain modeling, most storage work, page unavailable states, or policy tests.
-It is required before a real QR code is requested and before release-candidate
-validation.
+No operator-provisioned entitlement is required. Protocol fixtures, mock
+transport, domain modeling, storage work, page states, and policy tests remain
+offline. Live authenticated validation requires a deliberately bound test
+account.
 
 ## Milestone 0 — baseline, decisions, and contracts
 
@@ -253,16 +250,15 @@ validation.
 | `M0-01` | Capture root/submodule baselines and identify overlapping user files | None | 0.5 day |
 | `M0-02` | Freeze v1 non-goals, error codes, capability schema, and feature states | Architecture docs | 1 day |
 | `M0-03` | Record protocol evidence provenance and fixture-sanitization rules | Published package evidence | 0.5 day |
-| `M0-04` | Define production entitlement injection and mock-only origin injection | `EXT-01` may remain pending | 1 day |
+| `M0-04` | Pin the official production identity and isolate mock-only origin injection | `EXT-01` | 1 day |
 | `M0-05` | Create a threat-model checklist and name reviewers for later gates | Security architecture | 0.5 day |
 
 The capability contract is versioned from its first commit:
 
 ```text
-schemaVersion: 1
+schemaVersion: 2
 state: unavailable | unbound | binding | active | paused | degraded | staleCredential
 protocolMode: disabled | mock | tencent
-productionEntitled: boolean
 supportedScopes: RemoteScope[]
 releaseBlockers: SafeBlocker[]
 ```
@@ -282,42 +278,44 @@ An older backend returning 404 must be interpreted by the Web client as
 
 **Target:** weeks 1–2.
 **Effort:** 9–12 engineer days.
-**Deliverable:** disabled/mock `WeixinModule`, typed iLink client, and complete
+**Deliverable:** Boot `IlinkModule`, CLI channel composition, and complete
 text-protocol contract tests.
 
 ### Work packages
 
 | ID | Work item | Dependency | Estimate |
 | --- | --- | --- | --- |
-| `IL-101` | Add `weixin/ilink` module boundaries and typed protocol errors | `M0-02` | 1 day |
+| `IL-101` | Add `crates/boot/src/ilink` module boundaries and typed protocol errors | `M0-02` | 1 day |
 | `IL-102` | Add bounded Serde DTOs for QR states, updates, text messages, config, typing, notify start/stop | `IL-101` | 1.5 days |
 | `IL-103` | Implement application/client-version packing, random UIN, base info, and centralized secret redaction | `IL-101` | 1 day |
 | `IL-104` | Implement strict HTTPS host validation, redirect rejection, response limits, and timeout classes | `IL-101`, `EXT-03` policy shape | 1.5 days |
 | `IL-105` | Implement QR create/poll transport methods including verification and validated redirect state | `IL-102`–`IL-104` | 1 day |
 | `IL-106` | Implement `getupdates`, `sendmessage`, `getconfig`, typing, notify start/stop | `IL-102`–`IL-104` | 1.5 days |
 | `IL-107` | Add synthetic golden fixtures and local mock iLink HTTP server | `IL-102` | 1.5 days |
-| `BE-101` | Register a disabled/mock Boot module and `/api/v1/weixin/capability` | `M0-02`, `IL-101` | 1 day |
+| `BE-101` | Import Boot `IlinkModule` from CLI `WeixinModule` and expose `/api/v1/weixin/capability` | `M0-02`, `IL-101` | 1 day |
 
 ### Backend file scope
 
 ```text
+crates/boot/src/ilink/
+├── mod.rs
+├── transport.rs
+├── client.rs
+├── auth.rs
+├── types.rs
+├── url_policy.rs
+├── login.rs
+├── updates.rs
+├── messages.rs
+└── tests.rs
+
 crates/cli/src/api/code_web/
-├── module.rs                         import WeixinModule
+├── module.rs                         import CLI WeixinModule
 └── weixin/
     ├── mod.rs
-    ├── module.rs
+    ├── module.rs                     import Boot IlinkModule
     ├── dto.rs
-    ├── capability_controller.rs
-    └── ilink/
-        ├── mod.rs
-        ├── transport.rs
-        ├── client.rs
-        ├── auth.rs
-        ├── types.rs
-        ├── login.rs
-        ├── updates.rs
-        ├── messages.rs
-        └── tests.rs or test modules
+    └── capability_controller.rs
 ```
 
 No account token or real endpoint is needed in this milestone. `getuploadurl`
@@ -350,12 +348,12 @@ deserialize and reject media safely.
 **Deliverable:** local Web QR flow and a supervised text monitor; no agent
 commands yet.
 
-**Implementation status:** the mock Alpha and configuration-driven production
-wiring are complete as of 2026-07-22. `FE-201` through `FE-204`, the Rust mock
-path, entitlement parsing, Boot production assembly, QR exposure, and private
-runtime initialization are covered by focused tests. Live Tencent validation,
-operating-system credential-vault adapters, and cross-platform release
-validation remain open production gates.
+**Implementation status:** the mock Alpha and built-in production wiring are
+complete as of 2026-07-23. `FE-201` through `FE-204`, the Rust mock path, Boot
+protocol provider, QR exposure, optional enable switch, and private runtime
+initialization are covered by focused tests. Live QR creation has been smoke
+tested; bound-account, operating-system credential-vault, and cross-platform
+release validation remain open gates.
 
 ### Rust work packages
 
@@ -570,33 +568,32 @@ post-v1 risk-rendering review. `ApproveAlways` remains prohibited.
 
 ## Milestone 6 — production hardening and release candidate
 
-**Target:** weeks 10–12 after external gates are available.
+**Target:** weeks 10–12 after required validation gates are available.
 **Effort:** 13–16 engineer days.
-**Deliverable:** production-disabled-by-default release candidate, followed by
-staged enablement after approval.
+**Deliverable:** built-in read-only release candidate with every mutation still
+locally gated, followed by staged enablement after review.
 
 | ID | Work item | Dependency | Estimate |
 | --- | --- | --- | --- |
 | `SEC-601` | Complete threat-model review, canary-secret scan, URL/parser fuzzing, and local exposure tests | All features | 2.5 days |
 | `REL-601` | Run journal corruption/crash matrix, sleep/wake, network loss, stale token, and two-instance tests | All backend features | 2.5 days |
 | `PLAT-601` | Validate macOS Keychain, Linux Secret Service/headless fallback, and Windows credential behavior | `ST-201` | 3–4 days |
-| `TX-601` | Run Tencent sandbox QR, cursor, timeout, rate-limit, context-token, and outbound idempotency tests | `EXT-01`–`EXT-07` | 2 days |
+| `TX-601` | Run bound-account QR, cursor, timeout, rate-limit, context-token, and outbound idempotency tests | `EXT-03`–`EXT-07` | 2 days |
 | `OBS-601` | Finalize secret-free metrics, diagnostics, alerts, and audit retention | Monitor/control beta | 1.5 days |
 | `DOC-601` | Update README, roadmap, user docs, troubleshooting, privacy copy, and protocol provenance | All behavior final | 1 day |
 | `REL-602` | Build signed release candidate, execute rollback drill, and record go/no-go review | All gates | 1 day |
 
 ### Staged rollout
 
-1. **Unavailable shell:** page and capability endpoint ship with production
-   protocol disabled.
+1. **Built-in shell:** page and capability endpoint expose the Boot protocol;
+   operators may still disable it locally.
 2. **Internal mock alpha:** developers exercise complete flows against the mock
    server.
-3. **Tencent sandbox alpha:** binding and read-only queries for named testers.
-4. **Read-only beta:** production-entitled owner binding with all mutations
-   disabled.
+3. **Bound-account alpha:** binding and read-only queries for named testers.
+4. **Read-only beta:** owner binding with all mutations disabled.
 5. **Managed-control beta:** selected testers locally enable managed scopes.
 6. **Cooperative-control beta:** fresh advertised TUI actions are enabled.
-7. **General availability:** only after security, privacy, entitlement, and
+7. **General availability:** only after security, privacy, protocol, and
    reliability gates sign off.
 
 Every build retains a local kill switch that stops the monitor and makes the
@@ -606,7 +603,8 @@ failure automatically downgrades mutations to read-only.
 ### Release gate
 
 - All `EXT-*` items required by enabled capability are resolved in writing.
-- No production identifier or identity is copied from OpenClaw.
+- Fixed wire identifiers match Tencent's official SDK, while `bot_agent`
+  continues to identify A3S rather than OpenClaw.
 - The security review has no unresolved high-severity issue.
 - The complete crash matrix has no automatic duplicate mutation.
 - The real sandbox confirms cursor, context token, host, timeout, and
@@ -726,9 +724,10 @@ starts with this exact sequence:
 
 1. Add failing tests for protocol types, QR states, URL validation, and secret
    redaction.
-2. Add the `weixin/ilink` Rust module and make those tests pass.
+2. Add `crates/boot/src/ilink` and make those tests pass.
 3. Add the local mock iLink server and end-to-end QR/update/send fixtures.
-4. Register a disabled/mock `WeixinModule` and versioned capability endpoint.
+4. Compose Boot `IlinkModule` from CLI `WeixinModule` and add the versioned
+   capability endpoint.
 5. Add the Web unavailable state with graceful older-backend 404 behavior.
 
 This slice is independently reviewable, contacts no production service, and

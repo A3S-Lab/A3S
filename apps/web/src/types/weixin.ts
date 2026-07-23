@@ -26,7 +26,6 @@ export interface WeixinCapability {
   schemaVersion: number;
   state: WeixinCapabilityState;
   protocolMode: WeixinProtocolMode;
-  productionEntitled: boolean;
   supportedScopes: WeixinRemoteScope[];
   releaseBlockers: WeixinSafeBlocker[];
 }

@@ -44,23 +44,24 @@ by the
   changing the source folder. Market remains focused on signed Plugins and
   their verified Sources.
 - A single **Settings → Channels** page with internal WeChat and Feishu tabs.
-  The WeChat tab is backed only by the native Rust `WeixinModule` in A3S Boot.
+  The WeChat tab is backed by the product `WeixinModule`, which injects the
+  native Rust `IlinkModule` and `IlinkClient` exported by A3S Boot.
   `#settings/channels/weixin` is the canonical route; the legacy
   `#settings/weixin` and `#weixin` deep links open the same internal tab. The
   Feishu tab is a “Coming soon” placeholder and performs no credential or
   network activity. The read-only Beta exposes
-  truthful entitlement, binding, account, monitor, and
+  truthful protocol, binding, account, monitor, and
   bounded remote target state; covers mock-tested QR, verification,
   pause/resume, deterministic inventory pages, restart-safe opaque selection,
   redacted latest replies, and remove-from-this-machine flows; and keeps tokens,
   cursors, owner identifiers, source IDs, PIDs, and authenticated iLink URLs out
-  of the browser. A3S Boot now constructs the native Tencent runtime when an
-  A3S-specific iLink app identity and permitted bot type are injected at build
-  time, through the process environment, or through local ACL. It then enables
-  real QR binding and the supervised read-only monitor. Missing or invalid
-  identity, unsafe storage, and unapproved hosts fail closed without creating a
-  QR code or sending Tencent traffic. Public release injection and live Tencent
-  validation remain gated on A3S entitlement and security review.
+  of the browser. A3S Boot constructs the Tencent-compatible client by default
+  with `iLink-App-Id: bot`, `bot_type=3`, protocol version `2.4.6`, and the
+  product-specific `A3S/<version>` bot agent. No browser or local operator
+  identity injection is required. Explicit ACL disablement, unsafe storage, and
+  unapproved server routing fail closed. Live QR creation and wait-state polling
+  are verified against Tencent; credential issuance still occurs only after the
+  user scans and confirms in Weixin.
 - A Finder-inspired A3S Work local-files workspace backed by the real filesystem:
   it initially follows the default A3S Code workspace shown in Settings, while
   an explicit Work “Switch workspace” choice is persisted as a user override.

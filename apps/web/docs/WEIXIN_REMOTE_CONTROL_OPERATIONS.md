@@ -1,7 +1,7 @@
 # WeChat Remote Management: Security, Operations, and Delivery
 
-**Status:** Disabled/mock Alpha requirements implemented; production review open
-**Last updated:** 2026-07-22
+**Status:** Built-in Boot protocol and read-only Alpha implemented; production review open
+**Last updated:** 2026-07-23
 **Parent:** [WeChat Remote Management: Product and Native Rust iLink Architecture](WEIXIN_REMOTE_CONTROL.md)
 
 This companion document defines the persistence, security, reliability,
@@ -121,8 +121,8 @@ of:
 - loopback binding plus same-origin/admin nonce protections; or
 - an authenticated HTTPS admin surface with Origin/CSRF protection.
 
-If neither is true, account binding and mutating scopes remain disabled even if
-iLink entitlement is valid.
+If neither is true, account binding and mutating scopes remain disabled even
+though the built-in iLink protocol is available.
 
 ## Reliability and failure recovery
 
@@ -273,7 +273,7 @@ processes. Tests must leave no state files, locks, tasks, or sockets behind.
 
 - Every connection state, QR expiry/countdown, verification challenge, and
   reconnect path.
-- Local exposure and entitlement blockers.
+- Local exposure, explicit channel-disable, and runtime-initialization blockers.
 - Scope defaults, dangerous-scope warnings, workspace alias editing, and exact
   remote-visible preview.
 - Token/identifier absence from rendered state, browser storage, and mocked
@@ -298,16 +298,19 @@ processes. Tests must leave no state files, locks, tasks, or sockets behind.
 The task-level sequence, dependencies, estimates, and merge order are defined
 in the [WeChat Remote Management Development Plan](WEIXIN_REMOTE_CONTROL_DEVELOPMENT_PLAN.md).
 
-### Phase 0 — entitlement and contract harness
+### Phase 0 — protocol contract and harness
 
-- Obtain Tencent authorization and protocol identifiers.
-- Record an architecture decision that A3S never impersonates OpenClaw.
+- Pin Tencent's published protocol identifiers and version evidence.
+- Record that fixed wire identity remains Tencent-compatible while
+  `bot_agent=A3S/<version>` identifies the host product.
 - Add Rust protocol DTOs, strict URL policy, synthetic fixtures, and a mock
   iLink server.
-- Add a disabled capability endpoint so the Web page can show the release gate.
+- Add a capability endpoint so the Web page can distinguish available,
+  explicitly disabled, and runtime-failed states.
 
-**Exit gate:** Tencent terms and identifiers are recorded; all protocol tests
-run without production traffic; no secret can appear in diagnostics.
+**Exit gate:** protocol provenance and identifiers are recorded; all automated
+protocol tests run without production traffic; no secret can appear in
+diagnostics.
 
 ### Phase 1 — native binding and monitor foundation
 
@@ -368,7 +371,8 @@ The initial product is complete only when:
 
 1. The Rust process alone performs QR binding, polling, parsing, sending,
    persistence, and shutdown; Node/OpenClaw is absent at build and runtime.
-2. A3S-specific entitlement is present and no OpenClaw identity is copied.
+2. Boot uses Tencent's published fixed iLink identity and A3S's own
+   `bot_agent`; no operator-supplied App ID is required.
 3. The browser can bind and diagnose the account without ever receiving a bot
    token, context token, owner ID, cursor, or authenticated base URL.
 4. Only the scanning owner’s direct text messages are processed.

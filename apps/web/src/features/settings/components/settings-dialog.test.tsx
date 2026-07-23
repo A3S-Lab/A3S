@@ -171,12 +171,11 @@ describe('SettingsDialog', () => {
     appState.settingsOpen = true;
     appState.weixinCapabilityStatus = 'unavailable';
     appState.weixinCapability = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       state: 'unavailable',
       protocolMode: 'disabled',
-      productionEntitled: false,
       supportedScopes: [],
-      releaseBlockers: [{ code: 'ilink_entitlement_missing', message: 'Entitlement required.' }],
+      releaseBlockers: [{ code: 'ilink_channel_disabled', message: 'Channel disabled.' }],
     };
     render(<SettingsDialog actions={actions} weixinActions={weixinActions} />);
 

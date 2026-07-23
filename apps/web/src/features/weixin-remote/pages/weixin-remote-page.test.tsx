@@ -7,10 +7,9 @@ import { createWeixinRemoteState } from '../weixin-remote-state';
 import { WeixinRemotePage } from './weixin-remote-page';
 
 const capability: WeixinCapability = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   state: 'unbound',
   protocolMode: 'mock',
-  productionEntitled: false,
   supportedScopes: [],
   releaseBlockers: [{ code: 'mock_runtime_only', message: 'Mock runtime only.' }],
 };
@@ -104,19 +103,19 @@ describe('WeixinRemotePage', () => {
     Object.assign(appState, createWeixinRemoteState());
   });
 
-  it('explains the entitlement gate without offering a QR action', () => {
+  it('explains an explicit local disable without offering a QR action', () => {
     appState.weixinCapabilityStatus = 'unavailable';
     appState.weixinCapability = {
       ...capability,
       state: 'unavailable',
       protocolMode: 'disabled',
-      releaseBlockers: [{ code: 'ilink_entitlement_missing', message: 'Entitlement required.' }],
+      releaseBlockers: [{ code: 'ilink_channel_disabled', message: 'Channel disabled.' }],
     };
 
     render(<WeixinRemotePage actions={actions()} />);
 
     expect(screen.getByRole('heading', { name: '微信渠道尚未就绪' })).toBeInTheDocument();
-    expect(screen.getByText('缺少 A3S 专属 iLink 授权。')).toBeInTheDocument();
+    expect(screen.getByText('微信渠道已在本机配置中显式关闭。')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '扫码绑定' })).not.toBeInTheDocument();
   });
 
@@ -127,7 +126,6 @@ describe('WeixinRemotePage', () => {
       weixinCapability: {
         ...capability,
         protocolMode: 'tencent',
-        productionEntitled: true,
         supportedScopes: ['agents.read', 'sessions.read'],
         releaseBlockers: [],
       },
