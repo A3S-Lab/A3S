@@ -219,7 +219,8 @@ entries.
 - assistant Markdown uses Streamdown streaming mode while pending and static
   mode after completion, with Chinese control text, light/dark Shiki themes,
   line-numbered code blocks, bounded scrolling, normalized embedded-HTML
-  indentation, and
+  indentation, repair for short model-generated table delimiter rows outside
+  fenced code, and
   document typography for headings, paragraphs, nested lists, task lists,
   quotations, tables, links, images, footnotes, and inline code;
 - `InstructionMessage` removes transport wrappers while retaining selected
@@ -257,8 +258,10 @@ stable Web interaction per tool identity.
 
 **Contract:** successful calls default to collapsed; running, failed, and HITL
 calls remain open. Full output stays available in a scrollable disclosure and
-is never permanently sliced. File-editing calls hand off to the Monaco review
-surface, with raw tool output remaining available as a secondary disclosure.
+is never permanently sliced. Successful file-editing calls render
+`ToolCallFileDiff` inline as a unified Diff with added/deleted counts, old/new
+line numbers, semantic red/green row backgrounds, and an explicit file-open
+action. Raw tool output remains available as a secondary disclosure.
 Running output follows its own bottom only until the reader scrolls away.
 Shell calls expose an exact, copyable command with semantic program, flag,
 string, path, variable, keyword, operator, redirection, number, and comment
@@ -307,19 +310,17 @@ invent progress.
 **Role:** keep the current plan, completion, elapsed time, and associated
 parallel subagents visible without turning the Composer into a status toolbar.
 
-**Contract:** positioned at the upper-right of the task surface. It appears
-immediately with a bounded startup state while the first session is being
-created, then follows analysis and planning before projecting a non-empty task
-list from `PlanningEnd` / `TaskUpdated` or a real subagent lifecycle. Startup
-never invents a plan row or subagent. Active-Conversation layout uses the
+**Contract:** positioned at the upper-right of the task surface. It appears only
+for an active planning phase, a non-empty task list from `PlanningEnd` /
+`TaskUpdated`, or a real subagent lifecycle. Ordinary session creation,
+analysis, goal timing, and streaming without those events do not render or
+reserve space for the panel. Active-Conversation layout uses the
 measured Conversation pane, not the global viewport. A pane at least 1600 px
 wide has enough natural right-side whitespace for the floating surface beside
 the centered content; the panel never reserves a side rail or changes the
 transcript and Composer centering. The first evidence in a turn, the first
 available plan, and a new failed or interrupted branch expand it automatically.
-Additional healthy branches respect a manual collapse and update in place. The
-pre-session preparation surface uses the same measured-width behavior and docks
-a collapsed tracker when a floating panel would cover the task prompt. A
+Additional healthy branches respect a manual collapse and update in place. A
 narrower pane, including Conversation beside Result Workspace, uses a docked
 summary between `TaskHeader` and the transcript. Compact detail never
 auto-expands and opens only from its trigger, so task attention cannot hide the
@@ -1057,10 +1058,11 @@ remain service-owned; the browser never publishes a learned asset.
 **Role:** expose shell-level preferences without replacing or unmounting the
 current Code surface.
 
-**Composition:** a quiet Settings navigation rail plus independent Account,
-General, Model & Provider, Agent & Execution, Context & Storage, Integrations,
-About & Updates, and searchable `HelpSettings` components. Help is a first-class
-tab at `#settings/help`, not a separate product page.
+**Composition:** a roomy Settings dialog with a quiet navigation rail plus
+independent Account, General, Model & Provider, Agent & Execution, Context &
+Storage, Integrations, Channels, About & Updates, and searchable `HelpSettings`
+components. Help is a first-class tab at `#settings/help`, not a separate
+product page.
 
 **Contracts:** actual service and OS configuration state is shown; account
 sign-in does not imply runtime tools are active; warnings and empty states are
@@ -1083,18 +1085,10 @@ Saving replaces the baseline only after the CLI returns the parsed
 authoritative configuration; failure retains the draft for retry.
 
 The Integrations view composes `SearchSettingsEditor`,
-`DocumentParserSettingsEditor`, `OomolConnectorSettings`, and
-`McpSettingsEditor`. `OomolConnectorSettings` projects one standard
-`streamable-http` MCP server named `oomol-connector`: hosted mode fixes the official
-OOMOL endpoint and stores a raw API-key authorization header, while self-hosted
-mode accepts the runtime endpoint and stores a Bearer runtime token. It keeps
-masked secrets opaque across reads and clears them when a deployment switch
-changes the required authorization scheme. The managed OOMOL entry is excluded
-from the generic MCP list so a newly entered key cannot be duplicated into a
-plain header field. A same-name legacy entry using another transport stays in
-the generic editor until the user renames or removes it, and invalid self-hosted
-endpoint URLs cannot be saved. Other MCP servers and Providers use
-independently collapsible editors and inline add/remove actions.
+`DocumentParserSettingsEditor`, and `McpSettingsEditor`. There is no dedicated
+connector component; custom hosted or self-managed endpoints are ordinary MCP
+server entries. Existing connector-named entries remain editable through the
+generic MCP editor.
 Advanced queue, model metadata, OCR, cache, transport, and OAuth fields stay in
 disclosures rather than competing with common settings.
 
@@ -1114,6 +1108,14 @@ Provider and model list identity is independent of editable names and IDs, so a
 keystroke cannot remount the editor, drop focus, or collapse the current
 disclosure. Category save state remains sticky and distinguishes synced,
 unsaved, saving, saved, and failed states locally.
+
+`ModelSettings` keeps one Provider list and one detail surface. The selected
+Provider exposes connection fields and its model catalog in sequence; default
+model selection stays visible, while runtime limits and uncommon model metadata
+remain secondary disclosures.
+
+`ChannelSettingsPage` keeps one compact channel list beside the selected
+channel content without adding a second framed workspace container.
 
 ### `HelpSettings`
 

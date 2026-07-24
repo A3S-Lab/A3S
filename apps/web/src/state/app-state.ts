@@ -18,6 +18,7 @@ import {
   type SettingsTab,
   settingsHashForTab,
 } from '../features/settings/settings-state';
+import { rememberTaskContextFocus, restoreTaskContextFocus } from '../features/tasks/task-context-focus';
 import {
   createTaskDraft,
   createTaskState,
@@ -28,7 +29,6 @@ import {
   type TaskState,
   taskDraftKey,
 } from '../features/tasks/task-state';
-import { rememberTaskContextFocus, restoreTaskContextFocus } from '../features/tasks/task-context-focus';
 import { createWeixinRemoteState, type WeixinRemoteState } from '../features/weixin-remote/weixin-remote-state';
 import {
   captureWorkspaceTaskSnapshot,
@@ -40,6 +40,7 @@ import {
   type WorkspaceState,
 } from '../features/workspace/workspace-state';
 import type { CodeSession } from '../types/api';
+
 export type { ProductId, TaskView, ThemePreference } from '../features/code/code-state';
 
 type AppState = CodeShellState &

@@ -34,8 +34,9 @@ by the
   plugin Market (A3S Use release bundles plus signed TUF sources), and Settings
   share the pinned bottom section.
   Remote messaging channels live behind one Settings → Channels entry rather
-  than occupying top-level product slots. The Channels page contains internal
-  WeChat and Feishu tabs; Feishu currently displays only “Coming soon”.
+  than occupying top-level product slots. The Channels page uses one compact
+  channel list and one detail surface; Feishu currently displays only “Coming
+  soon”.
   Research and Finance are not hardcoded entries.
 - A standalone, local-only Knowledge page lets users create, search, and pin
   personal knowledge bases; import Obsidian Vaults and other local folders; and
@@ -43,11 +44,12 @@ by the
   reading workspace. Import copies content into the managed workspace without
   changing the source folder. Market remains focused on signed Plugins and
   their verified Sources.
-- A single **Settings → Channels** page with internal WeChat and Feishu tabs.
-  The WeChat tab is backed only by the native Rust `WeixinModule` in A3S Boot.
+- A single **Settings → Channels** page with a left-aligned WeChat and Feishu
+  list, without a second framed workspace around the selected channel. WeChat
+  is backed only by the native Rust `WeixinModule` in A3S Boot.
   `#settings/channels/weixin` is the canonical route; the legacy
-  `#settings/weixin` and `#weixin` deep links open the same internal tab. The
-  Feishu tab is a “Coming soon” placeholder and performs no credential or
+  `#settings/weixin` and `#weixin` deep links open the same channel. The
+  Feishu channel is a “Coming soon” placeholder and performs no credential or
   network activity. The read-only Beta exposes
   truthful entitlement, binding, account, monitor, and
   bounded remote target state; covers mock-tested QR, verification,
@@ -373,19 +375,24 @@ by the
   lifecycle-aware Markdown reasoning, reader-controlled stream following, and
   CJK-aware, typographically tuned Streamdown/Shiki rendering for headings,
   lists, task lists, quotations, tables, links, images, footnotes, inline code,
-  and line-numbered code blocks. Its semantic tool timeline merges live events,
-  output, HITL decisions, and recovery into one execution block, with
+  and line-numbered code blocks. Model-generated tables with a short delimiter
+  row are repaired outside fenced code before rendering. Its semantic tool
+  timeline merges live events, output, HITL decisions, and recovery into one
+  execution block, with
   TUI-aligned command, JSON-argument, and generic tool-call syntax highlighting
   across persisted Web API aliases, working-directory context, live output
-  metrics, copy actions, and a compact tail preview after completion.
+  metrics, copy actions, and a compact tail preview after completion. Successful
+  file edits render an inline unified Diff with added/deleted counts, old/new
+  line numbers, and full red/green row backgrounds.
 - Visible task execution mode with a mode-specific icon, provider-tabbed model
   selection, an independent Effort slider with English values and Chinese
   guidance, task goal timing, context usage, manual context compaction, and an
-  upper-right task-runtime panel that appears as soon as task creation starts,
-  tracks startup, analysis, planning, and real subagent lifecycles, then shows
-  only the checklist, completion, elapsed time, and parallel work actually
-  published by the runtime. First submission locks its controls and shows
-  creating or queueing feedback before the initial API round trip completes.
+  upper-right task-runtime panel that appears only after real planning or
+  subagent evidence exists, then shows only the checklist, completion, elapsed
+  time, and parallel work actually published by the runtime. Ordinary session
+  startup never creates a progress panel. First submission locks its controls
+  and shows creating or queueing feedback before the initial API round trip
+  completes.
   Dedicated Use workers are identified by their observed standard MCP routes
   (`Use · Browser`, `Use · Office`, or multiple deduplicated routes), while
   their evidence uses readable domain actions instead of raw MCP tool names.
@@ -414,17 +421,16 @@ by the
   references, implementations, and the file outline.
 - Workspace-wide Git review with complete original/modified Monaco diff tabs,
   stage, unstage, and commit.
-- A complete local configuration center for A3S OS account and endpoint,
+- A larger, deliberately simple local configuration center for A3S OS account
+  and endpoint,
   runtime-detected Claude Code, Codex, and WorkBuddy account status and refresh,
   appearance, models and Providers, Agent execution and queues, session storage
   and memory policy, search and headless browsing, document/OCR parsing, MCP
-  transports and OAuth, and a first-class connector backed by either the OOMOL
-  hosted service or a self-hosted OpenConnector runtime. The setup keeps
-  its API key/runtime token masked, applies the transport-specific
-  authorization scheme, and links directly to the connector catalog, connection
-  console, and self-hosting guide. See
-  [Connector integration](docs/OOMOL_CONNECTOR.md). Settings also covers updates,
-  service information, and searchable Help.
+  transports, and OAuth. The dedicated connector setup has been removed; custom
+  endpoints remain regular MCP servers. Model and Provider settings use one
+  list/detail flow with the default model, connection, model catalog, and
+  advanced limits kept in a clear order. Settings also covers updates, service
+  information, and searchable Help.
   Categories load and save independently; effect labels distinguish new-task
   changes from restart-required changes, and secrets remain masked.
   Configuration rows use aligned controls and explicit units; editable Provider

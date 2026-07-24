@@ -137,7 +137,8 @@ tabs without writing them to disk.
   typography and spacing for headings, paragraphs, nested and task lists,
   quotes, links, tables, media, and inline code. Fenced code uses Shiki in light
   and dark themes, visible line numbers, bounded scrolling, and localized copy
-  controls.
+  controls. Repair a model-generated table delimiter with missing cells before
+  rendering, but never rewrite fenced code.
 - Create a semantic execution stream from messages, plans, merged tool
   lifecycle events, permissions, replies, verification, and artifact references.
 - Present shell tools as readable command lines with TUI-aligned token roles,
@@ -145,7 +146,8 @@ tabs without writing them to disk.
   count. Present generic tools with the same visual grammar and a compact
   typed-argument signature. Keep raw arguments and complete output available as
   secondary disclosures, and retain a concise output excerpt when a completed
-  call is collapsed.
+  call is collapsed. Render successful file edits as an inline unified Diff with
+  added/deleted counts, old/new line numbers, and full red/green row backgrounds.
 - Preserve selected Skill and workspace-file context in restored user
   instructions; Continue editing restores those resources with the text.
 - Anchor each assistant turn with a stable Code identity row, local pending
@@ -163,12 +165,10 @@ tabs without writing them to disk.
   English values and Chinese descriptions, goal state, context usage, and a
   directly adjacent manual compaction action.
 - Keep persisted live `/goal` duration as a passive footer status. Expose the
-  upper-right task-runtime floating panel immediately while the first task
-  session is being created, then keep it visible for analysis, planning, a
+  upper-right task-runtime floating panel only for an active planning phase, a
   non-empty plan, or a real subagent lifecycle. Project its checklist,
   completed/total state, elapsed time, and parallel subagent evidence without
-  invented plan rows. The pre-session surface is a truthful startup state, not
-  a synthetic plan. A wide Conversation reserves a
+  invented startup or analysis rows. A wide Conversation reserves a
   non-overlapping transcript rail and expands new runtime evidence there. A
   narrow Conversation or side-by-side Result Workspace uses a docked compact
   summary whose detail opens only on explicit request, while collapse never
@@ -176,6 +176,10 @@ tabs without writing them to disk.
   timestamps when volatile timing is unavailable.
 - Reflect model, Effort, execution-mode, HITL, cancellation, queue, and compact
   success through local state rather than redundant global success toasts.
+- Match TUI execution semantics: Plan is read-only and forces planning; Default
+  runs ordinary Bash through the managed local sandbox and asks only for a host
+  boundary crossing; Auto never opens HITL and denies escalation or Bash when
+  the sandbox is unavailable.
 
 Acceptance: live output never leaks across tasks; duplicate persisted and live
 tool blocks are removed; complete tool output remains available without
@@ -408,18 +412,15 @@ Git state is never labelled as selected-task provenance.
   runtime catalog sources, with model counts, truthful sign-in guidance, and one
   in-place refresh action. Do not infer account login from a configured
   Anthropic or OpenAI Provider.
-- Configure the default model, providers, model capabilities, runtime limits,
-  and locally held credentials.
+- Configure the default model, Providers, model capabilities, runtime limits,
+  and locally held credentials through one simple list/detail flow.
 - Configure Agent execution limits, Skill and Agent directories, automatic
   delegation, and optional Lane queue behavior.
 - Configure session storage, memory paths, relevance, extraction, and pruning.
 - Configure A3S OS address, Web search and headless browsing, document parsing,
   OCR, cache, MCP transports, environment, OAuth, and tool timeouts.
-- Configure the connector through either the OOMOL hosted MCP endpoint or a self-hosted
-  OpenConnector endpoint. Hosted authentication sends the OOMOL API key as the
-  raw `Authorization` value; self-hosted authentication sends the runtime token
-  as `Bearer <token>`. Existing secrets remain masked, and switching between
-  modes clears a server-held secret that cannot be transformed safely.
+- Manage messaging channels in one compact channel list and one unframed detail
+  surface.
 - Check and install updates from the About tab.
 - Surface catalog warnings, missing configuration, disconnected service, and
   update failures with a useful retry.
@@ -440,11 +441,9 @@ independently; a failed save preserves the local draft and authoritative saved
 state; secrets are masked and are never returned to the browser; effect labels
 distinguish new-task changes from restart-required changes; Help does not teach
 slash commands as the primary Web interaction; local account refresh failure
-retains the previous catalog and stays inline in the Account section. The
-connector setup produces a standard enabled `streamable-http` MCP server named
-`oomol-connector`, uses the documented endpoint and authorization format for the
-selected deployment, and makes the connector catalog, connection management, API-key,
-and self-hosting destinations explicit.
+retains the previous catalog and stays inline in the Account section. Custom
+MCP endpoints remain ordinary MCP server entries rather than a dedicated
+connector component.
 
 ## F10 — Memory exploration
 
