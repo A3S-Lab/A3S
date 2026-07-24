@@ -129,9 +129,10 @@ to loopback by default.
   and research tooling
 - **Isolated Workloads**: Run Linux OCI workloads through A3S Box's Docker-like
   MicroVM CLI on supported virtualization hosts
-- **Cross-Platform OCI Runtime Foundation**: Inspect versioned Windows WHPX
-  capability evidence and lifecycle contracts without overstating container
-  launch support; the current driver readiness is explicitly `probe-only`
+- **Cross-Platform OCI Runtime Foundation**: Inspect versioned native Linux,
+  Linux KVM, macOS HVF, and Windows WHPX host capability evidence and lifecycle
+  contracts without overstating container launch support; every current driver
+  remains explicitly `probe-only`
 - **Reproducible Evaluation**: Bind a Task, packaged Candidate adapter, and
   task-owned Judge into an identity-bound Bench result
 - **Typed Application Capabilities**: Automate built-in Browser and OCR domains
@@ -160,7 +161,7 @@ to loopback by default.
 | Research | A3S CLI, Code, Flow | `a3s code research` runs a bounded local retrieval-summary workflow and writes Markdown and HTML report artifacts | The explicit OS research mode is reserved but currently disabled; signed-in Runtime remains available to ordinary Code workflows |
 | Scientific packages | A3S Science | First-party scientific Skills, MCP data services, compute workflows, and research tooling | Package contracts and release cadence are owned by the independent Science repository |
 | Isolation | A3S Box | Docker-like lifecycle for Linux OCI workloads in per-workload MicroVMs | Requires a supported host and virtualization backend; CRI, TEE, and Windows paths retain platform-specific validation requirements |
-| OCI runtime foundation | A3S OCI Runtime | Versioned driver capability inventory, OCI create/start lifecycle state contract, and a real Windows WHPX partition-object smoke | Experimental: WHPX readiness is `probe-only`; it does not yet create or run OCI containers |
+| OCI runtime foundation | A3S OCI Runtime | Versioned driver inventory with native Linux namespace/cgroup v2, Linux KVM, macOS HVF, and Windows WHPX evidence, plus the OCI create/start lifecycle state contract | Experimental: every driver remains `probe-only`; host availability does not mean that OCI workloads can launch |
 | Evaluation | A3S Bench | Local Task/Candidate/Judge execution with immutable locks and results | The current local path requires Docker and produces `local_unofficial` results; official evaluation requires signed admission and matching Runtime evidence |
 | Application automation | A3S Use | Built-in Browser and local PP-OCRv6 domains plus schema-versioned external repository capabilities such as A3S Office | Domain availability depends on installed runtime/model assets; external packages declare host compatibility and keep their native CLI, standard MCP, and Skill contracts |
 | Search | A3S Search | Multi-engine aggregation, deduplication, consensus ranking, CLI output, and optional A3S Use browser rendering | Engines, proxies, and browser providers depend on network and local runtime availability |
@@ -682,7 +683,7 @@ version or release channel.
 | Project | Role |
 | --- | --- |
 | [A3S Runtime](crates/runtime/) | Provider-neutral finite Task and long-running Service contract, managed durability, and provider conformance support |
-| [A3S OCI Runtime](crates/oci-runtime/) | Experimental cross-platform Linux OCI runtime; the current Windows milestone provides honest WHPX capability and partition-object smoke evidence while workload launch remains disabled |
+| [A3S OCI Runtime](crates/oci-runtime/) | Experimental cross-platform Linux OCI runtime with independent native Linux, KVM, HVF, and WHPX host probes; every driver remains `probe-only` while workload launch is disabled |
 | [A3S Flow](crates/flow/) | Event-sourced durable workflow engine with replay-safe steps, waits, hooks, retries, workers, and optional SQL stores |
 | [A3S Event](crates/event/) | Provider-neutral event publish, subscribe, history, and persistence with in-memory and optional NATS support |
 | [A3S Lane](crates/lane/) | Priority-lane async command scheduling with bounded concurrency, retry, observability, and optional Redis jobs |
